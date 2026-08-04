@@ -1,0 +1,17 @@
+{
+  "name": "@xprtlink/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./config/*": "./config/*",
+    "./middleware/*": "./middleware/*",
+    "./utils/*": "./utils/*",
+    "./constants/*": "./constants/*"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0"
+  }
+}

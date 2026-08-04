@@ -1,0 +1,6 @@
+packages:
+  - services/*
+  - shared
+
+# No native build deps required for scaffold yet.
+allowBuilds: {}

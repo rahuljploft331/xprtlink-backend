@@ -1,0 +1,31 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / IDE
+.DS_Store
+.idea/
+.vscode/
+
+# Runtime
+.pm2/
+pids/
+*.pid
+
+# Secrets
+*.pem
+*.key
+credentials.json
+
+!logs/
+!logs/.gitkeep
