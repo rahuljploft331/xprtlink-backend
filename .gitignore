@@ -12,9 +12,10 @@ shared/generated/
 # Local seed file store
 seeder/.data/
 
-# Logs & runtime
-logs/*
-!logs/.gitkeep
+# Logs & runtime (PM2 writes here — never commit)
+logs/
+
+# Log files anywhere in the repo
 *.log
 npm-debug.log*
 pnpm-debug.log*
