@@ -1,17 +1,8 @@
 import { Router } from "express";
-import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import notificationsRoutes from "./notifications.routes.js";
 
 const router = Router();
 
-router.get("/", (_req, res) => {
-  return ResponseFormatter.success(res, {
-    message: "notification-service scaffold",
-    data: {
-      service: "notification-service",
-      status: "scaffold",
-      owns: ["push","in-app","email-triggers"],
-    },
-  });
-});
+router.use("/v1/notifications", notificationsRoutes);
 
 export default router;

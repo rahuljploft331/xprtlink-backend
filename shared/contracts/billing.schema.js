@@ -56,3 +56,12 @@ export const subscribeRequestSchema = z.object({
 export const payConsultationRequestSchema = z.object({
   paymentMethodId: z.string().uuid(),
 });
+
+export const addPaymentMethodRequestSchema = z.object({
+  stripePaymentMethodId: z.string().min(1).optional(),
+  brand: z.string().min(1).default("visa"),
+  last4: z.string().length(4).default("4242"),
+  expMonth: z.number().int().min(1).max(12).default(12),
+  expYear: z.number().int().default(new Date().getFullYear() + 3),
+  setDefault: z.boolean().optional(),
+});

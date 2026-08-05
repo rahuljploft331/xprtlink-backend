@@ -1,17 +1,6 @@
 import { Router } from "express";
-import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import catalogRoutes from "./catalog.routes.js";
 
 const router = Router();
-
-router.get("/", (_req, res) => {
-  return ResponseFormatter.success(res, {
-    message: "catalog-service scaffold",
-    data: {
-      service: "catalog-service",
-      status: "scaffold",
-      owns: ["categories","banners","cms"],
-    },
-  });
-});
-
+router.use("/v1/catalog", catalogRoutes);
 export default router;

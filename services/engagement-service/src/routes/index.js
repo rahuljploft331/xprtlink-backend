@@ -1,17 +1,14 @@
 import { Router } from "express";
-import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import quotesRoutes from "./quotes.routes.js";
+import consultationsRoutes from "./consultations.routes.js";
+import reviewsRoutes from "./reviews.routes.js";
+import reportsRoutes from "./reports.routes.js";
 
 const router = Router();
 
-router.get("/", (_req, res) => {
-  return ResponseFormatter.success(res, {
-    message: "engagement-service scaffold",
-    data: {
-      service: "engagement-service",
-      status: "scaffold",
-      owns: ["quotes","consultations","reviews-submit"],
-    },
-  });
-});
+router.use("/v1/engagement/quotes", quotesRoutes);
+router.use("/v1/engagement/consultations", consultationsRoutes);
+router.use("/v1/engagement/reviews", reviewsRoutes);
+router.use("/v1/engagement/reports", reportsRoutes);
 
 export default router;

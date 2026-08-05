@@ -1,17 +1,8 @@
 import { Router } from "express";
-import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import mediaRoutes from "./media.routes.js";
 
 const router = Router();
 
-router.get("/", (_req, res) => {
-  return ResponseFormatter.success(res, {
-    message: "media-service scaffold",
-    data: {
-      service: "media-service",
-      status: "scaffold",
-      owns: ["uploads","signed-urls"],
-    },
-  });
-});
+router.use("/v1/media", mediaRoutes);
 
 export default router;

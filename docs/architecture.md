@@ -20,7 +20,7 @@ Clients (Flutter / Admin)
         └── admin-service       super_admin + subadmins + reports
         │
         ├── @xprtlink/shared
-        └── DB / Redis — deferred
+        └── PostgreSQL (Prisma) — single shared DB, per-service pools
 ```
 
 ## Why no dedicated search-service?

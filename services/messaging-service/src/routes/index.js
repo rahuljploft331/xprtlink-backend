@@ -1,17 +1,8 @@
 import { Router } from "express";
-import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import messagingRoutes from "./messaging.routes.js";
 
 const router = Router();
 
-router.get("/", (_req, res) => {
-  return ResponseFormatter.success(res, {
-    message: "messaging-service scaffold",
-    data: {
-      service: "messaging-service",
-      status: "scaffold",
-      owns: ["conversations","messages","socket"],
-    },
-  });
-});
+router.use("/v1/messaging", messagingRoutes);
 
 export default router;

@@ -22,3 +22,7 @@ export const deviceTokenRequestSchema = z.object({
   token: z.string().min(1),
   platform: z.enum(["ios", "android", "web"]),
 });
+
+export const updateNotificationPreferencesRequestSchema = z.object({
+  preferences: z.record(z.boolean()),
+});

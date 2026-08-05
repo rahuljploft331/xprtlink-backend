@@ -1,17 +1,8 @@
 import { Router } from "express";
-import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import expertsRoutes from "./experts.routes.js";
+import searchRoutes from "./search.routes.js";
 
 const router = Router();
-
-router.get("/", (_req, res) => {
-  return ResponseFormatter.success(res, {
-    message: "expert-service scaffold",
-    data: {
-      service: "expert-service",
-      status: "scaffold",
-      owns: ["profiles","verification","availability","search"],
-    },
-  });
-});
-
+router.use("/v1/experts", expertsRoutes);
+router.use("/v1/search", searchRoutes);
 export default router;

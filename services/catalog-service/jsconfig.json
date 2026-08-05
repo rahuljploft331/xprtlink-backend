@@ -4,25 +4,24 @@
     "moduleResolution": "bundler",
     "target": "ES2022",
     "checkJs": false,
-    "baseUrl": ".",
     "paths": {
       "#controllers/*": [
-        "src/controllers/*"
+        "./src/controllers/*"
       ],
       "#routes/*": [
-        "src/routes/*"
+        "./src/routes/*"
       ],
       "#middlewares/*": [
-        "src/middlewares/*"
+        "./src/middlewares/*"
       ],
       "#validations/*": [
-        "src/validations/*"
+        "./src/validations/*"
       ],
       "#utils/*": [
-        "src/utils/*"
+        "./src/utils/*"
       ],
       "#services/*": [
-        "src/services/*"
+        "./src/services/*"
       ]
     }
   },
