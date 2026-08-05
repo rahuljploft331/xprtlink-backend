@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ES2022",
+    "checkJs": false,
+    "paths": {
+      "#controllers/*": [
+        "./src/controllers/*"
+      ],
+      "#routes/*": [
+        "./src/routes/*"
+      ],
+      "#middlewares/*": [
+        "./src/middlewares/*"
+      ],
+      "#validations/*": [
+        "./src/validations/*"
+      ],
+      "#utils/*": [
+        "./src/utils/*"
+      ],
+      "#services/*": [
+        "./src/services/*"
+      ]
+    }
+  },
+  "exclude": [
+    "node_modules"
+  ]
+}

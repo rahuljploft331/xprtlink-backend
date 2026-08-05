@@ -2,7 +2,7 @@
 
 Port: `4005`
 
-Scaffold only — add routes under `src/routes`, controllers under `src/controllers`.
+Conversations, chat messages, Socket.IO realtime.
 
-Health: `GET /health`
+Health: `GET /health`  
 API mount: `/api`

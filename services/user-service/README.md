@@ -2,7 +2,7 @@
 
 Port: `4001`
 
-Scaffold only — add routes under `src/routes`, controllers under `src/controllers`.
+Auth, customer profiles, shared identity. Experts live in expert-service after role selection.
 
-Health: `GET /health`
+Health: `GET /health`  
 API mount: `/api`

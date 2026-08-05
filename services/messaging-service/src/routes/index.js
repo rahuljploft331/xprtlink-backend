@@ -6,7 +6,11 @@ const router = Router();
 router.get("/", (_req, res) => {
   return ResponseFormatter.success(res, {
     message: "messaging-service scaffold",
-    data: { service: "messaging-service", status: "scaffold" },
+    data: {
+      service: "messaging-service",
+      status: "scaffold",
+      owns: ["conversations","messages","socket"],
+    },
   });
 });
 

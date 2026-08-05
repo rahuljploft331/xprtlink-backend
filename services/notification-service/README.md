@@ -1,8 +1,8 @@
 # Notification Service
 
-Port: `4009`
+Port: `4007`
 
-Scaffold only — add routes under `src/routes`, controllers under `src/controllers`.
+FCM push + in-app notifications + admin blasts.
 
-Health: `GET /health`
+Health: `GET /health`  
 API mount: `/api`

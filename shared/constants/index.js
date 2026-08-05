@@ -7,24 +7,59 @@ export const HTTP_STATUS = {
   INTERNAL_ERROR: 500,
 };
 
+/** Mobile / marketplace roles */
 export const ROLES = {
   CUSTOMER: "customer",
   EXPERT: "expert",
   ADMIN: "admin",
+  SUBADMIN: "subadmin",
 };
+
+/**
+ * Admin portal roles (RBAC-lite).
+ * - super_admin: full access
+ * - subadmin: page-level view | edit | none permissions
+ */
+export const ADMIN_ROLES = {
+  SUPER_ADMIN: "super_admin",
+  SUBADMIN: "subadmin",
+};
+
+export const ADMIN_PERMISSION_LEVELS = {
+  NONE: "none",
+  VIEW: "view",
+  EDIT: "edit",
+};
+
+/** Admin modules that can be gated for subadmins (align with admin sitemap). */
+export const ADMIN_MODULES = [
+  "dashboard",
+  "customers",
+  "experts",
+  "verifications",
+  "categories",
+  "consultations",
+  "quotes",
+  "payments",
+  "payouts",
+  "subscriptions",
+  "reviews",
+  "cms",
+  "notifications",
+  "reports",
+  "admins",
+  "settings",
+];
 
 export const SERVICE_NAMES = [
   "api-gateway",
   "user-service",
+  "expert-service",
   "catalog-service",
-  "search-service",
-  "quote-service",
+  "engagement-service",
   "messaging-service",
-  "consultation-service",
-  "payment-service",
-  "subscription-service",
+  "billing-service",
   "notification-service",
   "media-service",
   "admin-service",
-  "reporting-service",
 ];

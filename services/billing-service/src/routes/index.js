@@ -5,11 +5,11 @@ const router = Router();
 
 router.get("/", (_req, res) => {
   return ResponseFormatter.success(res, {
-    message: "api-gateway scaffold",
+    message: "billing-service scaffold",
     data: {
-      service: "api-gateway",
+      service: "billing-service",
       status: "scaffold",
-      owns: ["proxy","ingress"],
+      owns: ["payments","subscriptions","payouts","transactions"],
     },
   });
 });

@@ -1,8 +1,8 @@
 # Catalog Service
 
-Port: `4002`
+Port: `4003`
 
-Scaffold only — add routes under `src/routes`, controllers under `src/controllers`.
+Categories, banners, CMS pages for apps and marketing.
 
-Health: `GET /health`
+Health: `GET /health`  
 API mount: `/api`

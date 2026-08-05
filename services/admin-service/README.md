@@ -1,8 +1,8 @@
 # Admin Service
 
-Port: `4011`
+Port: `4009`
 
-Scaffold only — add routes under `src/routes`, controllers under `src/controllers`.
+Admin + **subadmin** RBAC, audit logs, dashboard aggregates / reports (reporting folded in).
 
-Health: `GET /health`
+Health: `GET /health`  
 API mount: `/api`

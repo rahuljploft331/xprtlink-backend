@@ -22,6 +22,9 @@ pnpm-debug.log*
 pids/
 *.pid
 
+# Seeder generated state
+seeder/.data/
+
 # Secrets
 *.pem
 *.key

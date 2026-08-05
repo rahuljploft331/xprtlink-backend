@@ -18,3 +18,4 @@ if (missing === 0) {
 }
 
 console.log("[env:check] DB / Redis not required yet — deferred");
+console.log("[env:check] tip: pnpm seed | pnpm reset  (seeder/.data file store; Mongo if MONGODB_URI set)");

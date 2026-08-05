@@ -2,35 +2,58 @@
 
 ## Layout
 
-- `services/<name>/` — one Express microservice each
-- `shared/` — `@xprtlink/shared` (config, middleware, utils, constants)
-- `ecosystem.config.cjs` — PM2 process list
-- Root `.env` injected by PM2 / dotenv-cli
+- `services/<name>/` — Express microservices (consolidated set — see README)
+- `shared/` — `@xprtlink/shared`
+- `ecosystem.config.cjs` — PM2
+- Root `.env` via PM2 / dotenv-cli
 
-## Ports
+## Service map (do not re-split without asking)
 
-See README. Gateway is `:4000`.
+| Service | Responsibility |
+|---------|----------------|
+| user-service | Auth + customers |
+| expert-service | Experts + verification + **search/discovery** |
+| catalog-service | Categories / CMS / banners |
+| engagement-service | Quotes + consultations |
+| messaging-service | Chat realtime |
+| billing-service | Stripe payments + IAP subscriptions + payouts |
+| notification-service | Push / in-app |
+| media-service | Uploads |
+| admin-service | Super admin + **subadmin RBAC** + reports + audit |
+| api-gateway | Ingress |
+
+## Admin / subadmin RBAC
+
+Constants: `ADMIN_ROLES`, `ADMIN_MODULES`, `ADMIN_PERMISSION_LEVELS` in `shared/constants/index.js`.
+
+- `super_admin` — full access
+- `subadmin` — per-module `view | edit | none` (MFS §12.11)
+- Admin UI must filter nav/routes by these permissions when auth is wired
 
 ## Adding a route
 
-1. Put handlers in `src/controllers/`
-2. Mount under `src/routes/index.js` at `/api`
-3. Use `ResponseFormatter` from `@xprtlink/shared/utils/responseFormatter.js`
-4. Keep gateway public paths as `/api/v1/<domain>/*` (proxy later)
-
-## Bootstrap pattern
-
-```js
-import { getConfig } from "@xprtlink/shared/config/loadEnv.js";
-import { createApp, startService } from "@xprtlink/shared/config/serviceTemplate.js";
-```
+1. Controllers in `src/controllers/`
+2. Mount under `src/routes` at `/api`
+3. `ResponseFormatter` from shared
+4. Public gateway paths: `/api/v1/<domain>/*`
 
 ## Do not (yet)
 
-- Add Mongo/Postgres/Redis models or connections (DB deferred)
-- Commit real secrets
-- Implement full business features unless asked
+- Full shared Mongoose models / Redis wiring into services
+- Commit secrets
+- Split billing/expert/search back into tiny services unless product asks
+
+## Seed & reset (local baseline)
+
+```bash
+pnpm seed          # write seeder/.data/seed-state.json (+ Mongo if MONGODB_URI set)
+pnpm reset         # wipe seed state then reseed — use whenever you want a clean backend demo
+pnpm reset -- --no-seed   # wipe only
+```
+
+Seed source: `seeder/data/*` · Guide: `seeder/README.md`  
+Includes super_admin + subadmin demo accounts.
 
 ## Secrets
 
-`getSecret` / `getSecretSync` in `shared/config/secrets.js` — env today, AWS Secrets Manager later.
+`getSecret` / `getSecretSync` — env today, AWS Secrets Manager later.

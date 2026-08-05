@@ -11,52 +11,48 @@ pnpm workspace of Express microservices for the XprtLink platform.
 
 **Database / Redis:** deferred — not wired in this scaffold.
 
-## Services & ports
+## Consolidated services (10)
 
-| Service | Port |
-|---------|------|
-| api-gateway | 4000 |
-| user-service | 4001 |
-| catalog-service | 4002 |
-| search-service | 4003 |
-| quote-service | 4004 |
-| messaging-service | 4005 |
-| consultation-service | 4006 |
-| payment-service | 4007 |
-| subscription-service | 4008 |
-| notification-service | 4009 |
-| media-service | 4010 |
-| admin-service | 4011 |
-| reporting-service | 4012 |
+| Service | Port | Owns |
+|---------|------|------|
+| api-gateway | 4000 | Ingress / proxy |
+| user-service | 4001 | Auth, customers, shared identity |
+| expert-service | 4002 | Expert profiles, verification, availability, **search/discovery** |
+| catalog-service | 4003 | Categories, banners, CMS |
+| engagement-service | 4004 | Quotes + consultations (+ review submit) |
+| messaging-service | 4005 | Chat / Socket.IO |
+| billing-service | 4006 | Payments + subscriptions + payouts |
+| notification-service | 4007 | Push / in-app / blasts |
+| media-service | 4008 | S3 signed uploads |
+| admin-service | 4009 | Super admin + **subadmins** (RBAC), audit, reports |
+
+### Merges vs earlier scaffold
+
+- `search-service` → **expert-service** (discovery is expert ranking/filters)
+- `payment-service` + `subscription-service` → **billing-service**
+- `quote-service` + `consultation-service` → **engagement-service**
+- `reporting-service` → **admin-service**
 
 ## Setup
 
 ```bash
 cp .env.example .env
 pnpm install
+pnpm seed            # demo baseline (admins, customers, experts, categories…)
 pnpm pm2:start
-# or: pnpm --filter @xprtlink/user-service dev
 ```
 
-Health check example:
+### Reset anytime
 
 ```bash
-curl http://localhost:4001/health
+pnpm reset           # wipe local seed (+ Mongo if configured) and reseed
+pnpm pm2:restart     # optional — reload services after reset
 ```
 
-## Scripts
-
-| Script | Description |
-|--------|-------------|
-| `pnpm pm2:start` | Start all services via PM2 |
-| `pnpm pm2:stop` | Stop all |
-| `pnpm pm2:restart` | Restart all |
-| `pnpm pm2:logs` | Tail logs |
-| `pnpm pm2:status` | Status |
-| `pnpm env:check` | Soft env validation |
+See [`seeder/README.md`](./seeder/README.md).
 
 ## Secrets
 
-Use `.env` locally. `shared/config/secrets.js` is the abstraction point for a future **AWS Secrets Manager** migration.
+Use `.env` locally. `shared/config/secrets.js` is the abstraction for a future **AWS Secrets Manager** migration.
 
-See [AGENTS.md](./AGENTS.md) for conventions.
+See [AGENTS.md](./AGENTS.md).

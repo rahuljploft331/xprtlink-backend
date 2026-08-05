@@ -2,7 +2,7 @@
 
 Port: `4000`
 
-Scaffold only — add routes under `src/routes`, controllers under `src/controllers`.
+HTTP ingress and /api/v1/* path rewrite to downstream services.
 
-Health: `GET /health`
+Health: `GET /health`  
 API mount: `/api`

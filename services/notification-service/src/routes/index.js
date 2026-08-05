@@ -6,7 +6,11 @@ const router = Router();
 router.get("/", (_req, res) => {
   return ResponseFormatter.success(res, {
     message: "notification-service scaffold",
-    data: { service: "notification-service", status: "scaffold" },
+    data: {
+      service: "notification-service",
+      status: "scaffold",
+      owns: ["push","in-app","email-triggers"],
+    },
   });
 });
 

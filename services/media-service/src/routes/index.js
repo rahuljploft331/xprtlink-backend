@@ -6,7 +6,11 @@ const router = Router();
 router.get("/", (_req, res) => {
   return ResponseFormatter.success(res, {
     message: "media-service scaffold",
-    data: { service: "media-service", status: "scaffold" },
+    data: {
+      service: "media-service",
+      status: "scaffold",
+      owns: ["uploads","signed-urls"],
+    },
   });
 });
 

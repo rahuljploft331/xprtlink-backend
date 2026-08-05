@@ -1,8 +1,8 @@
 # Media Service
 
-Port: `4010`
+Port: `4008`
 
-Scaffold only — add routes under `src/routes`, controllers under `src/controllers`.
+S3 signed uploads for profiles, IDs, quote/chat media.
 
-Health: `GET /health`
+Health: `GET /health`  
 API mount: `/api`
