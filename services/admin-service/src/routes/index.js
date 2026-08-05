@@ -1,5 +1,6 @@
 import { Router } from "express";
 import authRoutes from "./auth.routes.js";
+import searchRoutes from "./search.routes.js";
 import dashboardRoutes from "./dashboard.routes.js";
 import customersRoutes from "./customers.routes.js";
 import expertsRoutes from "./experts.routes.js";
@@ -21,6 +22,7 @@ const router = Router();
 router.use("/auth", authRoutes);
 
 /* ── Protected domain routes ────────────────────────── */
+router.use("/search", searchRoutes);
 router.use("/dashboard", dashboardRoutes);
 router.use("/customers", customersRoutes);
 router.use("/experts", expertsRoutes);
