@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Reset backend seed data: clear local seed state (+ optional Mongo) then reseed.
+ * Reset backend seed data: clear local seed state + PostgreSQL then reseed.
  *
  * Usage:
  *   pnpm reset
@@ -12,11 +12,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { buildSeedPayload } from "../seeder/index.js";
+import { closePostgres, resetPostgres, seedPostgres } from "../seeder/lib/pg.js";
 import {
   clearSeedState,
-  dropMongoSeedCollectionsIfConfigured,
   getStatePath,
-  seedMongoIfConfigured,
   writeSeedState,
 } from "../seeder/lib/store.js";
 
@@ -30,16 +29,16 @@ async function main() {
   clearSeedState();
   console.log(`[reset] cleared ${getStatePath()}`);
 
-  const dropped = await dropMongoSeedCollectionsIfConfigured();
-  if (dropped.skipped) {
-    console.log(`[reset] mongo: skipped (${dropped.reason})`);
+  if (!process.env.DATABASE_URL) {
+    console.log("[reset] postgres: skipped (DATABASE_URL not set)");
   } else {
-    console.log(
-      `[reset] mongo: dropped collections in db=${dropped.database}`
-    );
+    console.log("[reset] truncating postgres tables…");
+    await resetPostgres();
+    console.log("[reset] postgres: truncated");
   }
 
   if (noSeed) {
+    if (process.env.DATABASE_URL) await closePostgres();
     console.log("[reset] wipe-only complete (--no-seed)");
     return;
   }
@@ -47,11 +46,13 @@ async function main() {
   console.log("[reset] reseeding…");
   const payload = buildSeedPayload();
   writeSeedState(payload);
-  const mongo = await seedMongoIfConfigured(payload);
-  if (mongo.skipped) {
-    console.log(`[reset] mongo seed: skipped (${mongo.reason})`);
+
+  if (process.env.DATABASE_URL) {
+    const pg = await seedPostgres(payload);
+    console.log(`[reset] postgres seed: ${JSON.stringify(pg.counts)}`);
+    await closePostgres();
   } else {
-    console.log(`[reset] mongo seed: db=${mongo.database}`);
+    console.log("[reset] postgres seed: skipped (DATABASE_URL not set)");
   }
 
   console.log("[reset] done — backend seed restored to demo baseline");

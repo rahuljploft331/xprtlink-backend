@@ -9,7 +9,7 @@ import {
 } from "./data/platform.js";
 
 /**
- * Canonical seed payload for local reset / future Mongo import.
+ * Canonical seed payload for local reset / PostgreSQL import.
  */
 export function buildSeedPayload() {
   const seededAt = new Date().toISOString();

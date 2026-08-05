@@ -1,0 +1,949 @@
+// XprtLink production schema — single shared PostgreSQL database.
+// All services connect via separate pools (see shared/db/getClient.js).
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum UserStatus {
+  active
+  suspended
+  deleted
+
+  @@map("user_status")
+}
+
+enum AvailabilityStatus {
+  online
+  offline
+  busy
+
+  @@map("availability_status")
+}
+
+enum VerificationStatus {
+  unverified
+  pending
+  approved
+  rejected
+  resubmit_required
+
+  @@map("verification_status")
+}
+
+enum CmsPageStatus {
+  draft
+  published
+
+  @@map("cms_page_status")
+}
+
+enum VisibilityBoost {
+  listing
+  top_25
+  top_5
+
+  @@map("visibility_boost")
+}
+
+enum QuoteStatus {
+  draft
+  submitted
+  pending_expert_review
+  quoted
+  accepted
+  rejected
+  expired
+  cancelled
+
+  @@map("quote_status")
+}
+
+enum ConsultationStatus {
+  requested
+  ringing
+  accepted
+  in_progress
+  completed
+  declined
+  cancelled
+  failed
+
+  @@map("consultation_status")
+}
+
+enum ConsultationBillingStatus {
+  pending
+  charged
+  failed
+  refunded
+
+  @@map("consultation_billing_status")
+}
+
+enum ReviewStatus {
+  published
+  hidden
+  flagged
+
+  @@map("review_status")
+}
+
+enum ExpertReportStatus {
+  open
+  reviewing
+  resolved
+  dismissed
+
+  @@map("expert_report_status")
+}
+
+enum MessageType {
+  text
+  attachment
+
+  @@map("message_type")
+}
+
+enum MessageDeliveryStatus {
+  sent
+  delivered
+  read
+  failed
+
+  @@map("message_delivery_status")
+}
+
+enum MediaPurpose {
+  avatar
+  quote_attachment
+  chat_attachment
+  verification_doc
+
+  @@map("media_purpose")
+}
+
+enum MediaStatus {
+  pending_upload
+  ready
+  deleted
+
+  @@map("media_status")
+}
+
+enum VerificationDocType {
+  government_id
+  credential
+  other
+
+  @@map("verification_doc_type")
+}
+
+enum TransactionType {
+  consultation_charge
+  subscription
+  refund
+
+  @@map("transaction_type")
+}
+
+enum TransactionStatus {
+  pending
+  succeeded
+  failed
+  refunded
+
+  @@map("transaction_status")
+}
+
+enum SubscriptionStore {
+  apple
+  google
+
+  @@map("subscription_store")
+}
+
+enum ExpertSubscriptionStatus {
+  active
+  expired
+  cancelled
+  grace_period
+
+  @@map("expert_subscription_status")
+}
+
+enum PayoutStatus {
+  pending
+  processing
+  paid
+  failed
+
+  @@map("payout_status")
+}
+
+enum OtpPurpose {
+  register
+  reset_password
+  verify_email
+  verify_phone
+
+  @@map("otp_purpose")
+}
+
+enum DevicePlatform {
+  ios
+  android
+  web
+
+  @@map("device_platform")
+}
+
+enum AdminUserStatus {
+  active
+  suspended
+
+  @@map("admin_user_status")
+}
+
+enum AdminRole {
+  super_admin
+  subadmin
+
+  @@map("admin_role")
+}
+
+enum AdminPermissionLevel {
+  none
+  view
+  edit
+
+  @@map("admin_permission_level")
+}
+
+// ─── Identity (user-service) ─────────────────────────────────────────────────
+
+model User {
+  id               String     @id @default(uuid()) @db.Uuid
+  email            String?    @unique @db.VarChar(320)
+  phone            String?    @unique @db.VarChar(32)
+  passwordHash     String?    @map("password_hash") @db.VarChar(255)
+  firebaseUid      String?    @unique @map("firebase_uid") @db.VarChar(128)
+  emailVerifiedAt  DateTime?  @map("email_verified_at") @db.Timestamptz(6)
+  phoneVerifiedAt  DateTime?  @map("phone_verified_at") @db.Timestamptz(6)
+  status           UserStatus @default(active)
+  deletedAt        DateTime?  @map("deleted_at") @db.Timestamptz(6)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customerProfile  CustomerProfile?
+  expertProfile    ExpertProfile?
+  refreshTokens    RefreshToken[]
+  authSessions     AuthSession[]
+  otpChallenges    OtpChallenge[]
+  deviceTokens     DeviceToken[]
+  mediaAssets      MediaAsset[]
+  notifications    Notification[]
+  notificationPref NotificationPreference?
+  messagesSent     Message[]              @relation("MessageSender")
+  conversationReads ConversationReadState[]
+  quoteStatusEvents QuoteStatusEvent[]   @relation("QuoteStatusActor")
+
+  @@index([status])
+  @@map("users")
+}
+
+model CustomerProfile {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  firstName       String   @map("first_name") @db.VarChar(100)
+  lastName        String   @map("last_name") @db.VarChar(100)
+  avatarMediaId   String?  @map("avatar_media_id") @db.Uuid
+  preferences     Json     @default("{}")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  avatarMedia     MediaAsset? @relation("CustomerAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
+  savedExperts    CustomerSavedExpert[]
+  recentlyViewed  CustomerRecentlyViewed[]
+  quoteRequests   QuoteRequest[]
+  consultations   Consultation[]
+  conversations   Conversation[]
+  paymentMethods  PaymentMethod[]
+  expertReports   ExpertReport[]
+  reviews         Review[]
+
+  @@map("customer_profiles")
+}
+
+model RefreshToken {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  tokenHash   String    @map("token_hash") @db.VarChar(255)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+model AuthSession {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  userAgent   String?   @map("user_agent") @db.VarChar(512)
+  ipAddress   String?   @map("ip_address") @db.VarChar(45)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_sessions")
+}
+
+model OtpChallenge {
+  id          String     @id @default(uuid()) @db.Uuid
+  userId      String?    @map("user_id") @db.Uuid
+  email       String?    @db.VarChar(320)
+  phone       String?    @db.VarChar(32)
+  codeHash    String     @map("code_hash") @db.VarChar(255)
+  purpose     OtpPurpose
+  expiresAt   DateTime   @map("expires_at") @db.Timestamptz(6)
+  consumedAt  DateTime?  @map("consumed_at") @db.Timestamptz(6)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([phone])
+  @@index([expiresAt])
+  @@map("otp_challenges")
+}
+
+model DeviceToken {
+  id          String         @id @default(uuid()) @db.Uuid
+  userId      String         @map("user_id") @db.Uuid
+  platform    DevicePlatform
+  token       String         @db.VarChar(512)
+  lastSeenAt  DateTime       @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, token])
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+model CustomerSavedExpert {
+  id                String          @id @default(uuid()) @db.Uuid
+  customerProfileId String          @map("customer_profile_id") @db.Uuid
+  expertProfileId   String          @map("expert_profile_id") @db.Uuid
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  customer          CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  expert            ExpertProfile   @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([customerProfileId, expertProfileId])
+  @@index([customerProfileId])
+  @@map("customer_saved_experts")
+}
+
+model CustomerRecentlyViewed {
+  id                String          @id @default(uuid()) @db.Uuid
+  customerProfileId String          @map("customer_profile_id") @db.Uuid
+  expertProfileId   String          @map("expert_profile_id") @db.Uuid
+  viewedAt          DateTime        @default(now()) @map("viewed_at") @db.Timestamptz(6)
+
+  customer          CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  expert            ExpertProfile   @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([customerProfileId, expertProfileId])
+  @@index([customerProfileId, viewedAt(sort: Desc)])
+  @@map("customer_recently_viewed")
+}
+
+// ─── Catalog (catalog-service) ───────────────────────────────────────────────
+
+model Category {
+  id        String   @id @default(uuid()) @db.Uuid
+  slug      String   @unique @db.VarChar(64)
+  name      String   @db.VarChar(120)
+  sortOrder Int      @default(0) @map("sort_order")
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  experts   ExpertProfile[]
+
+  @@index([isActive, sortOrder])
+  @@map("categories")
+}
+
+model CmsPage {
+  id              String        @id @default(uuid()) @db.Uuid
+  slug            String        @unique @db.VarChar(64)
+  title           String        @db.VarChar(200)
+  bodyHtml        String        @default("") @map("body_html")
+  status          CmsPageStatus @default(draft)
+  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(6)
+  updatedByAdminId String?      @map("updated_by_admin_id") @db.Uuid
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  updatedByAdmin  AdminUser?    @relation(fields: [updatedByAdminId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@map("cms_pages")
+}
+
+model PlatformSetting {
+  id        String   @id @default(uuid()) @db.Uuid
+  key       String   @unique @db.VarChar(64)
+  value     Json
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("platform_settings")
+}
+
+model AppConfig {
+  id                 String   @id @default(uuid()) @db.Uuid
+  minAppVersion      String   @map("min_app_version") @db.VarChar(32)
+  forceUpdate        Boolean  @default(false) @map("force_update")
+  maintenanceMessage String?  @map("maintenance_message")
+  updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("app_config")
+}
+
+model SubscriptionPlan {
+  id                 String          @id @default(uuid()) @db.Uuid
+  code               String          @unique @db.VarChar(32)
+  name               String          @db.VarChar(120)
+  priceMonthlyCents  Int             @map("price_monthly_cents")
+  visibilityBoost    VisibilityBoost @map("visibility_boost")
+  isActive           Boolean         @default(true) @map("is_active")
+  createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  subscriptions      ExpertSubscription[]
+
+  @@map("subscription_plans")
+}
+
+// ─── Experts (expert-service) ───────────────────────────────────────────────
+
+model ExpertProfile {
+  id                    String             @id @default(uuid()) @db.Uuid
+  userId                String             @unique @map("user_id") @db.Uuid
+  categoryId            String             @map("category_id") @db.Uuid
+  firstName             String             @map("first_name") @db.VarChar(100)
+  lastName              String             @map("last_name") @db.VarChar(100)
+  headline              String?            @db.VarChar(200)
+  bio                   String?
+  consultationRateCents Int                @map("consultation_rate_cents")
+  currency              String             @default("USD") @db.Char(3)
+  experienceYears       Int                @default(0) @map("experience_years")
+  availabilityStatus    AvailabilityStatus @default(offline) @map("availability_status")
+  verificationStatus    VerificationStatus @default(unverified) @map("verification_status")
+  onboardingStep        Int                @default(0) @map("onboarding_step")
+  onboardingCompletedAt DateTime?          @map("onboarding_completed_at") @db.Timestamptz(6)
+  foundingMember        Boolean            @default(false) @map("founding_member")
+  ratingAvg             Decimal            @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount           Int                @default(0) @map("rating_count")
+  searchEligible        Boolean            @default(false) @map("search_eligible")
+  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category              Category           @relation(fields: [categoryId], references: [id])
+  settings              ExpertSettings?
+  verifications         ExpertVerification[]
+  availabilityLogs      ExpertAvailabilityLog[]
+  subscriptions         ExpertSubscription[]
+  savedByCustomers      CustomerSavedExpert[]
+  recentlyViewedBy      CustomerRecentlyViewed[]
+  quoteRequests         QuoteRequest[]
+  consultations         Consultation[]
+  conversations         Conversation[]
+  reviews               Review[]
+  reports               ExpertReport[]
+  payouts               ExpertPayout[]
+  earningsLedger        ExpertEarningsLedger[]
+
+  @@index([categoryId])
+  @@index([verificationStatus])
+  @@index([availabilityStatus])
+  @@index([searchEligible])
+  @@map("expert_profiles")
+}
+
+model ExpertSettings {
+  id              String        @id @default(uuid()) @db.Uuid
+  expertProfileId String        @unique @map("expert_profile_id") @db.Uuid
+  preferences     Json          @default("{}")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  expert          ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+
+  @@map("expert_settings")
+}
+
+model ExpertVerification {
+  id              String             @id @default(uuid()) @db.Uuid
+  expertProfileId String             @map("expert_profile_id") @db.Uuid
+  status          VerificationStatus @default(pending)
+  submittedAt     DateTime           @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  reviewedAt      DateTime?          @map("reviewed_at") @db.Timestamptz(6)
+  reviewNotes     String?            @map("review_notes")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  expert          ExpertProfile      @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  documents       ExpertVerificationDocument[]
+
+  @@index([expertProfileId])
+  @@index([status])
+  @@map("expert_verifications")
+}
+
+model ExpertVerificationDocument {
+  id               String              @id @default(uuid()) @db.Uuid
+  verificationId   String              @map("verification_id") @db.Uuid
+  mediaId          String              @map("media_id") @db.Uuid
+  docType          VerificationDocType @map("doc_type")
+  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  verification     ExpertVerification  @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  media            MediaAsset          @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+
+  @@index([verificationId])
+  @@map("expert_verification_documents")
+}
+
+model ExpertAvailabilityLog {
+  id                String             @id @default(uuid()) @db.Uuid
+  expertProfileId   String             @map("expert_profile_id") @db.Uuid
+  fromStatus        AvailabilityStatus @map("from_status")
+  toStatus          AvailabilityStatus @map("to_status")
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  expert            ExpertProfile      @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+
+  @@index([expertProfileId, createdAt(sort: Desc)])
+  @@map("expert_availability_logs")
+}
+
+// ─── Engagement (engagement-service) ─────────────────────────────────────────
+
+model QuoteRequest {
+  id                     String      @id @default(uuid()) @db.Uuid
+  customerId             String      @map("customer_id") @db.Uuid
+  expertId               String      @map("expert_id") @db.Uuid
+  title                  String      @db.VarChar(200)
+  description            String
+  budgetCents            Int?        @map("budget_cents")
+  status                 QuoteStatus @default(draft)
+  expertQuoteAmountCents Int?        @map("expert_quote_amount_cents")
+  expertQuoteNotes       String?     @map("expert_quote_notes")
+  expiresAt              DateTime?   @map("expires_at") @db.Timestamptz(6)
+  submittedAt            DateTime?   @map("submitted_at") @db.Timestamptz(6)
+  quotedAt               DateTime?   @map("quoted_at") @db.Timestamptz(6)
+  resolvedAt             DateTime?   @map("resolved_at") @db.Timestamptz(6)
+  createdAt              DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customer               CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  expert                 ExpertProfile   @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  statusEvents           QuoteStatusEvent[]
+  attachments            QuoteAttachment[]
+
+  @@index([customerId])
+  @@index([expertId])
+  @@index([status])
+  @@map("quote_requests")
+}
+
+model QuoteStatusEvent {
+  id          String       @id @default(uuid()) @db.Uuid
+  quoteId     String       @map("quote_id") @db.Uuid
+  fromStatus  QuoteStatus? @map("from_status")
+  toStatus    QuoteStatus  @map("to_status")
+  actorUserId String?      @map("actor_user_id") @db.Uuid
+  note        String?
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  quote       QuoteRequest @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  actor       User?        @relation("QuoteStatusActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([quoteId, createdAt])
+  @@map("quote_status_events")
+}
+
+model QuoteAttachment {
+  id        String       @id @default(uuid()) @db.Uuid
+  quoteId   String       @map("quote_id") @db.Uuid
+  mediaId   String       @map("media_id") @db.Uuid
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  quote     QuoteRequest @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  media     MediaAsset   @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+
+  @@unique([quoteId, mediaId])
+  @@map("quote_attachments")
+}
+
+model Consultation {
+  id                  String                    @id @default(uuid()) @db.Uuid
+  customerId          String                    @map("customer_id") @db.Uuid
+  expertId            String                    @map("expert_id") @db.Uuid
+  status              ConsultationStatus        @default(requested)
+  ratePerMinuteCents  Int                       @map("rate_per_minute_cents")
+  requestedAt         DateTime                  @default(now()) @map("requested_at") @db.Timestamptz(6)
+  acceptedAt          DateTime?                 @map("accepted_at") @db.Timestamptz(6)
+  startedAt           DateTime?                 @map("started_at") @db.Timestamptz(6)
+  endedAt             DateTime?                 @map("ended_at") @db.Timestamptz(6)
+  durationSeconds     Int?                      @map("duration_seconds")
+  zegoRoomId          String?                   @map("zego_room_id") @db.VarChar(128)
+  billingStatus       ConsultationBillingStatus @default(pending) @map("billing_status")
+  createdAt           DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customer            CustomerProfile           @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  expert              ExpertProfile             @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  review              Review?
+  charge              ConsultationCharge?
+  earningsLedger      ExpertEarningsLedger[]
+
+  @@index([customerId])
+  @@index([expertId])
+  @@index([status])
+  @@map("consultations")
+}
+
+model Review {
+  id              String       @id @default(uuid()) @db.Uuid
+  consultationId  String       @unique @map("consultation_id") @db.Uuid
+  customerId      String       @map("customer_id") @db.Uuid
+  expertId        String       @map("expert_id") @db.Uuid
+  rating          Int
+  comment         String?
+  status          ReviewStatus @default(published)
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  consultation    Consultation    @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  customer        CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  expert          ExpertProfile   @relation(fields: [expertId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([expertId])
+  @@index([rating])
+  @@map("reviews")
+}
+
+model ExpertReport {
+  id              String             @id @default(uuid()) @db.Uuid
+  customerId      String             @map("customer_id") @db.Uuid
+  expertId        String             @map("expert_id") @db.Uuid
+  reason          String             @db.VarChar(120)
+  details         String?
+  status          ExpertReportStatus @default(open)
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customer        CustomerProfile    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  expert          ExpertProfile      @relation(fields: [expertId], references: [id], onDelete: Cascade)
+
+  @@index([expertId])
+  @@index([status])
+  @@map("expert_reports")
+}
+
+// ─── Messaging (messaging-service) ───────────────────────────────────────────
+
+model Conversation {
+  id              String    @id @default(uuid()) @db.Uuid
+  customerId      String    @map("customer_id") @db.Uuid
+  expertId        String    @map("expert_id") @db.Uuid
+  lastMessageAt   DateTime? @map("last_message_at") @db.Timestamptz(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  customer        CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  expert          ExpertProfile   @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  messages        Message[]
+  readStates      ConversationReadState[]
+
+  @@unique([customerId, expertId])
+  @@index([lastMessageAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model Message {
+  id               String                @id @default(uuid()) @db.Uuid
+  conversationId   String                @map("conversation_id") @db.Uuid
+  senderUserId     String                @map("sender_user_id") @db.Uuid
+  body             String?
+  type             MessageType           @default(text)
+  deliveryStatus   MessageDeliveryStatus @default(sent) @map("delivery_status")
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  conversation     Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender           User                  @relation("MessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+  attachments      MessageAttachment[]
+  readStates       ConversationReadState[] @relation("LastReadMessage")
+
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id        String   @id @default(uuid()) @db.Uuid
+  messageId String   @map("message_id") @db.Uuid
+  mediaId   String   @map("media_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  message   Message    @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  media     MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+
+  @@unique([messageId, mediaId])
+  @@map("message_attachments")
+}
+
+model ConversationReadState {
+  id                 String       @id @default(uuid()) @db.Uuid
+  conversationId     String       @map("conversation_id") @db.Uuid
+  userId             String       @map("user_id") @db.Uuid
+  lastReadMessageId  String?      @map("last_read_message_id") @db.Uuid
+  readAt             DateTime     @default(now()) @map("read_at") @db.Timestamptz(6)
+
+  conversation       Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadMessage    Message?     @relation("LastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, userId])
+  @@map("conversation_read_states")
+}
+
+// ─── Media (media-service) ───────────────────────────────────────────────────
+
+model MediaAsset {
+  id          String       @id @default(uuid()) @db.Uuid
+  ownerUserId String       @map("owner_user_id") @db.Uuid
+  purpose     MediaPurpose
+  storageKey  String       @map("storage_key") @db.VarChar(512)
+  mimeType    String       @map("mime_type") @db.VarChar(128)
+  sizeBytes   Int          @map("size_bytes")
+  status      MediaStatus  @default(pending_upload)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner       User         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  customerAvatars CustomerProfile[] @relation("CustomerAvatar")
+  quoteAttachments QuoteAttachment[]
+  messageAttachments MessageAttachment[]
+  verificationDocuments ExpertVerificationDocument[]
+
+  @@index([ownerUserId])
+  @@index([status])
+  @@map("media_assets")
+}
+
+// ─── Billing (billing-service) ───────────────────────────────────────────────
+
+model PaymentMethod {
+  id                    String          @id @default(uuid()) @db.Uuid
+  customerProfileId     String          @map("customer_profile_id") @db.Uuid
+  stripePaymentMethodId String          @unique @map("stripe_payment_method_id") @db.VarChar(128)
+  brand                 String          @db.VarChar(32)
+  last4                 String          @db.Char(4)
+  expMonth              Int             @map("exp_month")
+  expYear               Int             @map("exp_year")
+  isDefault             Boolean         @default(false) @map("is_default")
+  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  customer              CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+
+  @@index([customerProfileId])
+  @@map("payment_methods")
+}
+
+model Transaction {
+  id                    String            @id @default(uuid()) @db.Uuid
+  type                  TransactionType
+  amountCents           Int               @map("amount_cents")
+  currency              String            @default("USD") @db.Char(3)
+  status                TransactionStatus @default(pending)
+  stripePaymentIntentId String?           @map("stripe_payment_intent_id") @db.VarChar(128)
+  metadata              Json              @default("{}")
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  consultationCharge    ConsultationCharge?
+
+  @@index([status])
+  @@index([type])
+  @@map("transactions")
+}
+
+model ConsultationCharge {
+  id              String       @id @default(uuid()) @db.Uuid
+  consultationId  String       @unique @map("consultation_id") @db.Uuid
+  transactionId   String       @unique @map("transaction_id") @db.Uuid
+  commissionCents Int          @map("commission_cents")
+  expertShareCents Int         @map("expert_share_cents")
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  consultation    Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  transaction     Transaction  @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+
+  @@map("consultation_charges")
+}
+
+model ExpertSubscription {
+  id                     String                   @id @default(uuid()) @db.Uuid
+  expertProfileId        String                   @map("expert_profile_id") @db.Uuid
+  planId                 String                   @map("plan_id") @db.Uuid
+  store                  SubscriptionStore
+  externalSubscriptionId String                   @map("external_subscription_id") @db.VarChar(128)
+  status                 ExpertSubscriptionStatus @default(active)
+  currentPeriodStart     DateTime                 @map("current_period_start") @db.Timestamptz(6)
+  currentPeriodEnd       DateTime                 @map("current_period_end") @db.Timestamptz(6)
+  cancelledAt            DateTime?                @map("cancelled_at") @db.Timestamptz(6)
+  createdAt              DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  expert                 ExpertProfile            @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  plan                   SubscriptionPlan         @relation(fields: [planId], references: [id])
+
+  @@index([expertProfileId])
+  @@index([status])
+  @@map("expert_subscriptions")
+}
+
+model ExpertPayout {
+  id               String       @id @default(uuid()) @db.Uuid
+  expertProfileId  String       @map("expert_profile_id") @db.Uuid
+  amountCents      Int          @map("amount_cents")
+  currency         String       @default("USD") @db.Char(3)
+  periodStart      DateTime     @map("period_start") @db.Timestamptz(6)
+  periodEnd        DateTime     @map("period_end") @db.Timestamptz(6)
+  status           PayoutStatus @default(pending)
+  stripeTransferId String?      @map("stripe_transfer_id") @db.VarChar(128)
+  createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  expert           ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+
+  @@index([expertProfileId])
+  @@index([status])
+  @@map("expert_payouts")
+}
+
+model ExpertEarningsLedger {
+  id              String       @id @default(uuid()) @db.Uuid
+  expertProfileId String       @map("expert_profile_id") @db.Uuid
+  consultationId  String       @map("consultation_id") @db.Uuid
+  grossCents      Int          @map("gross_cents")
+  commissionCents Int          @map("commission_cents")
+  netCents        Int          @map("net_cents")
+  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  expert          ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  consultation    Consultation  @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+
+  @@index([expertProfileId, createdAt(sort: Desc)])
+  @@map("expert_earnings_ledger")
+}
+
+// ─── Notifications (notification-service) ────────────────────────────────────
+
+model Notification {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String    @db.VarChar(64)
+  title     String    @db.VarChar(200)
+  body      String
+  payload   Json      @default("{}")
+  readAt    DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String   @unique @map("user_id") @db.Uuid
+  preferences Json     @default("{}")
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_preferences")
+}
+
+// ─── Admin (admin-service) ─────────────────────────────────────────────────────
+
+model AdminUser {
+  id           String          @id @default(uuid()) @db.Uuid
+  email        String          @unique @db.VarChar(320)
+  passwordHash String          @map("password_hash") @db.VarChar(255)
+  name         String          @db.VarChar(120)
+  role         AdminRole
+  status       AdminUserStatus @default(active)
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  permissions  AdminPermission[]
+  auditLogs    AdminAuditLog[]
+  cmsPages     CmsPage[]
+
+  @@map("admin_users")
+}
+
+model AdminPermission {
+  id          String               @id @default(uuid()) @db.Uuid
+  adminUserId String               @map("admin_user_id") @db.Uuid
+  module      String               @db.VarChar(64)
+  level       AdminPermissionLevel @default(none)
+
+  admin       AdminUser            @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@unique([adminUserId, module])
+  @@map("admin_permissions")
+}
+
+model AdminAuditLog {
+  id            String    @id @default(uuid()) @db.Uuid
+  actorAdminId  String    @map("actor_admin_id") @db.Uuid
+  action        String    @db.VarChar(64)
+  entityType    String    @map("entity_type") @db.VarChar(64)
+  entityId      String?   @map("entity_id") @db.VarChar(64)
+  payload       Json      @default("{}")
+  ipAddress     String?   @map("ip_address") @db.VarChar(45)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor         AdminUser @relation(fields: [actorAdminId], references: [id], onDelete: Cascade)
+
+  @@index([actorAdminId])
+  @@index([entityType, entityId])
+  @@map("admin_audit_logs")
+}

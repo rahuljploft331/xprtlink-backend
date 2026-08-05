@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 /**
  * Seed local demo data.
- * Always writes seeder/.data/seed-state.json
- * Also upserts Mongo collections when MONGODB_URI is set.
+ * Writes seeder/.data/seed-state.json and upserts PostgreSQL when DATABASE_URL is set.
  *
  * Usage: pnpm seed
  */
@@ -10,11 +9,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { buildSeedPayload } from "../seeder/index.js";
-import {
-  getStatePath,
-  seedMongoIfConfigured,
-  writeSeedState,
-} from "../seeder/lib/store.js";
+import { closePostgres, seedPostgres } from "../seeder/lib/pg.js";
+import { getStatePath, writeSeedState } from "../seeder/lib/store.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, "../.env") });
@@ -27,14 +23,16 @@ async function main() {
     `[seed] counts: admins=${payload.admins.length}, customers=${payload.customers.length}, experts=${payload.experts.length}, categories=${payload.categories.length}`
   );
 
-  const mongo = await seedMongoIfConfigured(payload);
-  if (mongo.skipped) {
-    console.log(`[seed] mongo: skipped (${mongo.reason})`);
-  } else {
-    console.log(
-      `[seed] mongo: seeded db=${mongo.database} collections=${mongo.collections.join(", ")}`
-    );
+  if (!process.env.DATABASE_URL) {
+    console.log("[seed] postgres: skipped (DATABASE_URL not set — file seed only)");
+    console.log("[seed] done");
+    console.log(`[seed] state path: ${getStatePath()}`);
+    return;
   }
+
+  const pg = await seedPostgres(payload);
+  console.log(`[seed] postgres: seeded ${JSON.stringify(pg.counts)}`);
+  await closePostgres();
 
   console.log("[seed] done");
   console.log(`[seed] state path: ${getStatePath()}`);

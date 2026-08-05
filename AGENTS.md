@@ -3,7 +3,8 @@
 ## Layout
 
 - `services/<name>/` — Express microservices (consolidated set — see README)
-- `shared/` — `@xprtlink/shared`
+- `shared/` — `@xprtlink/shared` (Prisma, contracts, mappers, db)
+- `shared/prisma/schema.prisma` — PostgreSQL schema (single shared DB)
 - `ecosystem.config.cjs` — PM2
 - Root `.env` via PM2 / dotenv-cli
 
@@ -20,7 +21,22 @@
 | notification-service | Push / in-app |
 | media-service | Uploads |
 | admin-service | Super admin + **subadmin RBAC** + reports + audit |
-| api-gateway | Ingress |
+| api-gateway | Ingress (no database connection) |
+
+## Database (PostgreSQL + Prisma)
+
+- **One database** (`DATABASE_URL`) — each service process opens its **own pool** via `getDb()` from `@xprtlink/shared/db`
+- Schema + migrations: `shared/prisma/`
+- Domain repositories: `shared/db/repositories/<domain>/`
+- API responses: map DB rows with `shared/mappers/`; validate with `shared/contracts/` (Zod, camelCase for Flutter)
+- Enums: `shared/constants/enums.js` (mirrors Prisma enums)
+
+```bash
+pnpm db:generate      # after schema edits
+pnpm db:migrate:dev   # new migration in dev
+pnpm db:migrate       # deploy migrations
+pnpm seed / pnpm reset
+```
 
 ## Admin / subadmin RBAC
 
@@ -34,20 +50,21 @@ Constants: `ADMIN_ROLES`, `ADMIN_MODULES`, `ADMIN_PERMISSION_LEVELS` in `shared/
 
 1. Controllers in `src/controllers/`
 2. Mount under `src/routes` at `/api`
-3. `ResponseFormatter` from shared
-4. Public gateway paths: `/api/v1/<domain>/*`
+3. `ResponseFormatter` from shared — paginated lists use `data: { items, page, limit, total }`
+4. Return DTOs via mappers; do not expose Prisma objects directly
+5. Public gateway paths: `/api/v1/<domain>/*`
 
-## Do not (yet)
+## Do not
 
-- Full shared Mongoose models / Redis wiring into services
-- Commit secrets
+- Commit secrets (`.env`)
 - Split billing/expert/search back into tiny services unless product asks
+- Write across another service's tables without going through repositories
 
 ## Seed & reset (local baseline)
 
 ```bash
-pnpm seed          # write seeder/.data/seed-state.json (+ Mongo if MONGODB_URI set)
-pnpm reset         # wipe seed state then reseed — use whenever you want a clean backend demo
+pnpm seed          # file store + PostgreSQL when DATABASE_URL is set
+pnpm reset         # truncate + reseed
 pnpm reset -- --no-seed   # wipe only
 ```
 

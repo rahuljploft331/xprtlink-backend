@@ -11,4 +11,4 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 const PORT = config.port;
-await startService(app, PORT, "API Gateway");
+await startService(app, PORT, "API Gateway", { useDatabase: false });

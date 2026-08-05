@@ -7,15 +7,14 @@ pnpm workspace of Express microservices for the XprtLink platform.
 - Node.js (ESM) + Express
 - pnpm workspaces (`services/*` + `shared`)
 - PM2 (`ecosystem.config.cjs`)
+- **PostgreSQL** + Prisma (`@xprtlink/shared`)
 - Shared package: `@xprtlink/shared`
-
-**Database / Redis:** deferred — not wired in this scaffold.
 
 ## Consolidated services (10)
 
 | Service | Port | Owns |
 |---------|------|------|
-| api-gateway | 4000 | Ingress / proxy |
+| api-gateway | 4000 | Ingress / proxy (no DB) |
 | user-service | 4001 | Auth, customers, shared identity |
 | expert-service | 4002 | Expert profiles, verification, availability, **search/discovery** |
 | catalog-service | 4003 | Categories, banners, CMS |
@@ -26,30 +25,35 @@ pnpm workspace of Express microservices for the XprtLink platform.
 | media-service | 4008 | S3 signed uploads |
 | admin-service | 4009 | Super admin + **subadmins** (RBAC), audit, reports |
 
-### Merges vs earlier scaffold
-
-- `search-service` → **expert-service** (discovery is expert ranking/filters)
-- `payment-service` + `subscription-service` → **billing-service**
-- `quote-service` + `consultation-service` → **engagement-service**
-- `reporting-service` → **admin-service**
-
 ## Setup
 
 ```bash
 cp .env.example .env
+docker compose up -d     # PostgreSQL on localhost:5432
 pnpm install
-pnpm seed            # demo baseline (admins, customers, experts, categories…)
+pnpm db:migrate:dev      # first-time: create tables
+pnpm seed                # demo baseline (admins, customers, experts, categories…)
 pnpm pm2:start
+```
+
+### Database commands
+
+```bash
+pnpm db:generate         # Prisma client after schema changes
+pnpm db:migrate          # apply migrations (deploy)
+pnpm db:migrate:dev      # create + apply migration (development)
+pnpm db:studio           # Prisma Studio GUI
 ```
 
 ### Reset anytime
 
 ```bash
-pnpm reset           # wipe local seed (+ Mongo if configured) and reseed
-pnpm pm2:restart     # optional — reload services after reset
+pnpm reset               # truncate Postgres + reseed (+ file store)
+pnpm reset -- --no-seed  # wipe only
+pnpm pm2:restart         # optional — reload services after reset
 ```
 
-See [`seeder/README.md`](./seeder/README.md).
+See [`seeder/README.md`](./seeder/README.md) and [`../docs/database-schema.md`](../docs/database-schema.md).
 
 ## Secrets
 

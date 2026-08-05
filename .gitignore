@@ -1,34 +1,51 @@
-# Environment
-.env
-.env.local
-.env.*.local
-
 # Dependencies
 node_modules/
 
-# Logs
-logs/
+# Environment & secrets (never commit)
+.env
+.env.*
+!.env.example
+
+# Prisma generated client (regenerate via pnpm db:generate)
+shared/generated/
+
+# Local seed file store
+seeder/.data/
+
+# Logs & runtime
+logs/*
+!logs/.gitkeep
 *.log
 npm-debug.log*
 pnpm-debug.log*
+.pnpm-debug.log*
 
-# OS / IDE
-.DS_Store
-.idea/
-.vscode/
-
-# Runtime
+# PM2
 .pm2/
 pids/
 *.pid
 
-# Seeder generated state
-seeder/.data/
+# Test / coverage
+coverage/
+.nyc_output/
 
-# Secrets
-*.pem
-*.key
-credentials.json
+# Build output
+dist/
+build/
+*.tsbuildinfo
 
-!logs/
-!logs/.gitkeep
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / IDEs
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+*.swp
+*.swo
+*~
+
+# Optional local overrides
+docker-compose.override.yml

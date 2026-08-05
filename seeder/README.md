@@ -7,8 +7,8 @@ Local demo data for resetting the backend to a known baseline.
 From `xpertlink-backend/`:
 
 ```bash
-pnpm seed          # write seed state (file + Mongo if configured)
-pnpm reset         # wipe seed state then reseed
+pnpm seed          # write seed state (file + PostgreSQL when DATABASE_URL is set)
+pnpm reset         # truncate Postgres + reseed
 pnpm reset -- --no-seed   # wipe only
 ```
 
@@ -17,15 +17,15 @@ pnpm reset -- --no-seed   # wipe only
 | Dataset | Notes |
 |---------|--------|
 | admins | Super Admin + Subadmins (RBAC permissions) |
-| customers | Demo customer accounts |
-| experts | Demo experts + verification/plan fields |
+| customers | Demo customer accounts + `users` / `customer_profiles` |
+| experts | Demo experts + verification, subscriptions, `expert_profiles` |
 | categories | Marketplace categories |
-| cmsPages / platformConfig / subscriptionPlans | Platform defaults |
+| cmsPages / platformConfig / subscriptionPlans / appConfig | Platform defaults |
 
 ## Storage
 
 1. **Always** — `seeder/.data/seed-state.json` (gitignored file store)
-2. **Optional** — MongoDB collections when `MONGODB_URI` is set in `.env`
+2. **PostgreSQL** — when `DATABASE_URL` is set in `.env` (see `seeder/lib/pg.js`)
 
 ## Demo passwords (local only)
 

@@ -2,5 +2,7 @@ packages:
   - services/*
   - shared
 
-# No native build deps required for scaffold yet.
-allowBuilds: {}
+allowBuilds:
+  '@prisma/client': true
+  '@prisma/engines': true
+  prisma: true

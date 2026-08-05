@@ -51,6 +51,8 @@ export const ADMIN_MODULES = [
   "settings",
 ];
 
+export * from "./enums.js";
+
 export const SERVICE_NAMES = [
   "api-gateway",
   "user-service",

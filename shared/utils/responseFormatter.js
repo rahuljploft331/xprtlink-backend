@@ -9,13 +9,19 @@ export const ResponseFormatter = {
     res,
     {
       message = "Success",
-      data = [],
-      pagination = { page: 1, limit: 20, total: 0, pages: 0 },
+      items = [],
+      page = 1,
+      limit = 20,
+      total = 0,
       code,
       status = 200,
     } = {}
   ) {
-    const body = { success: true, message, data, pagination };
+    const body = {
+      success: true,
+      message,
+      data: { items, page, limit, total },
+    };
     if (code) body.code = code;
     return res.status(status).json(body);
   },
