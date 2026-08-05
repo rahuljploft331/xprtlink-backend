@@ -74,3 +74,7 @@ Includes super_admin + subadmin demo accounts.
 ## Secrets
 
 `getSecret` / `getSecretSync` — env today, AWS Secrets Manager later.
+
+## Conventions
+
+- Commit changes once done with a descriptive commit message.
