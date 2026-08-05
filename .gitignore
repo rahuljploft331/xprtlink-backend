@@ -47,6 +47,3 @@ Thumbs.db
 *.swp
 *.swo
 *~
-
-# Optional local overrides
-docker-compose.override.yml

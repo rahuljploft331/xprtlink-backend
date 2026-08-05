@@ -27,9 +27,16 @@ pnpm workspace of Express microservices for the XprtLink platform.
 
 ## Setup
 
+From the **umbrella root** (`xpertlink/`), start PostgreSQL:
+
+```bash
+docker compose up -d     # PostgreSQL on localhost:5432 (root docker-compose.yml)
+```
+
+Then in `xpertlink-backend/`:
+
 ```bash
 cp .env.example .env
-docker compose up -d     # PostgreSQL on localhost:5432
 pnpm install
 pnpm db:migrate:dev      # first-time: create tables
 pnpm seed                # demo baseline (admins, customers, experts, categories…)
