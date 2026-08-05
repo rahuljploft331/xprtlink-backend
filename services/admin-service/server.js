@@ -6,7 +6,7 @@ import routes from "./src/routes/index.js";
 const config = getConfig("admin-service");
 const app = createApp();
 
-app.use("/api", routes);
+app.use("/api/v1/admin", routes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 

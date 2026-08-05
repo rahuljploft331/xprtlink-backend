@@ -1,0 +1,90 @@
+import { getDb } from "@xprtlink/shared/db/getClient.js";
+import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
+
+/** GET /api/v1/admin/customers */
+export async function list(req, res, next) {
+  try {
+    const db = getDb();
+    const { page, limit, skip } = parsePagination(req.query);
+    const q = req.query.q?.trim();
+
+    const where = q
+      ? {
+          OR: [
+            { email: { contains: q, mode: "insensitive" } },
+            { customerProfile: { firstName: { contains: q, mode: "insensitive" } } },
+            { customerProfile: { lastName: { contains: q, mode: "insensitive" } } },
+          ],
+        }
+      : {};
+
+    const [total, users] = await Promise.all([
+      db.user.count({ where: { customerProfile: { isNot: null }, ...where } }),
+      db.user.findMany({
+        where: { customerProfile: { isNot: null }, ...where },
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          customerProfile: true,
+          _count: { select: { authSessions: true } },
+        },
+      }),
+    ]);
+
+    // Get consultation counts per customer profile
+    const customerIds = users.map((u) => u.customerProfile?.id).filter(Boolean);
+    const consultationCounts = await db.consultation.groupBy({
+      by: ["customerId"],
+      where: { customerId: { in: customerIds } },
+      _count: { id: true },
+    });
+    const countMap = Object.fromEntries(
+      consultationCounts.map((c) => [c.customerId, c._count.id])
+    );
+
+    const items = users.map((u) => ({
+      id: u.id,
+      email: u.email,
+      phone: u.phone,
+      status: u.status,
+      firstName: u.customerProfile?.firstName ?? "",
+      lastName: u.customerProfile?.lastName ?? "",
+      consultationCount: countMap[u.customerProfile?.id] ?? 0,
+      createdAt: u.createdAt,
+    }));
+
+    return ResponseFormatter.paginated(res, { items, page, limit, total });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** GET /api/v1/admin/customers/:id */
+export async function getById(req, res, next) {
+  try {
+    const db = getDb();
+    const user = await db.user.findUnique({
+      where: { id: req.params.id },
+      include: {
+        customerProfile: {
+          include: {
+            consultations: {
+              take: 10,
+              orderBy: { createdAt: "desc" },
+              include: { expert: { select: { firstName: true, lastName: true } } },
+            },
+          },
+        },
+      },
+    });
+    if (!user || !user.customerProfile) {
+      return res.status(404).json({ success: false, message: "Customer not found", code: "NOT_FOUND" });
+    }
+    const { passwordHash: _ph, ...safe } = user;
+    return ResponseFormatter.success(res, { data: safe });
+  } catch (err) {
+    next(err);
+  }
+}

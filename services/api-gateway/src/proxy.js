@@ -19,7 +19,9 @@ export function createGatewayProxies() {
     { path: "/api/v1/billing", target: serviceUrls.billing },
     { path: "/api/v1/notifications", target: serviceUrls.notification },
     { path: "/api/v1/media", target: serviceUrls.media },
+    { path: "/api/v1/admin", target: serviceUrls.admin },
   ];
+
 
   return routes.map(({ path, target }) =>
     createProxyMiddleware({

@@ -1,0 +1,11 @@
+import { Router } from "express";
+import { list, getById, create, update, setPermissions } from "#controllers/admins.controller.js";
+import { requireAdmin } from "#middlewares/adminAuth.js";
+const router = Router();
+router.use(requireAdmin);
+router.get("/", list);
+router.post("/", create);
+router.get("/:id", getById);
+router.patch("/:id", update);
+router.put("/:id/permissions", setPermissions);
+export default router;
