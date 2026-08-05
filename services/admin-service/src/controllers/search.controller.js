@@ -59,9 +59,17 @@ export async function globalSearch(req, res, next) {
         take: MAX_PER_GROUP,
       }),
 
-      // Consultations — match by ID prefix
+      // Consultations — search via related customer/expert names
+      // NOTE: UUID id field does NOT support startsWith/contains in Prisma
       db.consultation.findMany({
-        where: { id: { startsWith: q, ...ci } },
+        where: {
+          OR: [
+            { customer: { firstName: { contains: q, ...ci } } },
+            { customer: { lastName: { contains: q, ...ci } } },
+            { expert: { firstName: { contains: q, ...ci } } },
+            { expert: { lastName: { contains: q, ...ci } } },
+          ],
+        },
         take: MAX_PER_GROUP,
         include: {
           customer: { select: { firstName: true, lastName: true } },
@@ -69,13 +77,10 @@ export async function globalSearch(req, res, next) {
         },
       }),
 
-      // Quotes — match title or ID
+      // Quotes — search by title only (UUID id does not support string filters)
       db.quoteRequest.findMany({
         where: {
-          OR: [
-            { title: { contains: q, ...ci } },
-            { id: { startsWith: q, ...ci } },
-          ],
+          title: { contains: q, ...ci },
         },
         take: MAX_PER_GROUP,
         include: {
