@@ -12,6 +12,13 @@ import { amountToCents } from "@xprtlink/shared/mappers/common.js";
 const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
 function generateOtp() {
+  if (
+    process.env.OTP_ENABLE_HARDCODE === "true" &&
+    process.env.NODE_ENV !== "production" &&
+    process.env.OTP_HARDCODE_CODE
+  ) {
+    return process.env.OTP_HARDCODE_CODE;
+  }
   return String(crypto.randomInt(100000, 999999));
 }
 
