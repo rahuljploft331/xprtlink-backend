@@ -3,19 +3,31 @@ import cors from "cors";
 import helmet from "helmet";
 import { disconnectDb, getDb } from "../db/getClient.js";
 
+
 /**
- * Shared Express app factory.
+ * Parse CORS_ORIGIN env var.
+ * - "*"                  → true  (allow all — dev only)
+ * - "a.com,b.com,..."    → string[] of trimmed origins
+ * - single origin        → string
  */
+function parseCorsOrigin() {
+  const raw = process.env.CORS_ORIGIN ?? "*";
+  if (raw === "*") return true;
+  const origins = raw.split(",").map((o) => o.trim()).filter(Boolean);
+  return origins.length === 1 ? origins[0] : origins;
+}
+
 export function createApp() {
   const app = express();
   app.set("trust proxy", 1);
   app.use(helmet());
   app.use(
     cors({
-      origin: process.env.CORS_ORIGIN === "*" ? true : process.env.CORS_ORIGIN,
+      origin: parseCorsOrigin(),
       credentials: true,
     })
   );
+
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
