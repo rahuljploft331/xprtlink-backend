@@ -1,0 +1,707 @@
+{
+  "info": {
+    "_postman_id": "c1f7b7cb-4b3d-4c3e-8848-12cd80a1c6a4",
+    "name": "Engagement Service",
+    "description": "REST APIs for quotes, video consultations, billing summaries, reviews, and reporting experts.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Quotes",
+      "item": [
+        {
+          "name": "Create Quote Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expertId\": \"expert-uuid-here\",\n  \"title\": \"Need consultation on database architecture\",\n  \"description\": \"Require help sizing tables and setting up indexes.\",\n  \"mediaIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/quotes",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "quotes"
+              ]
+            },
+            "description": "Customer submits a new quote request to an expert."
+          }
+        },
+        {
+          "name": "Update Quote Request",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Updated description with more details.\",\n  \"mediaIds\": [\"media-uuid-1\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/quotes/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "quotes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "quote-uuid-here"
+                }
+              ]
+            },
+            "description": "Attach file media IDs or add additional notes to the quote."
+          }
+        },
+        {
+          "name": "List Quotes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/quotes?role=customer&page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "quotes"
+              ],
+              "query": [
+                {
+                  "key": "role",
+                  "value": "customer"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Get lists of quote requests (inbound for experts, outbound for customers)."
+          }
+        },
+        {
+          "name": "Get Quote Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/quotes/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "quotes",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "quote-uuid-here"
+                }
+              ]
+            },
+            "description": "Fetch detailed information of a quote request."
+          }
+        },
+        {
+          "name": "Submit Quotation (Expert)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 150.00,\n  \"estimatedHours\": 2,\n  \"notes\": \"I can finish this in one sessions.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/quotes/:id/quotation",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "quotes",
+                ":id",
+                "quotation"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "quote-uuid-here"
+                }
+              ]
+            },
+            "description": "Expert submits pricing quote estimation back to customer."
+          }
+        },
+        {
+          "name": "Accept Quote (Customer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/quotes/:id/accept",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "quotes",
+                ":id",
+                "accept"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "quote-uuid-here"
+                }
+              ]
+            },
+            "description": "Customer accepts the expert's quotation estimate."
+          }
+        },
+        {
+          "name": "Reject Quote (Customer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/quotes/:id/reject",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "quotes",
+                ":id",
+                "reject"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "quote-uuid-here"
+                }
+              ]
+            },
+            "description": "Customer rejects the expert's quotation estimate."
+          }
+        },
+        {
+          "name": "Cancel Quote (Customer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/quotes/:id/cancel",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "quotes",
+                ":id",
+                "cancel"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "quote-uuid-here"
+                }
+              ]
+            },
+            "description": "Cancel the quote request."
+          }
+        },
+        {
+          "name": "Get Quote History & Audit Trail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/quotes/:id/history",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "quotes",
+                ":id",
+                "history"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "quote-uuid-here"
+                }
+              ]
+            },
+            "description": "Load the status change history log list of the quote."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Consultations & Video",
+      "item": [
+        {
+          "name": "Start Consultation Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expertId\": \"expert-uuid-here\",\n  \"quoteId\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/consultations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "consultations"
+              ]
+            },
+            "description": "Customer starts/requests a call connection with an expert (optionally referencing a quote)."
+          }
+        },
+        {
+          "name": "List Consultations",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/consultations?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "consultations"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "List historical and active consultations."
+          }
+        },
+        {
+          "name": "Get Consultation Details",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/consultations/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "consultations",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "consultation-uuid-here"
+                }
+              ]
+            },
+            "description": "Retrieve specific consultation details."
+          }
+        },
+        {
+          "name": "Accept Call (Expert)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/consultations/:id/accept",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "consultations",
+                ":id",
+                "accept"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "consultation-uuid-here"
+                }
+              ]
+            },
+            "description": "Expert accepts an incoming consultation call request."
+          }
+        },
+        {
+          "name": "Decline Call (Expert)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/consultations/:id/decline",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "consultations",
+                ":id",
+                "decline"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "consultation-uuid-here"
+                }
+              ]
+            },
+            "description": "Expert declines an incoming consultation call request."
+          }
+        },
+        {
+          "name": "End Consultation",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/consultations/:id/end",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "consultations",
+                ":id",
+                "end"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "consultation-uuid-here"
+                }
+              ]
+            },
+            "description": "Disconnects the call and marks consultation completed."
+          }
+        },
+        {
+          "name": "Get ZEGO Video Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/consultations/:id/video-token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "consultations",
+                ":id",
+                "video-token"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "consultation-uuid-here"
+                }
+              ]
+            },
+            "description": "Fetch ZEGO video credentials / token for call room."
+          }
+        },
+        {
+          "name": "Get Call Billing Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/consultations/:id/billing-summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "consultations",
+                ":id",
+                "billing-summary"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "consultation-uuid-here"
+                }
+              ]
+            },
+            "description": "Fetch post-call consultation receipt pricing summary before charging."
+          }
+        },
+        {
+          "name": "Submit Consultation Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"comment\": \"Fantastic support on Postgres queries!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/consultations/:id/review",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "consultations",
+                ":id",
+                "review"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "consultation-uuid-here"
+                }
+              ]
+            },
+            "description": "Submit a rating/review review for a finished consultation call."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reviews & Reports",
+      "item": [
+        {
+          "name": "Get Pending Reviews",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/reviews/pending",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "reviews",
+                "pending"
+              ]
+            },
+            "description": "List consultations awaiting feedback reviews."
+          }
+        },
+        {
+          "name": "Submit Report Expert",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expertId\": \"expert-uuid-here\",\n  \"reason\": \"unprofessional_behavior\",\n  \"details\": \"Expert used abusive language during call.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/reports",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "reports"
+              ]
+            },
+            "description": "Submit safety/misconduct report regarding an expert."
+          }
+        }
+      ]
+    }
+  ]
+}

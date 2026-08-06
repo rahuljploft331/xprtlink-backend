@@ -1,0 +1,500 @@
+{
+  "info": {
+    "_postman_id": "c1f7b7cb-4b3d-4c3e-8848-12cd80a1c6a2",
+    "name": "Expert Service",
+    "description": "REST APIs for expert profile management, search/featured, ratings/reviews, and onboarding verification.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Marketplace & Discovery",
+      "item": [
+        {
+          "name": "Get Featured Experts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/featured",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "featured"
+              ]
+            },
+            "description": "Get active, verified, paid experts for the dashboard featured list."
+          }
+        },
+        {
+          "name": "Search Experts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/search/experts?q=development&category=software&sort=rating&page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "search",
+                "experts"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "development"
+                },
+                {
+                  "key": "category",
+                  "value": "software"
+                },
+                {
+                  "key": "sort",
+                  "value": "rating"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Search for experts in the marketplace. Query parameters include q, category, priceMin, priceMax, rating, experience, online, verified, sort, page, limit."
+          }
+        },
+        {
+          "name": "Get Expert Profile by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "expert-uuid-here"
+                }
+              ]
+            },
+            "description": "Get detailed public profile of an expert."
+          }
+        },
+        {
+          "name": "Get Expert Reviews",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/:id/reviews?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                ":id",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "expert-uuid-here"
+                }
+              ]
+            },
+            "description": "List reviews and ratings of an expert."
+          }
+        },
+        {
+          "name": "Get Expert Availability Status",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/:id/availability",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                ":id",
+                "availability"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "expert-uuid-here"
+                }
+              ]
+            },
+            "description": "Check real-time availability/callability status on the expert profile."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Expert Dashboard & Settings (Authenticated Expert)",
+      "item": [
+        {
+          "name": "Get Profile Me",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "me"
+              ]
+            },
+            "description": "Load the authenticated expert's professional hub details."
+          }
+        },
+        {
+          "name": "Update Profile Me",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bio\": \"Senior Cloud Architect with 10+ years experience.\",\n  \"hourlyRate\": 120,\n  \"availabilityMode\": \"online\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "me"
+              ]
+            },
+            "description": "Update professional information, rates, and availability."
+          }
+        },
+        {
+          "name": "Save Onboarding Draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"categories\": [\"software-architecture\"],\n  \"bio\": \"Onboarding draft biography.\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/me/onboarding",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "me",
+                "onboarding"
+              ]
+            },
+            "description": "Draft/save professional profile onboarding information."
+          }
+        },
+        {
+          "name": "Submit Onboarding Profile",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/me/onboarding/submit",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "me",
+                "onboarding",
+                "submit"
+              ]
+            },
+            "description": "Submit onboarding application for admin review."
+          }
+        },
+        {
+          "name": "Get Verification Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/me/verification",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "me",
+                "verification"
+              ]
+            },
+            "description": "Load ID / professional verification status details."
+          }
+        },
+        {
+          "name": "Submit Verification Documents",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"documentType\": \"national_id\",\n  \"mediaIds\": [\"media-uuid-1\", \"media-uuid-2\"]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/me/verification/documents",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "me",
+                "verification",
+                "documents"
+              ]
+            },
+            "description": "Submit verification ID document media IDs."
+          }
+        },
+        {
+          "name": "Get Expert Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/me/dashboard",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "me",
+                "dashboard"
+              ]
+            },
+            "description": "Load active practice numbers and subscription restrictions."
+          }
+        },
+        {
+          "name": "Get Rating Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/me/rating-summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "me",
+                "rating-summary"
+              ]
+            },
+            "description": "Get detailed average ratings and star breakdown summary."
+          }
+        },
+        {
+          "name": "Get My Reviews (Paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/me/reviews?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "me",
+                "reviews"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Fetch reviews left by customers for the authenticated expert."
+          }
+        },
+        {
+          "name": "Get Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/me/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "me",
+                "settings"
+              ]
+            },
+            "description": "Get config preferences for the expert dashboard."
+          }
+        },
+        {
+          "name": "Update Settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"holidayMode\": false,\n  \"vacationStart\": null,\n  \"vacationEnd\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/me/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "me",
+                "settings"
+              ]
+            },
+            "description": "Modify configurations/settings for the expert."
+          }
+        }
+      ]
+    }
+  ]
+}

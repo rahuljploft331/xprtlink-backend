@@ -1,0 +1,195 @@
+{
+  "info": {
+    "_postman_id": "c1f7b7cb-4b3d-4c3e-8848-12cd80a1c6a5",
+    "name": "Messaging Service",
+    "description": "REST APIs for managing message conversations, sending text/media attachments, marking threads read.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Get Conversations",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/messaging/conversations?page=1&limit=20",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "messaging",
+            "conversations"
+          ],
+          "query": [
+            {
+              "key": "page",
+              "value": "1"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+            },
+        "description": "Get lists of messaging threads/conversations."
+      }
+    },
+    {
+      "name": "Start Conversation Thread",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expertId\": \"expert-uuid-here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/messaging/conversations",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "messaging",
+                "conversations"
+              ]
+            },
+            "description": "Start a message conversation thread from an expert profile."
+          }
+        },
+        {
+          "name": "Get Thread Messages (Paginated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/messaging/conversations/:id/messages?page=1&limit=50",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "messaging",
+                "conversations",
+                ":id",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "conversation-uuid-here"
+                }
+              ]
+            },
+            "description": "Load messages inside a conversation thread."
+          }
+        },
+        {
+          "name": "Send Message",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Hello, can you help with this query?\",\n  \"mediaIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/messaging/conversations/:id/messages",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "messaging",
+                "conversations",
+                ":id",
+                "messages"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "conversation-uuid-here"
+                }
+              ]
+            },
+            "description": "Send a chat message with text content or media attachments."
+          }
+        },
+        {
+          "name": "Mark Conversation Read",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/messaging/conversations/:id/read",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "messaging",
+                "conversations",
+                ":id",
+                "read"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "conversation-uuid-here"
+                }
+              ]
+            },
+            "description": "Mark a conversation thread and its messages as read."
+          }
+        }
+      ]
+}
