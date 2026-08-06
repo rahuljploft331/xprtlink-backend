@@ -68,6 +68,11 @@ export const passwordChangeRequestSchema = z.object({
   newPassword: z.string().min(8),
 });
 
+export const registerOtpSentDtoSchema = z.object({
+  sent: z.literal(true),
+  expiresInSeconds: z.number().int().positive(),
+});
+
 export const checkAvailabilityDtoSchema = z.object({
   emailAvailable: z.boolean().optional(),
   phoneAvailable: z.boolean().optional(),

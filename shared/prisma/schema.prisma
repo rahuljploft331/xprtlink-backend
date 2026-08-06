@@ -14,6 +14,7 @@ datasource db {
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 enum UserStatus {
+  pending_verification
   active
   suspended
   deleted
@@ -315,17 +316,20 @@ model AuthSession {
 }
 
 model OtpChallenge {
-  id          String     @id @default(uuid()) @db.Uuid
-  userId      String?    @map("user_id") @db.Uuid
-  email       String?    @db.VarChar(320)
-  phone       String?    @db.VarChar(32)
-  codeHash    String     @map("code_hash") @db.VarChar(255)
-  purpose     OtpPurpose
-  expiresAt   DateTime   @map("expires_at") @db.Timestamptz(6)
-  consumedAt  DateTime?  @map("consumed_at") @db.Timestamptz(6)
-  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  id               String     @id @default(uuid()) @db.Uuid
+  userId           String?    @map("user_id") @db.Uuid
+  email            String?    @db.VarChar(320)
+  phone            String?    @db.VarChar(32)
+  codeHash         String     @map("code_hash") @db.VarChar(255)
+  purpose          OtpPurpose
+  // Stores { role, firstName, lastName } for the 2-step register flow.
+  // Populated only when purpose = register. Null for all other purposes.
+  registrationData Json?      @map("registration_data")
+  expiresAt        DateTime   @map("expires_at") @db.Timestamptz(6)
+  consumedAt       DateTime?  @map("consumed_at") @db.Timestamptz(6)
+  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user        User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user             User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([email])
   @@index([phone])

@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "f5b66d80-5a3d-4c3e-8848-12cd80a1c6a1",
     "name": "User Service",
-    "description": "REST APIs for registration, login, OTP validation, password management, and customer profile/discoveries.",
+    "description": "REST APIs for registration (2-step OTP flow), login, OTP validation, password management, and customer profile/discoveries.\n\n**Registration is now 2 steps:**\n1. POST /auth/register → returns { sent: true } — no tokens yet, no profile created\n2. POST /auth/otp/verify { purpose: register } → returns full auth tokens, creates profile atomically",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -21,21 +21,14 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/auth/session",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "session"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "session"]
             },
-            "description": "Splash screen session validation. Returns role and onboarding/verification gates."
+            "description": "Splash screen session validation. Returns role and onboarding/verification gates (emailVerified, expertSubscriptionActive, etc.)."
           }
         },
         {
-          "name": "Register",
+          "name": "Register — Step 1 (send OTP)",
           "request": {
             "method": "POST",
             "header": [
@@ -46,21 +39,36 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\",\n  \"fullName\": \"John Doe\",\n  \"role\": \"customer\",\n  \"mobile\": \"+1234567890\"\n}"
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"customer\",\n  \"phone\": \"+1234567890\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/register",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "register"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register"]
             },
-            "description": "Register a new user. Role can be 'customer' or 'expert'."
+            "description": "Step 1 of 2-step registration.\n\nCreates a pending_verification User (no CustomerProfile/ExpertProfile yet — zero dangling rows on abandon). Sends a 6-digit OTP to email/phone.\n\n**Response:** `{ sent: true, expiresInSeconds: 600 }` — no tokens issued.\n\nIf the email already has a pending_verification account, this resends the OTP and updates the stored password (handles 'I mistyped' case).\n\nRequired fields: firstName, lastName (separate), email OR phone, password (min 8), role ('customer' | 'expert')."
+          }
+        },
+        {
+          "name": "Register — Step 2 (verify OTP → get tokens)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"code\": \"123456\",\n  \"purpose\": \"register\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/otp/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "verify"]
+            },
+            "description": "Step 2 of 2-step registration.\n\nVerifies the OTP, atomically: creates the CustomerProfile or ExpertProfile, stamps emailVerifiedAt, and flips status → active.\n\n**Response:** Full auth tokens (same shape as /login). The account is now usable.\n\nNote: field is 'code', NOT 'otp'."
           }
         },
         {
@@ -79,17 +87,10 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/login",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "login"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login"]
             },
-            "description": "Log in and obtain access & refresh tokens."
+            "description": "Log in and obtain access & refresh tokens.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead)."
           }
         },
         {
@@ -112,15 +113,8 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/logout",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "logout"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "logout"]
             },
             "description": "Revoke the refresh token and sign out."
           }
@@ -141,15 +135,8 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/refresh",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "refresh"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "refresh"]
             },
             "description": "Issue a new access token using a valid refresh token."
           }
@@ -170,18 +157,10 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/otp/send",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "otp",
-                "send"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "send"]
             },
-            "description": "Send an OTP code via Email or Mobile. Purpose: 'verify_email' | 'reset_password'."
+            "description": "Send an OTP code via Email or Mobile.\n\nPurpose: 'verify_email' | 'verify_phone' | 'reset_password'\n\nNote: purpose='register' is NOT supported here — use POST /auth/register instead."
           }
         },
         {
@@ -196,22 +175,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"otp\": \"123456\",\n  \"purpose\": \"verify_email\"\n}"
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"code\": \"123456\",\n  \"purpose\": \"verify_email\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/otp/verify",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "otp",
-                "verify"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "verify"]
             },
-            "description": "Verify an OTP code."
+            "description": "Verify an OTP code.\n\nField is 'code', NOT 'otp'.\n\nBehaviour by purpose:\n- 'register'       → returns auth tokens (see 'Register — Step 2')\n- 'verify_email'   → stamps emailVerifiedAt, returns { verified: true }\n- 'verify_phone'   → stamps phoneVerifiedAt, returns { verified: true }\n- 'reset_password' → validates code only, returns { verified: true }"
           }
         },
         {
@@ -230,18 +201,10 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/otp/resend",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "otp",
-                "resend"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "resend"]
             },
-            "description": "Resend an OTP code."
+            "description": "Resend an OTP code. Same rules as Send OTP — purpose='register' is not supported here (re-call /auth/register instead)."
           }
         },
         {
@@ -260,18 +223,10 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/password/forgot",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "password",
-                "forgot"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "password", "forgot"]
             },
-            "description": "Initiate password reset. Sends a reset code."
+            "description": "Initiate password reset. Sends a reset code to email/phone."
           }
         },
         {
@@ -286,22 +241,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"NewPassword123!\"\n}"
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"code\": \"123456\",\n  \"newPassword\": \"NewPassword123!\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/password/reset",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "password",
-                "reset"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "password", "reset"]
             },
-            "description": "Set a new password using a reset OTP code."
+            "description": "Set a new password using a reset OTP code.\n\nField is 'code', NOT 'otp'."
           }
         },
         {
@@ -320,22 +267,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"oldPassword\": \"Password123!\",\n  \"newPassword\": \"NewPassword123!\"\n}"
+              "raw": "{\n  \"currentPassword\": \"Password123!\",\n  \"newPassword\": \"NewPassword123!\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/password/change",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "password",
-                "change"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "password", "change"]
             },
-            "description": "Change password for an authenticated session."
+            "description": "Change password for an authenticated session.\n\nField is 'currentPassword', NOT 'oldPassword'."
           }
         },
         {
@@ -345,15 +284,8 @@
             "header": [],
             "url": {
               "raw": "{{base_url}}/api/v1/auth/check-availability?email=user@example.com",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "check-availability"
-              ],
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "check-availability"],
               "query": [
                 {
                   "key": "email",
@@ -361,7 +293,7 @@
                 }
               ]
             },
-            "description": "Check if an email or mobile is available during onboarding."
+            "description": "Check if an email or mobile is available during onboarding.\n\npending_verification users are treated as available (they can re-register to get a fresh OTP)."
           }
         },
         {
@@ -380,17 +312,10 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/social",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "auth",
-                "social"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "social"]
             },
-            "description": "Authenticate via Google or Apple OAuth."
+            "description": "Authenticate via Google or Apple OAuth. Returns NOT_IMPLEMENTED — integration pending."
           }
         }
       ]
@@ -410,15 +335,8 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/customers/me",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "customers",
-                "me"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "customers", "me"]
             },
             "description": "Load the authenticated customer profile."
           }
@@ -439,21 +357,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"fullName\": \"Jane Doe\",\n  \"avatarUrl\": \"https://example.com/new-avatar.png\"\n}"
+              "raw": "{\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Doe\",\n  \"avatarMediaId\": null\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/customers/me",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "customers",
-                "me"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "customers", "me"]
             },
-            "description": "Update details of the authenticated customer profile."
+            "description": "Update the authenticated customer profile.\n\nAccepted fields:\n- firstName (string, optional)\n- lastName (string, optional)\n- avatarMediaId (UUID of an uploaded MediaAsset, or null — NOT a URL string)\n\nAll fields are optional (PATCH semantics)."
           }
         },
         {
@@ -468,18 +379,10 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/customers/me/delete",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "customers",
-                "me",
-                "delete"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "customers", "me", "delete"]
             },
-            "description": "Request deletion of the authenticated customer account."
+            "description": "Soft-delete the authenticated customer account (sets status=deleted)."
           }
         },
         {
@@ -494,25 +397,11 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/customers/me/recently-viewed?page=1&limit=20",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "customers",
-                "me",
-                "recently-viewed"
-              ],
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "customers", "me", "recently-viewed"],
               "query": [
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "20"
-                }
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
               ]
             },
             "description": "Fetch a paginated history list of experts recently viewed by the customer."
@@ -530,22 +419,10 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/customers/me/recently-viewed/:expertId",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "customers",
-                "me",
-                "recently-viewed",
-                ":expertId"
-              ],
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "customers", "me", "recently-viewed", ":expertId"],
               "variable": [
-                {
-                  "key": "expertId",
-                  "value": "expert-uuid-here"
-                }
+                { "key": "expertId", "value": "expert-uuid-here" }
               ]
             },
             "description": "Record that an expert profile was viewed."
@@ -563,25 +440,11 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/customers/me/saved-experts?page=1&limit=20",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "customers",
-                "me",
-                "saved-experts"
-              ],
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "customers", "me", "saved-experts"],
               "query": [
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "20"
-                }
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
               ]
             },
             "description": "List the customer's bookmarked or saved experts."
@@ -599,22 +462,10 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/customers/me/saved-experts/:expertId",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "customers",
-                "me",
-                "saved-experts",
-                ":expertId"
-              ],
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "customers", "me", "saved-experts", ":expertId"],
               "variable": [
-                {
-                  "key": "expertId",
-                  "value": "expert-uuid-here"
-                }
+                { "key": "expertId", "value": "expert-uuid-here" }
               ]
             },
             "description": "Save/bookmark an expert profile."
@@ -632,22 +483,10 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/customers/me/saved-experts/:expertId",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "customers",
-                "me",
-                "saved-experts",
-                ":expertId"
-              ],
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "customers", "me", "saved-experts", ":expertId"],
               "variable": [
-                {
-                  "key": "expertId",
-                  "value": "expert-uuid-here"
-                }
+                { "key": "expertId", "value": "expert-uuid-here" }
               ]
             },
             "description": "Remove an expert from the saved list."
