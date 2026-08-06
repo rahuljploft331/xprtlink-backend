@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "f5b66d80-5a3d-4c3e-8848-12cd80a1c6a1",
     "name": "User Service",
-    "description": "REST APIs for registration (2-step OTP flow), login, OTP validation, password management, and customer profile/discoveries.\n\n**Registration is now 2 steps:**\n1. POST /auth/register → returns { sent: true } — no tokens yet, no profile created\n2. POST /auth/otp/verify { purpose: register } → returns full auth tokens, creates profile atomically",
+    "description": "REST APIs for registration (2-step OTP flow), login, OTP validation, password management, social auth, and customer profile/discoveries.\n\n**Registration (2 steps):**\n1. POST /auth/register — requires email + phone (E.164), confirmPassword, termsAccepted, MFS password rules\n2. POST /auth/otp/verify { purpose: register } → auth tokens\n\n**Social signup (when phone missing):**\n1. POST /auth/social → may return completionToken\n2. POST /auth/social/complete → OTP to phone\n3. POST /auth/otp/verify { purpose: verify_phone } → auth tokens",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -39,14 +39,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"customer\",\n  \"phone\": \"+1234567890\"\n}"
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"phone\": \"+14155552671\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"customer\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/register",
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "register"]
             },
-            "description": "Step 1 of 2-step registration.\n\nCreates a pending_verification User (no CustomerProfile/ExpertProfile yet — zero dangling rows on abandon). Sends a 6-digit OTP to email/phone.\n\n**Response:** `{ sent: true, expiresInSeconds: 600 }` — no tokens issued.\n\nIf the email already has a pending_verification account, this resends the OTP and updates the stored password (handles 'I mistyped' case).\n\nRequired fields: firstName, lastName (separate), email OR phone, password (min 8), role ('customer' | 'expert')."
+            "description": "Step 1 of 2-step registration.\n\nCreates a pending_verification User with both email and phone. Sends a 6-digit OTP (default: phone).\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role.\nOptional: otpChannel ('email' | 'phone', default phone)."
           }
         },
         {
@@ -61,14 +61,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"code\": \"123456\",\n  \"purpose\": \"register\"\n}"
+              "raw": "{\n  \"phone\": \"+14155552671\",\n  \"code\": \"123456\",\n  \"purpose\": \"register\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/otp/verify",
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "otp", "verify"]
             },
-            "description": "Step 2 of 2-step registration.\n\nVerifies the OTP, atomically: creates the CustomerProfile or ExpertProfile, stamps emailVerifiedAt, and flips status → active.\n\n**Response:** Full auth tokens (same shape as /login). The account is now usable.\n\nNote: field is 'code', NOT 'otp'."
+            "description": "Step 2 of 2-step registration.\n\nVerify OTP sent to email or phone (match otpChannel from step 1). Stamps both emailVerifiedAt and phoneVerifiedAt, creates profile, issues tokens."
           }
         },
         {
@@ -241,7 +241,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"code\": \"123456\",\n  \"newPassword\": \"NewPassword123!\"\n}"
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"code\": \"123456\",\n  \"newPassword\": \"NewPassword123!\",\n  \"confirmPassword\": \"NewPassword123!\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/password/reset",
@@ -267,7 +267,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"currentPassword\": \"Password123!\",\n  \"newPassword\": \"NewPassword123!\"\n}"
+              "raw": "{\n  \"currentPassword\": \"Password123!\",\n  \"newPassword\": \"NewPassword123!\",\n  \"confirmPassword\": \"NewPassword123!\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/password/change",
@@ -297,6 +297,23 @@
           }
         },
         {
+          "name": "Login (by phone)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+14155552671\",\n  \"password\": \"Password123!\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Log in with mobile number (E.164) + password."
+          }
+        },
+        {
           "name": "Social Login",
           "request": {
             "method": "POST",
@@ -308,14 +325,31 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"provider\": \"google\",\n  \"token\": \"social-auth-token\"\n}"
+              "raw": "{\n  \"provider\": \"google\",\n  \"idToken\": \"firebase-id-token-from-mobile-sdk\",\n  \"role\": \"customer\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/social",
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "social"]
             },
-            "description": "Authenticate via Google or Apple OAuth. Returns NOT_IMPLEMENTED — integration pending."
+            "description": "Google or Apple sign-in via Firebase ID token.\n\nReturns auth tokens on success, or `{ needsProfileCompletion: true, missing: ['phone'], completionToken }` when phone is required."
+          }
+        },
+        {
+          "name": "Social Complete (collect phone)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completionToken\": \"{{completionToken}}\",\n  \"phone\": \"+14155552671\",\n  \"termsAccepted\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/social/complete",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "social", "complete"]
+            },
+            "description": "Complete social signup by providing phone. Sends OTP; verify with POST /auth/otp/verify { purpose: verify_phone }."
           }
         }
       ]

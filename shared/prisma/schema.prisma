@@ -239,6 +239,7 @@ model User {
   firebaseUid      String?    @unique @map("firebase_uid") @db.VarChar(128)
   emailVerifiedAt  DateTime?  @map("email_verified_at") @db.Timestamptz(6)
   phoneVerifiedAt  DateTime?  @map("phone_verified_at") @db.Timestamptz(6)
+  termsAcceptedAt  DateTime?  @map("terms_accepted_at") @db.Timestamptz(6)
   status           UserStatus @default(active)
   deletedAt        DateTime?  @map("deleted_at") @db.Timestamptz(6)
   createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -325,6 +326,8 @@ model OtpChallenge {
   // Stores { role, firstName, lastName } for the 2-step register flow.
   // Populated only when purpose = register. Null for all other purposes.
   registrationData Json?      @map("registration_data")
+  attemptCount     Int        @default(0) @map("attempt_count")
+  blockedUntil     DateTime?  @map("blocked_until") @db.Timestamptz(6)
   expiresAt        DateTime   @map("expires_at") @db.Timestamptz(6)
   consumedAt       DateTime?  @map("consumed_at") @db.Timestamptz(6)
   createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)

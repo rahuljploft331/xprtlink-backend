@@ -3,6 +3,8 @@ packages:
   - shared
 
 allowBuilds:
+  '@firebase/util': set this to true or false
   '@prisma/client': true
   '@prisma/engines': true
   prisma: true
+  protobufjs: set this to true or false

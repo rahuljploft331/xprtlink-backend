@@ -24,3 +24,18 @@ export function getExpiresInSeconds() {
   if (raw.endsWith("m")) return parseInt(raw, 10) * 60;
   return parseInt(raw, 10) || 604800;
 }
+
+/** Short-lived token for social signup profile completion (phone collection). */
+export function signCompletionToken(payload) {
+  return jwt.sign({ ...payload, typ: "social_completion" }, getSecret(), {
+    expiresIn: getSecretSync("SOCIAL_COMPLETION_TOKEN_EXPIRES_IN", "15m"),
+  });
+}
+
+export function verifyCompletionToken(token) {
+  const decoded = jwt.verify(token, getSecret());
+  if (decoded.typ !== "social_completion") {
+    throw new Error("Invalid completion token type");
+  }
+  return decoded;
+}

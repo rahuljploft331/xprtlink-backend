@@ -9,6 +9,8 @@ import {
   otpVerifyRequestSchema,
   passwordResetRequestSchema,
   passwordChangeRequestSchema,
+  socialLoginRequestSchema,
+  socialCompleteRequestSchema,
 } from "@xprtlink/shared/contracts";
 import * as svc from "../services/userService.js";
 
@@ -124,8 +126,21 @@ router.get(
 router.post(
   "/social",
   asyncHandler(async (req, res) => {
-    const data = await svc.socialLogin(req.body);
-    return ResponseFormatter.success(res, { message: "Social login", data });
+    const body = socialLoginRequestSchema.parse(req.body);
+    const data = await svc.socialLogin(body);
+    const message = data.needsProfileCompletion
+      ? "Profile completion required"
+      : "Social login successful";
+    return ResponseFormatter.success(res, { message, data });
+  })
+);
+
+router.post(
+  "/social/complete",
+  asyncHandler(async (req, res) => {
+    const body = socialCompleteRequestSchema.parse(req.body);
+    const data = await svc.socialComplete(body);
+    return ResponseFormatter.success(res, { message: "Verification code sent", data });
   })
 );
 

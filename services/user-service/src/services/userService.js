@@ -1,26 +1,17 @@
-import crypto from "crypto";
 import { getDb } from "@xprtlink/shared/db";
 import { issueTokens, loadUserContext, revokeRefreshToken } from "@xprtlink/shared/auth/tokens.js";
-import { hashPassword, verifyPassword, hashToken, verifyTokenHash } from "@xprtlink/shared/auth/password.js";
+import { hashPassword, verifyPassword, verifyTokenHash } from "@xprtlink/shared/auth/password.js";
+import {
+  createAndDeliverOtp,
+  findValidOtpChallenge,
+  verifyOtpCode,
+} from "@xprtlink/shared/auth/otp.js";
+import { verifyFirebaseIdToken, isFirebaseConfigured } from "@xprtlink/shared/auth/firebaseAdmin.js";
+import { signCompletionToken, verifyCompletionToken } from "@xprtlink/shared/auth/jwt.js";
 import { toAuthSessionDto } from "@xprtlink/shared/mappers/auth.mapper.js";
 import { toCustomerMeDto } from "@xprtlink/shared/mappers/customer.mapper.js";
-import { toExpertPublicDto } from "@xprtlink/shared/mappers/expert.mapper.js";
 import { badRequest, notFound, unauthorized, forbidden } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
-import { amountToCents } from "@xprtlink/shared/mappers/common.js";
-
-const OTP_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
-function generateOtp() {
-  if (
-    process.env.OTP_ENABLE_HARDCODE === "true" &&
-    process.env.NODE_ENV !== "production" &&
-    process.env.OTP_HARDCODE_CODE
-  ) {
-    return process.env.OTP_HARDCODE_CODE;
-  }
-  return String(crypto.randomInt(100000, 999999));
-}
 
 // ─── Session ──────────────────────────────────────────────────────────────────
 
@@ -43,101 +34,153 @@ export async function getSession(req) {
 // ─── Registration (2-step) ────────────────────────────────────────────────────
 //
 // Step 1 → POST /auth/register
-//   Creates User with status=pending_verification. NO profile is created yet
-//   (so there are zero dangling CustomerProfile/ExpertProfile rows on abandon).
-//   Stores { role, firstName, lastName } inside the OTP challenge so Step 2
-//   can atomically create the profile and activate the account.
+//   Creates User with status=pending_verification (email + phone required).
+//   Sends OTP to phone by default (or email if otpChannel=email).
 //
 // Step 2 → POST /auth/otp/verify  { purpose: "register" }
-//   Verifies the code, creates the profile, stamps emailVerifiedAt,
-//   flips status → active, and issues JWT + refresh token.
-//   Only at this point does the user become a real, usable account.
+//   Verifies OTP, creates profile, activates account, issues tokens.
+
+const claimedAvailabilityFilter = { status: { notIn: ["pending_verification", "deleted"] } };
+
+async function assertIdentifierAvailable({ email, phone, excludeUserId }) {
+  const db = getDb();
+  if (email) {
+    const row = await db.user.findFirst({
+      where: {
+        email,
+        ...claimedAvailabilityFilter,
+        ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+      },
+    });
+    if (row) {
+      throw badRequest("An account with this email already exists.", "EMAIL_TAKEN", "email");
+    }
+  }
+  if (phone) {
+    const row = await db.user.findFirst({
+      where: {
+        phone,
+        ...claimedAvailabilityFilter,
+        ...(excludeUserId ? { id: { not: excludeUserId } } : {}),
+      },
+    });
+    if (row) {
+      throw badRequest("This mobile number is already in use.", "PHONE_TAKEN", "phone");
+    }
+  }
+}
+
+async function createProfileForRole(tx, userId, role, firstName, lastName) {
+  if (role === "customer") {
+    return tx.user.update({
+      where: { id: userId },
+      data: { customerProfile: { create: { firstName, lastName } } },
+      include: profileInclude(),
+    });
+  }
+
+  const category = await tx.category.findFirst({
+    where: { isActive: true },
+    orderBy: { sortOrder: "asc" },
+  });
+  if (!category) throw badRequest("No categories configured");
+
+  return tx.user.update({
+    where: { id: userId },
+    data: {
+      expertProfile: {
+        create: {
+          firstName,
+          lastName,
+          categoryId: category.id,
+          consultationRateCents: 0,
+          settings: { create: { preferences: {} } },
+        },
+      },
+    },
+    include: profileInclude(),
+  });
+}
+
+function profileInclude() {
+  return {
+    customerProfile: true,
+    expertProfile: {
+      include: { subscriptions: { where: { status: "active" }, take: 1 } },
+    },
+  };
+}
+
+async function ensureProfileForRole(user, role, firstName, lastName) {
+  const hasProfile =
+    role === "customer" ? Boolean(user.customerProfile) : Boolean(user.expertProfile);
+  if (hasProfile) return user;
+
+  const resolvedFirst = firstName ?? user.customerProfile?.firstName ?? user.expertProfile?.firstName ?? "User";
+  const resolvedLast = lastName ?? user.customerProfile?.lastName ?? user.expertProfile?.lastName ?? "";
+
+  return createProfileForRole(getDb(), user.id, role, resolvedFirst, resolvedLast);
+}
 
 export async function register(body) {
-  const { role, email, phone, password, firstName, lastName } = body;
-  if (!email && !phone) throw badRequest("Email or phone is required", "VALIDATION_ERROR", "email");
+  const {
+    role,
+    email,
+    phone,
+    password,
+    firstName,
+    lastName,
+    otpChannel = "phone",
+  } = body;
+
+  await assertIdentifierAvailable({ email, phone });
 
   const db = getDb();
-  const identifierWhere = email ? { email } : { phone };
-
-  const existing = await db.user.findFirst({ where: identifierWhere });
-
-  if (existing) {
-    if (existing.status === "pending_verification") {
-      // Allow re-registration: update password in case they mistyped it,
-      // delete unconsumed register challenges, then fall through to issue a
-      // fresh OTP below.
-      const passwordHash = await hashPassword(password);
-      await db.user.update({ where: { id: existing.id }, data: { passwordHash } });
-      await db.otpChallenge.deleteMany({
-        where: { ...identifierWhere, purpose: "register", consumedAt: null },
-      });
-
-      const code = generateOtp();
-      const codeHash = await hashToken(code);
-      await db.otpChallenge.create({
-        data: {
-          userId: existing.id,
-          ...identifierWhere,
-          codeHash,
-          purpose: "register",
-          registrationData: { role, firstName, lastName },
-          expiresAt: new Date(Date.now() + OTP_TTL_MS),
-        },
-      });
-
-      if (process.env.NODE_ENV !== "production") {
-        console.log(`[otp] register (resend) code for ${email || phone}: ${code}`);
-      }
-      return { sent: true, expiresInSeconds: OTP_TTL_MS / 1000 };
-    }
-
-    // active / suspended / deleted — this identifier is genuinely taken
-    const field = email ? "email" : "phone";
-    throw badRequest(
-      email ? "Email already registered" : "Phone already registered",
-      email ? "EMAIL_TAKEN" : "PHONE_TAKEN",
-      field
-    );
-  }
-
-  // Brand-new user — create with pending_verification, NO profile yet
   const passwordHash = await hashPassword(password);
-  const user = await db.user.create({
-    data: {
-      ...(email ? { email } : {}),
-      ...(phone ? { phone } : {}),
-      passwordHash,
+  const termsAcceptedAt = new Date();
+
+  const pending = await db.user.findFirst({
+    where: {
       status: "pending_verification",
+      OR: [{ email }, { phone }],
     },
   });
 
-  const code = generateOtp();
-  const codeHash = await hashToken(code);
-  await db.otpChallenge.create({
-    data: {
-      userId: user.id,
-      ...identifierWhere,
-      codeHash,
-      purpose: "register",
-      // Carry the profile payload so verifyOtp can create it atomically
-      registrationData: { role, firstName, lastName },
-      expiresAt: new Date(Date.now() + OTP_TTL_MS),
-    },
-  });
-
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`[otp] register code for ${email || phone}: ${code}`);
+  let userId;
+  if (pending) {
+    await db.user.update({
+      where: { id: pending.id },
+      data: { email, phone, passwordHash, termsAcceptedAt },
+    });
+    userId = pending.id;
+  } else {
+    const user = await db.user.create({
+      data: {
+        email,
+        phone,
+        passwordHash,
+        termsAcceptedAt,
+        status: "pending_verification",
+      },
+    });
+    userId = user.id;
   }
 
-  return { sent: true, expiresInSeconds: OTP_TTL_MS / 1000 };
+  return createAndDeliverOtp({
+    email: otpChannel === "email" ? email : undefined,
+    phone: otpChannel === "phone" ? phone : undefined,
+    purpose: "register",
+    channel: otpChannel,
+    userId,
+    registrationData: { role, firstName, lastName, otpChannel },
+  });
 }
 
 // ─── Login ────────────────────────────────────────────────────────────────────
 
 export async function login(body) {
   const { role, email, phone, password } = body;
-  if (!email && !phone) throw badRequest("Email or phone is required");
+  if (!email && !phone) throw badRequest("Email or phone is required", "VALIDATION_ERROR", "email");
 
   const db = getDb();
   const user = await db.user.findFirst({
@@ -213,8 +256,6 @@ export async function sendOtp(body) {
   const { email, phone, purpose } = body;
   if (!email && !phone) throw badRequest("Email or phone required");
 
-  // The /register endpoint handles the register purpose internally.
-  // Calling /otp/send with purpose=register directly is not supported.
   if (purpose === "register") {
     throw badRequest(
       "Use POST /auth/register to start the registration flow.",
@@ -222,21 +263,13 @@ export async function sendOtp(body) {
     );
   }
 
-  const code = generateOtp();
-  const codeHash = await hashToken(code);
-  await getDb().otpChallenge.create({
-    data: {
-      email: email ?? null,
-      phone: phone ?? null,
-      codeHash,
-      purpose,
-      expiresAt: new Date(Date.now() + OTP_TTL_MS),
-    },
+  const channel = phone ? "phone" : "email";
+  return createAndDeliverOtp({
+    email,
+    phone,
+    purpose,
+    channel,
   });
-  if (process.env.NODE_ENV !== "production") {
-    console.log(`[otp] ${purpose} code for ${email || phone}: ${code}`);
-  }
-  return { sent: true, expiresInSeconds: OTP_TTL_MS / 1000 };
 }
 
 /**
@@ -257,13 +290,16 @@ export async function sendOtp(body) {
  */
 export async function verifyOtp(body) {
   const { email, phone, code, purpose } = body;
+  if (!email && !phone) throw badRequest("Email or phone required");
+
   const db = getDb();
-  const challenge = await findValidOtp({ email, phone, purpose });
+  const challenge = await findValidOtpChallenge({ email, phone, purpose });
+  await verifyOtpCode(challenge, code);
 
-  const valid = await verifyTokenHash(code, challenge.codeHash);
-  if (!valid) throw badRequest("Invalid OTP code", "INVALID_OTP");
+  if (purpose === "reset_password") {
+    return { verified: true };
+  }
 
-  // ── Register completion ──────────────────────────────────────────────────
   if (purpose === "register") {
     if (!challenge.registrationData || !challenge.userId) {
       throw badRequest(
@@ -274,50 +310,22 @@ export async function verifyOtp(body) {
 
     const { role, firstName, lastName } = challenge.registrationData;
 
-    // All three writes are atomic: consume OTP + create profile + activate user
     const user = await db.$transaction(async (tx) => {
       await tx.otpChallenge.update({
         where: { id: challenge.id },
         data: { consumedAt: new Date() },
       });
 
-      // Build profile payload — expert needs a default category
-      let profileData;
-      if (role === "customer") {
-        profileData = { customerProfile: { create: { firstName, lastName } } };
-      } else {
-        const category = await tx.category.findFirst({
-          where: { isActive: true },
-          orderBy: { sortOrder: "asc" },
-        });
-        if (!category) throw badRequest("No categories configured");
-        profileData = {
-          expertProfile: {
-            create: {
-              firstName,
-              lastName,
-              categoryId: category.id,
-              consultationRateCents: 0,
-              settings: { create: { preferences: {} } },
-            },
-          },
-        };
-      }
-
-      // Activate user + stamp verification + create profile in one update
-      return tx.user.update({
+      await tx.user.update({
         where: { id: challenge.userId },
         data: {
           status: "active",
-          ...(email ? { emailVerifiedAt: new Date() } : {}),
-          ...(phone ? { phoneVerifiedAt: new Date() } : {}),
-          ...profileData,
-        },
-        include: {
-          customerProfile: true,
-          expertProfile: { include: { subscriptions: { where: { status: "active" }, take: 1 } } },
+          emailVerifiedAt: new Date(),
+          phoneVerifiedAt: new Date(),
         },
       });
+
+      return createProfileForRole(tx, challenge.userId, role, firstName, lastName);
     });
 
     const tokens = await issueTokens(user, role);
@@ -325,7 +333,31 @@ export async function verifyOtp(body) {
     return tokens;
   }
 
-  // ── verify_email / verify_phone — stamp timestamps on active user ────────
+  if (purpose === "verify_phone" && challenge.registrationData?.isSocialCompletion) {
+    const { role, firstName, lastName } = challenge.registrationData;
+
+    const user = await db.$transaction(async (tx) => {
+      await tx.otpChallenge.update({
+        where: { id: challenge.id },
+        data: { consumedAt: new Date() },
+      });
+
+      await tx.user.update({
+        where: { id: challenge.userId },
+        data: {
+          status: "active",
+          phoneVerifiedAt: new Date(),
+        },
+      });
+
+      return createProfileForRole(tx, challenge.userId, role, firstName, lastName);
+    });
+
+    const tokens = await issueTokens(user, role);
+    if (!tokens) throw badRequest("Failed to create session");
+    return tokens;
+  }
+
   await db.$transaction([
     db.otpChallenge.update({
       where: { id: challenge.id },
@@ -354,9 +386,8 @@ export async function forgotPassword(body) {
 
 export async function resetPassword(body) {
   const { email, phone, code, newPassword } = body;
-  const challenge = await findValidOtp({ email, phone, purpose: "reset_password" });
-  const valid = await verifyTokenHash(code, challenge.codeHash);
-  if (!valid) throw badRequest("Invalid OTP code", "INVALID_OTP");
+  const challenge = await findValidOtpChallenge({ email, phone, purpose: "reset_password" });
+  await verifyOtpCode(challenge, code);
 
   const user = await getDb().user.findFirst({ where: email ? { email } : { phone } });
   if (!user) throw notFound("User not found");
@@ -392,23 +423,145 @@ export async function changePassword(userId, body) {
 export async function checkAvailability(query) {
   const db = getDb();
   const result = {};
-  // Exclude pending_verification users — they can re-register via the normal
-  // register endpoint which will resend a fresh OTP and update their record.
-  const claimedFilter = { status: { notIn: ["pending_verification", "deleted"] } };
   if (query.email) {
-    const row = await db.user.findFirst({ where: { email: query.email, ...claimedFilter } });
+    const row = await db.user.findFirst({
+      where: { email: query.email, ...claimedAvailabilityFilter },
+    });
     result.emailAvailable = !row;
   }
   if (query.mobile || query.phone) {
     const phone = query.mobile || query.phone;
-    const row = await db.user.findFirst({ where: { phone, ...claimedFilter } });
+    const row = await db.user.findFirst({
+      where: { phone, ...claimedAvailabilityFilter },
+    });
     result.phoneAvailable = !row;
   }
   return result;
 }
 
-export async function socialLogin(_body) {
-  throw badRequest("Social login not configured", "NOT_IMPLEMENTED");
+export async function socialLogin(body) {
+  const { idToken, role, firstName, lastName } = body;
+
+  if (!isFirebaseConfigured()) {
+    throw badRequest("Social login not configured", "NOT_IMPLEMENTED");
+  }
+
+  let decoded;
+  try {
+    decoded = await verifyFirebaseIdToken(idToken);
+  } catch {
+    throw unauthorized("Invalid social authentication token");
+  }
+
+  const firebaseUid = decoded.uid;
+  const email = decoded.email ?? null;
+  const db = getDb();
+  const include = profileInclude();
+
+  let user = await db.user.findUnique({ where: { firebaseUid }, include });
+
+  if (!user && email) {
+    user = await db.user.findUnique({ where: { email }, include });
+    if (user) {
+      user = await db.user.update({
+        where: { id: user.id },
+        data: { firebaseUid },
+        include,
+      });
+    }
+  }
+
+  if (!user) {
+    const nameParts = decoded.name?.trim().split(/\s+/) ?? [];
+    user = await db.user.create({
+      data: {
+        email,
+        firebaseUid,
+        emailVerifiedAt: decoded.email_verified ? new Date() : null,
+        status: "pending_verification",
+      },
+      include,
+    });
+
+    if (!user.phone) {
+      return {
+        needsProfileCompletion: true,
+        missing: ["phone"],
+        completionToken: signCompletionToken({
+          sub: user.id,
+          role,
+          firstName: firstName ?? nameParts[0] ?? "User",
+          lastName: lastName ?? nameParts.slice(1).join(" ") ?? "",
+        }),
+      };
+    }
+  }
+
+  if (!user.phone) {
+    return {
+      needsProfileCompletion: true,
+      missing: ["phone"],
+      completionToken: signCompletionToken({
+        sub: user.id,
+        role,
+        firstName: firstName ?? user.customerProfile?.firstName ?? user.expertProfile?.firstName ?? "User",
+        lastName: lastName ?? user.customerProfile?.lastName ?? user.expertProfile?.lastName ?? "",
+      }),
+    };
+  }
+
+  if (user.status === "suspended" || user.status === "deleted") {
+    throw forbidden("Your account has been suspended. Contact support.", "ACCOUNT_SUSPENDED");
+  }
+
+  user = await ensureProfileForRole(user, role, firstName, lastName);
+
+  if (user.status === "pending_verification") {
+    user = await db.user.update({
+      where: { id: user.id },
+      data: { status: "active" },
+      include,
+    });
+  }
+
+  const tokens = await issueTokens(user, role);
+  if (!tokens) throw badRequest(`No ${role} profile on this account`, "PROFILE_MISSING");
+  return tokens;
+}
+
+export async function socialComplete(body) {
+  const { completionToken, phone } = body;
+
+  let decoded;
+  try {
+    decoded = verifyCompletionToken(completionToken);
+  } catch {
+    throw badRequest("Profile completion session expired. Please sign in again.", "COMPLETION_EXPIRED");
+  }
+
+  const { sub: userId, role, firstName, lastName } = decoded;
+  const db = getDb();
+
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user) throw notFound("User not found");
+  if (user.phone) {
+    throw badRequest("Phone number already provided", "PHONE_ALREADY_SET", "phone");
+  }
+
+  await assertIdentifierAvailable({ phone, excludeUserId: userId });
+
+  await db.user.update({
+    where: { id: userId },
+    data: { phone, termsAcceptedAt: new Date() },
+  });
+
+  return createAndDeliverOtp({
+    phone,
+    purpose: "verify_phone",
+    channel: "phone",
+    userId,
+    registrationData: { role, firstName, lastName, isSocialCompletion: true },
+  });
 }
 
 // ─── Stale-account cleanup ────────────────────────────────────────────────────
@@ -436,21 +589,7 @@ export async function cleanupStalePendingUsers({ maxAgeMinutes = 60 } = {}) {
   return { deleted: result.count };
 }
 
-// ─── Internal helpers ─────────────────────────────────────────────────────────
-
-async function findValidOtp({ email, phone, purpose }) {
-  const challenge = await getDb().otpChallenge.findFirst({
-    where: {
-      purpose,
-      consumedAt: null,
-      expiresAt: { gt: new Date() },
-      ...(email ? { email } : { phone }),
-    },
-    orderBy: { createdAt: "desc" },
-  });
-  if (!challenge) throw badRequest("OTP expired or not found", "OTP_EXPIRED");
-  return challenge;
-}
+// findValidOtp removed — use @xprtlink/shared/auth/otp.js
 
 // ─── Customer profile & discoveries ──────────────────────────────────────────
 
