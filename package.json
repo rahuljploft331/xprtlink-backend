@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "packageManager": "pnpm@11.10.0",
+  "packageManager": "pnpm@11.20.0+sha512.9a6f330a95b66446ea088faf1521405a8a01f07fde7124cc9958dfed52d4bb436737e65b08f85f37b46fcba375092558ac51262b816844b22f63406ed166bfee",
   "workspaces": [
     "services/*",
     "shared"
@@ -30,12 +30,12 @@
   },
   "dependencies": {
     "@xprtlink/shared": "workspace:*",
-    "bcryptjs": "^3.0.2"
+    "bcryptjs": "^3.0.3"
   },
   "devDependencies": {
-    "dotenv": "^16.4.7",
+    "dotenv": "^16.6.1",
     "dotenv-cli": "^8.0.0",
-    "nodemon": "^3.1.9",
+    "nodemon": "^3.1.14",
     "pm2": "^5.4.3"
   },
   "engines": {
