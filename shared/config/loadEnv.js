@@ -28,6 +28,10 @@ export function getConfig(serviceName) {
     jwtSecret: getSecretSync("JWT_SECRET"),
     jwtExpiresIn: getSecretSync("JWT_EXPIRES_IN", "7d"),
     serviceSecret: getSecretSync("SERVICE_SECRET"),
+    rateLimitWindowMs: Number(getSecretSync("RATE_LIMIT_WINDOW_MS", "900000")),
+    rateLimitMax: Number(getSecretSync("RATE_LIMIT_MAX", "100")),
+    rateLimitAuthWindowMs: Number(getSecretSync("RATE_LIMIT_AUTH_WINDOW_MS", "900000")),
+    rateLimitAuthMax: Number(getSecretSync("RATE_LIMIT_AUTH_MAX", "10")),
     serviceUrls: {
       user: getSecretSync("USER_SERVICE_URL", "http://localhost:4001"),
       expert: getSecretSync("EXPERT_SERVICE_URL", "http://localhost:4002"),
