@@ -10,7 +10,7 @@ env:
 
 jobs:
   build-and-deploy:
-    name: Build, Migrate & Deploy Backend
+    name: Build, Migrate & Deploy Backend.
     runs-on: ubuntu-latest
 
     steps:
