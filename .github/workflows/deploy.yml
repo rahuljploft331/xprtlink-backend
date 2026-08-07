@@ -23,6 +23,11 @@ jobs:
 
           ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "bash -l -c '
             set -e
+            export PATH=\$PATH:\$HOME/.local/share/pnpm:\$HOME/.nvm/versions/node/\$(ls \$HOME/.nvm/versions/node 2>/dev/null | tail -n 1)/bin:/usr/local/bin:/usr/bin
+            export PNPM_HOME=\"\$HOME/.local/share/pnpm\"
+            export PATH=\"\$PNPM_HOME:\$PATH\"
+            source ~/.bashrc 2>/dev/null || true
+
             cd ${{ env.TARGET_DIR }}
             
             echo \"=== Fetching latest code via Git Pull ===\"
