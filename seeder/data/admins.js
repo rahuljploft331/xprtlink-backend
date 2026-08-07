@@ -44,7 +44,7 @@ const financePermissions = {
 
 export const admins = [
   {
-    email: "admin@xpertlink.local",
+    email: "admin@xpertlink.com",
     name: "Ops Admin",
     role: "super_admin",
     status: "active",

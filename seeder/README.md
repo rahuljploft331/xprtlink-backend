@@ -31,7 +31,7 @@ pnpm reset -- --no-seed   # wipe only
 
 | Account | Password |
 |---------|----------|
-| admin@xpertlink.local | Admin@123 |
+| admin@xpertlink.com | Admin@123 |
 | support@xpertlink.local | Support@123 |
 | finance@xpertlink.local | Finance@123 |
 | *customers* | Customer@123 |
