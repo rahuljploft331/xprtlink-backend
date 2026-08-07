@@ -1,0 +1,45 @@
+name: Deploy XprtLink Backend Microservices
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  TARGET_DIR: /home/ubuntu/xprtlink-backend
+
+jobs:
+  build-and-deploy:
+    name: Build, Migrate & Deploy Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via Git Pull, Migrate & Reload PM2
+        run: |
+          mkdir -p ~/.ssh
+          eval $(ssh-agent -s)
+          printf "%s\n" "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' | ssh-add -
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+          ssh ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }} "bash -l -c '
+            set -e
+            cd ${{ env.TARGET_DIR }}
+            
+            echo \"=== Fetching latest code via Git Pull ===\"
+            git pull origin main
+
+            echo \"=== Installing dependencies on server ===\"
+            pnpm install --frozen-lockfile
+
+            echo \"=== Generating Prisma Client ===\"
+            pnpm db:generate
+
+            echo \"=== Applying Database Migrations ===\"
+            pnpm db:migrate
+
+            echo \"=== Restarting PM2 Microservices ===\"
+            pnpm pm2:start || pnpm pm2:restart
+            
+            echo \"=== PM2 Status ===\"
+            pnpm pm2:status
+          '"
