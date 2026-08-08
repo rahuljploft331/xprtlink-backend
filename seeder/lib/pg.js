@@ -77,6 +77,7 @@ export async function truncateAllTables() {
  * Insert demo data from buildSeedPayload() into PostgreSQL.
  */
 export async function seedPostgres(payload) {
+  await truncateAllTables();
   const db = getDb();
 
   // Categories
