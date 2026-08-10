@@ -19,4 +19,6 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 const PORT = config.port;
-await startService(app, PORT, "API Gateway", { useDatabase: false });
+const server = await startService(app, PORT, "API Gateway", { useDatabase: false });
+server.setMaxListeners(25);
+

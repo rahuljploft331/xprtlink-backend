@@ -1,15 +1,29 @@
-import { Router } from "express";
+import { Router, raw } from "express";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { authenticate, requireRole } from "@xprtlink/shared/middleware/auth.js";
 import {
   addPaymentMethodRequestSchema,
   payConsultationRequestSchema,
+  preAuthHoldRequestSchema,
+  customConnectKycRequestSchema,
+  attachBankAccountRequestSchema,
   subscribeRequestSchema,
 } from "@xprtlink/shared/contracts";
 import * as svc from "../services/billingService.js";
 
 const router = Router();
+
+// Unauthenticated Webhook Listener Endpoint (uses raw body parsing for Stripe signature check)
+router.post(
+  "/webhook",
+  raw({ type: "application/json" }),
+  asyncHandler(async (req, res) => {
+    const signature = req.headers["stripe-signature"];
+    const result = await svc.handleStripeWebhook(req.body, signature);
+    return res.status(200).json(result);
+  })
+);
 
 router.use(authenticate);
 
@@ -42,6 +56,16 @@ router.delete(
 );
 
 router.post(
+  "/consultations/:id/hold",
+  requireRole("customer"),
+  asyncHandler(async (req, res) => {
+    const body = preAuthHoldRequestSchema.parse(req.body);
+    const data = await svc.holdConsultationFunds(req.auth, req.params.id, body);
+    return ResponseFormatter.success(res, { message: "Pre-authorization hold placed", data });
+  })
+);
+
+router.post(
   "/consultations/:id/pay",
   requireRole("customer"),
   asyncHandler(async (req, res) => {
@@ -56,6 +80,26 @@ router.get(
   asyncHandler(async (req, res) => {
     const data = await svc.getTransaction(req.auth, req.params.id);
     return ResponseFormatter.success(res, { message: "Transaction", data });
+  })
+);
+
+router.post(
+  "/experts/kyc",
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const body = customConnectKycRequestSchema.parse(req.body);
+    const data = await svc.submitCustomConnectKyc(req.auth, body);
+    return ResponseFormatter.success(res, { message: "Custom KYC account created", data, status: 201 });
+  })
+);
+
+router.post(
+  "/experts/bank-account",
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const body = attachBankAccountRequestSchema.parse(req.body);
+    const data = await svc.attachBankAccount(req.auth, body);
+    return ResponseFormatter.success(res, { message: "Bank account attached", data, status: 201 });
   })
 );
 
@@ -97,3 +141,4 @@ router.get(
 );
 
 export default router;
+

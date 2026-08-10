@@ -105,6 +105,47 @@
       "name": "Payments & Transactions",
       "item": [
         {
+          "name": "Pre-Authorize Consultation Funds Hold",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"paymentMethodId\": \"pm-uuid-here\",\n  \"estimatedCents\": 5000\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/consultations/:id/hold",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "consultations",
+                ":id",
+                "hold"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "consultation-uuid-here"
+                }
+              ]
+            },
+            "description": "Pre-authorizes (holds) funds on customer card before starting video call."
+          }
+        },
+        {
           "name": "Pay Consultation Call",
           "request": {
             "method": "POST",
@@ -175,6 +216,117 @@
               ]
             },
             "description": "Get Stripe receipt details of a financial transaction."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stripe Connect & Payouts (Expert)",
+      "item": [
+        {
+          "name": "Submit Custom Connect KYC",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"dob\": { \"day\": 15, \"month\": 5, \"year\": 1988 },\n  \"address\": {\n    \"line1\": \"123 Main St\",\n    \"city\": \"San Francisco\",\n    \"state\": \"CA\",\n    \"postalCode\": \"94105\",\n    \"country\": \"US\"\n  },\n  \"ssnLast4\": \"6789\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/experts/kyc",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "experts",
+                "kyc"
+              ]
+            },
+            "description": "Create Stripe Custom Connect account natively with Expert KYC details."
+          }
+        },
+        {
+          "name": "Attach Expert Bank Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"routingNumber\": \"110000000\",\n  \"accountNumber\": \"000123456789\",\n  \"accountHolderName\": \"John Doe\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/experts/bank-account",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "experts",
+                "bank-account"
+              ]
+            },
+            "description": "Link bank account to Expert Custom Connect account for payouts."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stripe Webhook",
+      "item": [
+        {
+          "name": "Stripe Webhook Event Listener",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "stripe-signature",
+                "value": "t=12345,v1=signature_hash"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"payment_intent.amount_capturable_updated\",\n  \"data\": {}\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/webhook",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "webhook"
+              ]
+            },
+            "description": "Stripe Webhook endpoint for processing async payment & account events."
           }
         }
       ]

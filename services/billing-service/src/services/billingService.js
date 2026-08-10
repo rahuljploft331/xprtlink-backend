@@ -9,8 +9,10 @@ import {
 } from "@xprtlink/shared/mappers/billing.mapper.js";
 import { badRequest, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
+import * as stripeSvc from "./stripeService.js";
 
 const COMMISSION_RATE = 0.15;
+
 
 function computeConsultationChargeCents(consultation) {
   const durationSeconds = consultation.durationSeconds ?? 0;
@@ -83,6 +85,58 @@ export async function removePaymentMethod(auth, methodId) {
   return { removed: true };
 }
 
+export async function holdConsultationFunds(auth, consultationId, body) {
+  const db = getDb();
+  const consultation = await db.consultation.findFirst({
+    where: { id: consultationId, customerId: auth.customerProfileId },
+    include: { customer: true, expert: true },
+  });
+
+  if (!consultation) throw notFound("Consultation not found");
+  if (consultation.billingStatus === "charged") {
+    throw badRequest("Consultation already paid", "ALREADY_PAID");
+  }
+
+  const paymentMethod = await db.paymentMethod.findFirst({
+    where: { id: body.paymentMethodId, customerProfileId: auth.customerProfileId },
+  });
+  if (!paymentMethod) throw notFound("Payment method not found");
+
+  // Default hold amount (e.g. estimated 30 mins) or provided estimatedCents
+  const estimatedCents = body.estimatedCents || Math.max(30 * consultation.ratePerMinuteCents, 3000);
+
+  // Get or create Stripe customer object
+  const customerUser = await db.customerProfile.findUnique({
+    where: { id: auth.customerProfileId },
+    include: { user: true },
+  });
+
+  const stripeCustomer = await stripeSvc.getOrCreateStripeCustomer({
+    email: customerUser?.user?.email || "customer@example.com",
+    name: customerUser?.user?.fullName || "Customer",
+  });
+
+  // Call Stripe Pre-Auth Hold (capture_method: 'manual')
+  const holdResult = await stripeSvc.createPreAuthHold({
+    customerStripeId: stripeCustomer.id,
+    stripePaymentMethodId: paymentMethod.stripePaymentMethodId,
+    amountCents: estimatedCents,
+    currency: consultation.expert.currency || "USD",
+    metadata: {
+      consultationId,
+      customerProfileId: auth.customerProfileId,
+    },
+  });
+
+  return {
+    consultationId,
+    holdStatus: holdResult.status, // 'requires_capture' when pre-auth succeeds
+    stripePaymentIntentId: holdResult.id,
+    amountCents: estimatedCents,
+    authorized: true,
+  };
+}
+
 export async function payConsultation(auth, consultationId, body) {
   const db = getDb();
   const consultation = await db.consultation.findFirst({
@@ -94,10 +148,7 @@ export async function payConsultation(auth, consultationId, body) {
   if (consultation.status !== "completed") {
     throw badRequest("Consultation must be completed before payment", "INVALID_STATE");
   }
-  if (consultation.billingStatus === "charged") {
-    throw badRequest("Consultation already paid", "ALREADY_PAID");
-  }
-  if (consultation.charge) {
+  if (consultation.billingStatus === "charged" || consultation.charge) {
     throw badRequest("Consultation already paid", "ALREADY_PAID");
   }
 
@@ -115,9 +166,15 @@ export async function payConsultation(auth, consultationId, body) {
   const expertShareCents = amountCents - commissionCents;
   const currency = consultation.expert.currency || "USD";
 
-  // Stripe PaymentIntent stub — always succeeds locally.
-  const stripePaymentIntentId = `pi_stub_${crypto.randomUUID()}`;
+  // Capture pre-auth charge or charge card directly via Stripe SDK
+  const stripeCharge = await stripeSvc.captureConsultationCharge({
+    stripePaymentIntentId: body.stripePaymentIntentId,
+    finalCents: amountCents,
+  });
 
+  const stripePaymentIntentId = stripeCharge.id;
+
+  // Execute database transaction
   const result = await db.$transaction(async (tx) => {
     const transaction = await tx.transaction.create({
       data: {
@@ -163,6 +220,84 @@ export async function payConsultation(auth, consultationId, body) {
 
   return toTransactionDto(result);
 }
+
+export async function submitCustomConnectKyc(auth, body) {
+  const db = getDb();
+  const expert = await db.expertProfile.findUnique({
+    where: { id: auth.expertProfileId },
+    include: { user: true },
+  });
+
+  if (!expert) throw notFound("Expert profile not found");
+
+  // Call Stripe Custom Account creation API
+  const account = await stripeSvc.createCustomConnectAccount({
+    expertEmail: expert.user.email,
+    firstName: body.firstName,
+    lastName: body.lastName,
+    dob: body.dob,
+    address: body.address,
+    ssnLast4: body.ssnLast4,
+    frontDocumentFileId: body.frontDocumentFileId,
+    backDocumentFileId: body.backDocumentFileId,
+    userIpAddress: body.userIpAddress,
+  });
+
+  return {
+    expertProfileId: auth.expertProfileId,
+    stripeAccountId: account.id,
+    kycStatus: "submitted",
+  };
+}
+
+export async function attachBankAccount(auth, body) {
+  const db = getDb();
+  const expert = await db.expertProfile.findUnique({
+    where: { id: auth.expertProfileId },
+  });
+
+  if (!expert) throw notFound("Expert profile not found");
+
+  const externalAccount = await stripeSvc.attachExternalBankAccount({
+    stripeAccountId: expert.stripeAccountId || `acct_stub_${auth.expertProfileId}`,
+    routingNumber: body.routingNumber,
+    accountNumber: body.accountNumber,
+    accountHolderName: body.accountHolderName,
+  });
+
+  return {
+    expertProfileId: auth.expertProfileId,
+    bankAccountId: externalAccount.id,
+    status: "active",
+  };
+}
+
+export async function handleStripeWebhook(payload, signature) {
+  const event = stripeSvc.constructWebhookEvent(payload, signature);
+
+  switch (event.type) {
+    case "payment_intent.amount_capturable_updated":
+      // Pre-auth hold succeeded
+      break;
+    case "payment_intent.succeeded":
+      // Final charge captured
+      break;
+    case "payment_intent.payment_failed":
+      // Pre-auth or charge failed
+      break;
+    case "account.updated":
+      // Expert Connect KYC account updated
+      break;
+    case "transfer.created":
+      // Payout transfer created
+      break;
+    default:
+      break;
+  }
+
+  return { received: true, eventType: event.type };
+}
+
 
 export async function getTransaction(auth, transactionId) {
   const db = getDb();

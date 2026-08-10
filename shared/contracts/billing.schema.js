@@ -65,3 +65,36 @@ export const addPaymentMethodRequestSchema = z.object({
   expYear: z.number().int().default(new Date().getFullYear() + 3),
   setDefault: z.boolean().optional(),
 });
+
+export const preAuthHoldRequestSchema = z.object({
+  paymentMethodId: z.string().uuid(),
+  estimatedCents: z.number().int().positive().optional(),
+});
+
+export const customConnectKycRequestSchema = z.object({
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  dob: z.object({
+    day: z.number().int().min(1).max(31),
+    month: z.number().int().min(1).max(12),
+    year: z.number().int().min(1900).max(new Date().getFullYear()),
+  }),
+  address: z.object({
+    line1: z.string().min(1),
+    city: z.string().min(1),
+    state: z.string().min(1),
+    postalCode: z.string().min(1),
+    country: z.string().length(2).default("US"),
+  }),
+  ssnLast4: z.string().length(4),
+  frontDocumentFileId: z.string().min(1).optional(),
+  backDocumentFileId: z.string().min(1).optional(),
+  userIpAddress: z.string().optional(),
+});
+
+export const attachBankAccountRequestSchema = z.object({
+  routingNumber: z.string().min(1),
+  accountNumber: z.string().min(1),
+  accountHolderName: z.string().min(1),
+});
+
