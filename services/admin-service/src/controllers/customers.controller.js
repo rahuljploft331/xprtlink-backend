@@ -19,13 +19,23 @@ export async function list(req, res, next) {
         }
       : {};
 
+    const sortField = req.query.sort || "createdAt";
+    const sortOrder = req.query.order === "asc" ? "asc" : "desc";
+    let orderBy = { createdAt: sortOrder };
+
+    if (sortField === "email" || sortField === "status") {
+      orderBy = { [sortField]: sortOrder };
+    } else if (sortField === "name") {
+      orderBy = { customerProfile: { firstName: sortOrder } };
+    }
+
     const [total, users] = await Promise.all([
       db.user.count({ where: { customerProfile: { isNot: null }, ...where } }),
       db.user.findMany({
         where: { customerProfile: { isNot: null }, ...where },
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         include: {
           customerProfile: true,
           _count: { select: { authSessions: true } },

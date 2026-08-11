@@ -19,13 +19,25 @@ export async function list(req, res, next) {
       ];
     }
 
+    const sortField = req.query.sort || "createdAt";
+    const sortOrder = req.query.order === "asc" ? "asc" : "desc";
+    let orderBy = { createdAt: sortOrder };
+
+    if (sortField === "name") {
+      orderBy = { firstName: sortOrder };
+    } else if (sortField === "status") {
+      orderBy = { verificationStatus: sortOrder };
+    } else if (sortField === "rating") {
+      orderBy = { ratingAvg: sortOrder };
+    }
+
     const [total, experts] = await Promise.all([
       db.expertProfile.count({ where }),
       db.expertProfile.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         include: {
           category: { select: { id: true, name: true } },
           subscriptions: {
