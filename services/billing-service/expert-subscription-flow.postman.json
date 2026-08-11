@@ -1,0 +1,259 @@
+{
+  "info": {
+    "_postman_id": "4b7415df-350a-4e25-a59a-c6ff9db01772",
+    "name": "XpertLink Expert Subscription Flow (Final Verified)",
+    "description": "Complete automated Postman flow for an expert subscribing to a subscription plan (login -> list plans -> subscribe -> verify active subscription state).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "expert_token",
+      "value": ""
+    },
+    {
+      "key": "plan_code",
+      "value": "professional"
+    }
+  ],
+  "item": [
+    {
+      "name": "Step 1: Expert Login / Auth Token",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "if (jsonData.data && jsonData.data.accessToken) {",
+              "    pm.collectionVariables.set('expert_token', jsonData.data.accessToken);",
+              "    pm.environment.set('expert_token', jsonData.data.accessToken);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "options": { "raw": { "language": "json" } },
+          "raw": "{\n  \"role\": \"expert\",\n  \"email\": \"ava.chen@expert.local\",\n  \"password\": \"Expert@123\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/login",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
+        },
+        "description": "Logs in demo expert user and saves the accessToken into {{expert_token}}."
+      }
+    },
+    {
+      "name": "Step 2: List Subscription Plans",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Plans list is non-empty', function () {",
+              "    pm.expect(jsonData.data).to.be.an('array').that.is.not.empty;",
+              "});",
+              "if (jsonData.data && jsonData.data.length > 0) {",
+              "    var targetPlan = jsonData.data.find(p => p.code === 'professional') || jsonData.data[0];",
+              "    pm.collectionVariables.set('plan_code', targetPlan.code);",
+              "    pm.collectionVariables.set('plan_id', targetPlan.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/billing/subscriptions/plans",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "subscriptions",
+            "plans"
+          ]
+        },
+        "description": "Retrieves available expert subscription plans (Core, Professional, Elite)."
+      }
+    },
+    {
+      "name": "Step 3: Subscribe to Subscription Plan",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.test('Status code is 200 or 201', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "});",
+              "pm.test('Subscription is active', function () {",
+              "    pm.expect(jsonData.data.status).to.eql('active');",
+              "});",
+              "if (jsonData.data && jsonData.data.id) {",
+              "    pm.collectionVariables.set('subscription_id', jsonData.data.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "options": { "raw": { "language": "json" } },
+          "raw": "{\n  \"planCode\": \"{{plan_code}}\",\n  \"store\": \"apple\",\n  \"receiptData\": \"receipt_demo_token_123\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/billing/subscriptions",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "subscriptions"
+          ]
+        },
+        "description": "Subscribes expert to chosen plan (IAP/Stripe receipt flow)."
+      }
+    },
+    {
+      "name": "Step 4: Check Active Subscription Details (/subscriptions/me)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Subscription details match active status', function () {",
+              "    pm.expect(jsonData.data.status).to.eql('active');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/billing/subscriptions/me",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "subscriptions",
+            "me"
+          ]
+        },
+        "description": "Fetches active subscription metadata for logged-in expert."
+      }
+    },
+    {
+      "name": "Step 5: Verify Expert Profile Subscription Flag (/experts/me)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var jsonData = pm.response.json();",
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Expert profile shows subscriptionActive is true', function () {",
+              "    pm.expect(jsonData.data.subscriptionActive).to.be.true;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/experts/me",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "me"
+          ]
+        },
+        "description": "Verifies that subscriptionActive is true in ExpertProfile DTO."
+      }
+    }
+  ]
+}

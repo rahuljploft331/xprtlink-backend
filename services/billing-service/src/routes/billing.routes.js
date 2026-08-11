@@ -12,6 +12,7 @@ import {
 } from "@xprtlink/shared/contracts";
 import * as svc from "../services/billingService.js";
 
+
 const router = Router();
 
 // Unauthenticated Webhook Listener Endpoint (uses raw body parsing for Stripe signature check)
@@ -133,6 +134,16 @@ router.get(
     return ResponseFormatter.success(res, { message: "Current subscription", data });
   })
 );
+
+router.delete(
+  "/subscriptions/me",
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const data = await svc.cancelSubscription(req.auth);
+    return ResponseFormatter.success(res, { message: "Subscription cancelled", data });
+  })
+);
+
 
 router.get(
   "/earnings",

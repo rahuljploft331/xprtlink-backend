@@ -7,7 +7,7 @@ import {
   toSubscriptionPlanDto,
   toTransactionDto,
 } from "@xprtlink/shared/mappers/billing.mapper.js";
-import { badRequest, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
+import { badRequest, conflict, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 import * as stripeSvc from "./stripeService.js";
 
@@ -398,10 +398,25 @@ export async function subscribe(auth, body) {
   periodEnd.setMonth(periodEnd.getMonth() + 1);
 
   const subscription = await db.$transaction(async (tx) => {
-    await tx.expertSubscription.updateMany({
+    // ── Guard: block re-subscribing to the same active plan ─────────────────
+    const existingActive = await tx.expertSubscription.findFirst({
       where: { expertProfileId: auth.expertProfileId, status: "active" },
-      data: { status: "cancelled", cancelledAt: now },
     });
+
+    if (existingActive && existingActive.planId === plan.id) {
+      throw conflict(
+        "You are already subscribed to this plan. To change your plan, choose a different one.",
+        "ALREADY_SUBSCRIBED"
+      );
+    }
+
+    // Cancel any other active subscription (upgrade / downgrade)
+    if (existingActive) {
+      await tx.expertSubscription.update({
+        where: { id: existingActive.id },
+        data: { status: "cancelled", cancelledAt: now },
+      });
+    }
 
     const created = await tx.expertSubscription.create({
       data: {
@@ -469,4 +484,24 @@ export async function getEarnings(auth, query) {
 
   const items = rows.map((row) => toEarningsEntryDto(row, expert?.currency || "USD"));
   return paginatedResult(items, { page, limit, total });
+}
+
+export async function cancelSubscription(auth) {
+  const db = getDb();
+  const subscription = await db.expertSubscription.findFirst({
+    where: { expertProfileId: auth.expertProfileId, status: "active" },
+    include: { plan: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!subscription) throw notFound("No active subscription to cancel");
+
+  const now = new Date();
+  const cancelled = await db.expertSubscription.update({
+    where: { id: subscription.id },
+    data: { status: "cancelled", cancelledAt: now },
+    include: { plan: true },
+  });
+
+  return toExpertSubscriptionDto(cancelled, cancelled.plan);
 }

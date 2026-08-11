@@ -435,9 +435,72 @@
             },
             "description": "Retrieve current plan info and active subscription state of the expert."
           }
+        },
+        {
+          "id": "57225879-55555555-0000-4000-8000-000000000005",
+          "name": "Upgrade / Downgrade Plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"planCode\": \"elite\",\n  \"store\": \"apple\",\n  \"receiptData\": \"receipt_upgrade_token\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/subscriptions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "subscriptions"
+              ]
+            },
+            "description": "Upgrade or downgrade to a different plan. Cancels current active subscription and activates the new plan immediately. Will return 409 ALREADY_SUBSCRIBED if same plan is requested."
+          }
+        },
+        {
+          "id": "57225879-55555555-0000-4000-8000-000000000006",
+          "name": "Cancel Subscription",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/subscriptions/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "subscriptions",
+                "me"
+              ]
+            },
+            "description": "Cancels the expert's active subscription immediately. Sets status to 'cancelled'. Returns 404 if no active subscription exists."
+          }
         }
       ]
     },
+
     {
       "id": "57225879-66666666-0000-4000-8000-000000000001",
       "name": "Earnings (Expert)",
