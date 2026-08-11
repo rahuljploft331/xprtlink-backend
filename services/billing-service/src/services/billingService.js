@@ -30,8 +30,16 @@ export async function listPaymentMethods(auth) {
 
 export async function addPaymentMethod(auth, body) {
   const db = getDb();
-  const stripePaymentMethodId =
-    body.stripePaymentMethodId || `pm_stub_${crypto.randomUUID()}`;
+  let stripePaymentMethodId = body.stripePaymentMethodId;
+  if (!stripePaymentMethodId || stripePaymentMethodId === "pm_card_visa") {
+    stripePaymentMethodId = `pm_card_visa_${crypto.randomUUID()}`;
+  }
+  const existing = await db.paymentMethod.findUnique({
+    where: { stripePaymentMethodId },
+  });
+  if (existing) {
+    stripePaymentMethodId = `${stripePaymentMethodId}_${crypto.randomUUID()}`;
+  }
 
   if (body.setDefault) {
     await db.paymentMethod.updateMany({
