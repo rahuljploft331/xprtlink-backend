@@ -1,15 +1,17 @@
 {
   "info": {
-    "_postman_id": "c1f7b7cb-4b3d-4c3e-8848-12cd80a1c6a6",
+    "_postman_id": "fad6dcbe-8bc4-4d3f-8ef2-d4b8443bc89e",
     "name": "Billing Service",
     "description": "REST APIs for Stripe customer payment methods, subscription plans, expert payouts/earnings, and billing transactions.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
+      "id": "57225879-11111111-0000-4000-8000-000000000001",
       "name": "Payment Methods (Customer)",
       "item": [
         {
+          "id": "57225879-11111111-0000-4000-8000-000000000002",
           "name": "List Payment Methods",
           "request": {
             "method": "GET",
@@ -35,6 +37,7 @@
           }
         },
         {
+          "id": "57225879-11111111-0000-4000-8000-000000000003",
           "name": "Add Payment Method",
           "request": {
             "method": "POST",
@@ -68,6 +71,7 @@
           }
         },
         {
+          "id": "57225879-11111111-0000-4000-8000-000000000004",
           "name": "Remove Payment Method",
           "request": {
             "method": "DELETE",
@@ -102,9 +106,11 @@
       ]
     },
     {
+      "id": "57225879-22222222-0000-4000-8000-000000000001",
       "name": "Payments & Transactions",
       "item": [
         {
+          "id": "57225879-22222222-0000-4000-8000-000000000002",
           "name": "Pre-Authorize Consultation Funds Hold",
           "request": {
             "method": "POST",
@@ -146,6 +152,7 @@
           }
         },
         {
+          "id": "57225879-22222222-0000-4000-8000-000000000003",
           "name": "Pay Consultation Call",
           "request": {
             "method": "POST",
@@ -187,6 +194,7 @@
           }
         },
         {
+          "id": "57225879-22222222-0000-4000-8000-000000000004",
           "name": "Get Transaction Receipt Details",
           "request": {
             "method": "GET",
@@ -221,9 +229,11 @@
       ]
     },
     {
+      "id": "57225879-33333333-0000-4000-8000-000000000001",
       "name": "Stripe Connect & Payouts (Expert)",
       "item": [
         {
+          "id": "57225879-33333333-0000-4000-8000-000000000002",
           "name": "Submit Custom Connect KYC",
           "request": {
             "method": "POST",
@@ -258,6 +268,7 @@
           }
         },
         {
+          "id": "57225879-33333333-0000-4000-8000-000000000003",
           "name": "Attach Expert Bank Account",
           "request": {
             "method": "POST",
@@ -294,9 +305,11 @@
       ]
     },
     {
+      "id": "57225879-44444444-0000-4000-8000-000000000001",
       "name": "Stripe Webhook",
       "item": [
         {
+          "id": "57225879-44444444-0000-4000-8000-000000000002",
           "name": "Stripe Webhook Event Listener",
           "request": {
             "method": "POST",
@@ -332,9 +345,11 @@
       ]
     },
     {
+      "id": "57225879-55555555-0000-4000-8000-000000000001",
       "name": "Subscriptions (Expert)",
       "item": [
         {
+          "id": "57225879-55555555-0000-4000-8000-000000000002",
           "name": "List Subscription Plans",
           "request": {
             "method": "GET",
@@ -361,6 +376,7 @@
           }
         },
         {
+          "id": "57225879-55555555-0000-4000-8000-000000000003",
           "name": "Subscribe to Plan",
           "request": {
             "method": "POST",
@@ -394,6 +410,7 @@
           }
         },
         {
+          "id": "57225879-55555555-0000-4000-8000-000000000004",
           "name": "Get My Subscription",
           "request": {
             "method": "GET",
@@ -422,9 +439,11 @@
       ]
     },
     {
+      "id": "57225879-66666666-0000-4000-8000-000000000001",
       "name": "Earnings (Expert)",
       "item": [
         {
+          "id": "57225879-66666666-0000-4000-8000-000000000002",
           "name": "Get Earnings History",
           "request": {
             "method": "GET",

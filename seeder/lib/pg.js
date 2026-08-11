@@ -267,6 +267,64 @@ export async function seedPostgres(payload) {
     expert._userId = user.id;
   }
 
+  // Seed consultations & transactions
+  if (payload.consultations && payload.customers.length > 0 && payload.experts.length > 0) {
+    const now = Date.now();
+    for (const c of payload.consultations) {
+      const customer = payload.customers[c.customerIndex % payload.customers.length];
+      const expert = payload.experts[c.expertIndex % payload.experts.length];
+      const createdAt = new Date(now - (c.daysAgo || 1) * 24 * 60 * 60 * 1000);
+
+      const consultation = await db.consultation.create({
+        data: {
+          customerId: customer._seedId,
+          expertId: expert._seedId,
+          status: c.status,
+          durationSeconds: c.durationMins * 60,
+          rateCentsPerMin: 400,
+          totalAmountCents: c.amountCents,
+          createdAt,
+        },
+      });
+
+      if (c.status === "completed" && c.amountCents > 0) {
+        await db.transaction.create({
+          data: {
+            consultationId: consultation.id,
+            customerId: customer._seedId,
+            expertId: expert._seedId,
+            amountCents: c.amountCents,
+            type: "consultation_charge",
+            status: "succeeded",
+            createdAt,
+          },
+        });
+      }
+    }
+  }
+
+  // Seed quote requests
+  if (payload.quotes && payload.customers.length > 0 && payload.experts.length > 0) {
+    const now = Date.now();
+    for (const q of payload.quotes) {
+      const customer = payload.customers[q.customerIndex % payload.customers.length];
+      const expert = payload.experts[q.expertIndex % payload.experts.length];
+      const createdAt = new Date(now - (q.daysAgo || 1) * 24 * 60 * 60 * 1000);
+
+      await db.quoteRequest.create({
+        data: {
+          customerId: customer._seedId,
+          expertId: expert._seedId,
+          title: q.title,
+          description: `Details for ${q.title}`,
+          status: q.status,
+          quoteAmountCents: q.amountCents > 0 ? q.amountCents : null,
+          createdAt,
+        },
+      });
+    }
+  }
+
   return {
     database: "postgresql",
     counts: {
@@ -276,6 +334,8 @@ export async function seedPostgres(payload) {
       experts: payload.experts.length,
       cmsPages: payload.cmsPages.length,
       subscriptionPlans: payload.subscriptionPlans.length,
+      consultations: payload.consultations?.length || 0,
+      quotes: payload.quotes?.length || 0,
     },
   };
 }

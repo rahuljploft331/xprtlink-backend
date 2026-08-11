@@ -1,12 +1,19 @@
-import Stripe from "stripe";
 import crypto from "crypto";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 const isLiveKeyAvailable = Boolean(stripeSecretKey && !stripeSecretKey.includes("placeholder"));
 
-const stripe = isLiveKeyAvailable
-  ? new Stripe(stripeSecretKey, { apiVersion: "2024-12-18.acacia" })
-  : null;
+let stripe = null;
+if (isLiveKeyAvailable) {
+  try {
+    const StripeModule = (await import("stripe")).default;
+    stripe = new StripeModule(stripeSecretKey, { apiVersion: "2024-12-18.acacia" });
+    console.log("[Stripe Service] Stripe SDK initialized successfully.");
+  } catch (_err) {
+    console.warn("[Stripe Service] Stripe package not found or failed to load. Falling back to local stub mode.");
+  }
+}
+
 
 /**
  * Creates or retrieves a Stripe Customer object.
@@ -64,20 +71,45 @@ export async function createPreAuthHold({
  */
 export async function captureConsultationCharge({
   stripePaymentIntentId,
+  paymentIntentId,
+  customerStripeId,
+  stripePaymentMethodId,
   finalCents,
+  currency = "usd",
 }) {
-  if (!stripe || stripePaymentIntentId?.startsWith("pi_hold_stub_")) {
+  const intentId = stripePaymentIntentId || paymentIntentId;
+
+  if (!stripe) {
     return {
-      id: stripePaymentIntentId || `pi_stub_${crypto.randomUUID()}`,
+      id: intentId || `pi_stub_${crypto.randomUUID()}`,
       status: "succeeded",
       amount_captured: finalCents,
     };
   }
 
-  return await stripe.paymentIntents.capture(stripePaymentIntentId, {
-    amount_to_capture: finalCents,
+  if (intentId) {
+    if (intentId.startsWith("pi_hold_stub_")) {
+      return {
+        id: intentId,
+        status: "succeeded",
+        amount_captured: finalCents,
+      };
+    }
+    return await stripe.paymentIntents.capture(intentId, {
+      ...(finalCents ? { amount_to_capture: finalCents } : {}),
+    });
+  }
+
+  return await stripe.paymentIntents.create({
+    amount: finalCents,
+    currency: currency.toLowerCase(),
+    customer: customerStripeId,
+    payment_method: stripePaymentMethodId,
+    off_session: true,
+    confirm: true,
   });
 }
+
 
 /**
  * Uploads identity verification document (Passport / Driver's License) to Stripe Files.

@@ -19,11 +19,14 @@ router.post(
   "/webhook",
   raw({ type: "application/json" }),
   asyncHandler(async (req, res) => {
+    console.log(`[Billing Service Webhook] ${new Date().toISOString()} Incoming Stripe Webhook event`);
     const signature = req.headers["stripe-signature"];
     const result = await svc.handleStripeWebhook(req.body, signature);
+    console.log(`[Billing Service Webhook] Handled event: ${result.eventType || "ok"}`);
     return res.status(200).json(result);
   })
 );
+
 
 router.use(authenticate);
 
