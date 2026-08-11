@@ -50,20 +50,28 @@ async function runAllFlows() {
   console.log("👉 Testing Flow 1: Expert Onboarding & Verification Flow...");
   try {
     for (const exp of experts) {
-      await db.expertVerification.upsert({
-        where: { id: `ver_${exp.id.slice(0, 8)}` },
-        create: {
-          id: `ver_${exp.id.slice(0, 8)}`,
-          expertProfileId: exp.id,
-          status: exp.verificationStatus === "unverified" ? "pending" : exp.verificationStatus,
-          submittedAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
-          reviewedAt: exp.verificationStatus === "approved" ? new Date() : null,
-          reviewNotes: "Credentials and ID verified via admin verification queue.",
-        },
-        update: {
-          status: exp.verificationStatus === "unverified" ? "pending" : exp.verificationStatus,
-        },
+      const existingVer = await db.expertVerification.findFirst({
+        where: { expertProfileId: exp.id },
       });
+
+      const targetStatus = exp.verificationStatus === "unverified" ? "pending" : exp.verificationStatus;
+
+      if (existingVer) {
+        await db.expertVerification.update({
+          where: { id: existingVer.id },
+          data: { status: targetStatus },
+        });
+      } else {
+        await db.expertVerification.create({
+          data: {
+            expertProfileId: exp.id,
+            status: targetStatus,
+            submittedAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
+            reviewedAt: targetStatus === "approved" ? new Date() : null,
+            reviewNotes: "Credentials and ID verified via admin verification queue.",
+          },
+        });
+      }
     }
     console.log(`✅ Flow 1 PASSED: Verified ${experts.length} expert onboarding records.\n`);
   } catch (err) {

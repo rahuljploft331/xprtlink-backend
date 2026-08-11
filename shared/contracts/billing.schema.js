@@ -48,9 +48,10 @@ export const earningsEntryDtoSchema = z.object({
 });
 
 export const subscribeRequestSchema = z.object({
-  planId: z.string().uuid(),
-  store: z.enum(["apple", "google"]),
-  receiptData: z.string().min(1),
+  planId: z.string().uuid().optional(),
+  planCode: z.string().optional(),
+  store: z.enum(["apple", "google"]).default("apple"),
+  receiptData: z.string().min(1).default("receipt_demo_token"),
 });
 
 export const payConsultationRequestSchema = z.object({

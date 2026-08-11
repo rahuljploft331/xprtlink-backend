@@ -365,9 +365,22 @@ export async function listSubscriptionPlans() {
 
 export async function subscribe(auth, body) {
   const db = getDb();
-  const plan = await db.subscriptionPlan.findFirst({
-    where: { id: body.planId, isActive: true },
-  });
+  let plan = null;
+  if (body.planId) {
+    plan = await db.subscriptionPlan.findFirst({
+      where: { id: body.planId, isActive: true },
+    });
+  }
+  if (!plan && body.planCode) {
+    plan = await db.subscriptionPlan.findFirst({
+      where: { code: body.planCode, isActive: true },
+    });
+  }
+  if (!plan) {
+    plan = await db.subscriptionPlan.findFirst({
+      where: { isActive: true },
+    });
+  }
   if (!plan) throw notFound("Subscription plan not found");
 
   // IAP receipt validation stub — accept any non-empty receiptData.

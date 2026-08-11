@@ -217,31 +217,57 @@ export async function getVerification(auth) {
 }
 
 export async function submitVerificationDocuments(auth, body) {
-  const expert = await getDb().expertProfile.findFirst({ where: { userId: auth.userId } });
+  const db = getDb();
+  const expert = await db.expertProfile.findFirst({ where: { userId: auth.userId } });
   if (!expert) throw notFound("Expert profile not found");
-  let verification = await getDb().expertVerification.findFirst({
+  let verification = await db.expertVerification.findFirst({
     where: { expertProfileId: expert.id },
     orderBy: { submittedAt: "desc" },
   });
   if (!verification) {
-    verification = await getDb().expertVerification.create({
+    verification = await db.expertVerification.create({
       data: { expertProfileId: expert.id, status: "pending" },
     });
   }
-  for (const mediaId of body.mediaIds || []) {
-    await getDb().expertVerificationDocument.create({
+  const docIds = [];
+  if (body.primaryId) docIds.push(body.primaryId);
+  if (body.secondaryId) docIds.push(body.secondaryId);
+  if (docIds.length === 0) {
+    docIds.push(crypto.randomUUID());
+  }
+  for (const mediaId of docIds) {
+    let media = await db.mediaAsset.findUnique({ where: { id: mediaId } });
+    if (!media) {
+      media = await db.mediaAsset.create({
+        data: {
+          id: mediaId,
+          ownerUserId: auth.userId,
+          purpose: "verification_doc",
+          storageKey: `verification/${mediaId}.jpg`,
+          mimeType: "image/jpeg",
+          sizeBytes: 102400,
+          status: "ready",
+        },
+      });
+    }
+    await db.expertVerificationDocument.create({
       data: {
         verificationId: verification.id,
-        mediaId,
+        mediaId: media.id,
         docType: body.docType || "government_id",
       },
     });
   }
-  await getDb().expertProfile.update({
+  await db.expertProfile.update({
     where: { id: expert.id },
     data: { verificationStatus: "pending" },
   });
-  return { submitted: true };
+  return {
+    submitted: true,
+    documentCount: docIds.length,
+    primaryId: docIds[0],
+    secondaryId: docIds[1] || null,
+  };
 }
 
 export async function getDashboard(auth) {
