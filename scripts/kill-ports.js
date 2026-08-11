@@ -5,10 +5,11 @@
  *   node scripts/kill-ports.js          # ports + nodemon orphans
  *   node scripts/kill-ports.js --pm2    # also stop PM2 ecosystem
  */
+import "dotenv/config";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { SERVICE_PORTS } from "../shared/config/loadEnv.js";
+import { getServicePorts } from "../shared/config/loadEnv.js";
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const stopPm2 = process.argv.includes("--pm2");
@@ -85,7 +86,7 @@ function killOrphanDevProcesses() {
   }
 }
 
-const entries = Object.entries(SERVICE_PORTS).sort(([, a], [, b]) => a - b);
+const entries = Object.entries(getServicePorts()).sort(([, a], [, b]) => a - b);
 
 if (stopPm2) {
   stopPm2Ecosystem();
