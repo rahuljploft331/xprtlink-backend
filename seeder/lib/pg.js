@@ -1,8 +1,79 @@
 import bcrypt from "bcryptjs";
+import Stripe from "stripe";
 import { getDb, disconnectDb } from "@xprtlink/shared/db";
 import { ADMIN_MODULES } from "@xprtlink/shared/constants/index.js";
 
 const SALT_ROUNDS = 10;
+
+async function syncStripePlans(plans) {
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    console.log("[seed] Stripe secret key not set. Skipping Stripe product sync.");
+    return {};
+  }
+
+  const stripe = new Stripe(stripeSecretKey);
+  const stripeMap = {};
+
+  try {
+    const existingProductsList = await stripe.products.list({ limit: 100, active: true });
+    const existingProducts = existingProductsList.data;
+
+    for (const plan of plans) {
+      const priceCents = Math.round(plan.priceMonthly * 100);
+      const expectedProductName = `XprtLink ${plan.name}`;
+
+      // 1. Find product by metadata code or name
+      let product = existingProducts.find(
+        (p) =>
+          p.metadata?.code === plan.code ||
+          p.name.toLowerCase() === expectedProductName.toLowerCase()
+      );
+
+      if (!product) {
+        console.log(`[seed] Creating Stripe product: "${expectedProductName}"...`);
+        product = await stripe.products.create({
+          name: expectedProductName,
+          description: plan.description || `XprtLink ${plan.name} Expert Subscription`,
+          metadata: { code: plan.code, platform: "xpertlink" },
+        });
+      } else {
+        console.log(`[seed] Found existing Stripe product: ${product.id} (${product.name})`);
+      }
+
+      // 2. Find or create monthly price for this product
+      const existingPricesList = await stripe.prices.list({
+        product: product.id,
+        active: true,
+      });
+      let price = existingPricesList.data.find(
+        (p) => p.unit_amount === priceCents && p.recurring?.interval === "month"
+      );
+
+      if (!price) {
+        console.log(`[seed] Creating Stripe price ($${plan.priceMonthly}/mo) for ${plan.name}...`);
+        price = await stripe.prices.create({
+          product: product.id,
+          unit_amount: priceCents,
+          currency: "usd",
+          recurring: { interval: "month" },
+          metadata: { code: plan.code },
+        });
+      } else {
+        console.log(`[seed] Found existing Stripe price: ${price.id} ($${plan.priceMonthly}/mo)`);
+      }
+
+      stripeMap[plan.code] = {
+        stripeProductId: product.id,
+        stripePriceId: price.id,
+      };
+    }
+  } catch (error) {
+    console.warn("[seed] Warning: Stripe subscription plan sync failed:", error.message);
+  }
+
+  return stripeMap;
+}
 
 /** Tables cleared in FK-safe order (children first). */
 const TRUNCATE_ORDER = [
@@ -95,14 +166,18 @@ export async function seedPostgres(payload) {
   }
 
   // Subscription plans
+  const stripeMap = await syncStripePlans(payload.subscriptionPlans);
   const planByCode = {};
   for (const plan of payload.subscriptionPlans) {
+    const stripeInfo = stripeMap[plan.code] || {};
     const row = await db.subscriptionPlan.create({
       data: {
         code: plan.code,
         name: plan.name,
         priceMonthlyCents: Math.round(plan.priceMonthly * 100),
         visibilityBoost: plan.visibilityBoost,
+        stripeProductId: stripeInfo.stripeProductId ?? null,
+        stripePriceId: stripeInfo.stripePriceId ?? null,
       },
     });
     planByCode[plan.code] = row;
@@ -274,28 +349,56 @@ export async function seedPostgres(payload) {
       const customer = payload.customers[c.customerIndex % payload.customers.length];
       const expert = payload.experts[c.expertIndex % payload.experts.length];
       const createdAt = new Date(now - (c.daysAgo || 1) * 24 * 60 * 60 * 1000);
+      const ratePerMinuteCents = c.durationMins > 0 ? Math.round(c.amountCents / c.durationMins) : 400;
 
       const consultation = await db.consultation.create({
         data: {
           customerId: customer._seedId,
           expertId: expert._seedId,
           status: c.status,
+          ratePerMinuteCents,
           durationSeconds: c.durationMins * 60,
-          rateCentsPerMin: 400,
-          totalAmountCents: c.amountCents,
+          requestedAt: createdAt,
+          acceptedAt: createdAt,
+          startedAt: createdAt,
+          endedAt: c.status === "completed" ? new Date(createdAt.getTime() + c.durationMins * 60000) : null,
+          billingStatus: c.status === "completed" ? "charged" : "pending",
           createdAt,
         },
       });
 
       if (c.status === "completed" && c.amountCents > 0) {
-        await db.transaction.create({
+        const tx = await db.transaction.create({
+          data: {
+            type: "consultation_charge",
+            amountCents: c.amountCents,
+            currency: "USD",
+            status: "succeeded",
+            stripePaymentIntentId: `pi_seed_${consultation.id.slice(0, 8)}`,
+            createdAt,
+          },
+        });
+
+        const commissionCents = Math.round(c.amountCents * 0.15);
+        const expertShareCents = c.amountCents - commissionCents;
+
+        await db.consultationCharge.create({
           data: {
             consultationId: consultation.id,
-            customerId: customer._seedId,
-            expertId: expert._seedId,
-            amountCents: c.amountCents,
-            type: "consultation_charge",
-            status: "succeeded",
+            transactionId: tx.id,
+            commissionCents,
+            expertShareCents,
+            createdAt,
+          },
+        });
+
+        await db.expertEarningsLedger.create({
+          data: {
+            expertProfileId: expert._seedId,
+            consultationId: consultation.id,
+            grossCents: c.amountCents,
+            commissionCents,
+            netCents: expertShareCents,
             createdAt,
           },
         });
@@ -318,7 +421,7 @@ export async function seedPostgres(payload) {
           title: q.title,
           description: `Details for ${q.title}`,
           status: q.status,
-          quoteAmountCents: q.amountCents > 0 ? q.amountCents : null,
+          expertQuoteAmountCents: q.amountCents > 0 ? q.amountCents : null,
           createdAt,
         },
       });

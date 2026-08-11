@@ -443,6 +443,8 @@ model SubscriptionPlan {
   priceMonthlyCents  Int             @map("price_monthly_cents")
   visibilityBoost    VisibilityBoost @map("visibility_boost")
   isActive           Boolean         @default(true) @map("is_active")
+  stripeProductId    String?         @map("stripe_product_id") @db.VarChar(128)
+  stripePriceId      String?         @map("stripe_price_id") @db.VarChar(128)
   createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
 

@@ -14,6 +14,9 @@ importers:
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
+      stripe:
+        specifier: ^17.7.0
+        version: 17.7.0
     devDependencies:
       dotenv:
         specifier: ^16.6.1
@@ -27,6 +30,9 @@ importers:
       pm2:
         specifier: ^5.4.3
         version: 5.4.3(supports-color@5.5.0)
+      prisma:
+        specifier: ^6.19.0
+        version: 6.19.3
 
   services/admin-service:
     dependencies:
@@ -153,6 +159,9 @@ importers:
       jsonwebtoken:
         specifier: ^9.0.2
         version: 9.0.3
+      stripe:
+        specifier: ^17.7.0
+        version: 17.7.0
       twilio:
         specifier: ^5.7.1
         version: 5.13.1(debug@4.4.3(supports-color@7.2.0))(supports-color@7.2.0)

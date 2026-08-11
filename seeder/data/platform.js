@@ -16,12 +16,25 @@ export const cmsPages = [
 ];
 
 export const subscriptionPlans = [
-  { code: "core", name: "Core", priceMonthly: 9.99, visibilityBoost: "listing" },
+  {
+    code: "core",
+    name: "Core",
+    description: 'For "New Experts"',
+    priceMonthly: 9.99,
+    visibilityBoost: "listing",
+  },
   {
     code: "professional",
     name: "Professional",
+    description: 'For "Active Professionals"',
     priceMonthly: 29.99,
     visibilityBoost: "top_25",
   },
-  { code: "elite", name: "Elite", priceMonthly: 49.99, visibilityBoost: "top_5" },
+  {
+    code: "elite",
+    name: "Elite",
+    description: 'For "High-Volume Experts"',
+    priceMonthly: 49.99,
+    visibilityBoost: "top_5",
+  },
 ];
