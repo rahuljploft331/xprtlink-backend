@@ -139,7 +139,11 @@ async function getExpertProfileOrThrow(auth) {
   });
   if (!expert) throw notFound("Expert profile not found");
   const user = await getDb().user.findUnique({ where: { id: auth.userId } });
-  return { expert, user, subscriptionActive: Boolean(expert.subscriptions.length) };
+  // subscriptionActive is true when expert has an active subscription,
+  // including those scheduled to cancel at period end (access remains until currentPeriodEnd)
+  const subscriptionActive = expert.subscriptions.length > 0;
+  return { expert, user, subscriptionActive };
+
 }
 
 export async function getExpertMe(auth) {

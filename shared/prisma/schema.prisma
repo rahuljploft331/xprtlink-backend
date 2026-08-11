@@ -832,6 +832,7 @@ model ExpertSubscription {
   status                 ExpertSubscriptionStatus @default(active)
   currentPeriodStart     DateTime                 @map("current_period_start") @db.Timestamptz(6)
   currentPeriodEnd       DateTime                 @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd      Boolean                  @default(false) @map("cancel_at_period_end")
   cancelledAt            DateTime?                @map("cancelled_at") @db.Timestamptz(6)
   createdAt              DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)

@@ -154,5 +154,16 @@ router.get(
   })
 );
 
+// ── Internal cron endpoint — expire subscriptions past their period end ──────
+// Should only be called by your PM2 cron task or an internal scheduler.
+// Protect this in production with an internal secret header or restrict to localhost.
+router.post(
+  "/subscriptions/expire",
+  asyncHandler(async (_req, res) => {
+    const data = await svc.expireSubscriptions();
+    return ResponseFormatter.success(res, { message: `Expired ${data.expired} subscription(s)`, data });
+  })
+);
+
 export default router;
 

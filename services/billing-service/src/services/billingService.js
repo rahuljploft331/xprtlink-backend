@@ -404,6 +404,15 @@ export async function subscribe(auth, body) {
     });
 
     if (existingActive && existingActive.planId === plan.id) {
+      if (existingActive.cancelAtPeriodEnd) {
+        // Expert is reinstating a plan they scheduled to cancel — undo the cancel
+        const reinstated = await tx.expertSubscription.update({
+          where: { id: existingActive.id },
+          data: { cancelAtPeriodEnd: false },
+          include: { plan: true },
+        });
+        return reinstated;
+      }
       throw conflict(
         "You are already subscribed to this plan. To change your plan, choose a different one.",
         "ALREADY_SUBSCRIBED"
@@ -414,9 +423,10 @@ export async function subscribe(auth, body) {
     if (existingActive) {
       await tx.expertSubscription.update({
         where: { id: existingActive.id },
-        data: { status: "cancelled", cancelledAt: now },
+        data: { status: "cancelled", cancelledAt: now, cancelAtPeriodEnd: false },
       });
     }
+
 
     const created = await tx.expertSubscription.create({
       data: {
@@ -453,8 +463,12 @@ export async function subscribe(auth, body) {
 }
 
 export async function getMySubscription(auth) {
+  // Includes subscriptions that are active OR scheduled to cancel at period end
   const subscription = await getDb().expertSubscription.findFirst({
-    where: { expertProfileId: auth.expertProfileId, status: "active" },
+    where: {
+      expertProfileId: auth.expertProfileId,
+      status: "active",
+    },
     include: { plan: true },
     orderBy: { createdAt: "desc" },
   });
@@ -496,12 +510,42 @@ export async function cancelSubscription(auth) {
 
   if (!subscription) throw notFound("No active subscription to cancel");
 
-  const now = new Date();
-  const cancelled = await db.expertSubscription.update({
+  // If already scheduled to cancel at period end, no-op
+  if (subscription.cancelAtPeriodEnd) {
+    return toExpertSubscriptionDto(subscription, subscription.plan);
+  }
+
+  // Mark as cancel-at-period-end — expert keeps access until currentPeriodEnd
+  const updated = await db.expertSubscription.update({
     where: { id: subscription.id },
-    data: { status: "cancelled", cancelledAt: now },
+    data: { cancelAtPeriodEnd: true },
     include: { plan: true },
   });
 
-  return toExpertSubscriptionDto(cancelled, cancelled.plan);
+  return toExpertSubscriptionDto(updated, updated.plan);
+}
+
+/**
+ * Called by a scheduled cron job (e.g. nightly).
+ * Finds all active subscriptions where cancelAtPeriodEnd=true AND currentPeriodEnd
+ * has passed, then flips them to 'cancelled'.
+ */
+export async function expireSubscriptions() {
+  const db = getDb();
+  const now = new Date();
+
+  const result = await db.expertSubscription.updateMany({
+    where: {
+      status: "active",
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: { lte: now },
+    },
+    data: {
+      status: "cancelled",
+      cancelledAt: now,
+    },
+  });
+
+  console.log(`[billing] expireSubscriptions: expired ${result.count} subscription(s) at ${now.toISOString()}`);
+  return { expired: result.count };
 }

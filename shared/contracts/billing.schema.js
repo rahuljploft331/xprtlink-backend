@@ -32,6 +32,7 @@ export const expertSubscriptionDtoSchema = z.object({
   plan: subscriptionPlanDtoSchema,
   store: z.enum(["apple", "google"]),
   status: z.enum(["active", "expired", "cancelled", "grace_period"]),
+  cancelAtPeriodEnd: z.boolean(),
   currentPeriodStart: z.string().datetime(),
   currentPeriodEnd: z.string().datetime(),
   cancelledAt: z.string().datetime().nullable(),
