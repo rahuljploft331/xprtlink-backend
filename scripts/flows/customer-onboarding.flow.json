@@ -1,0 +1,230 @@
+{
+  "info": {
+    "_postman_id": "88b2b6e3-7688-41e6-b73e-383aa911443c",
+    "name": "XpertLink Automated Customer Onboarding & Flow  (Verified)",
+    "description": "Official Automated Customer Onboarding, Profile Setup, Payment Method & Quote Request Chained Flow Collection for XpertLink.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:4000" },
+    { "key": "customer_email", "value": "" },
+    { "key": "customer_phone", "value": "" },
+    { "key": "customer_token", "value": "" },
+    { "key": "expert_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Step 1: Register New Customer",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "var ts = Date.now();",
+              "pm.collectionVariables.set('customer_email', 'customer_' + ts + '@xprtlink-test.com');",
+              "pm.collectionVariables.set('customer_phone', '+1415' + String(ts).slice(-7));"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.test('sent flag is true', function () { pm.expect(json.data.sent).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{customer_email}}\",\"phone\":\"{{customer_phone}}\",\"password\":\"Customer@123\",\"confirmPassword\":\"Customer@123\",\"firstName\":\"Alex\",\"lastName\":\"Testuser\",\"role\":\"customer\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/register",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "register"]
+        }
+      }
+    },
+    {
+      "name": "Step 2: Verify OTP & Get Tokens",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('accessToken present', function () { pm.expect(json.data.accessToken).to.be.a('string').and.not.empty; });",
+              "pm.test('role is customer', function () { pm.expect(json.data.session.role).to.eql('customer'); });",
+              "pm.collectionVariables.set('customer_token', json.data.accessToken);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"{{customer_phone}}\",\"code\":\"123456\",\"purpose\":\"register\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/otp/verify",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "otp", "verify"]
+        }
+      }
+    },
+    {
+      "name": "Step 3: Update Customer Profile",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('firstName updated', function () { pm.expect(json.data.firstName).to.eql('Alex'); });",
+              "pm.test('lastName updated', function () { pm.expect(json.data.lastName).to.eql('Johnson'); });",
+              "pm.test('status is active', function () { pm.expect(json.data.status).to.eql('active'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"firstName\":\"Alex\",\"lastName\":\"Johnson\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/customers/me",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "customers", "me"]
+        }
+      }
+    },
+    {
+      "name": "Step 4: Add Saved Payment Method",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var json = pm.response.json();",
+              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "pm.test('payment method created', function () { pm.expect(json.success).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"stripePaymentMethodId\":\"pm_card_visa\",\"setAsDefault\":true}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/billing/payment-methods",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "billing", "payment-methods"]
+        }
+      }
+    },
+    {
+      "name": "Step 5: Browse Categories & Catalog",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('categories returned', function () { pm.expect(json.data).to.be.an('array').and.not.empty; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/v1/catalog/categories",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "catalog", "categories"]
+        }
+      }
+    },
+    {
+      "name": "Step 6: Submit Quote Request to Expert",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Fetch a real expert ID from the DB via the public search endpoint",
+              "pm.sendRequest({",
+              "  url: pm.collectionVariables.get('base_url') + '/api/v1/experts/featured',",
+              "  method: 'GET'",
+              "}, function (err, res) {",
+              "  var json = res.json();",
+              "  if (json.data && json.data.length > 0) {",
+              "    pm.collectionVariables.set('expert_id', json.data[0].id);",
+              "  }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var json = pm.response.json();",
+              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "pm.test('quote request created', function () { pm.expect(json.success).to.be.true; });",
+              "pm.test('quote has id', function () { pm.expect(json.data.id).to.be.a('string'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"expertId\":\"{{expert_id}}\",\"title\":\"API Init Flow: Test Quote Request\",\"description\":\"This quote was submitted by the automated init:flows script to test the full quote submission lifecycle.\",\"budgetCents\":25000}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/engagement/quotes",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "engagement", "quotes"]
+        }
+      }
+    }
+  ]
+}

@@ -63,13 +63,27 @@ Constants: `ADMIN_ROLES`, `ADMIN_MODULES`, `ADMIN_PERMISSION_LEVELS` in `shared/
 ## Seed & reset (local baseline)
 
 ```bash
+# ── Legacy static seeder (dummy data) ──────────────────────────────────────
 pnpm seed          # file store + PostgreSQL when DATABASE_URL is set
-pnpm reset         # truncate + reseed
+pnpm reset         # truncate + reseed (dummy data)
 pnpm reset -- --no-seed   # wipe only
+
+# ── API-Driven Init (real data via Newman flows) ────────────────────────────
+pnpm seed:platform          # seed only system prereqs (categories, plans, admins)
+pnpm init:flows             # seed prereqs + run all 4 verified Postman flows
+pnpm init:flows:fresh       # wipe DB first, then seed + run flows (clean slate)
+pnpm init:flows -- --flow A # run only flow A (A=Expert phone, B=Expert email,
+                             #   C=Customer, D=Subscription lifecycle)
+pnpm init:flows -- --no-seed  # skip platform seed, just run flows
 ```
 
-Seed source: `seeder/data/*` · Guide: `seeder/README.md`  
-Includes super_admin + subadmin demo accounts.
+**init:flows** runs these 4 verified collections against the live backend (Newman):
+- **Flow A**: Expert Onboarding (phone OTP) — `scripts/flows/expert-onboarding-phone.flow.json`
+- **Flow B**: Email Expert Onboarding — `scripts/flows/expert-onboarding-email.flow.json`
+- **Flow C**: Customer Onboarding & Quote Flow — `scripts/flows/customer-onboarding.flow.json`
+- **Flow D**: Expert Subscription Lifecycle (13 steps) — `scripts/flows/expert-subscription-lifecycle.flow.json`
+
+Needs: `pm2 start` first, `DATABASE_URL` in `.env`, `newman` (auto-installed if missing).
 
 ## Secrets
 

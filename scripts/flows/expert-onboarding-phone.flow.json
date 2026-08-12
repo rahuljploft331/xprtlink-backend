@@ -1,0 +1,223 @@
+{
+  "info": {
+    "_postman_id": "78347630-2718-41f8-b27b-9fe331d94198",
+    "name": "XpertLink Automated Expert Onboarding Flow  (Verified)",
+    "description": "Official Automated User & Expert Onboarding Chained Flow Collection for XpertLink. Automatically generates fresh E.164 phone numbers per run for infinite repeatability.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:4000" },
+    { "key": "expert_email", "value": "" },
+    { "key": "expert_phone", "value": "" },
+    { "key": "expert_token", "value": "" },
+    { "key": "plan_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Step 1: Register New Expert",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "var ts = Date.now();",
+              "pm.collectionVariables.set('expert_email', 'expert_phone_' + ts + '@xprtlink-test.com');",
+              "pm.collectionVariables.set('expert_phone', '+1617' + String(ts).slice(-7));"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.test('sent flag is true', function () { pm.expect(json.data.sent).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{expert_email}}\",\"phone\":\"{{expert_phone}}\",\"password\":\"Expert@123\",\"confirmPassword\":\"Expert@123\",\"firstName\":\"Jordan\",\"lastName\":\"ExpertUser\",\"role\":\"expert\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/register",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "register"]
+        }
+      }
+    },
+    {
+      "name": "Step 2: Verify OTP & Get Tokens",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('accessToken present', function () { pm.expect(json.data.accessToken).to.be.a('string').and.not.empty; });",
+              "pm.test('role is expert', function () { pm.expect(json.data.session.role).to.eql('expert'); });",
+              "pm.collectionVariables.set('expert_token', json.data.accessToken);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"{{expert_phone}}\",\"code\":\"123456\",\"purpose\":\"register\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/otp/verify",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "otp", "verify"]
+        }
+      }
+    },
+    {
+      "name": "Step 3: Complete Expert Profile",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Fetch a valid category ID to use in the onboarding payload",
+              "pm.sendRequest({",
+              "  url: pm.collectionVariables.get('base_url') + '/api/v1/catalog/categories',",
+              "  method: 'GET'",
+              "}, function (err, res) {",
+              "  var json = res.json();",
+              "  if (json.data && json.data.length > 0) {",
+              "    pm.collectionVariables.set('category_id', json.data[0].id);",
+              "  }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "var json = pm.response.json();",
+              "pm.test('success true', function () { pm.expect(json.success).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"categories\":[\"{{category_id}}\"],\"bio\":\"Experienced consultant with 8+ years in the field. Init flow expert account.\",\"headline\":\"Senior Consultant\",\"hourlyRate\":120,\"experienceYears\":8,\"languages\":[\"English\"],\"location\":\"Austin, TX\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/experts/me/onboarding",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "experts", "me", "onboarding"]
+        }
+      }
+    },
+    {
+      "name": "Step 4: Submit Verification Documents",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "var json = pm.response.json();",
+              "pm.test('success true', function () { pm.expect(json.success).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"documentType\":\"national_id\",\"primaryId\":\"00000000-0000-0000-0000-000000000001\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/experts/me/verification/documents",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "experts", "me", "verification", "documents"]
+        }
+      }
+    },
+    {
+      "name": "Step 5: Subscribe to Elite Plan",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.sendRequest({",
+              "  url: pm.collectionVariables.get('base_url') + '/api/v1/billing/subscriptions/plans',",
+              "  method: 'GET',",
+              "  header: [{ key: 'Authorization', value: 'Bearer ' + pm.collectionVariables.get('expert_token') }]",
+              "}, function (err, res) {",
+              "  var json = res.json();",
+              "  if (json.data && json.data.length > 0) {",
+              "    var elite = json.data.find(function(p) { return p.code === 'elite'; }) || json.data[0];",
+              "    pm.collectionVariables.set('plan_id', elite.id);",
+              "    pm.collectionVariables.set('plan_code', elite.code);",
+              "  }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "var json = pm.response.json();",
+              "pm.test('subscription is active', function () { pm.expect(json.data.status).to.eql('active'); });",
+              "pm.test('subscriptionActive gate', function () { pm.expect(json.data.status).to.be.a('string'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"planCode\":\"{{plan_code}}\",\"store\":\"apple\",\"receiptData\":\"receipt_init_flow_phone_expert_token_123\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/billing/subscriptions",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "billing", "subscriptions"]
+        }
+      }
+    }
+  ]
+}
