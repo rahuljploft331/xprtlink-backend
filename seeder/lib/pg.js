@@ -89,6 +89,7 @@ const TRUNCATE_ORDER = [
   "reviews",
   "expert_reports",
   "consultation_charges",
+  "transactions",
   "expert_earnings_ledger",
   "consultations",
   "expert_verification_documents",

@@ -313,28 +313,31 @@
           "listen": "test",
           "script": {
             "exec": [
-              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
               "var json = pm.response.json();",
-              "pm.test('Subscription still active after upgrade', function () { pm.expect(json.data.status).to.eql('active'); });"
+              "pm.test('Subscription still active after upgrade', function () { pm.expect(json.data.status).to.eql('active'); });",
+              "pm.test('Plan upgraded to elite', function () {",
+              "  pm.expect(json.data.plan.code || json.data.planCode || '').to.satisfy(function(v) { return v === pm.collectionVariables.get('upgrade_plan_code') || v === 'elite'; });",
+              "});"
             ],
             "type": "text/javascript"
           }
         }
       ],
       "request": {
-        "method": "PATCH",
+        "method": "POST",
         "header": [
           { "key": "Authorization", "value": "Bearer {{expert_token}}" },
           { "key": "Content-Type", "value": "application/json" }
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"planCode\":\"{{upgrade_plan_code}}\"}"
+          "raw": "{\"planCode\":\"{{upgrade_plan_code}}\",\"store\":\"apple\",\"receiptData\":\"receipt_sub_lifecycle_upgrade_003\"}"
         },
         "url": {
-          "raw": "{{base_url}}/api/v1/billing/subscriptions/me",
+          "raw": "{{base_url}}/api/v1/billing/subscriptions",
           "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "subscriptions", "me"]
+          "path": ["api", "v1", "billing", "subscriptions"]
         }
       }
     },
@@ -403,7 +406,7 @@
           "listen": "test",
           "script": {
             "exec": [
-              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
               "var json = pm.response.json();",
               "pm.test('Subscription reinstated active', function () {",
               "  pm.expect(json.data.status).to.eql('active');",
@@ -424,12 +427,12 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"action\":\"reinstate\"}"
+          "raw": "{\"planCode\":\"{{upgrade_plan_code}}\",\"store\":\"apple\",\"receiptData\":\"receipt_sub_lifecycle_reinstate_004\"}"
         },
         "url": {
-          "raw": "{{base_url}}/api/v1/billing/subscriptions/me/reinstate",
+          "raw": "{{base_url}}/api/v1/billing/subscriptions",
           "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "subscriptions", "me", "reinstate"]
+          "path": ["api", "v1", "billing", "subscriptions"]
         }
       }
     }
