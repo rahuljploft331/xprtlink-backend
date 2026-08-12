@@ -15,6 +15,7 @@ import reviewsRoutes from "./reviews.routes.js";
 import cmsRoutes from "./cms.routes.js";
 import adminsRoutes from "./admins.routes.js";
 import notificationsRoutes from "./notifications.routes.js";
+import reportsRoutes from "./reports.routes.js";
 
 const router = Router();
 
@@ -37,6 +38,7 @@ router.use("/reviews", reviewsRoutes);
 router.use("/cms", cmsRoutes);
 router.use("/admins", adminsRoutes);
 router.use("/notifications", notificationsRoutes);
+router.use("/reports", reportsRoutes);
 
 export default router;
 
