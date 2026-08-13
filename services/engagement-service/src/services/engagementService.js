@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { generateZegoToken } from "@xprtlink/shared/lib/zegoToken.js";
 import { getDb } from "@xprtlink/shared/db";
 import { amountToCents } from "@xprtlink/shared/mappers/common.js";
 import {
@@ -479,10 +480,17 @@ export async function getVideoToken(auth, consultationId) {
     throw badRequest("Video is not available for this consultation", "INVALID_STATUS");
   }
 
+  const zegoData = generateZegoToken(
+    auth.userId,              // userID for the Zego token
+    consultation.zegoRoomId,  // room they'll join
+    3600                      // 1-hour validity
+  );
+
   return toVideoTokenDto({
-    token: `zego-stub-${consultation.id}`,
-    roomId: consultation.zegoRoomId,
-    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    token: zegoData.token,
+    appID: zegoData.appID,
+    roomId: zegoData.roomId,
+    expiresAt: zegoData.expiresAt,
   });
 }
 

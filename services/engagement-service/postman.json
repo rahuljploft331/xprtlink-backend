@@ -560,7 +560,7 @@
                 }
               ]
             },
-            "description": "Fetch ZEGO video credentials / token for call room."
+            "description": "Fetch ZEGO video credentials / token for call room. Returns { token, appID, roomId, expiresAt }. Flutter UIKit uses appID + token (not appSign) to join the call."
           }
         },
         {
