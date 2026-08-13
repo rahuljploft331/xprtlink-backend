@@ -9,17 +9,18 @@
  *   1. Optionally resets the database (--fresh flag)
  *   2. Seeds only system prerequisites (categories, plans, admins) via DB
  *   3. Health-checks the running API gateway
- *   4. Runs 4 verified Postman flow collections sequentially via Newman:
+ *   4. Runs 5 verified Postman flow collections sequentially via Newman:
  *      A. Expert Onboarding Flow (phone OTP)
  *      B. Email Expert Onboarding Flow
  *      C. Customer Onboarding & Quote Flow
  *      D. Expert Subscription Lifecycle Flow (13 steps)
+ *      E. Expert Verification Approval Flow
  *   5. Prints a final pass/fail summary table
  *
  * Usage:
  *   pnpm init:flows               # seed platform prereqs + run all flows
  *   pnpm init:flows --fresh       # wipe DB first, then seed + run flows
- *   pnpm init:flows --flow A      # run only flow A (A|B|C|D)
+ *   pnpm init:flows --flow A      # run only flow A (A|B|C|D|E)
  *   pnpm init:flows --no-seed     # skip platform seed, just run flows
  *
  * Requirements:
@@ -66,6 +67,12 @@ const FLOWS = [
     label: "Expert Subscription Lifecycle (13 steps)",
     file: path.join(FLOWS_DIR, "expert-subscription-lifecycle.flow.json"),
     collection: "XpertLink Expert Subscription Flow (Verified)",
+  },
+  {
+    id: "E",
+    label: "Expert Verification Approval",
+    file: path.join(FLOWS_DIR, "expert-verification-approval.flow.json"),
+    collection: "XpertLink Expert Verification Approval Flow (Verified)",
   },
 ];
 
@@ -225,7 +232,7 @@ async function main() {
   log(`  Flows : ${selectedFlows.map((f) => `${f.id}. ${f.label}`).join(", ")}`);
   log(`  Target: ${BASE_URL}`);
   if (onlyFlowId && selectedFlows.length === 0) {
-    console.error(`\n❌  Unknown flow ID: ${onlyFlowId}. Valid IDs are: A, B, C, D`);
+    console.error(`\n❌  Unknown flow ID: ${onlyFlowId}. Valid IDs are: A, B, C, D, E`);
     process.exit(1);
   }
 
