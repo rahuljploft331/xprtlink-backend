@@ -702,6 +702,41 @@
           }
         }
       ]
+    },
+    {
+      "name": "Webhooks",
+      "item": [
+        {
+          "name": "ZegoCloud Callback (server-to-server)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"appid\": \"283072073\",\n  \"event\": \"room_close\",\n  \"nonce\": \"abc123\",\n  \"timestamp\": \"1723536000\",\n  \"signature\": \"computed-sha1-hex\",\n  \"room_id\": \"room-xxxx-xxxx\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/webhooks/zego",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "webhooks",
+                "zego"
+              ]
+            },
+            "description": "ZegoCloud server callback endpoint. No JWT auth — verified via CallbackSecret SHA-1 signature. Events: room_create, user_login, user_logout, room_close. Returns { code: 0 } on success."
+          }
+        }
+      ]
     }
   ]
 }

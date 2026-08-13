@@ -93,9 +93,30 @@ try {
     console.warn("   ⚠️  Base64 portion could not be decoded");
   }
 
+  // --- Check 4: Callback Secret ---
+  console.log("\n4. Checking callback secret...");
+  const callbackSecret = process.env.ZEGO_CALLBACK_SECRET;
+  if (!callbackSecret) {
+    console.warn("   ⚠️  ZEGO_CALLBACK_SECRET is not set — webhook signature verification will fail");
+    console.warn("      Get it from ZegoCloud Console → Project → Callback Setup");
+  } else {
+    console.log(`   ✅ ZEGO_CALLBACK_SECRET = ${callbackSecret.slice(0, 4)}...${callbackSecret.slice(-4)} (${callbackSecret.length} chars)`);
+
+    // Test signature generation/verification
+    const testTimestamp = String(Math.floor(Date.now() / 1000));
+    const testNonce = "test-nonce-123";
+    const arr = [callbackSecret, testTimestamp, testNonce].sort();
+    const { createHash } = await import("crypto");
+    const sig = createHash("sha1").update(arr.join("")).digest("hex");
+    console.log(`   ✅ Test webhook signature generated: ${sig.slice(0, 16)}...`);
+  }
+
   console.log("\n═══════════════════════════════════════════════");
   console.log("  ✅ ALL CHECKS PASSED — ZegoCloud is ready!");
   console.log("═══════════════════════════════════════════════\n");
+
+  console.log("Webhook URL to enter in ZegoCloud Console → Callback Setup:");
+  console.log("  https://<your-domain>/api/v1/engagement/webhooks/zego\n");
 
   // Print the full token for manual testing / ZegoCloud console validation
   console.log("Full test token (for ZegoCloud Token Assistant debugging):");
