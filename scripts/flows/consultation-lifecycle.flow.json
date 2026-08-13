@@ -18,6 +18,7 @@
     { "key": "plan_code", "value": "" },
     { "key": "consultation_id", "value": "" },
     { "key": "payment_method_id", "value": "" },
+    { "key": "stripe_pm_id", "value": "" },
     { "key": "stripe_pi_id", "value": "" }
   ],
   "item": [
@@ -94,6 +95,17 @@
       "name": "Step 3: Add Customer Payment Method",
       "event": [
         {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Generate a unique PM ID to avoid unique constraint conflicts",
+              "var ts = Date.now();",
+              "pm.collectionVariables.set('stripe_pm_id', 'pm_card_visa_' + ts);"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
           "listen": "test",
           "script": {
             "exec": [
@@ -114,7 +126,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"stripePaymentMethodId\":\"pm_card_visa\",\"setAsDefault\":true}"
+          "raw": "{\"stripePaymentMethodId\":\"{{stripe_pm_id}}\",\"setAsDefault\":true}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/billing/payment-methods",

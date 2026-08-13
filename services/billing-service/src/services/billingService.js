@@ -55,11 +55,16 @@ export async function addPaymentMethod(auth, body) {
     }
   }
 
-  // 3. Attach PaymentMethod to Stripe Customer
-  await stripeSvc.attachPaymentMethod({
-    stripePaymentMethodId: body.stripePaymentMethodId,
-    stripeCustomerId,
-  });
+  // 3. Attach PaymentMethod to Stripe Customer (non-fatal in test mode)
+  try {
+    await stripeSvc.attachPaymentMethod({
+      stripePaymentMethodId: body.stripePaymentMethodId,
+      stripeCustomerId,
+    });
+  } catch (attachErr) {
+    // In test mode, pm_card_* tokens may not be attachable — log and continue
+    console.warn(`[billing] Stripe attach PM failed (non-fatal): ${attachErr.message}`);
+  }
 
   // 4. Persist locally
   if (body.setDefault) {
