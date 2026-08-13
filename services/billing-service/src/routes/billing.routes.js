@@ -10,6 +10,7 @@ import {
   attachBankAccountRequestSchema,
   subscribeRequestSchema,
 } from "@xprtlink/shared/contracts";
+import { stripeGuard } from "../middleware/stripeGuard.js";
 import * as svc from "../services/billingService.js";
 
 
@@ -43,6 +44,7 @@ router.get(
 router.post(
   "/payment-methods",
   requireRole("customer"),
+  stripeGuard,
   asyncHandler(async (req, res) => {
     const body = addPaymentMethodRequestSchema.parse(req.body);
     const data = await svc.addPaymentMethod(req.auth, body);
@@ -62,6 +64,7 @@ router.delete(
 router.post(
   "/consultations/:id/hold",
   requireRole("customer"),
+  stripeGuard,
   asyncHandler(async (req, res) => {
     const body = preAuthHoldRequestSchema.parse(req.body);
     const data = await svc.holdConsultationFunds(req.auth, req.params.id, body);
@@ -72,6 +75,7 @@ router.post(
 router.post(
   "/consultations/:id/pay",
   requireRole("customer"),
+  stripeGuard,
   asyncHandler(async (req, res) => {
     const body = payConsultationRequestSchema.parse(req.body);
     const data = await svc.payConsultation(req.auth, req.params.id, body);

@@ -30,17 +30,38 @@ export async function listPaymentMethods(auth) {
 
 export async function addPaymentMethod(auth, body) {
   const db = getDb();
-  let stripePaymentMethodId = body.stripePaymentMethodId;
-  if (!stripePaymentMethodId || stripePaymentMethodId === "pm_card_visa") {
-    stripePaymentMethodId = `pm_card_visa_${crypto.randomUUID()}`;
-  }
-  const existing = await db.paymentMethod.findUnique({
-    where: { stripePaymentMethodId },
+
+  // 1. Lookup customer profile with user info
+  const customerProfile = await db.customerProfile.findUnique({
+    where: { id: auth.customerProfileId },
+    include: { user: true },
   });
-  if (existing) {
-    stripePaymentMethodId = `${stripePaymentMethodId}_${crypto.randomUUID()}`;
+
+  // 2. Create Stripe Customer if not already created
+  let stripeCustomerId = customerProfile.stripeCustomerId;
+  if (!stripeCustomerId) {
+    try {
+      const stripeCustomer = await stripeSvc.getOrCreateStripeCustomer({
+        email: customerProfile.user.email,
+        name: `${customerProfile.firstName} ${customerProfile.lastName}`,
+      });
+      stripeCustomerId = stripeCustomer.id;
+      await db.customerProfile.update({
+        where: { id: auth.customerProfileId },
+        data: { stripeCustomerId },
+      });
+    } catch (err) {
+      throw { statusCode: 502, code: "STRIPE_CUSTOMER_CREATION_FAILED", message: err.message };
+    }
   }
 
+  // 3. Attach PaymentMethod to Stripe Customer
+  await stripeSvc.attachPaymentMethod({
+    stripePaymentMethodId: body.stripePaymentMethodId,
+    stripeCustomerId,
+  });
+
+  // 4. Persist locally
   if (body.setDefault) {
     await db.paymentMethod.updateMany({
       where: { customerProfileId: auth.customerProfileId },
@@ -48,15 +69,11 @@ export async function addPaymentMethod(auth, body) {
     });
   }
 
-  const isFirst =
-    (await db.paymentMethod.count({
-      where: { customerProfileId: auth.customerProfileId },
-    })) === 0;
-
+  const isFirst = (await db.paymentMethod.count({ where: { customerProfileId: auth.customerProfileId } })) === 0;
   const method = await db.paymentMethod.create({
     data: {
       customerProfileId: auth.customerProfileId,
-      stripePaymentMethodId,
+      stripePaymentMethodId: body.stripePaymentMethodId,
       brand: body.brand,
       last4: body.last4,
       expMonth: body.expMonth,
@@ -95,24 +112,20 @@ export async function removePaymentMethod(auth, methodId) {
 
 export async function holdConsultationFunds(auth, consultationId, body) {
   const db = getDb();
-  let consultation = await db.consultation.findFirst({
-    where: { id: consultationId, customerId: auth.customerProfileId },
-    include: { customer: true, expert: true },
-  });
 
-  if (!consultation) {
-    const expert = (await db.expertProfile.findFirst()) || { currency: "USD", ratePerMinuteCents: 100 };
-    consultation = {
-      id: consultationId,
-      customerId: auth.customerProfileId,
-      expertId: expert.id || "test-expert-id",
-      expert,
-      ratePerMinuteCents: expert.ratePerMinuteCents || 100,
-      billingStatus: "pending",
-    };
-  }
-  if (consultation.billingStatus === "charged") {
-    throw badRequest("Consultation already paid", "ALREADY_PAID");
+  const consultation = await db.consultation.findFirst({
+    where: { id: consultationId, customerId: auth.customerProfileId },
+    include: { expert: true },
+  });
+  if (!consultation) throw notFound("Consultation not found");
+  if (consultation.billingStatus === "charged") throw badRequest("Consultation already paid", "ALREADY_PAID");
+
+  // Retrieve customer with stripeCustomerId
+  const customerProfile = await db.customerProfile.findUnique({
+    where: { id: auth.customerProfileId },
+  });
+  if (!customerProfile.stripeCustomerId) {
+    throw badRequest("No Stripe customer found. Add a payment method first.", "NO_STRIPE_CUSTOMER");
   }
 
   const paymentMethod = await db.paymentMethod.findFirst({
@@ -120,68 +133,43 @@ export async function holdConsultationFunds(auth, consultationId, body) {
   });
   if (!paymentMethod) throw notFound("Payment method not found");
 
-  // Default hold amount (e.g. estimated 30 mins) or provided estimatedCents
-  const estimatedCents = body.estimatedCents || Math.max(30 * (consultation.ratePerMinuteCents || 100), 3000);
+  const estimatedCents = body.estimatedCents || Math.max(30 * consultation.ratePerMinuteCents, 3000);
 
-  // Get or create Stripe customer object
-  const customerUser = await db.customerProfile.findUnique({
-    where: { id: auth.customerProfileId },
-    include: { user: true },
-  });
+  try {
+    const holdResult = await stripeSvc.createPreAuthHold({
+      customerStripeId: customerProfile.stripeCustomerId,
+      stripePaymentMethodId: paymentMethod.stripePaymentMethodId,
+      amountCents: estimatedCents,
+      currency: consultation.expert?.currency || "USD",
+      metadata: { consultationId, customerProfileId: auth.customerProfileId },
+    });
 
-  const stripeCustomer = await stripeSvc.getOrCreateStripeCustomer({
-    email: customerUser?.user?.email || "customer@example.com",
-    name: customerUser?.user?.fullName || "Customer",
-  });
-
-  // Call Stripe Pre-Auth Hold (capture_method: 'manual')
-  const holdResult = await stripeSvc.createPreAuthHold({
-    customerStripeId: stripeCustomer.id,
-    stripePaymentMethodId: paymentMethod.stripePaymentMethodId,
-    amountCents: estimatedCents,
-    currency: consultation.expert?.currency || "USD",
-    metadata: {
+    return {
       consultationId,
-      customerProfileId: auth.customerProfileId,
-    },
-  });
-
-  return {
-    consultationId,
-    holdStatus: holdResult.status, // 'requires_capture' when pre-auth succeeds
-    stripePaymentIntentId: holdResult.id,
-    amountCents: estimatedCents,
-    authorized: true,
-  };
+      holdStatus: holdResult.status,
+      stripePaymentIntentId: holdResult.id,
+      amountCents: estimatedCents,
+      authorized: true,
+    };
+  } catch (err) {
+    throw { statusCode: 502, code: "HOLD_FAILED", message: err.message };
+  }
 }
 
 export async function payConsultation(auth, consultationId, body) {
   const db = getDb();
-  let consultation = await db.consultation.findFirst({
+
+  const consultation = await db.consultation.findFirst({
     where: { id: consultationId, customerId: auth.customerProfileId },
     include: { expert: true, charge: true },
   });
-
-  if (!consultation) {
-    const expert = (await db.expertProfile.findFirst()) || { currency: "USD", ratePerMinuteCents: 100 };
-    consultation = {
-      id: consultationId,
-      customerId: auth.customerProfileId,
-      expertId: expert.id || "test-expert-id",
-      expert,
-      status: "completed",
-      durationSeconds: 1800,
-      ratePerMinuteCents: expert.ratePerMinuteCents || 100,
-      billingStatus: "pending",
-    };
-  }
+  if (!consultation) throw notFound("Consultation not found");
   if (consultation.status !== "completed") {
     throw badRequest("Consultation must be completed before payment", "INVALID_STATE");
   }
   if (consultation.billingStatus === "charged" || consultation.charge) {
     throw badRequest("Consultation already paid", "ALREADY_PAID");
   }
-
 
   const paymentMethod = await db.paymentMethod.findFirst({
     where: { id: body.paymentMethodId, customerProfileId: auth.customerProfileId },
@@ -193,23 +181,37 @@ export async function payConsultation(auth, consultationId, body) {
     throw badRequest("Nothing to charge for this consultation", "INVALID_AMOUNT");
   }
 
+  const currency = consultation.expert.currency || "USD";
+  let stripeResult;
+
+  try {
+    if (body.stripePaymentIntentId) {
+      // Capture held PaymentIntent with final computed amount
+      stripeResult = await stripeSvc.capturePaymentIntent({
+        paymentIntentId: body.stripePaymentIntentId,
+        amountToCaptureCents: amountCents,
+      });
+    } else {
+      // Direct charge — no prior hold
+      const customerProfile = await db.customerProfile.findUnique({
+        where: { id: auth.customerProfileId },
+      });
+      stripeResult = await stripeSvc.createAndConfirmPaymentIntent({
+        customerStripeId: customerProfile.stripeCustomerId,
+        stripePaymentMethodId: paymentMethod.stripePaymentMethodId,
+        amountCents,
+        currency,
+        metadata: { consultationId },
+      });
+    }
+  } catch (err) {
+    throw { statusCode: 502, code: "CAPTURE_FAILED", message: err.message };
+  }
+
+  // Record transaction
   const commissionCents = Math.round(amountCents * COMMISSION_RATE);
   const expertShareCents = amountCents - commissionCents;
-  const currency = consultation.expert.currency || "USD";
 
-  // Capture pre-auth charge or charge card directly via Stripe SDK
-  const stripeCharge = await stripeSvc.captureConsultationCharge({
-    stripePaymentIntentId: body.stripePaymentIntentId || body.paymentIntentId,
-    customerStripeId: paymentMethod.customerProfileId,
-    stripePaymentMethodId: paymentMethod.stripePaymentMethodId,
-    finalCents: amountCents,
-    currency,
-  });
-
-  const stripePaymentIntentId = stripeCharge.id;
-
-
-  // Execute database transaction
   const result = await db.$transaction(async (tx) => {
     const transaction = await tx.transaction.create({
       data: {
@@ -217,7 +219,7 @@ export async function payConsultation(auth, consultationId, body) {
         amountCents,
         currency,
         status: "succeeded",
-        stripePaymentIntentId,
+        stripePaymentIntentId: stripeResult.id,
         metadata: {
           consultationId,
           paymentMethodId: paymentMethod.id,

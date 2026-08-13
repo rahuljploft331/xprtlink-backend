@@ -40,10 +40,12 @@
   "devDependencies": {
     "dotenv": "^16.6.1",
     "dotenv-cli": "^8.0.0",
+    "fast-check": "3.22.0",
     "newman": "^6.2.1",
     "nodemon": "^3.1.14",
     "pm2": "^5.4.3",
-    "prisma": "^6.19.0"
+    "prisma": "^6.19.0",
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=20"

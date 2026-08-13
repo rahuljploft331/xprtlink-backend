@@ -2,13 +2,14 @@
   "info": {
     "_postman_id": "fad6dcbe-8bc4-4d3f-8ef2-d4b8443bc89e",
     "name": "Billing Service",
-    "description": "REST APIs for Stripe customer payment methods, subscription plans, expert payouts/earnings, and billing transactions.",
+    "description": "REST APIs for Stripe customer payment methods, subscription plans, expert payouts/earnings, and billing transactions.\n\nNote: POST /payment-methods, POST /consultations/:id/hold, and POST /consultations/:id/pay are protected by the stripeGuard middleware. If STRIPE_SECRET_KEY is missing, empty, or contains \"placeholder\", these endpoints return HTTP 503 with code STRIPE_UNAVAILABLE.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
       "id": "57225879-11111111-0000-4000-8000-000000000001",
       "name": "Payment Methods (Customer)",
+      "description": "Manage customer payment methods. POST is protected by stripeGuard (returns 503 if Stripe is not configured).",
       "item": [
         {
           "id": "57225879-11111111-0000-4000-8000-000000000002",
@@ -23,17 +24,10 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/payment-methods",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "payment-methods"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "payment-methods"]
             },
-            "description": "List all saved payment methods of the customer."
+            "description": "List all saved payment methods of the customer. Does NOT require Stripe to be configured."
           }
         },
         {
@@ -53,21 +47,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"paymentMethodId\": \"pm_card_visa\"\n}"
+              "raw": "{\n  \"stripePaymentMethodId\": \"pm_card_visa\",\n  \"setAsDefault\": true\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/payment-methods",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "payment-methods"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "payment-methods"]
             },
-            "description": "Associate a new Stripe payment method with the customer."
+            "description": "Associate a new Stripe payment method with the customer. Creates a Stripe Customer object on first call (stores stripeCustomerId on profile). Attaches the PaymentMethod to the Stripe Customer.\n\nProtected by stripeGuard: returns HTTP 503 STRIPE_UNAVAILABLE if STRIPE_SECRET_KEY is not configured.\n\nPossible errors:\n- 503 STRIPE_UNAVAILABLE: Stripe not configured\n- 502 STRIPE_CUSTOMER_CREATION_FAILED: Stripe Customer creation failed"
           }
         },
         {
@@ -83,16 +70,8 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/payment-methods/:id",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "payment-methods",
-                ":id"
-              ],
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "payment-methods", ":id"],
               "variable": [
                 {
                   "key": "id",
@@ -100,7 +79,7 @@
                 }
               ]
             },
-            "description": "Delete a customer's saved payment method."
+            "description": "Delete a customer's saved payment method. Does NOT require Stripe to be configured."
           }
         }
       ]
@@ -108,6 +87,7 @@
     {
       "id": "57225879-22222222-0000-4000-8000-000000000001",
       "name": "Payments & Transactions",
+      "description": "Consultation payment lifecycle: pre-auth hold → capture/pay. Both POST endpoints are protected by stripeGuard.",
       "item": [
         {
           "id": "57225879-22222222-0000-4000-8000-000000000002",
@@ -126,21 +106,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"paymentMethodId\": \"pm-uuid-here\",\n  \"estimatedCents\": 5000\n}"
+              "raw": "{\n  \"paymentMethodId\": \"pm-uuid-here\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/consultations/:id/hold",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "consultations",
-                ":id",
-                "hold"
-              ],
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "consultations", ":id", "hold"],
               "variable": [
                 {
                   "key": "id",
@@ -148,7 +119,7 @@
                 }
               ]
             },
-            "description": "Pre-authorizes (holds) funds on customer card before starting video call."
+            "description": "Pre-authorizes (holds) funds on customer card before/after a video call using Stripe PaymentIntent with capture_method=manual. Returns stripePaymentIntentId on success.\n\nProtected by stripeGuard: returns HTTP 503 STRIPE_UNAVAILABLE if STRIPE_SECRET_KEY is not configured.\n\nPossible errors:\n- 503 STRIPE_UNAVAILABLE: Stripe not configured\n- 400 NO_STRIPE_CUSTOMER: Customer has no Stripe Customer (must add a payment method first)\n- 502 HOLD_FAILED: Stripe PaymentIntent creation failed"
           }
         },
         {
@@ -168,21 +139,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"paymentMethodId\": \"pm_card_visa\"\n}"
+              "raw": "{\n  \"paymentMethodId\": \"pm_card_visa\",\n  \"stripePaymentIntentId\": \"pi_optional_from_hold_step\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/consultations/:id/pay",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "consultations",
-                ":id",
-                "pay"
-              ],
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "consultations", ":id", "pay"],
               "variable": [
                 {
                   "key": "id",
@@ -190,7 +152,7 @@
                 }
               ]
             },
-            "description": "Process Stripe charge payment for a completed consultation call."
+            "description": "Capture payment for a completed consultation. If stripePaymentIntentId is provided (from a prior hold), captures the existing PaymentIntent. Otherwise creates and confirms a new PaymentIntent for the full charge.\n\nProtected by stripeGuard: returns HTTP 503 STRIPE_UNAVAILABLE if STRIPE_SECRET_KEY is not configured.\n\nPossible errors:\n- 503 STRIPE_UNAVAILABLE: Stripe not configured\n- 502 CAPTURE_FAILED: Stripe capture or charge failed"
           }
         },
         {
@@ -206,16 +168,8 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/transactions/:id",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "transactions",
-                ":id"
-              ],
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "transactions", ":id"],
               "variable": [
                 {
                   "key": "id",
@@ -253,16 +207,8 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/experts/kyc",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "experts",
-                "kyc"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "experts", "kyc"]
             },
             "description": "Create Stripe Custom Connect account natively with Expert KYC details."
           }
@@ -288,16 +234,8 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/experts/bank-account",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "experts",
-                "bank-account"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "experts", "bank-account"]
             },
             "description": "Link bank account to Expert Custom Connect account for payouts."
           }
@@ -329,17 +267,10 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/webhook",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "webhook"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "webhook"]
             },
-            "description": "Stripe Webhook endpoint for processing async payment & account events."
+            "description": "Stripe Webhook endpoint for processing async payment & account events. Not protected by stripeGuard or authentication."
           }
         }
       ]
@@ -361,16 +292,8 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/subscriptions/plans",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "subscriptions",
-                "plans"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "subscriptions", "plans"]
             },
             "description": "List subscription plans available for experts."
           }
@@ -392,19 +315,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"planId\": \"premium_plan_id\",\n  \"paymentMethodId\": \"pm_card_visa\"\n}"
+              "raw": "{\n  \"planCode\": \"professional\",\n  \"store\": \"apple\",\n  \"receiptData\": \"receipt_token_here\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/subscriptions",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "subscriptions"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "subscriptions"]
             },
             "description": "Subscribe the expert to a membership plan."
           }
@@ -422,16 +338,8 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/subscriptions/me",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "subscriptions",
-                "me"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "subscriptions", "me"]
             },
             "description": "Retrieve current plan info and active subscription state of the expert."
           }
@@ -458,15 +366,8 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/subscriptions",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "subscriptions"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "subscriptions"]
             },
             "description": "Upgrade or downgrade to a different plan. Cancels current active subscription and activates the new plan immediately. Will return 409 ALREADY_SUBSCRIBED if same plan is requested."
           }
@@ -484,23 +385,14 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/subscriptions/me",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "subscriptions",
-                "me"
-              ]
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "subscriptions", "me"]
             },
             "description": "Cancels the expert's active subscription immediately. Sets status to 'cancelled'. Returns 404 if no active subscription exists."
           }
         }
       ]
     },
-
     {
       "id": "57225879-66666666-0000-4000-8000-000000000001",
       "name": "Earnings (Expert)",
@@ -518,15 +410,8 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/earnings?page=1&limit=20",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "billing",
-                "earnings"
-              ],
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "earnings"],
               "query": [
                 {
                   "key": "page",
@@ -539,6 +424,31 @@
               ]
             },
             "description": "Get expert consultation earnings transaction log history."
+          }
+        }
+      ]
+    },
+    {
+      "id": "57225879-77777777-0000-4000-8000-000000000001",
+      "name": "Internal / Cron",
+      "item": [
+        {
+          "id": "57225879-77777777-0000-4000-8000-000000000002",
+          "name": "Expire Subscriptions (Cron)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/subscriptions/expire",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "subscriptions", "expire"]
+            },
+            "description": "Internal cron endpoint to expire subscriptions past their period end. Should be protected with internal secret header or restricted to localhost in production."
           }
         }
       ]

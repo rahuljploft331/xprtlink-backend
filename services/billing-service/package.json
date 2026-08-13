@@ -14,7 +14,8 @@
   },
   "scripts": {
     "start": "node server.js",
-    "dev": "npx dotenv -e ../../.env -- nodemon server.js"
+    "dev": "npx dotenv -e ../../.env -- nodemon server.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "@xprtlink/shared": "workspace:*",

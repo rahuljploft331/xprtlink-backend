@@ -1,38 +1,40 @@
-import crypto from "crypto";
+import Stripe from "stripe";
 
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-const isLiveKeyAvailable = Boolean(stripeSecretKey && !stripeSecretKey.includes("placeholder"));
-
 let stripe = null;
-if (isLiveKeyAvailable) {
-  try {
-    const StripeModule = (await import("stripe")).default;
-    stripe = new StripeModule(stripeSecretKey, { apiVersion: "2024-12-18.acacia" });
-    console.log("[Stripe Service] Stripe SDK initialized successfully.");
-  } catch (_err) {
-    console.warn("[Stripe Service] Stripe package not found or failed to load. Falling back to local stub mode.");
-  }
+
+if (stripeSecretKey && stripeSecretKey.trim() && !stripeSecretKey.includes("placeholder")) {
+  stripe = new Stripe(stripeSecretKey, { apiVersion: "2024-12-18.acacia" });
+  console.log("[Stripe Service] Stripe SDK initialized successfully.");
+} else {
+  console.warn("[Stripe Service] STRIPE_SECRET_KEY missing or placeholder. Stripe is unavailable.");
 }
 
+function requireStripe() {
+  if (!stripe) {
+    const err = new Error("Stripe SDK not initialized");
+    err.code = "STRIPE_UNAVAILABLE";
+    throw err;
+  }
+  return stripe;
+}
 
 /**
- * Creates or retrieves a Stripe Customer object.
+ * Creates or retrieves a Stripe Customer object by email.
  */
 export async function getOrCreateStripeCustomer({ email, name, metadata = {} }) {
-  if (!stripe) {
-    return { id: `cus_stub_${crypto.randomUUID()}` };
-  }
+  const sdk = requireStripe();
+  const existing = await sdk.customers.list({ email, limit: 1 });
+  if (existing.data.length > 0) return existing.data[0];
+  return await sdk.customers.create({ email, name, metadata });
+}
 
-  const existing = await stripe.customers.list({ email, limit: 1 });
-  if (existing.data.length > 0) {
-    return existing.data[0];
-  }
-
-  return await stripe.customers.create({
-    email,
-    name,
-    metadata,
-  });
+/**
+ * Attaches a PaymentMethod to a Stripe Customer.
+ */
+export async function attachPaymentMethod({ stripePaymentMethodId, stripeCustomerId }) {
+  const sdk = requireStripe();
+  return await sdk.paymentMethods.attach(stripePaymentMethodId, { customer: stripeCustomerId });
 }
 
 /**
@@ -46,80 +48,57 @@ export async function createPreAuthHold({
   currency = "usd",
   metadata = {},
 }) {
-  if (!stripe) {
-    return {
-      id: `pi_hold_stub_${crypto.randomUUID()}`,
-      status: "requires_capture",
-      amount: amountCents,
-    };
-  }
-
-  return await stripe.paymentIntents.create({
+  const sdk = requireStripe();
+  return await sdk.paymentIntents.create({
     amount: amountCents,
     currency: currency.toLowerCase(),
     customer: customerStripeId,
     payment_method: stripePaymentMethodId,
     off_session: true,
     confirm: true,
-    capture_method: "manual", // Reserves funds on customer card
+    capture_method: "manual",
     metadata,
   });
 }
 
 /**
- * Captures a previously pre-authorized hold when the consultation completes.
+ * Captures a previously pre-authorized PaymentIntent.
  */
-export async function captureConsultationCharge({
-  stripePaymentIntentId,
-  paymentIntentId,
+export async function capturePaymentIntent({ paymentIntentId, amountToCaptureCents }) {
+  const sdk = requireStripe();
+  return await sdk.paymentIntents.capture(paymentIntentId, {
+    ...(amountToCaptureCents ? { amount_to_capture: amountToCaptureCents } : {}),
+  });
+}
+
+/**
+ * Creates and immediately confirms a new PaymentIntent (direct charge without prior hold).
+ */
+export async function createAndConfirmPaymentIntent({
   customerStripeId,
   stripePaymentMethodId,
-  finalCents,
+  amountCents,
   currency = "usd",
+  metadata = {},
 }) {
-  const intentId = stripePaymentIntentId || paymentIntentId;
-
-  if (!stripe) {
-    return {
-      id: intentId || `pi_stub_${crypto.randomUUID()}`,
-      status: "succeeded",
-      amount_captured: finalCents,
-    };
-  }
-
-  if (intentId) {
-    if (intentId.startsWith("pi_hold_stub_")) {
-      return {
-        id: intentId,
-        status: "succeeded",
-        amount_captured: finalCents,
-      };
-    }
-    return await stripe.paymentIntents.capture(intentId, {
-      ...(finalCents ? { amount_to_capture: finalCents } : {}),
-    });
-  }
-
-  return await stripe.paymentIntents.create({
-    amount: finalCents,
+  const sdk = requireStripe();
+  return await sdk.paymentIntents.create({
+    amount: amountCents,
     currency: currency.toLowerCase(),
     customer: customerStripeId,
     payment_method: stripePaymentMethodId,
     off_session: true,
     confirm: true,
+    metadata,
   });
 }
-
 
 /**
  * Uploads identity verification document (Passport / Driver's License) to Stripe Files.
  */
 export async function uploadIdentityDocument({ fileBuffer, mimeType, fileName = "id_doc.jpg" }) {
-  if (!stripe) {
-    return { id: `file_stub_${crypto.randomUUID()}` };
-  }
-
-  return await stripe.files.create({
+  const sdk = requireStripe();
+  return await sdk.files.create({
     file: {
       data: fileBuffer,
       name: fileName,
@@ -143,11 +122,8 @@ export async function createCustomConnectAccount({
   backDocumentFileId,
   userIpAddress = "127.0.0.1",
 }) {
-  if (!stripe) {
-    return { id: `acct_stub_${crypto.randomUUID()}` };
-  }
-
-  return await stripe.accounts.create({
+  const sdk = requireStripe();
+  return await sdk.accounts.create({
     type: "custom",
     country: address.country || "US",
     email: expertEmail,
@@ -195,11 +171,8 @@ export async function attachExternalBankAccount({
   accountNumber,
   accountHolderName,
 }) {
-  if (!stripe || stripeAccountId?.startsWith("acct_stub_")) {
-    return { id: `ba_stub_${crypto.randomUUID()}` };
-  }
-
-  const bankToken = await stripe.tokens.create({
+  const sdk = requireStripe();
+  const bankToken = await sdk.tokens.create({
     bank_account: {
       country: "US",
       currency: "usd",
@@ -210,7 +183,7 @@ export async function attachExternalBankAccount({
     },
   });
 
-  return await stripe.accounts.createExternalAccount(stripeAccountId, {
+  return await sdk.accounts.createExternalAccount(stripeAccountId, {
     external_account: bankToken.id,
   });
 }
@@ -223,11 +196,8 @@ export async function transferEarningsToExpert({
   destinationStripeAccountId,
   consultationId,
 }) {
-  if (!stripe || destinationStripeAccountId?.startsWith("acct_stub_")) {
-    return { id: `tr_stub_${crypto.randomUUID()}` };
-  }
-
-  return await stripe.transfers.create(
+  const sdk = requireStripe();
+  return await sdk.transfers.create(
     {
       amount: amountCents,
       currency: "usd",
@@ -244,10 +214,10 @@ export async function transferEarningsToExpert({
  * Constructs and verifies incoming Stripe Webhook events.
  */
 export function constructWebhookEvent(payload, signature) {
+  const sdk = requireStripe();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!stripe || !webhookSecret || webhookSecret.includes("dummy")) {
-    return JSON.parse(payload.toString());
+  if (!webhookSecret || webhookSecret.includes("dummy")) {
+    throw new Error("STRIPE_WEBHOOK_SECRET is not configured");
   }
-
-  return stripe.webhooks.constructEvent(payload, signature, webhookSecret);
+  return sdk.webhooks.constructEvent(payload, signature, webhookSecret);
 }
