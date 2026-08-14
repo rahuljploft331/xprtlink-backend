@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XprtLink — WebSocket Chat Real-Time Test</title>
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #334155;
+      --success: #10b981;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 24px; }
+    .container { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+    .header { text-align: center; margin-bottom: 8px; }
+    .header h1 { font-size: 24px; color: #fff; margin-bottom: 6px; }
+    .header p { color: var(--text-muted); font-size: 14px; }
+    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .card h2 { font-size: 16px; margin-bottom: 14px; color: #38bdf8; display: flex; align-items: center; justify-content: space-between; }
+    .badge { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: #334155; }
+    .badge.connected { background: rgba(16, 185, 129, 0.2); color: #34d399; }
+    .badge.disconnected { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    label { font-size: 13px; color: var(--text-muted); }
+    input, select, textarea {
+      background: #090d16;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: #fff;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+    input:focus, textarea:focus { outline: none; border-color: var(--primary); }
+    .btn-row { display: flex; gap: 10px; margin-top: 10px; }
+    button {
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-weight: 500;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover { background: var(--primary-hover); }
+    button.secondary { background: #334155; }
+    button.secondary:hover { background: #475569; }
+    .chat-box {
+      height: 300px;
+      overflow-y: auto;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      background: #090d16;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .msg {
+      max-width: 75%;
+      padding: 8px 12px;
+      border-radius: 10px;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .msg.mine {
+      align-self: flex-end;
+      background: #2563eb;
+      color: #fff;
+    }
+    .msg.theirs {
+      align-self: flex-start;
+      background: #334155;
+      color: #f1f5f9;
+    }
+    .msg-meta { font-size: 11px; opacity: 0.7; margin-top: 4px; text-align: right; }
+    .typing-bar { font-size: 12px; color: #38bdf8; font-style: italic; min-height: 18px; }
+    .logs-box {
+      height: 140px;
+      overflow-y: auto;
+      background: #090d16;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: monospace;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>XprtLink WebSocket Chat Client</h1>
+      <p>Single source of truth real-time messaging test interface (Socket.IO)</p>
+    </div>
+
+    <!-- Connection Setup -->
+    <div class="card">
+      <h2>
+        1. Connection & Authentication
+        <span id="connBadge" class="badge disconnected">Disconnected</span>
+      </h2>
+      <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px;">
+        <div class="form-group">
+          <label>Socket URL</label>
+          <input id="socketUrl" value="http://localhost:4000" />
+        </div>
+        <div class="form-group">
+          <label>JWT Access Token</label>
+          <input id="jwtToken" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." />
+        </div>
+      </div>
+      <div class="btn-row">
+        <button id="btnConnect" onclick="connectSocket()">Connect</button>
+        <button id="btnDisconnect" class="secondary" onclick="disconnectSocket()" disabled>Disconnect</button>
+      </div>
+    </div>
+
+    <!-- Conversations & Rooms -->
+    <div class="card">
+      <h2>2. Conversations & Active Room</h2>
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label>Active Conversation ID</label>
+          <input id="conversationId" placeholder="UUID of conversation" />
+        </div>
+        <div class="form-group" style="align-self: flex-end;">
+          <div class="btn-row" style="margin-top: 0;">
+            <button class="secondary" onclick="listConversations()">List My Threads</button>
+            <button onclick="joinRoom()">Join Thread</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live Chat Interface -->
+    <div class="card">
+      <h2>3. Chat Room</h2>
+      <div id="chatBox" class="chat-box"></div>
+      <div id="typingBar" class="typing-bar"></div>
+      
+      <div style="display: flex; gap: 10px; margin-top: 10px;">
+        <input
+          id="msgInput"
+          placeholder="Type a message..."
+          style="flex: 1;"
+          oninput="handleTyping()"
+          onkeydown="if(event.key === 'Enter') sendMessage()"
+        />
+        <button onclick="sendMessage()">Send</button>
+        <button class="secondary" onclick="markRead()">Mark Read</button>
+      </div>
+    </div>
+
+    <!-- Event Logs -->
+    <div class="card">
+      <h2>4. Real-Time Socket Event Logs</h2>
+      <div id="logsBox" class="logs-box"></div>
+    </div>
+  </div>
+
+  <script>
+    let socket = null;
+    let typingTimer = null;
+    let isTyping = false;
+    let myUserId = null;
+
+    function log(msg, obj) {
+      const logs = document.getElementById("logsBox");
+      const time = new Date().toLocaleTimeString();
+      const line = document.createElement("div");
+      line.textContent = `[${time}] ${msg} ${obj ? JSON.stringify(obj) : ""}`;
+      logs.appendChild(line);
+      logs.scrollTop = logs.scrollHeight;
+    }
+
+    function connectSocket() {
+      const url = document.getElementById("socketUrl").value;
+      const token = document.getElementById("jwtToken").value.trim();
+
+      if (!token) {
+        alert("Please enter a JWT access token");
+        return;
+      }
+
+      try {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        myUserId = payload.sub;
+        log("Decoded Token for user:", payload.sub);
+      } catch (e) {
+        log("Warning: Could not parse token payload client-side");
+      }
+
+      log(`Connecting to ${url}...`);
+      socket = io(url, {
+        auth: { token },
+        transports: ["websocket", "polling"],
+      });
+
+      socket.on("connect", () => {
+        log("Connected! Socket ID:", socket.id);
+        document.getElementById("connBadge").className = "badge connected";
+        document.getElementById("connBadge").textContent = "Connected (" + socket.id.slice(0, 6) + ")";
+        document.getElementById("btnConnect").disabled = true;
+        document.getElementById("btnDisconnect").disabled = false;
+      });
+
+      socket.on("connect_error", (err) => {
+        log("Connect Error:", err.message);
+        alert("Connection error: " + err.message);
+      });
+
+      socket.on("disconnect", (reason) => {
+        log("Disconnected:", reason);
+        document.getElementById("connBadge").className = "badge disconnected";
+        document.getElementById("connBadge").textContent = "Disconnected";
+        document.getElementById("btnConnect").disabled = false;
+        document.getElementById("btnDisconnect").disabled = true;
+      });
+
+      // Realtime chat events
+      socket.on("message:new", (data) => {
+        log("Received message:new", data);
+        appendMessage(data.message);
+      });
+
+      socket.on("conversation:read", (data) => {
+        log("Received conversation:read", data);
+      });
+
+      socket.on("conversation:updated", (data) => {
+        log("Received conversation:updated (Inbox alert)", data);
+      });
+
+      socket.on("typing:status", (data) => {
+        const bar = document.getElementById("typingBar");
+        if (data.isTyping) {
+          bar.textContent = "Peer is typing...";
+        } else {
+          bar.textContent = "";
+        }
+      });
+    }
+
+    function disconnectSocket() {
+      if (socket) {
+        socket.disconnect();
+        socket = null;
+      }
+    }
+
+    function listConversations() {
+      if (!socket) return alert("Connect socket first");
+      socket.emit("conversation:list", {}, (res) => {
+        log("conversation:list response:", res);
+        if (res.success && res.data.items.length > 0) {
+          document.getElementById("conversationId").value = res.data.items[0].id;
+          log("Auto-selected conversation:", res.data.items[0].id);
+        }
+      });
+    }
+
+    function joinRoom() {
+      const conversationId = document.getElementById("conversationId").value.trim();
+      if (!socket || !conversationId) return alert("Connect and provide Conversation ID");
+      socket.emit("conversation:join", { conversationId }, (res) => {
+        log("conversation:join response:", res);
+        if (res.success) {
+          loadHistory(conversationId);
+        }
+      });
+    }
+
+    function loadHistory(conversationId) {
+      socket.emit("message:history", { conversationId, page: 1, limit: 50 }, (res) => {
+        log("message:history response:", res);
+        if (res.success) {
+          const chat = document.getElementById("chatBox");
+          chat.innerHTML = "";
+          (res.data.items || []).reverse().forEach(appendMessage);
+        }
+      });
+    }
+
+    function sendMessage() {
+      const input = document.getElementById("msgInput");
+      const conversationId = document.getElementById("conversationId").value.trim();
+      const body = input.value.trim();
+      if (!socket || !conversationId || !body) return;
+
+      socket.emit("message:send", { conversationId, body }, (res) => {
+        log("message:send response:", res);
+        if (res.success) {
+          input.value = "";
+          handleTyping(true);
+        }
+      });
+    }
+
+    function markRead() {
+      const conversationId = document.getElementById("conversationId").value.trim();
+      if (!socket || !conversationId) return;
+      socket.emit("message:read", { conversationId }, (res) => {
+        log("message:read response:", res);
+      });
+    }
+
+    function handleTyping(forceStop = false) {
+      const conversationId = document.getElementById("conversationId").value.trim();
+      if (!socket || !conversationId) return;
+
+      if (forceStop) {
+        if (isTyping) {
+          socket.emit("typing:stop", { conversationId });
+          isTyping = false;
+        }
+        return;
+      }
+
+      if (!isTyping) {
+        socket.emit("typing:start", { conversationId });
+        isTyping = true;
+      }
+
+      clearTimeout(typingTimer);
+      typingTimer = setTimeout(() => {
+        socket.emit("typing:stop", { conversationId });
+        isTyping = false;
+      }, 2000);
+    }
+
+    function appendMessage(msg) {
+      const chat = document.getElementById("chatBox");
+      const isMine = msg.senderUserId === myUserId;
+      const el = document.createElement("div");
+      el.className = "msg " + (isMine ? "mine" : "theirs");
+      el.innerHTML = `
+        <div>${msg.body || "[Attachment]"}</div>
+        <div class="msg-meta">${new Date(msg.createdAt).toLocaleTimeString()} • ${msg.deliveryStatus}</div>
+      `;
+      chat.appendChild(el);
+      chat.scrollTop = chat.scrollHeight;
+    }
+  </script>
+</body>
+</html>

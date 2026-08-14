@@ -1,13 +1,50 @@
 {
   "info": {
-    "_postman_id": "c1f7b7cb-4b3d-4c3e-8848-12cd80a1c6a5",
+    "_postman_id": "6b50cd2e-d7e3-4cc7-9fc6-d4332f826d4c",
     "name": "Messaging Service",
-    "description": "REST APIs for managing message conversations, sending text/media attachments, marking threads read.",
+    "description": "Messaging Service (WebSocket-Only Architecture). All chat messaging operations (conversations, messages, typing, read receipts) are handled via Socket.IO connections at `/socket.io`. HTTP endpoints are limited to service health checks.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Get Conversations",
+      "id": "d1a0e884-3c66-4cf8-8f55-7d4efb7b6401",
+      "name": "Service Info",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api"
+          ]
+        },
+        "description": "Returns status information indicating Messaging Service operates exclusively on Socket.IO protocol."
+      }
+    },
+    {
+      "id": "e2b1f995-4d77-4df9-9e66-8e5f0c8c7512",
+      "name": "Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Health probe for Messaging Service."
+      }
+    },
+    {
+      "id": "f3c2a006-5e88-4ef0-af77-9f601d9d8623",
+      "name": "WebSocket / Socket.IO Reference",
       "request": {
         "method": "GET",
         "header": [
@@ -17,179 +54,27 @@
           }
         ],
         "url": {
-          "raw": "{{base_url}}/api/v1/messaging/conversations?page=1&limit=20",
+          "raw": "{{base_url}}/socket.io/?EIO=4&transport=websocket",
           "host": [
             "{{base_url}}"
           ],
           "path": [
-            "api",
-            "v1",
-            "messaging",
-            "conversations"
+            "socket.io",
+            ""
           ],
           "query": [
             {
-              "key": "page",
-              "value": "1"
+              "key": "EIO",
+              "value": "4"
             },
             {
-              "key": "limit",
-              "value": "20"
+              "key": "transport",
+              "value": "websocket"
             }
           ]
-            },
-        "description": "Get lists of messaging threads/conversations."
+        },
+        "description": "### Socket.IO Protocol Reference\n\n**Connect Endpoint**: `ws://localhost:4000/socket.io` (or `:4005/socket.io`)\n**Auth**: Pass JWT in `auth: { token: \"<jwt>\" }` or Header `Authorization: Bearer <jwt>`\n\n#### Events Summary:\n1. **`conversation:list`**:\n   - Request: `{ page?: number, limit?: number }`\n   - Ack: `{ success: true, data: { items: [], pagination: {} } }`\n\n2. **`conversation:create`**:\n   - Request: `{ expertId?: UUID, customerId?: UUID }`\n   - Ack: `{ success: true, data: ConversationSummary }`\n   - Broadcast: Emits `conversation:new` to peer user room `user:<peerUserId>`\n\n3. **`conversation:join`**:\n   - Request: `{ conversationId: UUID }`\n   - Ack: `{ success: true, data: { conversationId, joined: true } }`\n\n4. **`conversation:leave`**:\n   - Request: `{ conversationId: UUID }`\n   - Ack: `{ success: true, data: { conversationId, left: true } }`\n\n5. **`message:history`**:\n   - Request: `{ conversationId: UUID, page?: number, limit?: number }`\n   - Ack: `{ success: true, data: { items: [], pagination: {} } }`\n\n6. **`message:send`**:\n   - Request: `{ conversationId: UUID, body?: string, mediaIds?: UUID[] }`\n   - Ack: `{ success: true, data: Message }`\n   - Broadcast: Emits `message:new` to room `conversation:<id>` and `conversation:updated` to `user:<peerUserId>`\n\n7. **`message:read`**:\n   - Request: `{ conversationId: UUID }`\n   - Ack: `{ success: true, data: { read: true, unreadCount: 0 } }`\n   - Broadcast: Emits `conversation:read` to room `conversation:<id>`\n\n8. **`typing:start` / `typing:stop`**:\n   - Request: `{ conversationId: UUID }`\n   - Broadcast: Emits `typing:status` with `{ conversationId, userId, isTyping: true/false }` to `conversation:<id>`"
       }
-    },
-    {
-      "name": "Start Conversation Thread",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"expertId\": \"expert-uuid-here\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/messaging/conversations",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "messaging",
-                "conversations"
-              ]
-            },
-            "description": "Start a message conversation thread from an expert profile."
-          }
-        },
-        {
-          "name": "Get Thread Messages (Paginated)",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/messaging/conversations/:id/messages?page=1&limit=50",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "messaging",
-                "conversations",
-                ":id",
-                "messages"
-              ],
-              "query": [
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "50"
-                }
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "conversation-uuid-here"
-                }
-              ]
-            },
-            "description": "Load messages inside a conversation thread."
-          }
-        },
-        {
-          "name": "Send Message",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"content\": \"Hello, can you help with this query?\",\n  \"mediaIds\": []\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/messaging/conversations/:id/messages",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "messaging",
-                "conversations",
-                ":id",
-                "messages"
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "conversation-uuid-here"
-                }
-              ]
-            },
-            "description": "Send a chat message with text content or media attachments."
-          }
-        },
-        {
-          "name": "Mark Conversation Read",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/messaging/conversations/:id/read",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "messaging",
-                "conversations",
-                ":id",
-                "read"
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "conversation-uuid-here"
-                }
-              ]
-            },
-            "description": "Mark a conversation thread and its messages as read."
-          }
-        }
-      ]
+    }
+  ]
 }

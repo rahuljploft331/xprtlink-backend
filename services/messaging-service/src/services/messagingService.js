@@ -18,7 +18,7 @@ function conversationWhere(auth) {
   throw forbidden("Messaging requires customer or expert role");
 }
 
-async function loadConversation(auth, conversationId) {
+export async function loadConversation(auth, conversationId) {
   const conversation = await getDb().conversation.findFirst({
     where: { id: conversationId, ...conversationWhere(auth) },
     include: {
@@ -28,6 +28,21 @@ async function loadConversation(auth, conversationId) {
   });
   if (!conversation) throw notFound("Conversation not found");
   return conversation;
+}
+
+export async function getConversationPeerUserId(conversationId, currentUserId) {
+  const conversation = await getDb().conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      customer: { select: { userId: true } },
+      expert: { select: { userId: true } },
+    },
+  });
+  if (!conversation) return null;
+  if (conversation.customer?.userId === currentUserId) {
+    return conversation.expert?.userId ?? null;
+  }
+  return conversation.customer?.userId ?? null;
 }
 
 async function countUnreadMessages(conversationId, userId, lastReadMessage) {
