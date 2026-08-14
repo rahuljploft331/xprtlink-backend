@@ -23,20 +23,29 @@
     "reset": "node scripts/reset.js",
     "db:seed": "node scripts/seed.js",
     "db:reset": "node scripts/reset.js",
-    "db:generate": "dotenv -e .env -- pnpm --filter @xprtlink/shared run db:generate",
-    "db:migrate": "dotenv -e .env -- pnpm --filter @xprtlink/shared run db:migrate",
-    "db:migrate:dev": "dotenv -e .env -- pnpm --filter @xprtlink/shared run db:migrate:dev",
-    "db:studio": "dotenv -e .env -- pnpm --filter @xprtlink/shared run db:studio"
+    "seed:platform": "node scripts/seed-platform.js",
+    "init:flows": "node scripts/init-flows.js",
+    "init:flows:fresh": "node scripts/init-flows.js --fresh",
+    "db:generate": "npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared run db:generate",
+    "db:push": "npx dotenv-cli -e .env -- npx prisma db push --schema=shared/prisma/schema.prisma",
+    "db:migrate": "npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared run db:migrate",
+    "db:migrate:dev": "npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared run db:migrate:dev",
+    "db:studio": "npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared run db:studio"
   },
   "dependencies": {
     "@xprtlink/shared": "workspace:*",
-    "bcryptjs": "^3.0.3"
+    "bcryptjs": "^3.0.3",
+    "stripe": "^17.7.0"
   },
   "devDependencies": {
     "dotenv": "^16.6.1",
     "dotenv-cli": "^8.0.0",
+    "fast-check": "3.22.0",
+    "newman": "^6.2.1",
     "nodemon": "^3.1.14",
-    "pm2": "^5.4.3"
+    "pm2": "^5.4.3",
+    "prisma": "^6.19.0",
+    "vitest": "^4.1.10"
   },
   "engines": {
     "node": ">=20"

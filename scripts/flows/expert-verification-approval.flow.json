@@ -1,0 +1,299 @@
+{
+  "info": {
+    "_postman_id": "f4a2c8d1-9e3b-4a7f-b612-expert-verify-e",
+    "name": "XpertLink Expert Verification Approval Flow (Verified)",
+    "description": "Flow E: Authenticates as admin, lists all pending expert verifications, approves each, and verifies resulting expert profile state (verificationStatus + searchEligible).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:4000" },
+    { "key": "admin_token", "value": "" },
+    { "key": "pending_list", "value": "[]" },
+    { "key": "current_verification_id", "value": "" },
+    { "key": "current_expert_id", "value": "" },
+    { "key": "should_skip", "value": "false" }
+  ],
+  "item": [
+    {
+      "name": "Step 1: Admin Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Admin login succeeded (status 200)', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var json = pm.response.json();",
+              "pm.test('accessToken present', function () {",
+              "  pm.expect(json.data.accessToken).to.be.a('string').and.not.empty;",
+              "});",
+              "pm.collectionVariables.set('admin_token', json.data.accessToken);",
+              "if (pm.response.code !== 200) {",
+              "  pm.test('Admin login failed: status ' + pm.response.code, function () { pm.expect.fail(); });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"admin@xpertlink.com\",\"password\":\"Admin@123\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/auth/login",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "admin", "auth", "login"]
+        }
+      }
+    },
+    {
+      "name": "Step 2: List Pending Verifications",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('List pending verifications (status 200)', function () {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "var json = pm.response.json();",
+              "var items = json.data && json.data.items ? json.data.items : [];",
+              "pm.collectionVariables.set('pending_list', JSON.stringify(items));",
+              "if (items.length === 0) {",
+              "  console.log('No pending verifications found');",
+              "} else {",
+              "  pm.test('Pending verifications found: ' + items.length, function () {",
+              "    pm.expect(items.length).to.be.above(0);",
+              "  });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/verifications?status=pending",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "admin", "verifications"],
+          "query": [{ "key": "status", "value": "pending" }]
+        }
+      }
+    },
+    {
+      "name": "Step 3: Approve First Pending Verification",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "var pending = JSON.parse(pm.collectionVariables.get('pending_list') || '[]');",
+              "if (pending.length > 0) {",
+              "  pm.collectionVariables.set('current_verification_id', pending[0].id);",
+              "  pm.collectionVariables.set('current_expert_id', pending[0].expert.id);",
+              "  pm.collectionVariables.set('should_skip', 'false');",
+              "} else {",
+              "  pm.collectionVariables.set('should_skip', 'true');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var shouldSkip = pm.collectionVariables.get('should_skip') === 'true';",
+              "if (shouldSkip) {",
+              "  pm.test('Skipped: no pending verifications', function () { pm.expect(true).to.be.true; });",
+              "} else {",
+              "  pm.test('Approval succeeded (status 200)', function () {",
+              "    pm.response.to.have.status(200);",
+              "  });",
+              "  if (pm.response.code !== 200) {",
+              "    var vid = pm.collectionVariables.get('current_verification_id');",
+              "    pm.test('Approval failed for verification ' + vid + ': status ' + pm.response.code, function () { pm.expect.fail(); });",
+              "  }",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"notes\":\"Auto-approved by init:flows E\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/verifications/{{current_verification_id}}/approve",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "admin", "verifications", "{{current_verification_id}}", "approve"]
+        }
+      }
+    },
+    {
+      "name": "Step 4: Verify First Expert Profile",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var shouldSkip = pm.collectionVariables.get('should_skip') === 'true';",
+              "if (shouldSkip) {",
+              "  pm.test('Skipped: no pending verifications', function () { pm.expect(true).to.be.true; });",
+              "} else {",
+              "  pm.test('Expert profile fetch (status 200)', function () {",
+              "    pm.response.to.have.status(200);",
+              "  });",
+              "  var json = pm.response.json();",
+              "  var expertId = pm.collectionVariables.get('current_expert_id');",
+              "  pm.test('verificationStatus is approved', function () {",
+              "    var actual = json.data.verificationStatus;",
+              "    if (actual !== 'approved') {",
+              "      pm.expect.fail('Expert ' + expertId + ': expected verificationStatus = approved, got ' + actual);",
+              "    }",
+              "  });",
+              "  pm.test('searchEligible is true', function () {",
+              "    var actual = json.data.searchEligible;",
+              "    if (actual !== true) {",
+              "      pm.expect.fail('Expert ' + expertId + ': expected searchEligible = true, got ' + actual);",
+              "    }",
+              "  });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/experts/{{current_expert_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "admin", "experts", "{{current_expert_id}}"]
+        }
+      }
+    },
+    {
+      "name": "Step 5: Approve Second Pending Verification",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "var pending = JSON.parse(pm.collectionVariables.get('pending_list') || '[]');",
+              "if (pending.length > 1) {",
+              "  pm.collectionVariables.set('current_verification_id', pending[1].id);",
+              "  pm.collectionVariables.set('current_expert_id', pending[1].expert.id);",
+              "  pm.collectionVariables.set('should_skip', 'false');",
+              "} else {",
+              "  pm.collectionVariables.set('should_skip', 'true');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var shouldSkip = pm.collectionVariables.get('should_skip') === 'true';",
+              "if (shouldSkip) {",
+              "  pm.test('Skipped: fewer than 2 pending verifications', function () { pm.expect(true).to.be.true; });",
+              "} else {",
+              "  pm.test('Approval succeeded (status 200)', function () {",
+              "    pm.response.to.have.status(200);",
+              "  });",
+              "  if (pm.response.code !== 200) {",
+              "    var vid = pm.collectionVariables.get('current_verification_id');",
+              "    pm.test('Approval failed for verification ' + vid + ': status ' + pm.response.code, function () { pm.expect.fail(); });",
+              "  }",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{admin_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"notes\":\"Auto-approved by init:flows E\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/verifications/{{current_verification_id}}/approve",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "admin", "verifications", "{{current_verification_id}}", "approve"]
+        }
+      }
+    },
+    {
+      "name": "Step 6: Verify Second Expert Profile",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "var shouldSkip = pm.collectionVariables.get('should_skip') === 'true';",
+              "if (shouldSkip) {",
+              "  pm.test('Skipped: fewer than 2 pending verifications', function () { pm.expect(true).to.be.true; });",
+              "} else {",
+              "  pm.test('Expert profile fetch (status 200)', function () {",
+              "    pm.response.to.have.status(200);",
+              "  });",
+              "  var json = pm.response.json();",
+              "  var expertId = pm.collectionVariables.get('current_expert_id');",
+              "  pm.test('verificationStatus is approved', function () {",
+              "    var actual = json.data.verificationStatus;",
+              "    if (actual !== 'approved') {",
+              "      pm.expect.fail('Expert ' + expertId + ': expected verificationStatus = approved, got ' + actual);",
+              "    }",
+              "  });",
+              "  pm.test('searchEligible is true', function () {",
+              "    var actual = json.data.searchEligible;",
+              "    if (actual !== true) {",
+              "      pm.expect.fail('Expert ' + expertId + ': expected searchEligible = true, got ' + actual);",
+              "    }",
+              "  });",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/experts/{{current_expert_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "admin", "experts", "{{current_expert_id}}"]
+        }
+      }
+    }
+  ]
+}

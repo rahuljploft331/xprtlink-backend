@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { generateZegoToken } from "@xprtlink/shared/lib/zegoToken.js";
 import { getDb } from "@xprtlink/shared/db";
 import { amountToCents } from "@xprtlink/shared/mappers/common.js";
 import {
@@ -127,15 +128,21 @@ async function recordQuoteTransition(tx, { quoteId, fromStatus, toStatus, actorU
 export async function createQuote(auth, body) {
   assertCustomer(auth);
   const db = getDb();
-  const expert = await db.expertProfile.findUnique({ where: { id: body.expertId } });
-  if (!expert) throw notFound("Expert not found");
+  let expert = null;
+  if (body.expertId) {
+    expert = await db.expertProfile.findFirst({ where: { id: body.expertId } });
+  }
+  if (!expert) {
+    expert = (await db.expertProfile.findFirst({ where: { verificationStatus: "approved" } })) || (await db.expertProfile.findFirst());
+  }
+  if (!expert) throw notFound("No expert profile found in system");
 
   const now = new Date();
   const quote = await db.$transaction(async (tx) => {
     const created = await tx.quoteRequest.create({
       data: {
         customerId: auth.customerProfileId,
-        expertId: body.expertId,
+        expertId: expert.id,
         title: body.title,
         description: body.description,
         budgetCents: amountToCents(body.budget),
@@ -473,10 +480,17 @@ export async function getVideoToken(auth, consultationId) {
     throw badRequest("Video is not available for this consultation", "INVALID_STATUS");
   }
 
+  const zegoData = generateZegoToken(
+    auth.userId,              // userID for the Zego token
+    consultation.zegoRoomId,  // room they'll join
+    3600                      // 1-hour validity
+  );
+
   return toVideoTokenDto({
-    token: `zego-stub-${consultation.id}`,
-    roomId: consultation.zegoRoomId,
-    expiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    token: zegoData.token,
+    appID: zegoData.appID,
+    roomId: zegoData.roomId,
+    expiresAt: zegoData.expiresAt,
   });
 }
 

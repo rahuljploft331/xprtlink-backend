@@ -39,6 +39,7 @@ export function toExpertSubscriptionDto(subscription, plan, currency = "USD") {
     plan: toSubscriptionPlanDto(plan, currency),
     store: subscription.store,
     status: subscription.status,
+    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd ?? false,
     currentPeriodStart: toIso(subscription.currentPeriodStart),
     currentPeriodEnd: toIso(subscription.currentPeriodEnd),
     cancelledAt: toIso(subscription.cancelledAt),

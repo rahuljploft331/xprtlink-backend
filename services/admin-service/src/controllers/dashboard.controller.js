@@ -8,13 +8,21 @@ export async function getStats(_req, res, next) {
     const now = new Date();
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
+    const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+
     const [
       totalCustomers,
       totalExperts,
       pendingVerifications,
       activeSubscriptions,
       consultations30d,
+      consultationsPrev30d,
       quotes30d,
+      quotesPrev30d,
+      customers30d,
+      customersPrev30d,
+      experts30d,
+      expertsPrev30d,
       pendingPayouts,
       pendingReviews,
       pendingPaymentsInvestigating,
@@ -26,24 +34,54 @@ export async function getStats(_req, res, next) {
       db.consultation.count({
         where: { createdAt: { gte: thirtyDaysAgo }, status: "completed" },
       }),
+      db.consultation.count({
+        where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo }, status: "completed" },
+      }),
       db.quoteRequest.count({
         where: { createdAt: { gte: thirtyDaysAgo } },
+      }),
+      db.quoteRequest.count({
+        where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+      }),
+      db.customerProfile.count({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+      }),
+      db.customerProfile.count({
+        where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
+      }),
+      db.expertProfile.count({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+      }),
+      db.expertProfile.count({
+        where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
       }),
       db.expertPayout.count({ where: { status: "pending" } }),
       db.review.count({ where: { status: "flagged" } }),
       db.transaction.count({ where: { status: "pending" } }),
     ]);
 
-    // Revenue last 30d (sum of succeeded consultation_charge transactions)
-    const revenueResult = await db.transaction.aggregate({
-      _sum: { amountCents: true },
-      where: {
-        status: "succeeded",
-        type: "consultation_charge",
-        createdAt: { gte: thirtyDaysAgo },
-      },
-    });
+    // Platform Revenue last 30d (sum of succeeded consultation_charge + subscription transactions)
+    const [revenueResult, revenuePrevResult] = await Promise.all([
+      db.transaction.aggregate({
+        _sum: { amountCents: true },
+        where: {
+          status: "succeeded",
+          type: { in: ["consultation_charge", "subscription"] },
+          createdAt: { gte: thirtyDaysAgo },
+        },
+      }),
+      db.transaction.aggregate({
+        _sum: { amountCents: true },
+        where: {
+          status: "succeeded",
+          type: { in: ["consultation_charge", "subscription"] },
+          createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
+        },
+      }),
+    ]);
+
     const revenueCents = revenueResult._sum.amountCents || 0;
+    const revenuePrevCents = revenuePrevResult._sum.amountCents || 0;
     const revenue30d = `$${(revenueCents / 100).toLocaleString("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
@@ -52,15 +90,21 @@ export async function getStats(_req, res, next) {
     const pendingAdminActions =
       pendingVerifications + pendingReviews + pendingPaymentsInvestigating + pendingPayouts;
 
+    const custDelta = calculateDelta(customers30d, customersPrev30d);
+    const expDelta = calculateDelta(experts30d, expertsPrev30d);
+    const consDelta = calculateDelta(consultations30d, consultationsPrev30d);
+    const quotesDelta = calculateDelta(quotes30d, quotesPrev30d);
+    const revDelta = calculateDelta(revenueCents, revenuePrevCents);
+
     const stats = [
-      { id: "customers", label: "Total Customers", value: totalCustomers.toLocaleString(), trend: "up" },
-      { id: "experts", label: "Total Experts", value: totalExperts.toLocaleString(), trend: "up" },
-      { id: "verifications", label: "Pending Verifications", value: String(pendingVerifications), trend: pendingVerifications > 0 ? "neutral" : "up" },
-      { id: "subscriptions", label: "Active Subscriptions", value: activeSubscriptions.toLocaleString(), trend: "up" },
-      { id: "consultations", label: "Consultations (30d)", value: consultations30d.toLocaleString(), trend: "up" },
-      { id: "quotes", label: "Quote Requests (30d)", value: quotes30d.toLocaleString(), trend: "up" },
-      { id: "revenue", label: "Platform Revenue (30d)", value: revenue30d, trend: "up" },
-      { id: "actions", label: "Pending Admin Actions", value: String(pendingAdminActions), trend: pendingAdminActions > 0 ? "down" : "up" },
+      { id: "customers", label: "Total Customers", value: totalCustomers.toLocaleString(), delta: custDelta.delta, trend: custDelta.trend },
+      { id: "experts", label: "Total Experts", value: totalExperts.toLocaleString(), delta: expDelta.delta, trend: expDelta.trend },
+      { id: "verifications", label: "Pending Verifications", value: String(pendingVerifications), delta: pendingVerifications > 0 ? `${pendingVerifications} pending` : "All clear", trend: pendingVerifications > 0 ? "neutral" : "up" },
+      { id: "subscriptions", label: "Active Subscriptions", value: activeSubscriptions.toLocaleString(), delta: totalExperts > 0 ? `${Math.round((activeSubscriptions / totalExperts) * 100)}% of experts` : null, trend: "up" },
+      { id: "consultations", label: "Consultations (30d)", value: consultations30d.toLocaleString(), delta: consDelta.delta, trend: consDelta.trend },
+      { id: "quotes", label: "Quote Requests (30d)", value: quotes30d.toLocaleString(), delta: quotesDelta.delta, trend: quotesDelta.trend },
+      { id: "revenue", label: "Platform Revenue (30d)", value: revenue30d, delta: revDelta.delta, trend: revDelta.trend },
+      { id: "actions", label: "Pending Admin Actions", value: String(pendingAdminActions), delta: pendingAdminActions > 0 ? `${pendingAdminActions} queue` : "All clear", trend: pendingAdminActions > 0 ? "down" : "up" },
     ];
 
     // Recent activity — last 10 consultations/verifications/transactions mixed
@@ -137,4 +181,16 @@ function formatRelative(date) {
   const diffHrs = Math.floor(diffMins / 60);
   if (diffHrs < 24) return `${diffHrs}h ago`;
   return `${Math.floor(diffHrs / 24)}d ago`;
+}
+
+function calculateDelta(current, previous) {
+  if (previous === 0) {
+    if (current === 0) return { delta: "0%", trend: "neutral" };
+    return { delta: "+100%", trend: "up" };
+  }
+  const diff = current - previous;
+  const pct = Math.round((diff / previous) * 100);
+  if (pct > 0) return { delta: `+${pct}%`, trend: "up" };
+  if (pct < 0) return { delta: `${pct}%`, trend: "down" };
+  return { delta: "0%", trend: "neutral" };
 }

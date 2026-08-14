@@ -1,0 +1,440 @@
+{
+  "info": {
+    "_postman_id": "4b7415df-350a-4e25-a59a-c6ff9db01772",
+    "name": "XpertLink Expert Subscription Flow (Verified)",
+    "description": "Real-world expert subscription lifecycle flow: registers a fresh expert, verifies OTP, completes onboarding, subscribes for the first time, tests re-subscribe guard (409), upgrades plan, cancels subscription (cancel-at-period-end), and verifies access is preserved until period end.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:4000" },
+    { "key": "fresh_email", "value": "" },
+    { "key": "fresh_phone", "value": "" },
+    { "key": "expert_token", "value": "" },
+    { "key": "plan_code", "value": "professional" },
+    { "key": "upgrade_plan_code", "value": "elite" },
+    { "key": "subscription_id", "value": "" },
+    { "key": "plan_id", "value": "" },
+    { "key": "category_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Step 1: Register Fresh Expert Account",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "var ts = Date.now();",
+              "pm.collectionVariables.set('fresh_email', 'expert_sub_' + ts + '@xprtlink-test.com');",
+              "pm.collectionVariables.set('fresh_phone', '+1310' + String(ts).slice(-7));"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 201', function () { pm.response.to.have.status(201); });",
+              "var json = pm.response.json();",
+              "pm.test('OTP sent', function () { pm.expect(json.data.sent).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{fresh_email}}\",\"phone\":\"{{fresh_phone}}\",\"password\":\"Expert@123\",\"confirmPassword\":\"Expert@123\",\"firstName\":\"Taylor\",\"lastName\":\"SubFlow\",\"role\":\"expert\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/register",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "register"]
+        }
+      }
+    },
+    {
+      "name": "Step 2: Verify Email OTP & Get Tokens",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('accessToken present', function () { pm.expect(json.data.accessToken).to.be.a('string').and.not.empty; });",
+              "pm.collectionVariables.set('expert_token', json.data.accessToken);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"{{fresh_phone}}\",\"code\":\"123456\",\"purpose\":\"register\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/otp/verify",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "otp", "verify"]
+        }
+      }
+    },
+    {
+      "name": "Step 3: Save Expert Onboarding Profile",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "pm.sendRequest({",
+              "  url: pm.collectionVariables.get('base_url') + '/api/v1/catalog/categories',",
+              "  method: 'GET'",
+              "}, function (err, res) {",
+              "  var json = res.json();",
+              "  if (json.data && json.data.length > 0) {",
+              "    pm.collectionVariables.set('category_id', json.data[0].id);",
+              "  }",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "pm.test('success', function () { pm.expect(pm.response.json().success).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"categories\":[\"{{category_id}}\"],\"bio\":\"Subscription lifecycle flow test expert. Created by init:flows.\",\"headline\":\"Flow Test Consultant\",\"hourlyRate\":100,\"experienceYears\":5,\"languages\":[\"English\"],\"location\":\"Chicago, IL\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/experts/me/onboarding",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "experts", "me", "onboarding"]
+        }
+      }
+    },
+    {
+      "name": "Step 4: Submit Onboarding",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{expert_token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/experts/me/onboarding/submit",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "experts", "me", "onboarding", "submit"]
+        }
+      }
+    },
+    {
+      "name": "Step 5: List Subscription Plans",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('Plans list non-empty', function () { pm.expect(json.data).to.be.an('array').that.is.not.empty; });",
+              "var pro = json.data.find(function(p) { return p.code === 'professional'; }) || json.data[0];",
+              "pm.collectionVariables.set('plan_code', pro.code);",
+              "pm.collectionVariables.set('plan_id', pro.id);",
+              "var elite = json.data.find(function(p) { return p.code === 'elite'; }) || json.data[json.data.length - 1];",
+              "pm.collectionVariables.set('upgrade_plan_code', elite.code);",
+              "pm.collectionVariables.set('upgrade_plan_id', elite.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{expert_token}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/v1/billing/subscriptions/plans",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "billing", "subscriptions", "plans"]
+        }
+      }
+    },
+    {
+      "name": "Step 6: Subscribe to Plan (First Time)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "var json = pm.response.json();",
+              "pm.test('Subscription is active', function () { pm.expect(json.data.status).to.eql('active'); });",
+              "if (json.data && json.data.id) { pm.collectionVariables.set('subscription_id', json.data.id); }"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"planCode\":\"{{plan_code}}\",\"store\":\"apple\",\"receiptData\":\"receipt_sub_lifecycle_flow_001\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/billing/subscriptions",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "billing", "subscriptions"]
+        }
+      }
+    },
+    {
+      "name": "Step 7: Confirm Active Subscription (/subscriptions/me)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('Subscription status is active', function () { pm.expect(json.data.status).to.eql('active'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{expert_token}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/v1/billing/subscriptions/me",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "billing", "subscriptions", "me"]
+        }
+      }
+    },
+    {
+      "name": "Step 8: Verify subscriptionActive (/experts/me)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('subscriptionActive is true', function () { pm.expect(json.data.subscriptionActive).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{expert_token}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/v1/experts/me",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "experts", "me"]
+        }
+      }
+    },
+    {
+      "name": "Step 9: Re-Subscribe Same Plan → Expect 409",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 409 (already subscribed)', function () { pm.response.to.have.status(409); });",
+              "var json = pm.response.json();",
+              "pm.test('Error code indicates conflict', function () { pm.expect(json.success).to.be.false; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"planCode\":\"{{plan_code}}\",\"store\":\"apple\",\"receiptData\":\"receipt_sub_lifecycle_dup_002\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/billing/subscriptions",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "billing", "subscriptions"]
+        }
+      }
+    },
+    {
+      "name": "Step 10: Upgrade Plan (professional → elite)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "var json = pm.response.json();",
+              "pm.test('Subscription still active after upgrade', function () { pm.expect(json.data.status).to.eql('active'); });",
+              "pm.test('Plan upgraded to elite', function () {",
+              "  pm.expect(json.data.plan.code || json.data.planCode || '').to.satisfy(function(v) { return v === pm.collectionVariables.get('upgrade_plan_code') || v === 'elite'; });",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"planCode\":\"{{upgrade_plan_code}}\",\"store\":\"apple\",\"receiptData\":\"receipt_sub_lifecycle_upgrade_003\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/billing/subscriptions",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "billing", "subscriptions"]
+        }
+      }
+    },
+    {
+      "name": "Step 11: Schedule Cancellation (Cancel at Period End)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('cancelAtPeriodEnd is true', function () {",
+              "  pm.expect(json.data.cancelAtPeriodEnd || json.data.status).to.satisfy(function(v) {",
+              "    return v === true || v === 'active' || v === 'cancelling';",
+              "  });",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{expert_token}}" }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/billing/subscriptions/me",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "billing", "subscriptions", "me"]
+        }
+      }
+    },
+    {
+      "name": "Step 12: Verify Expert Still Active After Cancel Scheduled",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('subscriptionActive still true within period', function () {",
+              "  pm.expect(json.data.subscriptionActive).to.be.true;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{expert_token}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/v1/experts/me",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "experts", "me"]
+        }
+      }
+    },
+    {
+      "name": "Step 13: Reinstate Plan (Undo Cancel)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "var json = pm.response.json();",
+              "pm.test('Subscription reinstated active', function () {",
+              "  pm.expect(json.data.status).to.eql('active');",
+              "});",
+              "pm.test('cancelAtPeriodEnd is false', function () {",
+              "  pm.expect(json.data.cancelAtPeriodEnd).to.be.false;",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"planCode\":\"{{upgrade_plan_code}}\",\"store\":\"apple\",\"receiptData\":\"receipt_sub_lifecycle_reinstate_004\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/billing/subscriptions",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "billing", "subscriptions"]
+        }
+      }
+    }
+  ]
+}

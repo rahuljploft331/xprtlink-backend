@@ -64,20 +64,40 @@ export async function getById(req, res, next) {
 export async function approve(req, res, next) {
   try {
     const db = getDb();
-    const v = await db.expertVerification.update({
-      where: { id: req.params.id },
-      data: {
-        status: "approved",
-        reviewedAt: new Date(),
-        reviewNotes: req.body?.notes ?? null,
-      },
+
+    const result = await db.$transaction(async (tx) => {
+      // 1. Update verification record
+      const v = await tx.expertVerification.update({
+        where: { id: req.params.id },
+        data: {
+          status: "approved",
+          reviewedAt: new Date(),
+          reviewNotes: req.body?.notes ?? null,
+        },
+      });
+
+      // 2. Check if expert has an active subscription
+      const activeSubscription = await tx.expertSubscription.findFirst({
+        where: {
+          expertProfileId: v.expertProfileId,
+          status: "active",
+        },
+      });
+
+      // 3. Update expert profile: always set verificationStatus,
+      //    conditionally set searchEligible based on subscription
+      await tx.expertProfile.update({
+        where: { id: v.expertProfileId },
+        data: {
+          verificationStatus: "approved",
+          searchEligible: !!activeSubscription,
+        },
+      });
+
+      return v;
     });
-    // Also update expert profile verification status
-    await db.expertProfile.update({
-      where: { id: v.expertProfileId },
-      data: { verificationStatus: "approved" },
-    });
-    return ResponseFormatter.success(res, { message: "Verification approved", data: v });
+
+    return ResponseFormatter.success(res, { message: "Verification approved", data: result });
   } catch (err) {
     next(err);
   }

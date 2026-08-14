@@ -23,3 +23,7 @@ export function forbidden(message = "Forbidden", code = "FORBIDDEN") {
 export function badRequest(message = "Bad request", code = "BAD_REQUEST", field) {
   return new AppError(message, { statusCode: 400, code, field });
 }
+
+export function conflict(message = "Conflict", code = "CONFLICT") {
+  return new AppError(message, { statusCode: 409, code });
+}

@@ -72,9 +72,10 @@ export function toExpertReportDto(report) {
   };
 }
 
-export function toVideoTokenDto({ token, roomId, expiresAt }) {
+export function toVideoTokenDto({ token, appID, roomId, expiresAt }) {
   return {
     token,
+    appID: appID ?? null,
     roomId,
     expiresAt: toIso(expiresAt),
   };

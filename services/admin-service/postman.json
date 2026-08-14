@@ -21,7 +21,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"admin@xpertlink.com\",\n  \"password\": \"AdminSecret123!\"\n}"
+              "raw": "{\n  \"email\": \"admin@xpertlink.com\",\n  \"password\": \"Admin@123\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/admin/auth/login",
@@ -331,8 +331,16 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
               }
             ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Documents verified and approved\"\n}"
+            },
             "url": {
               "raw": "{{base_url}}/api/v1/admin/verifications/:id/approve",
               "host": [
@@ -353,7 +361,7 @@
                 }
               ]
             },
-            "description": "Approve the expert verification request."
+            "description": "Approve the expert verification request. Runs in a transaction: updates verification status to 'approved', checks if expert has an active subscription, sets verificationStatus='approved' on the expert profile, and conditionally sets searchEligible=true only if an active subscription exists. Accepts optional JSON body with 'notes' field for review comments."
           }
         },
         {

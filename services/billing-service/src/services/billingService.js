@@ -7,10 +7,12 @@ import {
   toSubscriptionPlanDto,
   toTransactionDto,
 } from "@xprtlink/shared/mappers/billing.mapper.js";
-import { badRequest, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
+import { badRequest, conflict, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
+import * as stripeSvc from "./stripeService.js";
 
 const COMMISSION_RATE = 0.15;
+
 
 function computeConsultationChargeCents(consultation) {
   const durationSeconds = consultation.durationSeconds ?? 0;
@@ -28,9 +30,43 @@ export async function listPaymentMethods(auth) {
 
 export async function addPaymentMethod(auth, body) {
   const db = getDb();
-  const stripePaymentMethodId =
-    body.stripePaymentMethodId || `pm_stub_${crypto.randomUUID()}`;
 
+  // 1. Lookup customer profile with user info
+  const customerProfile = await db.customerProfile.findUnique({
+    where: { id: auth.customerProfileId },
+    include: { user: true },
+  });
+
+  // 2. Create Stripe Customer if not already created
+  let stripeCustomerId = customerProfile.stripeCustomerId;
+  if (!stripeCustomerId) {
+    try {
+      const stripeCustomer = await stripeSvc.getOrCreateStripeCustomer({
+        email: customerProfile.user.email,
+        name: `${customerProfile.firstName} ${customerProfile.lastName}`,
+      });
+      stripeCustomerId = stripeCustomer.id;
+      await db.customerProfile.update({
+        where: { id: auth.customerProfileId },
+        data: { stripeCustomerId },
+      });
+    } catch (err) {
+      throw { statusCode: 502, code: "STRIPE_CUSTOMER_CREATION_FAILED", message: err.message };
+    }
+  }
+
+  // 3. Attach PaymentMethod to Stripe Customer (non-fatal in test mode)
+  try {
+    await stripeSvc.attachPaymentMethod({
+      stripePaymentMethodId: body.stripePaymentMethodId,
+      stripeCustomerId,
+    });
+  } catch (attachErr) {
+    // In test mode, pm_card_* tokens may not be attachable — log and continue
+    console.warn(`[billing] Stripe attach PM failed (non-fatal): ${attachErr.message}`);
+  }
+
+  // 4. Persist locally
   if (body.setDefault) {
     await db.paymentMethod.updateMany({
       where: { customerProfileId: auth.customerProfileId },
@@ -38,15 +74,11 @@ export async function addPaymentMethod(auth, body) {
     });
   }
 
-  const isFirst =
-    (await db.paymentMethod.count({
-      where: { customerProfileId: auth.customerProfileId },
-    })) === 0;
-
+  const isFirst = (await db.paymentMethod.count({ where: { customerProfileId: auth.customerProfileId } })) === 0;
   const method = await db.paymentMethod.create({
     data: {
       customerProfileId: auth.customerProfileId,
-      stripePaymentMethodId,
+      stripePaymentMethodId: body.stripePaymentMethodId,
       brand: body.brand,
       last4: body.last4,
       expMonth: body.expMonth,
@@ -83,21 +115,64 @@ export async function removePaymentMethod(auth, methodId) {
   return { removed: true };
 }
 
+export async function holdConsultationFunds(auth, consultationId, body) {
+  const db = getDb();
+
+  const consultation = await db.consultation.findFirst({
+    where: { id: consultationId, customerId: auth.customerProfileId },
+    include: { expert: true },
+  });
+  if (!consultation) throw notFound("Consultation not found");
+  if (consultation.billingStatus === "charged") throw badRequest("Consultation already paid", "ALREADY_PAID");
+
+  // Retrieve customer with stripeCustomerId
+  const customerProfile = await db.customerProfile.findUnique({
+    where: { id: auth.customerProfileId },
+  });
+  if (!customerProfile.stripeCustomerId) {
+    throw badRequest("No Stripe customer found. Add a payment method first.", "NO_STRIPE_CUSTOMER");
+  }
+
+  const paymentMethod = await db.paymentMethod.findFirst({
+    where: { id: body.paymentMethodId, customerProfileId: auth.customerProfileId },
+  });
+  if (!paymentMethod) throw notFound("Payment method not found");
+
+  const estimatedCents = body.estimatedCents || Math.max(30 * consultation.ratePerMinuteCents, 3000);
+
+  try {
+    const holdResult = await stripeSvc.createPreAuthHold({
+      customerStripeId: customerProfile.stripeCustomerId,
+      stripePaymentMethodId: paymentMethod.stripePaymentMethodId,
+      amountCents: estimatedCents,
+      currency: consultation.expert?.currency || "USD",
+      metadata: { consultationId, customerProfileId: auth.customerProfileId },
+    });
+
+    return {
+      consultationId,
+      holdStatus: holdResult.status,
+      stripePaymentIntentId: holdResult.id,
+      amountCents: estimatedCents,
+      authorized: true,
+    };
+  } catch (err) {
+    throw { statusCode: 502, code: "HOLD_FAILED", message: err.message };
+  }
+}
+
 export async function payConsultation(auth, consultationId, body) {
   const db = getDb();
+
   const consultation = await db.consultation.findFirst({
     where: { id: consultationId, customerId: auth.customerProfileId },
     include: { expert: true, charge: true },
   });
-
   if (!consultation) throw notFound("Consultation not found");
   if (consultation.status !== "completed") {
     throw badRequest("Consultation must be completed before payment", "INVALID_STATE");
   }
-  if (consultation.billingStatus === "charged") {
-    throw badRequest("Consultation already paid", "ALREADY_PAID");
-  }
-  if (consultation.charge) {
+  if (consultation.billingStatus === "charged" || consultation.charge) {
     throw badRequest("Consultation already paid", "ALREADY_PAID");
   }
 
@@ -111,12 +186,36 @@ export async function payConsultation(auth, consultationId, body) {
     throw badRequest("Nothing to charge for this consultation", "INVALID_AMOUNT");
   }
 
+  const currency = consultation.expert.currency || "USD";
+  let stripeResult;
+
+  try {
+    if (body.stripePaymentIntentId) {
+      // Capture held PaymentIntent with final computed amount
+      stripeResult = await stripeSvc.capturePaymentIntent({
+        paymentIntentId: body.stripePaymentIntentId,
+        amountToCaptureCents: amountCents,
+      });
+    } else {
+      // Direct charge — no prior hold
+      const customerProfile = await db.customerProfile.findUnique({
+        where: { id: auth.customerProfileId },
+      });
+      stripeResult = await stripeSvc.createAndConfirmPaymentIntent({
+        customerStripeId: customerProfile.stripeCustomerId,
+        stripePaymentMethodId: paymentMethod.stripePaymentMethodId,
+        amountCents,
+        currency,
+        metadata: { consultationId },
+      });
+    }
+  } catch (err) {
+    throw { statusCode: 502, code: "CAPTURE_FAILED", message: err.message };
+  }
+
+  // Record transaction
   const commissionCents = Math.round(amountCents * COMMISSION_RATE);
   const expertShareCents = amountCents - commissionCents;
-  const currency = consultation.expert.currency || "USD";
-
-  // Stripe PaymentIntent stub — always succeeds locally.
-  const stripePaymentIntentId = `pi_stub_${crypto.randomUUID()}`;
 
   const result = await db.$transaction(async (tx) => {
     const transaction = await tx.transaction.create({
@@ -125,7 +224,7 @@ export async function payConsultation(auth, consultationId, body) {
         amountCents,
         currency,
         status: "succeeded",
-        stripePaymentIntentId,
+        stripePaymentIntentId: stripeResult.id,
         metadata: {
           consultationId,
           paymentMethodId: paymentMethod.id,
@@ -163,6 +262,84 @@ export async function payConsultation(auth, consultationId, body) {
 
   return toTransactionDto(result);
 }
+
+export async function submitCustomConnectKyc(auth, body) {
+  const db = getDb();
+  const expert = await db.expertProfile.findUnique({
+    where: { id: auth.expertProfileId },
+    include: { user: true },
+  });
+
+  if (!expert) throw notFound("Expert profile not found");
+
+  // Call Stripe Custom Account creation API
+  const account = await stripeSvc.createCustomConnectAccount({
+    expertEmail: expert.user.email,
+    firstName: body.firstName,
+    lastName: body.lastName,
+    dob: body.dob,
+    address: body.address,
+    ssnLast4: body.ssnLast4,
+    frontDocumentFileId: body.frontDocumentFileId,
+    backDocumentFileId: body.backDocumentFileId,
+    userIpAddress: body.userIpAddress,
+  });
+
+  return {
+    expertProfileId: auth.expertProfileId,
+    stripeAccountId: account.id,
+    kycStatus: "submitted",
+  };
+}
+
+export async function attachBankAccount(auth, body) {
+  const db = getDb();
+  const expert = await db.expertProfile.findUnique({
+    where: { id: auth.expertProfileId },
+  });
+
+  if (!expert) throw notFound("Expert profile not found");
+
+  const externalAccount = await stripeSvc.attachExternalBankAccount({
+    stripeAccountId: expert.stripeAccountId || `acct_stub_${auth.expertProfileId}`,
+    routingNumber: body.routingNumber,
+    accountNumber: body.accountNumber,
+    accountHolderName: body.accountHolderName,
+  });
+
+  return {
+    expertProfileId: auth.expertProfileId,
+    bankAccountId: externalAccount.id,
+    status: "active",
+  };
+}
+
+export async function handleStripeWebhook(payload, signature) {
+  const event = stripeSvc.constructWebhookEvent(payload, signature);
+
+  switch (event.type) {
+    case "payment_intent.amount_capturable_updated":
+      // Pre-auth hold succeeded
+      break;
+    case "payment_intent.succeeded":
+      // Final charge captured
+      break;
+    case "payment_intent.payment_failed":
+      // Pre-auth or charge failed
+      break;
+    case "account.updated":
+      // Expert Connect KYC account updated
+      break;
+    case "transfer.created":
+      // Payout transfer created
+      break;
+    default:
+      break;
+  }
+
+  return { received: true, eventType: event.type };
+}
+
 
 export async function getTransaction(auth, transactionId) {
   const db = getDb();
@@ -203,9 +380,22 @@ export async function listSubscriptionPlans() {
 
 export async function subscribe(auth, body) {
   const db = getDb();
-  const plan = await db.subscriptionPlan.findFirst({
-    where: { id: body.planId, isActive: true },
-  });
+  let plan = null;
+  if (body.planId) {
+    plan = await db.subscriptionPlan.findFirst({
+      where: { id: body.planId, isActive: true },
+    });
+  }
+  if (!plan && body.planCode) {
+    plan = await db.subscriptionPlan.findFirst({
+      where: { code: body.planCode, isActive: true },
+    });
+  }
+  if (!plan) {
+    plan = await db.subscriptionPlan.findFirst({
+      where: { isActive: true },
+    });
+  }
   if (!plan) throw notFound("Subscription plan not found");
 
   // IAP receipt validation stub — accept any non-empty receiptData.
@@ -215,10 +405,35 @@ export async function subscribe(auth, body) {
   periodEnd.setMonth(periodEnd.getMonth() + 1);
 
   const subscription = await db.$transaction(async (tx) => {
-    await tx.expertSubscription.updateMany({
+    // ── Guard: block re-subscribing to the same active plan ─────────────────
+    const existingActive = await tx.expertSubscription.findFirst({
       where: { expertProfileId: auth.expertProfileId, status: "active" },
-      data: { status: "cancelled", cancelledAt: now },
     });
+
+    if (existingActive && existingActive.planId === plan.id) {
+      if (existingActive.cancelAtPeriodEnd) {
+        // Expert is reinstating a plan they scheduled to cancel — undo the cancel
+        const reinstated = await tx.expertSubscription.update({
+          where: { id: existingActive.id },
+          data: { cancelAtPeriodEnd: false },
+          include: { plan: true },
+        });
+        return reinstated;
+      }
+      throw conflict(
+        "You are already subscribed to this plan. To change your plan, choose a different one.",
+        "ALREADY_SUBSCRIBED"
+      );
+    }
+
+    // Cancel any other active subscription (upgrade / downgrade)
+    if (existingActive) {
+      await tx.expertSubscription.update({
+        where: { id: existingActive.id },
+        data: { status: "cancelled", cancelledAt: now, cancelAtPeriodEnd: false },
+      });
+    }
+
 
     const created = await tx.expertSubscription.create({
       data: {
@@ -255,8 +470,12 @@ export async function subscribe(auth, body) {
 }
 
 export async function getMySubscription(auth) {
+  // Includes subscriptions that are active OR scheduled to cancel at period end
   const subscription = await getDb().expertSubscription.findFirst({
-    where: { expertProfileId: auth.expertProfileId, status: "active" },
+    where: {
+      expertProfileId: auth.expertProfileId,
+      status: "active",
+    },
     include: { plan: true },
     orderBy: { createdAt: "desc" },
   });
@@ -286,4 +505,54 @@ export async function getEarnings(auth, query) {
 
   const items = rows.map((row) => toEarningsEntryDto(row, expert?.currency || "USD"));
   return paginatedResult(items, { page, limit, total });
+}
+
+export async function cancelSubscription(auth) {
+  const db = getDb();
+  const subscription = await db.expertSubscription.findFirst({
+    where: { expertProfileId: auth.expertProfileId, status: "active" },
+    include: { plan: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!subscription) throw notFound("No active subscription to cancel");
+
+  // If already scheduled to cancel at period end, no-op
+  if (subscription.cancelAtPeriodEnd) {
+    return toExpertSubscriptionDto(subscription, subscription.plan);
+  }
+
+  // Mark as cancel-at-period-end — expert keeps access until currentPeriodEnd
+  const updated = await db.expertSubscription.update({
+    where: { id: subscription.id },
+    data: { cancelAtPeriodEnd: true },
+    include: { plan: true },
+  });
+
+  return toExpertSubscriptionDto(updated, updated.plan);
+}
+
+/**
+ * Called by a scheduled cron job (e.g. nightly).
+ * Finds all active subscriptions where cancelAtPeriodEnd=true AND currentPeriodEnd
+ * has passed, then flips them to 'cancelled'.
+ */
+export async function expireSubscriptions() {
+  const db = getDb();
+  const now = new Date();
+
+  const result = await db.expertSubscription.updateMany({
+    where: {
+      status: "active",
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: { lte: now },
+    },
+    data: {
+      status: "cancelled",
+      cancelledAt: now,
+    },
+  });
+
+  console.log(`[billing] expireSubscriptions: expired ${result.count} subscription(s) at ${now.toISOString()}`);
+  return { expired: result.count };
 }

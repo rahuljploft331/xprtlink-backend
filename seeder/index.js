@@ -2,6 +2,8 @@ import { admins } from "./data/admins.js";
 import { categories } from "./data/categories.js";
 import { customers } from "./data/customers.js";
 import { experts } from "./data/experts.js";
+import { seedConsultations } from "./data/consultations.js";
+import { seedQuotes } from "./data/quotes.js";
 import {
   cmsPages,
   platformConfig,
@@ -26,6 +28,8 @@ export function buildSeedPayload() {
     admins,
     customers,
     experts,
+    consultations: seedConsultations,
+    quotes: seedQuotes,
   };
 }
 
@@ -37,4 +41,7 @@ export const SEED_COLLECTIONS = [
   "admins",
   "customers",
   "experts",
+  "consultations",
+  "quotes",
 ];
+

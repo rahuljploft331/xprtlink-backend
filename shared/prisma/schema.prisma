@@ -263,14 +263,15 @@ model User {
 }
 
 model CustomerProfile {
-  id              String   @id @default(uuid()) @db.Uuid
-  userId          String   @unique @map("user_id") @db.Uuid
-  firstName       String   @map("first_name") @db.VarChar(100)
-  lastName        String   @map("last_name") @db.VarChar(100)
-  avatarMediaId   String?  @map("avatar_media_id") @db.Uuid
-  preferences     Json     @default("{}")
-  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @unique @map("user_id") @db.Uuid
+  firstName        String   @map("first_name") @db.VarChar(100)
+  lastName         String   @map("last_name") @db.VarChar(100)
+  avatarMediaId    String?  @map("avatar_media_id") @db.Uuid
+  stripeCustomerId String?  @unique @map("stripe_customer_id") @db.VarChar(128)
+  preferences      Json     @default("{}")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   avatarMedia     MediaAsset? @relation("CustomerAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
@@ -443,6 +444,8 @@ model SubscriptionPlan {
   priceMonthlyCents  Int             @map("price_monthly_cents")
   visibilityBoost    VisibilityBoost @map("visibility_boost")
   isActive           Boolean         @default(true) @map("is_active")
+  stripeProductId    String?         @map("stripe_product_id") @db.VarChar(128)
+  stripePriceId      String?         @map("stripe_price_id") @db.VarChar(128)
   createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -830,6 +833,7 @@ model ExpertSubscription {
   status                 ExpertSubscriptionStatus @default(active)
   currentPeriodStart     DateTime                 @map("current_period_start") @db.Timestamptz(6)
   currentPeriodEnd       DateTime                 @map("current_period_end") @db.Timestamptz(6)
+  cancelAtPeriodEnd      Boolean                  @default(false) @map("cancel_at_period_end")
   cancelledAt            DateTime?                @map("cancelled_at") @db.Timestamptz(6)
   createdAt              DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)

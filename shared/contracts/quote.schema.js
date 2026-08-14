@@ -73,7 +73,7 @@ export const quoteHistoryDtoSchema = z.object({
 });
 
 export const createQuoteRequestSchema = z.object({
-  expertId: z.string().uuid(),
+  expertId: z.string().uuid().optional(),
   title: z.string().min(1).max(200),
   description: z.string().min(1),
   budget: z.number().positive().optional(),
