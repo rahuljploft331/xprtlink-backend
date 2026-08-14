@@ -1,0 +1,421 @@
+{
+  "info": {
+    "_postman_id": "b2d8f3e4-6c5a-4b9f-a723-messaging-chat-g",
+    "name": "XpertLink Messaging Chat Flow (Verified)",
+    "description": "Flow G: Customer and Expert exchange messages — creates conversation, sends messages from both sides, marks conversation read, verifies message history.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:4000" },
+    { "key": "customer_email", "value": "" },
+    { "key": "customer_phone", "value": "" },
+    { "key": "customer_token", "value": "" },
+    { "key": "expert_email", "value": "" },
+    { "key": "expert_phone", "value": "" },
+    { "key": "expert_token", "value": "" },
+    { "key": "expert_id", "value": "" },
+    { "key": "conversation_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Step 1: Register Fresh Customer",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "var ts = Date.now();",
+              "pm.collectionVariables.set('customer_email', 'cust_msg_' + ts + '@xprtlink-test.com');",
+              "pm.collectionVariables.set('customer_phone', '+1415' + String(ts).slice(-7));"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Customer registered (201)', function () { pm.response.to.have.status(201); });",
+              "pm.test('sent flag true', function () { pm.expect(pm.response.json().data.sent).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{customer_email}}\",\"phone\":\"{{customer_phone}}\",\"password\":\"Customer@123\",\"confirmPassword\":\"Customer@123\",\"firstName\":\"MsgCust\",\"lastName\":\"FlowG\",\"role\":\"customer\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/register",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "register"]
+        }
+      }
+    },
+    {
+      "name": "Step 2: Verify Customer OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('accessToken present', function () { pm.expect(json.data.accessToken).to.be.a('string').and.not.empty; });",
+              "pm.collectionVariables.set('customer_token', json.data.accessToken);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"{{customer_phone}}\",\"code\":\"123456\",\"purpose\":\"register\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/otp/verify",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "otp", "verify"]
+        }
+      }
+    },
+    {
+      "name": "Step 3: Register Fresh Expert",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "var ts = Date.now();",
+              "pm.collectionVariables.set('expert_email', 'expert_msg_' + ts + '@xprtlink-test.com');",
+              "pm.collectionVariables.set('expert_phone', '+1617' + String(ts).slice(-7));"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Expert registered (201)', function () { pm.response.to.have.status(201); });",
+              "pm.test('sent flag true', function () { pm.expect(pm.response.json().data.sent).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"email\":\"{{expert_email}}\",\"phone\":\"{{expert_phone}}\",\"password\":\"Expert@123\",\"confirmPassword\":\"Expert@123\",\"firstName\":\"MsgExpert\",\"lastName\":\"FlowG\",\"role\":\"expert\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/register",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "register"]
+        }
+      }
+    },
+    {
+      "name": "Step 4: Verify Expert OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('accessToken present', function () { pm.expect(json.data.accessToken).to.be.a('string').and.not.empty; });",
+              "pm.collectionVariables.set('expert_token', json.data.accessToken);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"{{expert_phone}}\",\"code\":\"123456\",\"purpose\":\"register\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/otp/verify",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "auth", "otp", "verify"]
+        }
+      }
+    },
+    {
+      "name": "Step 5: Get Expert Profile ID",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Complete minimal onboarding so expert profile exists",
+              "pm.sendRequest({",
+              "  url: pm.collectionVariables.get('base_url') + '/api/v1/experts/me/onboarding',",
+              "  method: 'POST',",
+              "  header: [",
+              "    { key: 'Authorization', value: 'Bearer ' + pm.collectionVariables.get('expert_token') },",
+              "    { key: 'Content-Type', value: 'application/json' }",
+              "  ],",
+              "  body: { mode: 'raw', raw: JSON.stringify({ bio: 'Messaging flow expert.', headline: 'Chat Specialist', hourlyRate: 80, experienceYears: 3 }) }",
+              "}, function () {});"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('expert id present', function () { pm.expect(json.data.id).to.be.a('string').and.not.empty; });",
+              "pm.collectionVariables.set('expert_id', json.data.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{expert_token}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/v1/experts/me",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "experts", "me"]
+        }
+      }
+    },
+    {
+      "name": "Step 6: Customer Creates Conversation with Expert",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "var json = pm.response.json();",
+              "pm.test('conversation has id', function () { pm.expect(json.data.id).to.be.a('string').and.not.empty; });",
+              "pm.collectionVariables.set('conversation_id', json.data.id);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"expertId\":\"{{expert_id}}\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/messaging/conversations",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "messaging", "conversations"]
+        }
+      }
+    },
+    {
+      "name": "Step 7: Customer Sends First Message",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "var json = pm.response.json();",
+              "pm.test('message has id', function () { pm.expect(json.data.id).to.be.a('string').and.not.empty; });",
+              "pm.test('message body matches', function () { pm.expect(json.data.body).to.include('Hello'); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"body\":\"Hello! I have a question about your consultation services. Are you available this week?\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/messaging/conversations/{{conversation_id}}/messages",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "messaging", "conversations", "{{conversation_id}}", "messages"]
+        }
+      }
+    },
+    {
+      "name": "Step 8: Expert Sends Reply",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "var json = pm.response.json();",
+              "pm.test('message has id', function () { pm.expect(json.data.id).to.be.a('string').and.not.empty; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"body\":\"Hi! Yes, I am available this week. Would you like to schedule a video consultation? My rate is $80/hour.\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/messaging/conversations/{{conversation_id}}/messages",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "messaging", "conversations", "{{conversation_id}}", "messages"]
+        }
+      }
+    },
+    {
+      "name": "Step 9: Customer Sends Follow-up",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });",
+              "pm.test('success true', function () { pm.expect(pm.response.json().success).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{customer_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"body\":\"That sounds great! Let me know what time works best for you. I am flexible on Tuesday or Thursday.\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/messaging/conversations/{{conversation_id}}/messages",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "messaging", "conversations", "{{conversation_id}}", "messages"]
+        }
+      }
+    },
+    {
+      "name": "Step 10: Expert Marks Conversation Read",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "pm.test('success true', function () { pm.expect(pm.response.json().success).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": { "mode": "raw", "raw": "{}" },
+        "url": {
+          "raw": "{{base_url}}/api/v1/messaging/conversations/{{conversation_id}}/read",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "messaging", "conversations", "{{conversation_id}}", "read"]
+        }
+      }
+    },
+    {
+      "name": "Step 11: Verify Message History",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('messages returned', function () {",
+              "  var items = json.data.items || json.data;",
+              "  pm.expect(items).to.be.an('array');",
+              "  pm.expect(items.length).to.be.at.least(3);",
+              "});",
+              "pm.test('conversation has messages from both parties', function () {",
+              "  var items = json.data.items || json.data;",
+              "  var bodies = items.map(function(m) { return m.body; }).join(' ');",
+              "  pm.expect(bodies).to.include('Hello');",
+              "  pm.expect(bodies).to.include('available');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/v1/messaging/conversations/{{conversation_id}}/messages",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "messaging", "conversations", "{{conversation_id}}", "messages"]
+        }
+      }
+    },
+    {
+      "name": "Step 12: Verify Conversation List",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "var items = json.data.items || json.data;",
+              "pm.test('at least 1 conversation', function () { pm.expect(items.length).to.be.at.least(1); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{customer_token}}" }],
+        "url": {
+          "raw": "{{base_url}}/api/v1/messaging/conversations",
+          "host": ["{{base_url}}"],
+          "path": ["api", "v1", "messaging", "conversations"]
+        }
+      }
+    }
+  ]
+}

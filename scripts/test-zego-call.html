@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>XprtLink — ZegoCloud Call Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; }
+    .setup {
+      max-width: 480px;
+      margin: 40px auto;
+      padding: 24px;
+      background: #16213e;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 8px; color: #64ffda; }
+    p.desc { font-size: 0.85rem; color: #aaa; margin-bottom: 20px; line-height: 1.5; }
+    label { display: block; font-size: 0.8rem; color: #aaa; margin-bottom: 4px; margin-top: 12px; }
+    input, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #333;
+      border-radius: 6px;
+      background: #0f3460;
+      color: #eee;
+      font-size: 0.9rem;
+    }
+    button {
+      margin-top: 20px;
+      width: 100%;
+      padding: 12px;
+      background: #64ffda;
+      color: #1a1a2e;
+      border: none;
+      border-radius: 6px;
+      font-weight: 700;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    button:hover { background: #4fd1b0; }
+    #call-container { width: 100vw; height: 100vh; display: none; }
+    .info { font-size: 0.75rem; color: #666; margin-top: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <!-- Setup form -->
+  <div class="setup" id="setup">
+    <h1>🎥 ZegoCloud Call Test</h1>
+    <p class="desc">
+      Open this page in <strong>two browser tabs</strong> (or two different browsers)
+      with different User IDs but the <strong>same Room ID</strong>.
+      Both users joining will trigger real ZegoCloud webhook callbacks to your backend.
+    </p>
+
+    <label>Room ID (same for both participants)</label>
+    <input type="text" id="roomID" value="test-consultation-001" />
+
+    <label>User ID (unique per participant)</label>
+    <input type="text" id="userID" />
+
+    <label>User Name</label>
+    <input type="text" id="userName" />
+
+    <label>Call Scenario</label>
+    <select id="scenario">
+      <option value="OneONoneCall">1-on-1 Call (consultation)</option>
+      <option value="VideoConference">Video Conference</option>
+    </select>
+
+    <button onclick="startCall()">Join Call</button>
+
+    <p class="info">
+      App ID: 283072073 &bull; Make sure your backend is running on port 4004<br>
+      and ngrok is forwarding to it with the callback URL set in ZegoCloud Console.
+    </p>
+  </div>
+
+  <!-- Call container (full screen) -->
+  <div id="call-container"></div>
+
+  <script src="https://unpkg.com/@zegocloud/zego-uikit-prebuilt/zego-uikit-prebuilt.js"></script>
+  <script>
+    // Pre-fill user ID with a random value
+    document.getElementById('userID').value = 'user_' + Math.floor(Math.random() * 9000 + 1000);
+    document.getElementById('userName').value = 'TestUser_' + Math.floor(Math.random() * 100);
+
+    // Parse roomID from URL if shared
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('roomID')) {
+      document.getElementById('roomID').value = urlParams.get('roomID');
+    }
+
+    function startCall() {
+      const appID = 283072073;
+      const serverSecret = "5115080c6d8c93e1cfcfdf8330918761";
+
+      const roomID = document.getElementById('roomID').value.trim();
+      const userID = document.getElementById('userID').value.trim();
+      const userName = document.getElementById('userName').value.trim();
+      const scenarioMode = document.getElementById('scenario').value;
+
+      if (!roomID || !userID || !userName) {
+        alert('Please fill in all fields');
+        return;
+      }
+
+      // Generate Kit Token for testing (uses serverSecret client-side — OK for dev only)
+      const kitToken = ZegoUIKitPrebuilt.generateKitTokenForTest(
+        appID, serverSecret, roomID, userID, userName
+      );
+
+      // Hide setup, show call container
+      document.getElementById('setup').style.display = 'none';
+      const container = document.getElementById('call-container');
+      container.style.display = 'block';
+
+      // Create and join
+      const zp = ZegoUIKitPrebuilt.create(kitToken);
+      zp.joinRoom({
+        container: container,
+        scenario: {
+          mode: ZegoUIKitPrebuilt.OneONoneCall,
+        },
+        sharedLinks: [{
+          name: 'Invite link',
+          url: window.location.protocol + '//' + window.location.host + window.location.pathname + '?roomID=' + roomID,
+        }],
+        showPreJoinView: false,
+        turnOnMicrophoneWhenJoining: false,
+        turnOnCameraWhenJoining: false,
+        showLeaveRoomConfirmDialog: true,
+        onLeaveRoom: () => {
+          // Return to setup
+          container.style.display = 'none';
+          document.getElementById('setup').style.display = 'block';
+        },
+      });
+    }
+  </script>
+</body>
+</html>
