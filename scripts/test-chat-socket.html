@@ -3,353 +3,664 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>XprtLink — WebSocket Chat Real-Time Test</title>
+  <title>XprtLink — Dual WebSocket Chat Test (Customer & Expert)</title>
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
   <style>
     :root {
-      --bg: #0f172a;
-      --card-bg: #1e293b;
-      --primary: #3b82f6;
-      --primary-hover: #2563eb;
+      --bg: #0b0f19;
+      --card-bg: #151d30;
+      --customer-color: #3b82f6;
+      --customer-hover: #2563eb;
+      --expert-color: #10b981;
+      --expert-hover: #059669;
       --text: #f8fafc;
       --text-muted: #94a3b8;
-      --border: #334155;
-      --success: #10b981;
+      --border: #23304d;
+      --badge-conn: rgba(16, 185, 129, 0.2);
+      --badge-conn-text: #34d399;
+      --badge-dis: rgba(239, 68, 68, 0.2);
+      --badge-dis-text: #f87171;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    body { background: var(--bg); color: var(--text); padding: 24px; }
-    .container { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
-    .header { text-align: center; margin-bottom: 8px; }
-    .header h1 { font-size: 24px; color: #fff; margin-bottom: 6px; }
-    .header p { color: var(--text-muted); font-size: 14px; }
-    .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
-    .card h2 { font-size: 16px; margin-bottom: 14px; color: #38bdf8; display: flex; align-items: center; justify-content: space-between; }
-    .badge { font-size: 12px; padding: 3px 8px; border-radius: 999px; background: #334155; }
-    .badge.connected { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-    .badge.disconnected { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
-    label { font-size: 13px; color: var(--text-muted); }
-    input, select, textarea {
-      background: #090d16;
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; display: flex; flex-direction: column; gap: 16px; }
+    
+    /* Header */
+    .top-header { text-align: center; margin-bottom: 4px; }
+    .top-header h1 { font-size: 22px; color: #fff; font-weight: 700; letter-spacing: -0.02em; }
+    .top-header p { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
+    /* Control Panel */
+    .control-panel {
+      background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .ctrl-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+    input {
+      background: #0b1120;
+      border: 1px solid var(--border);
+      border-radius: 6px;
       color: #fff;
-      padding: 10px 12px;
-      font-size: 14px;
+      padding: 8px 12px;
+      font-size: 13px;
     }
-    input:focus, textarea:focus { outline: none; border-color: var(--primary); }
-    .btn-row { display: flex; gap: 10px; margin-top: 10px; }
+    input:focus { outline: none; border-color: #60a5fa; }
     button {
-      background: var(--primary);
-      color: white;
       border: none;
-      border-radius: 8px;
-      padding: 10px 18px;
-      font-weight: 500;
-      font-size: 14px;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-weight: 600;
+      font-size: 13px;
       cursor: pointer;
-      transition: background 0.2s;
+      transition: all 0.15s ease;
     }
-    button:hover { background: var(--primary-hover); }
-    button.secondary { background: #334155; }
-    button.secondary:hover { background: #475569; }
-    .chat-box {
-      height: 300px;
-      overflow-y: auto;
+    button.primary-btn { background: #3b82f6; color: #fff; }
+    button.primary-btn:hover { background: #2563eb; }
+    button.secondary-btn { background: #243049; color: #cbd5e1; }
+    button.secondary-btn:hover { background: #334155; color: #fff; }
+
+    /* Grid Layout */
+    .chat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 900px) {
+      .chat-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Client Cards */
+    .client-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .card-title.customer { color: #60a5fa; }
+    .card-title.expert { color: #34d399; }
+    .status-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--badge-dis);
+      color: var(--badge-dis-text);
+    }
+    .status-badge.connected {
+      background: var(--badge-conn);
+      color: var(--badge-conn-text);
+    }
+
+    .token-box {
+      font-family: monospace;
+      font-size: 11px;
+      width: 100%;
+    }
+
+    .chat-area {
+      height: 320px;
+      background: #090d16;
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 12px;
-      background: #090d16;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
+      gap: 10px;
+    }
+    .msg-bubble {
+      max-width: 78%;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    .msg-bubble.mine-cust {
+      align-self: flex-end;
+      background: #1d4ed8;
+      color: #ffffff;
+      border-bottom-right-radius: 2px;
+    }
+    .msg-bubble.mine-exp {
+      align-self: flex-end;
+      background: #047857;
+      color: #ffffff;
+      border-bottom-right-radius: 2px;
+    }
+    .msg-bubble.theirs {
+      align-self: flex-start;
+      background: #1e293b;
+      color: #e2e8f0;
+      border-bottom-left-radius: 2px;
+    }
+    .msg-meta {
+      font-size: 10px;
+      opacity: 0.75;
+      margin-top: 3px;
+      text-align: right;
+    }
+
+    .typing-status {
+      font-size: 11px;
+      font-style: italic;
+      color: #38bdf8;
+      min-height: 16px;
+      padding: 0 4px;
+    }
+
+    .send-row {
+      display: flex;
       gap: 8px;
     }
-    .msg {
-      max-width: 75%;
-      padding: 8px 12px;
-      border-radius: 10px;
-      font-size: 14px;
-      line-height: 1.4;
-    }
-    .msg.mine {
-      align-self: flex-end;
-      background: #2563eb;
-      color: #fff;
-    }
-    .msg.theirs {
-      align-self: flex-start;
-      background: #334155;
-      color: #f1f5f9;
-    }
-    .msg-meta { font-size: 11px; opacity: 0.7; margin-top: 4px; text-align: right; }
-    .typing-bar { font-size: 12px; color: #38bdf8; font-style: italic; min-height: 18px; }
-    .logs-box {
-      height: 140px;
-      overflow-y: auto;
-      background: #090d16;
+    .send-row input { flex: 1; }
+
+    /* Console / Logs */
+    .logs-panel {
+      background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px;
-      font-family: monospace;
-      font-size: 12px;
+      border-radius: 12px;
+      padding: 14px 18px;
+    }
+    .logs-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .logs-content {
+      height: 130px;
+      background: #070a12;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      overflow-y: auto;
       color: #94a3b8;
     }
+    .log-entry { margin-bottom: 3px; }
+    .log-entry.customer { color: #93c5fd; }
+    .log-entry.expert { color: #86efac; }
+    .log-entry.system { color: #cbd5e1; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>XprtLink WebSocket Chat Client</h1>
-      <p>Single source of truth real-time messaging test interface (Socket.IO)</p>
+
+  <!-- Top Header -->
+  <div class="top-header">
+    <h1>💬 XprtLink Dual-Card WebSocket Chat Test</h1>
+    <p>Live simultaneous Customer ↔ Expert Socket.IO messaging test interface</p>
+  </div>
+
+  <!-- Global Controls -->
+  <div class="control-panel">
+    <div class="ctrl-group">
+      <label>Server URL:</label>
+      <input id="globalUrl" value="http://localhost:4000" style="width: 180px;" />
+      <button class="secondary-btn" onclick="setUrl('http://localhost:4000')">Gateway (:4000)</button>
+      <button class="secondary-btn" onclick="setUrl('http://localhost:4005')">Direct (:4005)</button>
     </div>
 
-    <!-- Connection Setup -->
-    <div class="card">
-      <h2>
-        1. Connection & Authentication
-        <span id="connBadge" class="badge disconnected">Disconnected</span>
-      </h2>
-      <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 12px;">
-        <div class="form-group">
-          <label>Socket URL</label>
-          <input id="socketUrl" value="http://localhost:4000" />
-        </div>
-        <div class="form-group">
-          <label>JWT Access Token</label>
-          <input id="jwtToken" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6..." />
-        </div>
-      </div>
-      <div class="btn-row">
-        <button id="btnConnect" onclick="connectSocket()">Connect</button>
-        <button id="btnDisconnect" class="secondary" onclick="disconnectSocket()" disabled>Disconnect</button>
-      </div>
-    </div>
-
-    <!-- Conversations & Rooms -->
-    <div class="card">
-      <h2>2. Conversations & Active Room</h2>
-      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px;">
-        <div class="form-group">
-          <label>Active Conversation ID</label>
-          <input id="conversationId" placeholder="UUID of conversation" />
-        </div>
-        <div class="form-group" style="align-self: flex-end;">
-          <div class="btn-row" style="margin-top: 0;">
-            <button class="secondary" onclick="listConversations()">List My Threads</button>
-            <button onclick="joinRoom()">Join Thread</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Live Chat Interface -->
-    <div class="card">
-      <h2>3. Chat Room</h2>
-      <div id="chatBox" class="chat-box"></div>
-      <div id="typingBar" class="typing-bar"></div>
-      
-      <div style="display: flex; gap: 10px; margin-top: 10px;">
-        <input
-          id="msgInput"
-          placeholder="Type a message..."
-          style="flex: 1;"
-          oninput="handleTyping()"
-          onkeydown="if(event.key === 'Enter') sendMessage()"
-        />
-        <button onclick="sendMessage()">Send</button>
-        <button class="secondary" onclick="markRead()">Mark Read</button>
-      </div>
-    </div>
-
-    <!-- Event Logs -->
-    <div class="card">
-      <h2>4. Real-Time Socket Event Logs</h2>
-      <div id="logsBox" class="logs-box"></div>
+    <div class="ctrl-group">
+      <label>Conversation ID:</label>
+      <input id="sharedConvId" value="" placeholder="UUID / Click Create" style="width: 250px;" />
+      <button class="primary-btn" onclick="createOrLinkThread()">Create / Link Thread</button>
+      <button class="secondary-btn" onclick="connectBoth()">⚡ Connect Both</button>
+      <button class="secondary-btn" onclick="joinBoth()">Join Both</button>
     </div>
   </div>
 
-  <script>
-    let socket = null;
-    let typingTimer = null;
-    let isTyping = false;
-    let myUserId = null;
+  <!-- Dual Client Cards -->
+  <div class="chat-grid">
+    
+    <!-- Customer Card -->
+    <div class="client-card" id="cardCustomer">
+      <div class="card-header">
+        <div class="card-title customer">
+          <span>👤 Customer Client</span>
+          <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Jordan Customer)</span>
+        </div>
+        <span id="custBadge" class="status-badge">Disconnected</span>
+      </div>
 
-    function log(msg, obj) {
-      const logs = document.getElementById("logsBox");
-      const time = new Date().toLocaleTimeString();
-      const line = document.createElement("div");
-      line.textContent = `[${time}] ${msg} ${obj ? JSON.stringify(obj) : ""}`;
-      logs.appendChild(line);
-      logs.scrollTop = logs.scrollHeight;
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <label>Customer JWT Token:</label>
+        <input
+          id="custToken"
+          class="token-box"
+          value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjNzE3ZjZlNC0xMDRmLTRhZGUtYjNjMy01ZDE1N2NiMzA2ZDMiLCJyb2xlIjoiY3VzdG9tZXIiLCJjdXN0b21lclByb2ZpbGVJZCI6IjRiOGYyODJmLTMwMTYtNDFiOC05OGY3LTFiOTY3NjM5YjY5YyIsImlhdCI6MTc4NjcwMTgwNCwiZXhwIjoxNzg3MzA2NjA0fQ.JU4t4oMlOYn5h7OvkPDwiQiel6Bcizcw8zuvhlWRBPE"
+        />
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button id="custBtnConnect" class="primary-btn" onclick="connectCust()">Connect</button>
+        <button id="custBtnDisconnect" class="secondary-btn" onclick="disconnectCust()" disabled>Disconnect</button>
+        <button class="secondary-btn" onclick="listConversationsCust()">My Threads</button>
+        <button class="secondary-btn" onclick="joinCust()">Join Room</button>
+      </div>
+
+      <!-- Chat Feed -->
+      <div id="custChatArea" class="chat-area"></div>
+      <div id="custTyping" class="typing-status"></div>
+
+      <!-- Message input -->
+      <div class="send-row">
+        <input
+          id="custMsgInput"
+          placeholder="Type message as Customer..."
+          oninput="handleTyping('cust')"
+          onkeydown="if(event.key==='Enter') sendCustMsg()"
+        />
+        <button class="primary-btn" onclick="sendCustMsg()">Send</button>
+        <button class="secondary-btn" onclick="markReadCust()">Mark Read</button>
+      </div>
+    </div>
+
+    <!-- Expert Card -->
+    <div class="client-card" id="cardExpert">
+      <div class="card-header">
+        <div class="card-title expert">
+          <span>👨‍💼 Expert Client</span>
+          <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Jordan Expert)</span>
+        </div>
+        <span id="expBadge" class="status-badge">Disconnected</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <label>Expert JWT Token:</label>
+        <input
+          id="expToken"
+          class="token-box"
+          value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2NjAwOWE0Ny04N2EyLTQyYmYtODBhYS1kZTk5YWRkOGFhOGMiLCJyb2xlIjoiZXhwZXJ0IiwiZXhwZXJ0UHJvZmlsZUlkIjoiNTc2OGI3ODctMjYxZC00YzE2LTg2NDAtYjAyODdhMzIyN2Q5IiwiaWF0IjoxNzg2NzAxODA0LCJleHAiOjE3ODczMDY2MDR9.ys_v7Xo0x4aMRzc9gekrkAcSabujbmK9mop0bLiltSc"
+        />
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button id="expBtnConnect" class="primary-btn" style="background: #10b981;" onclick="connectExp()">Connect</button>
+        <button id="expBtnDisconnect" class="secondary-btn" onclick="disconnectExp()" disabled>Disconnect</button>
+        <button class="secondary-btn" onclick="listConversationsExp()">My Threads</button>
+        <button class="secondary-btn" onclick="joinExp()">Join Room</button>
+      </div>
+
+      <!-- Chat Feed -->
+      <div id="expChatArea" class="chat-area"></div>
+      <div id="expTyping" class="typing-status"></div>
+
+      <!-- Message input -->
+      <div class="send-row">
+        <input
+          id="expMsgInput"
+          placeholder="Type message as Expert..."
+          oninput="handleTyping('exp')"
+          onkeydown="if(event.key==='Enter') sendExpMsg()"
+        />
+        <button class="primary-btn" style="background: #10b981;" onclick="sendExpMsg()">Send</button>
+        <button class="secondary-btn" onclick="markReadExp()">Mark Read</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Realtime Logs -->
+  <div class="logs-panel">
+    <div class="logs-header">
+      <span style="font-size: 13px; font-weight: 600; color: var(--text-muted);">Real-Time Socket Event Stream</span>
+      <button class="secondary-btn" style="padding: 4px 10px; font-size: 11px;" onclick="clearLogs()">Clear</button>
+    </div>
+    <div id="logsBox" class="logs-content"></div>
+  </div>
+
+  <script>
+    let socketCust = null;
+    let socketExp = null;
+    let custUserId = "c717f6e4-104f-4ade-b3c3-5d157cb306d3";
+    let expUserId = "66009a47-87a2-42bf-80aa-de99add8aa8c";
+    let expProfileId = "5768b787-261d-4c16-8640-b0287a3227d9";
+
+    let custTypingTimer = null;
+    let expTypingTimer = null;
+    let custIsTyping = false;
+    let expIsTyping = false;
+
+    function setUrl(url) {
+      document.getElementById("globalUrl").value = url;
     }
 
-    function connectSocket() {
-      const url = document.getElementById("socketUrl").value;
-      const token = document.getElementById("jwtToken").value.trim();
+    function log(actor, msg, data) {
+      const box = document.getElementById("logsBox");
+      const time = new Date().toLocaleTimeString();
+      const line = document.createElement("div");
+      line.className = `log-entry ${actor}`;
+      line.textContent = `[${time}] [${actor.toUpperCase()}] ${msg} ${data ? JSON.stringify(data) : ""}`;
+      box.appendChild(line);
+      box.scrollTop = box.scrollHeight;
+    }
 
-      if (!token) {
-        alert("Please enter a JWT access token");
-        return;
-      }
+    function clearLogs() {
+      document.getElementById("logsBox").innerHTML = "";
+    }
 
-      try {
-        const payload = JSON.parse(atob(token.split(".")[1]));
-        myUserId = payload.sub;
-        log("Decoded Token for user:", payload.sub);
-      } catch (e) {
-        log("Warning: Could not parse token payload client-side");
-      }
+    /* CUSTOMER SOCKET */
+    function connectCust() {
+      const url = document.getElementById("globalUrl").value.trim();
+      const token = document.getElementById("custToken").value.trim();
+      if (!token) return alert("Customer token required");
 
-      log(`Connecting to ${url}...`);
-      socket = io(url, {
+      log("customer", `Connecting to ${url}...`);
+      socketCust = io(url, {
         auth: { token },
         transports: ["websocket", "polling"],
       });
 
-      socket.on("connect", () => {
-        log("Connected! Socket ID:", socket.id);
-        document.getElementById("connBadge").className = "badge connected";
-        document.getElementById("connBadge").textContent = "Connected (" + socket.id.slice(0, 6) + ")";
-        document.getElementById("btnConnect").disabled = true;
-        document.getElementById("btnDisconnect").disabled = false;
+      socketCust.on("connect", () => {
+        log("customer", `Connected! ID: ${socketCust.id}`);
+        document.getElementById("custBadge").className = "status-badge connected";
+        document.getElementById("custBadge").textContent = `Connected (${socketCust.id.slice(0, 5)})`;
+        document.getElementById("custBtnConnect").disabled = true;
+        document.getElementById("custBtnDisconnect").disabled = false;
       });
 
-      socket.on("connect_error", (err) => {
-        log("Connect Error:", err.message);
-        alert("Connection error: " + err.message);
+      socketCust.on("connect_error", (err) => {
+        log("customer", `Connect Error: ${err.message}`);
       });
 
-      socket.on("disconnect", (reason) => {
-        log("Disconnected:", reason);
-        document.getElementById("connBadge").className = "badge disconnected";
-        document.getElementById("connBadge").textContent = "Disconnected";
-        document.getElementById("btnConnect").disabled = false;
-        document.getElementById("btnDisconnect").disabled = true;
+      socketCust.on("disconnect", (reason) => {
+        log("customer", `Disconnected: ${reason}`);
+        document.getElementById("custBadge").className = "status-badge";
+        document.getElementById("custBadge").textContent = "Disconnected";
+        document.getElementById("custBtnConnect").disabled = false;
+        document.getElementById("custBtnDisconnect").disabled = true;
       });
 
-      // Realtime chat events
-      socket.on("message:new", (data) => {
-        log("Received message:new", data);
-        appendMessage(data.message);
+      socketCust.on("message:new", (data) => {
+        log("customer", "Received message:new", data);
+        appendMsgTo("cust", data.message, custUserId, "mine-cust");
       });
 
-      socket.on("conversation:read", (data) => {
-        log("Received conversation:read", data);
+      socketCust.on("conversation:read", (data) => {
+        log("customer", "Received conversation:read", data);
       });
 
-      socket.on("conversation:updated", (data) => {
-        log("Received conversation:updated (Inbox alert)", data);
+      socketCust.on("conversation:updated", (data) => {
+        log("customer", "Inbox alert: conversation:updated", data);
       });
 
-      socket.on("typing:status", (data) => {
-        const bar = document.getElementById("typingBar");
-        if (data.isTyping) {
-          bar.textContent = "Peer is typing...";
-        } else {
-          bar.textContent = "";
-        }
+      socketCust.on("typing:status", (data) => {
+        const bar = document.getElementById("custTyping");
+        bar.textContent = data.isTyping ? "Expert is typing..." : "";
       });
     }
 
-    function disconnectSocket() {
-      if (socket) {
-        socket.disconnect();
-        socket = null;
+    function disconnectCust() {
+      if (socketCust) {
+        socketCust.disconnect();
+        socketCust = null;
       }
     }
 
-    function listConversations() {
-      if (!socket) return alert("Connect socket first");
-      socket.emit("conversation:list", {}, (res) => {
-        log("conversation:list response:", res);
-        if (res.success && res.data.items.length > 0) {
-          document.getElementById("conversationId").value = res.data.items[0].id;
-          log("Auto-selected conversation:", res.data.items[0].id);
-        }
+    /* EXPERT SOCKET */
+    function connectExp() {
+      const url = document.getElementById("globalUrl").value.trim();
+      const token = document.getElementById("expToken").value.trim();
+      if (!token) return alert("Expert token required");
+
+      log("expert", `Connecting to ${url}...`);
+      socketExp = io(url, {
+        auth: { token },
+        transports: ["websocket", "polling"],
+      });
+
+      socketExp.on("connect", () => {
+        log("expert", `Connected! ID: ${socketExp.id}`);
+        document.getElementById("expBadge").className = "status-badge connected";
+        document.getElementById("expBadge").textContent = `Connected (${socketExp.id.slice(0, 5)})`;
+        document.getElementById("expBtnConnect").disabled = true;
+        document.getElementById("expBtnDisconnect").disabled = false;
+      });
+
+      socketExp.on("connect_error", (err) => {
+        log("expert", `Connect Error: ${err.message}`);
+      });
+
+      socketExp.on("disconnect", (reason) => {
+        log("expert", `Disconnected: ${reason}`);
+        document.getElementById("expBadge").className = "status-badge";
+        document.getElementById("expBadge").textContent = "Disconnected";
+        document.getElementById("expBtnConnect").disabled = false;
+        document.getElementById("expBtnDisconnect").disabled = true;
+      });
+
+      socketExp.on("message:new", (data) => {
+        log("expert", "Received message:new", data);
+        appendMsgTo("exp", data.message, expUserId, "mine-exp");
+      });
+
+      socketExp.on("conversation:read", (data) => {
+        log("expert", "Received conversation:read", data);
+      });
+
+      socketExp.on("conversation:updated", (data) => {
+        log("expert", "Inbox alert: conversation:updated", data);
+      });
+
+      socketExp.on("typing:status", (data) => {
+        const bar = document.getElementById("expTyping");
+        bar.textContent = data.isTyping ? "Customer is typing..." : "";
       });
     }
 
-    function joinRoom() {
-      const conversationId = document.getElementById("conversationId").value.trim();
-      if (!socket || !conversationId) return alert("Connect and provide Conversation ID");
-      socket.emit("conversation:join", { conversationId }, (res) => {
-        log("conversation:join response:", res);
-        if (res.success) {
-          loadHistory(conversationId);
-        }
-      });
+    function disconnectExp() {
+      if (socketExp) {
+        socketExp.disconnect();
+        socketExp = null;
+      }
     }
 
-    function loadHistory(conversationId) {
-      socket.emit("message:history", { conversationId, page: 1, limit: 50 }, (res) => {
-        log("message:history response:", res);
-        if (res.success) {
-          const chat = document.getElementById("chatBox");
-          chat.innerHTML = "";
-          (res.data.items || []).reverse().forEach(appendMessage);
-        }
-      });
+    /* BATCH OPERATIONS */
+    function connectBoth() {
+      connectCust();
+      connectExp();
     }
 
-    function sendMessage() {
-      const input = document.getElementById("msgInput");
-      const conversationId = document.getElementById("conversationId").value.trim();
-      const body = input.value.trim();
-      if (!socket || !conversationId || !body) return;
-
-      socket.emit("message:send", { conversationId, body }, (res) => {
-        log("message:send response:", res);
-        if (res.success) {
-          input.value = "";
-          handleTyping(true);
-        }
-      });
-    }
-
-    function markRead() {
-      const conversationId = document.getElementById("conversationId").value.trim();
-      if (!socket || !conversationId) return;
-      socket.emit("message:read", { conversationId }, (res) => {
-        log("message:read response:", res);
-      });
-    }
-
-    function handleTyping(forceStop = false) {
-      const conversationId = document.getElementById("conversationId").value.trim();
-      if (!socket || !conversationId) return;
-
-      if (forceStop) {
-        if (isTyping) {
-          socket.emit("typing:stop", { conversationId });
-          isTyping = false;
-        }
+    function createOrLinkThread() {
+      if (!socketCust) {
+        alert("Please connect Customer socket first");
         return;
       }
-
-      if (!isTyping) {
-        socket.emit("typing:start", { conversationId });
-        isTyping = true;
-      }
-
-      clearTimeout(typingTimer);
-      typingTimer = setTimeout(() => {
-        socket.emit("typing:stop", { conversationId });
-        isTyping = false;
-      }, 2000);
+      log("customer", "Creating/getting conversation with expert...");
+      socketCust.emit("conversation:create", { expertId: expProfileId }, (res) => {
+        log("customer", "conversation:create response", res);
+        if (res.success && res.data?.id) {
+          document.getElementById("sharedConvId").value = res.data.id;
+          joinBoth();
+        }
+      });
     }
 
-    function appendMessage(msg) {
-      const chat = document.getElementById("chatBox");
-      const isMine = msg.senderUserId === myUserId;
-      const el = document.createElement("div");
-      el.className = "msg " + (isMine ? "mine" : "theirs");
-      el.innerHTML = `
-        <div>${msg.body || "[Attachment]"}</div>
+    function joinBoth() {
+      joinCust();
+      joinExp();
+    }
+
+    function joinCust() {
+      const convId = document.getElementById("sharedConvId").value.trim();
+      if (!socketCust || !convId) return;
+      socketCust.emit("conversation:join", { conversationId: convId }, (res) => {
+        log("customer", "conversation:join", res);
+        if (res.success) loadHistory("cust", convId, custUserId, "mine-cust");
+      });
+    }
+
+    function joinExp() {
+      const convId = document.getElementById("sharedConvId").value.trim();
+      if (!socketExp || !convId) return;
+      socketExp.emit("conversation:join", { conversationId: convId }, (res) => {
+        log("expert", "conversation:join", res);
+        if (res.success) loadHistory("exp", convId, expUserId, "mine-exp");
+      });
+    }
+
+    function loadHistory(actor, convId, myId, myClass) {
+      const s = actor === "cust" ? socketCust : socketExp;
+      s.emit("message:history", { conversationId: convId, page: 1, limit: 50 }, (res) => {
+        if (res.success) {
+          const area = document.getElementById(actor + "ChatArea");
+          area.innerHTML = "";
+          (res.data.items || []).reverse().forEach((msg) => {
+            appendMsgTo(actor, msg, myId, myClass);
+          });
+        }
+      });
+    }
+
+    function listConversationsCust() {
+      if (!socketCust) return alert("Connect Customer first");
+      socketCust.emit("conversation:list", {}, (res) => {
+        log("customer", "conversation:list", res);
+        if (res.success && res.data?.items?.length > 0) {
+          document.getElementById("sharedConvId").value = res.data.items[0].id;
+        }
+      });
+    }
+
+    function listConversationsExp() {
+      if (!socketExp) return alert("Connect Expert first");
+      socketExp.emit("conversation:list", {}, (res) => {
+        log("expert", "conversation:list", res);
+        if (res.success && res.data?.items?.length > 0) {
+          document.getElementById("sharedConvId").value = res.data.items[0].id;
+        }
+      });
+    }
+
+    function sendCustMsg() {
+      const input = document.getElementById("custMsgInput");
+      const convId = document.getElementById("sharedConvId").value.trim();
+      const body = input.value.trim();
+      if (!socketCust || !convId || !body) return;
+
+      socketCust.emit("message:send", { conversationId: convId, body }, (res) => {
+        log("customer", "message:send", res);
+        if (res.success) {
+          input.value = "";
+          handleTyping("cust", true);
+        }
+      });
+    }
+
+    function sendExpMsg() {
+      const input = document.getElementById("expMsgInput");
+      const convId = document.getElementById("sharedConvId").value.trim();
+      const body = input.value.trim();
+      if (!socketExp || !convId || !body) return;
+
+      socketExp.emit("message:send", { conversationId: convId, body }, (res) => {
+        log("expert", "message:send", res);
+        if (res.success) {
+          input.value = "";
+          handleTyping("exp", true);
+        }
+      });
+    }
+
+    function markReadCust() {
+      const convId = document.getElementById("sharedConvId").value.trim();
+      if (!socketCust || !convId) return;
+      socketCust.emit("message:read", { conversationId: convId }, (res) => {
+        log("customer", "message:read", res);
+      });
+    }
+
+    function markReadExp() {
+      const convId = document.getElementById("sharedConvId").value.trim();
+      if (!socketExp || !convId) return;
+      socketExp.emit("message:read", { conversationId: convId }, (res) => {
+        log("expert", "message:read", res);
+      });
+    }
+
+    function handleTyping(actor, forceStop = false) {
+      const convId = document.getElementById("sharedConvId").value.trim();
+      const s = actor === "cust" ? socketCust : socketExp;
+      if (!s || !convId) return;
+
+      if (actor === "cust") {
+        if (forceStop) {
+          if (custIsTyping) { s.emit("typing:stop", { conversationId: convId }); custIsTyping = false; }
+          return;
+        }
+        if (!custIsTyping) {
+          s.emit("typing:start", { conversationId: convId });
+          custIsTyping = true;
+        }
+        clearTimeout(custTypingTimer);
+        custTypingTimer = setTimeout(() => {
+          s.emit("typing:stop", { conversationId: convId });
+          custIsTyping = false;
+        }, 2000);
+      } else {
+        if (forceStop) {
+          if (expIsTyping) { s.emit("typing:stop", { conversationId: convId }); expIsTyping = false; }
+          return;
+        }
+        if (!expIsTyping) {
+          s.emit("typing:start", { conversationId: convId });
+          expIsTyping = true;
+        }
+        clearTimeout(expTypingTimer);
+        expTypingTimer = setTimeout(() => {
+          s.emit("typing:stop", { conversationId: convId });
+          expIsTyping = false;
+        }, 2000);
+      }
+    }
+
+    function appendMsgTo(actor, msg, myId, myClass) {
+      const area = document.getElementById(actor + "ChatArea");
+      const isMine = msg.senderUserId === myId;
+      const bubble = document.createElement("div");
+      bubble.className = `msg-bubble ${isMine ? myClass : "theirs"}`;
+      bubble.innerHTML = `
+        <div>${escapeHtml(msg.body || "[Attachment]")}</div>
         <div class="msg-meta">${new Date(msg.createdAt).toLocaleTimeString()} • ${msg.deliveryStatus}</div>
       `;
-      chat.appendChild(el);
-      chat.scrollTop = chat.scrollHeight;
+      area.appendChild(bubble);
+      area.scrollTop = area.scrollHeight;
     }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    // Auto load thread if available
+    window.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("sharedConvId").value = "a6e13d67-1c28-4e73-a22f-c15ec9a2684b";
+    });
   </script>
 </body>
 </html>
