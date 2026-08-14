@@ -40,20 +40,7 @@ router.get("/files/*", (req, res) => {
 // Authenticated Routes
 router.use(authenticate);
 
-// Direct Upload (useful for Base64 / Dev / Mobile)
-router.post(
-  "/direct-upload",
-  asyncHandler(async (req, res) => {
-    const data = await svc.directUpload(req.auth, req.body);
-    return ResponseFormatter.success(res, {
-      message: "Direct upload successful",
-      data,
-      status: 201,
-    });
-  })
-);
-
-// Create Presigned / Pending Upload
+// Create Presigned Upload URL (Single Source of Truth)
 router.post(
   "/uploads",
   asyncHandler(async (req, res) => {

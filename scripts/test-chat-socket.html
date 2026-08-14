@@ -804,28 +804,23 @@
         return;
       }
 
-      // Store pending file
-      const reader = new FileReader();
-      reader.onload = () => {
-        const fileData = {
-          name: file.name,
-          sizeBytes: file.size,
-          mimeType,
-          category,
-          base64Data: reader.result,
-        };
-
-        if (actor === "cust") custPendingFile = fileData;
-        else expPendingFile = fileData;
-
-        // Update UI Chip
-        const chip = document.getElementById(actor + "PendingAtt");
-        const label = document.getElementById(actor + "PendingAttLabel");
-        chip.style.display = "flex";
-        label.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
-        log(actor, `Selected ${category} attachment:`, { name: file.name, size: file.size, mime: mimeType });
+      const fileData = {
+        fileBlob: file,
+        name: file.name,
+        sizeBytes: file.size,
+        mimeType,
+        category,
       };
-      reader.readAsDataURL(file);
+
+      if (actor === "cust") custPendingFile = fileData;
+      else expPendingFile = fileData;
+
+      // Update UI Chip
+      const chip = document.getElementById(actor + "PendingAtt");
+      const label = document.getElementById(actor + "PendingAttLabel");
+      chip.style.display = "flex";
+      label.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      log(actor, `Selected ${category} attachment:`, { name: file.name, size: file.size, mime: mimeType });
     }
 
     function clearPendingAtt(actor) {
@@ -863,13 +858,14 @@
       return map[ext] || "application/octet-stream";
     }
 
-    // Upload attachment to Media Service and return mediaId
+    // Step 1: POST /api/v1/media/uploads -> gets Presigned S3 PUT URL
+    // Step 2: HTTP PUT binary directly to AWS S3
     async function uploadAttachment(actor, fileData) {
       const url = document.getElementById("globalUrl").value.trim();
       const token = document.getElementById(actor + "Token").value.trim();
 
-      log(actor, `Uploading ${fileData.category} to Media Service...`);
-      const res = await fetch(`${url}/api/v1/media/direct-upload`, {
+      log(actor, `[1/2] Requesting S3 Presigned Upload URL for ${fileData.name}...`);
+      const presignRes = await fetch(`${url}/api/v1/media/uploads`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -879,18 +875,32 @@
           purpose: "chat_attachment",
           mimeType: fileData.mimeType,
           fileName: fileData.name,
-          base64Data: fileData.base64Data,
           sizeBytes: fileData.sizeBytes,
         }),
       });
 
-      const json = await res.json();
-      if (!res.ok || !json.success) {
-        throw new Error(json.message || "Failed to upload attachment");
+      const presignJson = await presignRes.json();
+      if (!presignRes.ok || !presignJson.success) {
+        throw new Error(presignJson.message || "Failed to create S3 upload URL");
       }
 
-      log(actor, "Upload complete:", json.data);
-      return json.data.id;
+      const { id, uploadUrl } = presignJson.data;
+      log(actor, `[2/2] Uploading binary directly to S3 (temp stage)...`);
+
+      const s3PutRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": fileData.mimeType,
+        },
+        body: fileData.fileBlob,
+      });
+
+      if (!s3PutRes.ok) {
+        throw new Error(`S3 PUT failed with status: ${s3PutRes.status}`);
+      }
+
+      log(actor, `S3 upload completed for asset ID: ${id}`);
+      return id;
     }
 
     async function sendCustMsg() {
