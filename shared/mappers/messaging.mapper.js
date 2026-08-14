@@ -25,6 +25,8 @@ export function toMessageDto(message, attachments = []) {
       mediaId: a.mediaId,
       url: resolveMediaUrl(a.media?.storageKey),
       mimeType: a.media?.mimeType ?? null,
+      sizeBytes: a.media?.sizeBytes ?? null,
+      purpose: a.media?.purpose ?? null,
     })),
     createdAt: toIso(message.createdAt),
   };

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>XprtLink — Dual WebSocket Chat Test (Customer & Expert)</title>
+  <title>XprtLink — Dual WebSocket Chat & Attachments Test</title>
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
   <style>
     :root {
@@ -67,6 +67,21 @@
     button.secondary-btn:hover { background: #334155; color: #fff; }
     button.expert-btn { background: #10b981; color: #fff; }
     button.expert-btn:hover { background: #059669; }
+
+    /* Attachment Limits Bar */
+    .limits-bar {
+      background: #101828;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+    .limit-tag { display: inline-flex; align-items: center; gap: 5px; background: #1e293b; padding: 2px 8px; border-radius: 4px; color: #e2e8f0; }
 
     /* Grid Layout */
     .chat-grid {
@@ -135,7 +150,7 @@
       gap: 10px;
     }
     .msg-bubble {
-      max-width: 78%;
+      max-width: 82%;
       padding: 8px 12px;
       border-radius: 12px;
       font-size: 13px;
@@ -163,8 +178,52 @@
     .msg-meta {
       font-size: 10px;
       opacity: 0.75;
-      margin-top: 3px;
+      margin-top: 4px;
       text-align: right;
+    }
+
+    /* Attachment Display in Bubbles */
+    .att-preview-img {
+      max-width: 220px;
+      max-height: 160px;
+      border-radius: 8px;
+      margin-top: 6px;
+      display: block;
+      cursor: pointer;
+      object-fit: cover;
+    }
+    .att-preview-video {
+      max-width: 260px;
+      max-height: 180px;
+      border-radius: 8px;
+      margin-top: 6px;
+      display: block;
+    }
+    .att-preview-doc {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-top: 6px;
+      text-decoration: none;
+      color: #fff;
+    }
+    .att-preview-doc:hover { background: rgba(0, 0, 0, 0.4); }
+
+    /* Pending Attachment Chip */
+    .pending-att-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #1e293b;
+      border: 1px solid #3b82f6;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: #93c5fd;
     }
 
     .typing-status {
@@ -189,6 +248,24 @@
       0% { opacity: 0.3; transform: scale(0.8); }
       100% { opacity: 1; transform: scale(1.2); }
     }
+
+    .attach-buttons-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .attach-btn {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      color: #cbd5e1;
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .attach-btn:hover { background: #334155; color: #fff; }
 
     .send-row {
       display: flex;
@@ -230,8 +307,16 @@
 
   <!-- Top Header -->
   <div class="top-header">
-    <h1>💬 XprtLink Dual-Card WebSocket Chat Test</h1>
-    <p>Live simultaneous Customer ↔ Expert Socket.IO messaging test interface</p>
+    <h1>💬 XprtLink Dual-Card WebSocket Chat & Media Test</h1>
+    <p>Live simultaneous Customer ↔ Expert Socket.IO messaging with Document, Image & Video Attachments</p>
+  </div>
+
+  <!-- Attachment Limits from .env -->
+  <div class="limits-bar" id="limitsBar">
+    <strong style="color: #fff;">⚙️ .env Attachment Limits:</strong>
+    <span class="limit-tag">🖼️ Image: <b id="lblImgLimit">Max 10 MB</b> (JPEG, PNG, WEBP, GIF, HEIC)</span>
+    <span class="limit-tag">📄 Doc: <b id="lblDocLimit">Max 15 MB</b> (PDF, DOC, DOCX, XLS, XLSX, TXT, CSV)</span>
+    <span class="limit-tag">🎥 Video: <b id="lblVidLimit">Max 50 MB</b> (MP4, MOV, WEBM, MKV, 3GP)</span>
   </div>
 
   <!-- Global Controls -->
@@ -260,7 +345,7 @@
       <div class="card-header">
         <div class="card-title customer">
           <span>👤 Customer Client</span>
-          <span id="custUserLabel" style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Jordan Customer)</span>
+          <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Jordan Customer)</span>
         </div>
         <span id="custBadge" class="status-badge">Disconnected</span>
       </div>
@@ -285,6 +370,21 @@
       <div id="custChatArea" class="chat-area"></div>
       <div id="custTyping" class="typing-status"></div>
 
+      <!-- Pending Attachment Display -->
+      <div id="custPendingAtt" style="display: none;" class="pending-att-box">
+        <span id="custPendingAttLabel">📎 Attachment</span>
+        <button style="background: none; border: none; color: #f87171; cursor: pointer; padding: 0 4px;" onclick="clearPendingAtt('cust')">✕</button>
+      </div>
+
+      <!-- Attachment Pickers -->
+      <div class="attach-buttons-row">
+        <label style="font-size: 11px;">Attach:</label>
+        <button class="attach-btn" onclick="triggerFileInput('cust', 'image/*')">🖼️ Image</button>
+        <button class="attach-btn" onclick="triggerFileInput('cust', '.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv')">📄 Document</button>
+        <button class="attach-btn" onclick="triggerFileInput('cust', 'video/*')">🎥 Video</button>
+        <input type="file" id="custFileInput" style="display: none;" onchange="handleFileSelect('cust', event)" />
+      </div>
+
       <!-- Message input -->
       <div class="send-row">
         <input
@@ -303,7 +403,7 @@
       <div class="card-header">
         <div class="card-title expert">
           <span>👨‍💼 Expert Client</span>
-          <span id="expUserLabel" style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Jordan Expert)</span>
+          <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Jordan Expert)</span>
         </div>
         <span id="expBadge" class="status-badge">Disconnected</span>
       </div>
@@ -327,6 +427,21 @@
       <!-- Chat Feed -->
       <div id="expChatArea" class="chat-area"></div>
       <div id="expTyping" class="typing-status"></div>
+
+      <!-- Pending Attachment Display -->
+      <div id="expPendingAtt" style="display: none;" class="pending-att-box">
+        <span id="expPendingAttLabel">📎 Attachment</span>
+        <button style="background: none; border: none; color: #f87171; cursor: pointer; padding: 0 4px;" onclick="clearPendingAtt('exp')">✕</button>
+      </div>
+
+      <!-- Attachment Pickers -->
+      <div class="attach-buttons-row">
+        <label style="font-size: 11px;">Attach:</label>
+        <button class="attach-btn" onclick="triggerFileInput('exp', 'image/*')">🖼️ Image</button>
+        <button class="attach-btn" onclick="triggerFileInput('exp', '.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv')">📄 Document</button>
+        <button class="attach-btn" onclick="triggerFileInput('exp', 'video/*')">🎥 Video</button>
+        <input type="file" id="expFileInput" style="display: none;" onchange="handleFileSelect('exp', event)" />
+      </div>
 
       <!-- Message input -->
       <div class="send-row">
@@ -360,6 +475,15 @@
     let expUserId = "66009a47-87a2-42bf-80aa-de99add8aa8c";
     let expProfileId = "5768b787-261d-4c16-8640-b0287a3227d9";
 
+    let custPendingFile = null;
+    let expPendingFile = null;
+
+    let attachmentLimits = {
+      image: { maxSizeMb: 10, mimes: ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"] },
+      document: { maxSizeMb: 15, mimes: ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain", "text/csv"] },
+      video: { maxSizeMb: 50, mimes: ["video/mp4", "video/quicktime", "video/webm", "video/x-matroska", "video/3gpp"] },
+    };
+
     let custTypingTimer = null;
     let expTypingTimer = null;
     let custIsTyping = false;
@@ -367,6 +491,7 @@
 
     function setUrl(url) {
       document.getElementById("globalUrl").value = url;
+      loadAttachmentConfig();
     }
 
     function log(actor, msg, data) {
@@ -388,6 +513,24 @@
         return JSON.parse(atob(token.split(".")[1]));
       } catch (e) {
         return null;
+      }
+    }
+
+    // Load .env Attachment Limits from Server
+    async function loadAttachmentConfig() {
+      const url = document.getElementById("globalUrl").value.trim();
+      try {
+        const res = await fetch(`${url}/api/v1/media/config/attachments`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          attachmentLimits = json.data;
+          document.getElementById("lblImgLimit").textContent = `Max ${attachmentLimits.image.maxSizeMb} MB`;
+          document.getElementById("lblDocLimit").textContent = `Max ${attachmentLimits.document.maxSizeMb} MB`;
+          document.getElementById("lblVidLimit").textContent = `Max ${attachmentLimits.video.maxSizeMb} MB`;
+          log("system", "Loaded .env attachment limits", attachmentLimits);
+        }
+      } catch (err) {
+        log("system", "Could not fetch dynamic attachment config, using defaults");
       }
     }
 
@@ -419,12 +562,8 @@
         document.getElementById("custBtnConnect").disabled = true;
         document.getElementById("custBtnDisconnect").disabled = false;
 
-        // Auto join conversation if already set
         const convId = document.getElementById("sharedConvId").value.trim();
-        if (convId) {
-          joinCust();
-        }
-
+        if (convId) joinCust();
         if (typeof callback === "function") callback();
       });
 
@@ -440,30 +579,21 @@
         document.getElementById("custBtnDisconnect").disabled = true;
       });
 
-      // Realtime incoming message
       socketCust.on("message:new", (data) => {
         log("customer", "Received message:new", data);
         appendMsgTo("cust", data.message, custUserId, "mine-cust");
       });
 
-      // Read receipt
       socketCust.on("conversation:read", (data) => {
         log("customer", "Received conversation:read", data);
-        const area = document.getElementById("custChatArea");
-        const note = document.createElement("div");
-        note.style.cssText = "font-size: 11px; color: #64748b; text-align: center; margin: 4px 0;";
-        note.textContent = `✓ Read by peer at ${new Date(data.readAt).toLocaleTimeString()}`;
-        area.appendChild(note);
-        area.scrollTop = area.scrollHeight;
+        renderReadReceipt("cust", data.readAt);
       });
 
       socketCust.on("conversation:updated", (data) => {
         log("customer", "Inbox alert: conversation:updated", data);
       });
 
-      // Peer typing indicator
       socketCust.on("typing:status", (data) => {
-        log("customer", "Received typing:status", data);
         const bar = document.getElementById("custTyping");
         if (data.isTyping) {
           bar.innerHTML = '<span class="pulse-dot"></span> Expert is typing...';
@@ -509,12 +639,8 @@
         document.getElementById("expBtnConnect").disabled = true;
         document.getElementById("expBtnDisconnect").disabled = false;
 
-        // Auto join conversation if already set
         const convId = document.getElementById("sharedConvId").value.trim();
-        if (convId) {
-          joinExp();
-        }
-
+        if (convId) joinExp();
         if (typeof callback === "function") callback();
       });
 
@@ -530,30 +656,21 @@
         document.getElementById("expBtnDisconnect").disabled = true;
       });
 
-      // Realtime incoming message
       socketExp.on("message:new", (data) => {
         log("expert", "Received message:new", data);
         appendMsgTo("exp", data.message, expUserId, "mine-exp");
       });
 
-      // Read receipt
       socketExp.on("conversation:read", (data) => {
         log("expert", "Received conversation:read", data);
-        const area = document.getElementById("expChatArea");
-        const note = document.createElement("div");
-        note.style.cssText = "font-size: 11px; color: #64748b; text-align: center; margin: 4px 0;";
-        note.textContent = `✓ Read by peer at ${new Date(data.readAt).toLocaleTimeString()}`;
-        area.appendChild(note);
-        area.scrollTop = area.scrollHeight;
+        renderReadReceipt("exp", data.readAt);
       });
 
       socketExp.on("conversation:updated", (data) => {
         log("expert", "Inbox alert: conversation:updated", data);
       });
 
-      // Peer typing indicator
       socketExp.on("typing:status", (data) => {
-        log("expert", "Received typing:status", data);
         const bar = document.getElementById("expTyping");
         if (data.isTyping) {
           bar.innerHTML = '<span class="pulse-dot"></span> Customer is typing...';
@@ -577,11 +694,8 @@
 
     /* ALL IN ONE CONNECT & START */
     function connectAndStartBoth() {
-      // Connect customer first
       connectCust(() => {
-        // Connect expert
         connectExp(() => {
-          // Both connected: create/get conversation thread
           log("system", "Both connected! Establishing conversation thread...");
           socketCust.emit("conversation:create", { expertId: expProfileId }, (res) => {
             log("customer", "conversation:create", res);
@@ -606,9 +720,7 @@
       if (!socketCust || !convId) return;
       socketCust.emit("conversation:join", { conversationId: convId }, (res) => {
         log("customer", "conversation:join", res);
-        if (res.success) {
-          loadHistory("cust", convId, custUserId, "mine-cust");
-        }
+        if (res.success) loadHistory("cust", convId, custUserId, "mine-cust");
       });
     }
 
@@ -617,9 +729,7 @@
       if (!socketExp || !convId) return;
       socketExp.emit("conversation:join", { conversationId: convId }, (res) => {
         log("expert", "conversation:join", res);
-        if (res.success) {
-          loadHistory("exp", convId, expUserId, "mine-exp");
-        }
+        if (res.success) loadHistory("exp", convId, expUserId, "mine-exp");
       });
     }
 
@@ -660,15 +770,150 @@
       });
     }
 
-    function sendCustMsg() {
+    /* ATTACHMENT HANDLING & VALIDATION */
+    function triggerFileInput(actor, accept) {
+      const input = document.getElementById(actor + "FileInput");
+      input.accept = accept;
+      input.click();
+    }
+
+    function handleFileSelect(actor, event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const mimeType = file.type || getMimeFromExtension(file.name);
+      let category = "document";
+      if (mimeType.startsWith("image/")) category = "image";
+      else if (mimeType.startsWith("video/")) category = "video";
+
+      const catLimit = attachmentLimits[category];
+      const maxBytes = catLimit.maxSizeMb * 1024 * 1024;
+
+      // Validate Format
+      const isAllowedMime = catLimit.mimes.some((m) => m === mimeType || m === mimeType.split(";")[0]);
+      if (!isAllowedMime) {
+        alert(`❌ Invalid format for ${category}!\nFile type '${mimeType}' is not allowed.\nAllowed: ${catLimit.mimes.join(", ")}`);
+        event.target.value = "";
+        return;
+      }
+
+      // Validate Size
+      if (file.size > maxBytes) {
+        alert(`❌ File too large for ${category}!\nFile size: ${(file.size / (1024 * 1024)).toFixed(2)} MB\nMaximum allowed: ${catLimit.maxSizeMb} MB`);
+        event.target.value = "";
+        return;
+      }
+
+      // Store pending file
+      const reader = new FileReader();
+      reader.onload = () => {
+        const fileData = {
+          name: file.name,
+          sizeBytes: file.size,
+          mimeType,
+          category,
+          base64Data: reader.result,
+        };
+
+        if (actor === "cust") custPendingFile = fileData;
+        else expPendingFile = fileData;
+
+        // Update UI Chip
+        const chip = document.getElementById(actor + "PendingAtt");
+        const label = document.getElementById(actor + "PendingAttLabel");
+        chip.style.display = "flex";
+        label.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+        log(actor, `Selected ${category} attachment:`, { name: file.name, size: file.size, mime: mimeType });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearPendingAtt(actor) {
+      if (actor === "cust") {
+        custPendingFile = null;
+        document.getElementById("custFileInput").value = "";
+        document.getElementById("custPendingAtt").style.display = "none";
+      } else {
+        expPendingFile = null;
+        document.getElementById("expFileInput").value = "";
+        document.getElementById("expPendingAtt").style.display = "none";
+      }
+    }
+
+    function getMimeFromExtension(filename) {
+      const ext = filename.split(".").pop().toLowerCase();
+      const map = {
+        pdf: "application/pdf",
+        doc: "application/msword",
+        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        xls: "application/vnd.ms-excel",
+        xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        txt: "text/plain",
+        csv: "text/csv",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        png: "image/png",
+        webp: "image/webp",
+        gif: "image/gif",
+        mp4: "video/mp4",
+        mov: "video/quicktime",
+        webm: "video/webm",
+        mkv: "video/x-matroska",
+      };
+      return map[ext] || "application/octet-stream";
+    }
+
+    // Upload attachment to Media Service and return mediaId
+    async function uploadAttachment(actor, fileData) {
+      const url = document.getElementById("globalUrl").value.trim();
+      const token = document.getElementById(actor + "Token").value.trim();
+
+      log(actor, `Uploading ${fileData.category} to Media Service...`);
+      const res = await fetch(`${url}/api/v1/media/direct-upload`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          purpose: "chat_attachment",
+          mimeType: fileData.mimeType,
+          fileName: fileData.name,
+          base64Data: fileData.base64Data,
+          sizeBytes: fileData.sizeBytes,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        throw new Error(json.message || "Failed to upload attachment");
+      }
+
+      log(actor, "Upload complete:", json.data);
+      return json.data.id;
+    }
+
+    async function sendCustMsg() {
       const input = document.getElementById("custMsgInput");
       const convId = document.getElementById("sharedConvId").value.trim();
       const body = input.value.trim();
       if (!socketCust) return alert("Connect Customer socket first");
       if (!convId) return alert("Please specify or Create a Conversation ID");
-      if (!body) return;
+      if (!body && !custPendingFile) return;
 
-      socketCust.emit("message:send", { conversationId: convId, body }, (res) => {
+      let mediaIds = [];
+      if (custPendingFile) {
+        try {
+          const mediaId = await uploadAttachment("cust", custPendingFile);
+          mediaIds.push(mediaId);
+          clearPendingAtt("cust");
+        } catch (err) {
+          alert("Media upload error: " + err.message);
+          return;
+        }
+      }
+
+      socketCust.emit("message:send", { conversationId: convId, body, mediaIds }, (res) => {
         log("customer", "message:send", res);
         if (res.success) {
           input.value = "";
@@ -677,15 +922,27 @@
       });
     }
 
-    function sendExpMsg() {
+    async function sendExpMsg() {
       const input = document.getElementById("expMsgInput");
       const convId = document.getElementById("sharedConvId").value.trim();
       const body = input.value.trim();
       if (!socketExp) return alert("Connect Expert socket first");
       if (!convId) return alert("Please specify or Create a Conversation ID");
-      if (!body) return;
+      if (!body && !expPendingFile) return;
 
-      socketExp.emit("message:send", { conversationId: convId, body }, (res) => {
+      let mediaIds = [];
+      if (expPendingFile) {
+        try {
+          const mediaId = await uploadAttachment("exp", expPendingFile);
+          mediaIds.push(mediaId);
+          clearPendingAtt("exp");
+        } catch (err) {
+          alert("Media upload error: " + err.message);
+          return;
+        }
+      }
+
+      socketExp.emit("message:send", { conversationId: convId, body, mediaIds }, (res) => {
         log("expert", "message:send", res);
         if (res.success) {
           input.value = "";
@@ -758,11 +1015,48 @@
       const isMine = msg.senderUserId === myId;
       const bubble = document.createElement("div");
       bubble.className = `msg-bubble ${isMine ? myClass : "theirs"}`;
+
+      let bodyHtml = msg.body ? `<div>${escapeHtml(msg.body)}</div>` : "";
+
+      // Attachments rendering
+      if (msg.attachments && msg.attachments.length > 0) {
+        msg.attachments.forEach((att) => {
+          const mime = (att.mimeType || "").toLowerCase();
+          const fileUrl = att.url || "#";
+
+          if (mime.startsWith("image/")) {
+            bodyHtml += `<a href="${fileUrl}" target="_blank"><img src="${fileUrl}" class="att-preview-img" alt="Image" onerror="this.alt='Image attachment'" /></a>`;
+          } else if (mime.startsWith("video/")) {
+            bodyHtml += `<video src="${fileUrl}" controls class="att-preview-video"></video>`;
+          } else {
+            const sizeStr = att.sizeBytes ? ` (${(att.sizeBytes / 1024).toFixed(1)} KB)` : "";
+            bodyHtml += `
+              <a href="${fileUrl}" target="_blank" class="att-preview-doc">
+                <span style="font-size: 18px;">📄</span>
+                <div>
+                  <div style="font-weight: 600; font-size: 12px;">Document Attachment</div>
+                  <div style="font-size: 10px; opacity: 0.8;">${mime}${sizeStr}</div>
+                </div>
+              </a>`;
+          }
+        });
+      }
+
       bubble.innerHTML = `
-        <div>${escapeHtml(msg.body || "[Attachment]")}</div>
+        ${bodyHtml}
         <div class="msg-meta">${new Date(msg.createdAt).toLocaleTimeString()} • ${msg.deliveryStatus}</div>
       `;
       area.appendChild(bubble);
+      area.scrollTop = area.scrollHeight;
+    }
+
+    function renderReadReceipt(actor, readAt) {
+      const area = document.getElementById(actor + "ChatArea");
+      if (!area) return;
+      const note = document.createElement("div");
+      note.style.cssText = "font-size: 11px; color: #64748b; text-align: center; margin: 4px 0;";
+      note.textContent = `✓ Read by peer at ${new Date(readAt).toLocaleTimeString()}`;
+      area.appendChild(note);
       area.scrollTop = area.scrollHeight;
     }
 
@@ -770,9 +1064,9 @@
       return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    // Auto set default thread ID on page load
     window.addEventListener("DOMContentLoaded", () => {
       document.getElementById("sharedConvId").value = "a6e13d67-1c28-4e73-a22f-c15ec9a2684b";
+      loadAttachmentConfig();
     });
   </script>
 </body>
