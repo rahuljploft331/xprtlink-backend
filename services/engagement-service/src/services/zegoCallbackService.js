@@ -1,5 +1,4 @@
 import { getDb } from "@xprtlink/shared/db";
-import crypto from "crypto";
 
 /**
  * ZegoCloud Callback Event Handlers.
@@ -14,11 +13,10 @@ import crypto from "crypto";
  *   { appid, event, nonce, timestamp, signature, room_id, id_name (userId), ... }
  */
 
-// Map of event names to handlers
 const handlers = {
   room_create: handleRoomCreate,
-  user_login: handleUserLogin,
-  user_logout: handleUserLogout,
+  room_login: handleUserLogin,
+  room_logout: handleUserLogout,
   room_close: handleRoomClose,
 };
 
@@ -162,56 +160,26 @@ async function handleRoomClose(payload) {
     `(duration=${durationSeconds}s, connected=${wasConnected})`
   );
 
-  // Basic billing amount calculation
-  let totalCents = 0;
-  let expertShareCents = 0;
-  let commissionCents = 0;
-
+  // Trigger real Stripe capture via billing-service (internal call, no JWT needed)
   if (wasConnected && durationSeconds > 0) {
-    const minutes = Math.ceil(durationSeconds / 60);
-    totalCents = minutes * consultation.ratePerMinuteCents;
-    
-    // Default 15% commission
-    commissionCents = Math.round(totalCents * 0.15);
-    expertShareCents = totalCents - commissionCents;
-
-    // Simulate transaction and charge creation (in production, integrate with billing-service/Stripe here)
-    const transactionId = crypto.randomUUID();
-    
-    await db.transaction.create({
-      data: {
-        id: transactionId,
-        type: "charge",
-        status: "succeeded",
-        amountCents: totalCents,
-        currency: "USD",
-        metadata: { consultationId: consultation.id },
-      },
-    });
-
-    await db.consultationCharge.create({
-      data: {
-        consultationId: consultation.id,
-        transactionId: transactionId,
-        commissionCents: commissionCents,
-        expertShareCents: expertShareCents,
-      },
-    });
-
-    await db.expertEarningsLedger.create({
-      data: {
-        expertProfileId: consultation.expertId,
-        consultationId: consultation.id,
-        grossCents: totalCents,
-        commissionCents: commissionCents,
-        netCents: expertShareCents,
-      },
-    });
-
-    await db.consultation.update({
-      where: { id: consultation.id },
-      data: { billingStatus: "succeeded" },
-    });
+    try {
+      const billingUrl = `http://localhost:${process.env.BILLING_SERVICE_PORT || 4006}/api/v1/billing/consultations/${consultation.id}/capture`;
+      const resp = await fetch(billingUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-internal-service": "engagement-service",
+        },
+        body: JSON.stringify({ durationSeconds }),
+      });
+      const result = await resp.json();
+      console.log(`[zego-callback] Billing capture result:`, JSON.stringify(result?.data ?? result));
+    } catch (err) {
+      // Non-fatal — consultation is already marked completed; billing can be retried
+      console.error(`[zego-callback] Billing capture call failed: ${err.message}`);
+    }
+  } else {
+    console.log(`[zego-callback] Consultation ${consultation.id} — no charge (wasConnected=${wasConnected}, duration=${durationSeconds}s)`);
   }
 
   // TODO: Send push notification to both participants

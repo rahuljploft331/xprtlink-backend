@@ -628,6 +628,7 @@ model Consultation {
   endedAt             DateTime?                 @map("ended_at") @db.Timestamptz(6)
   durationSeconds     Int?                      @map("duration_seconds")
   zegoRoomId          String?                   @map("zego_room_id") @db.VarChar(128)
+  stripePaymentIntentId String?                 @map("stripe_payment_intent_id") @db.VarChar(128)
   billingStatus       ConsultationBillingStatus @default(pending) @map("billing_status")
   createdAt           DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)

@@ -149,6 +149,12 @@ export async function holdConsultationFunds(auth, consultationId, body) {
       metadata: { consultationId, customerProfileId: auth.customerProfileId },
     });
 
+    // Persist the PaymentIntent ID on the consultation so room_close can capture it
+    await db.consultation.update({
+      where: { id: consultationId },
+      data: { stripePaymentIntentId: holdResult.id },
+    });
+
     return {
       consultationId,
       holdStatus: holdResult.status,
@@ -263,6 +269,114 @@ export async function payConsultation(auth, consultationId, body) {
   return toTransactionDto(result);
 }
 
+/**
+ * Internal service-to-service capture — called by engagement-service on room_close.
+ * No customer auth required. Uses the stripePaymentIntentId stored on the consultation.
+ *
+ * If no hold was placed (customer had no card), marks billing as failed gracefully.
+ */
+export async function captureConsultation(consultationId, durationSeconds) {
+  const db = getDb();
+
+  const consultation = await db.consultation.findUnique({
+    where: { id: consultationId },
+    include: { expert: true, charge: true },
+  });
+
+  if (!consultation) {
+    console.warn(`[billing] captureConsultation: consultation ${consultationId} not found`);
+    return { skipped: true, reason: "not_found" };
+  }
+
+  if (consultation.billingStatus === "charged" || consultation.charge) {
+    console.log(`[billing] captureConsultation: ${consultationId} already charged — skipping`);
+    return { skipped: true, reason: "already_charged" };
+  }
+
+  const actualDuration = durationSeconds ?? consultation.durationSeconds ?? 0;
+  const amountCents = Math.ceil((actualDuration / 60) * consultation.ratePerMinuteCents);
+
+  if (amountCents <= 0) {
+    console.log(`[billing] captureConsultation: ${consultationId} — zero amount, skipping charge`);
+    return { skipped: true, reason: "zero_amount" };
+  }
+
+  const commissionCents = Math.round(amountCents * COMMISSION_RATE);
+  const expertShareCents = amountCents - commissionCents;
+  const currency = consultation.expert?.currency || "USD";
+
+  let stripeResult = null;
+
+  if (consultation.stripePaymentIntentId) {
+    // Happy path — customer placed a hold before the call
+    try {
+      stripeResult = await stripeSvc.capturePaymentIntent({
+        paymentIntentId: consultation.stripePaymentIntentId,
+        amountToCaptureCents: amountCents,
+      });
+      console.log(`[billing] captureConsultation: captured PI=${stripeResult.id} amount=${amountCents}¢`);
+    } catch (err) {
+      console.error(`[billing] captureConsultation: Stripe capture failed — ${err.message}`);
+      await db.consultation.update({
+        where: { id: consultationId },
+        data: { billingStatus: "failed" },
+      });
+      return { skipped: false, captured: false, reason: "stripe_capture_failed", error: err.message };
+    }
+  } else {
+    // No hold placed — customer had no payment method on file
+    console.warn(`[billing] captureConsultation: ${consultationId} has no stripePaymentIntentId — marking failed`);
+    await db.consultation.update({
+      where: { id: consultationId },
+      data: { billingStatus: "failed" },
+    });
+    return { skipped: false, captured: false, reason: "no_hold" };
+  }
+
+  // Record billing in a transaction
+  const result = await db.$transaction(async (tx) => {
+    const transaction = await tx.transaction.create({
+      data: {
+        type: "consultation_charge",
+        amountCents,
+        currency,
+        status: "succeeded",
+        stripePaymentIntentId: stripeResult.id,
+        metadata: { consultationId, source: "room_close" },
+      },
+    });
+
+    await tx.consultationCharge.create({
+      data: {
+        consultationId,
+        transactionId: transaction.id,
+        commissionCents,
+        expertShareCents,
+      },
+    });
+
+    await tx.expertEarningsLedger.create({
+      data: {
+        expertProfileId: consultation.expertId,
+        consultationId,
+        grossCents: amountCents,
+        commissionCents,
+        netCents: expertShareCents,
+      },
+    });
+
+    await tx.consultation.update({
+      where: { id: consultationId },
+      data: { billingStatus: "charged" },
+    });
+
+    return transaction;
+  });
+
+  console.log(`[billing] captureConsultation: ${consultationId} → charged $${(amountCents / 100).toFixed(2)}`);
+  return { captured: true, transactionId: result.id, amountCents, commissionCents, expertShareCents };
+}
+
 export async function submitCustomConnectKyc(auth, body) {
   const db = getDb();
   const expert = await db.expertProfile.findUnique({
@@ -316,23 +430,53 @@ export async function attachBankAccount(auth, body) {
 
 export async function handleStripeWebhook(payload, signature) {
   const event = stripeSvc.constructWebhookEvent(payload, signature);
+  const db = getDb();
 
   switch (event.type) {
-    case "payment_intent.amount_capturable_updated":
-      // Pre-auth hold succeeded
+    case "payment_intent.succeeded": {
+      // Final capture confirmed by Stripe — sync transaction status
+      const pi = event.data.object;
+      await db.transaction.updateMany({
+        where: { stripePaymentIntentId: pi.id },
+        data: { status: "succeeded" },
+      });
+      const consultationId = pi.metadata?.consultationId;
+      if (consultationId) {
+        await db.consultation.updateMany({
+          where: { id: consultationId },
+          data: { billingStatus: "charged" },
+        });
+      }
+      console.log(`[billing-webhook] payment_intent.succeeded PI=${pi.id}`);
       break;
-    case "payment_intent.succeeded":
-      // Final charge captured
+    }
+
+    case "payment_intent.payment_failed": {
+      // Pre-auth or capture failed — mark as failed
+      const pi = event.data.object;
+      await db.transaction.updateMany({
+        where: { stripePaymentIntentId: pi.id },
+        data: { status: "failed" },
+      });
+      const consultationId = pi.metadata?.consultationId;
+      if (consultationId) {
+        await db.consultation.updateMany({
+          where: { id: consultationId },
+          data: { billingStatus: "failed" },
+        });
+      }
+      console.log(`[billing-webhook] payment_intent.payment_failed PI=${pi.id}`);
       break;
-    case "payment_intent.payment_failed":
-      // Pre-auth or charge failed
-      break;
+    }
+
     case "account.updated":
-      // Expert Connect KYC account updated
+      // Expert Connect KYC status update — handle KYC approval/rejection here later
       break;
+
     case "transfer.created":
-      // Payout transfer created
+      // Expert payout transfer created
       break;
+
     default:
       break;
   }

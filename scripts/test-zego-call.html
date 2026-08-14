@@ -55,6 +55,11 @@
       Both users joining will trigger real ZegoCloud webhook callbacks to your backend.
     </p>
 
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+      <button style="margin-top: 0; background: #3b82f6; color: white; font-size: 0.9rem; padding: 8px;" type="button" onclick="fillCustomer()">Load Customer</button>
+      <button style="margin-top: 0; background: #8b5cf6; color: white; font-size: 0.9rem; padding: 8px;" type="button" onclick="fillExpert()">Load Expert</button>
+    </div>
+
     <label>Room ID (same for both participants)</label>
     <input type="text" id="roomID" value="test-consultation-001" />
 
@@ -86,6 +91,18 @@
     // Pre-fill user ID with a random value
     document.getElementById('userID').value = 'user_' + Math.floor(Math.random() * 9000 + 1000);
     document.getElementById('userName').value = 'TestUser_' + Math.floor(Math.random() * 100);
+
+    function fillCustomer() {
+      document.getElementById('roomID').value = 'room-0d3004b9-06f6-44d4-b2e3-f42cf7386a25';
+      document.getElementById('userID').value = 'dda88444-429f-4720-8f6f-28b177d8d30e';
+      document.getElementById('userName').value = 'CustomerFlow';
+    }
+
+    function fillExpert() {
+      document.getElementById('roomID').value = 'room-0d3004b9-06f6-44d4-b2e3-f42cf7386a25';
+      document.getElementById('userID').value = '0cb42929-cf47-4b26-b19c-4891ff27e8a5';
+      document.getElementById('userName').value = 'ExpertFlow';
+    }
 
     // Parse roomID from URL if shared
     const urlParams = new URLSearchParams(window.location.search);
