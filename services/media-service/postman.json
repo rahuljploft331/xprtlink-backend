@@ -2,12 +2,33 @@
   "info": {
     "_postman_id": "c1f7b7cb-4b3d-4c3e-8848-12cd80a1c6a8",
     "name": "Media Service",
-    "description": "REST APIs for signed URL uploads and resolving media asset metadata.",
+    "description": "REST APIs for AWS S3 presigned upload URLs, attachment limits configuration, and media asset resolution.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "Create Signed Upload URL",
+      "name": "Get Attachment Configuration",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/media/config/attachments",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "media",
+            "config",
+            "attachments"
+          ]
+        },
+        "description": "Get current environment-configured attachment formats and maximum size limits (in MB and bytes) for Images, Documents, and Videos."
+      }
+    },
+    {
+      "name": "Create S3 Presigned Upload URL",
       "request": {
         "method": "POST",
         "header": [
@@ -22,7 +43,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"fileName\": \"receipt.jpg\",\n  \"fileType\": \"image/jpeg\"\n}"
+          "raw": "{\n  \"purpose\": \"chat_attachment\",\n  \"mimeType\": \"image/png\",\n  \"fileName\": \"receipt.png\",\n  \"sizeBytes\": 102400\n}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/media/uploads",
@@ -36,11 +57,43 @@
             "uploads"
           ]
         },
-        "description": "Request a signed URL to upload media files (e.g. quote attachments, verification documents)."
+        "description": "Request a presigned AWS S3 PUT URL for uploading media files into the temporary staging folder."
       }
     },
     {
-      "name": "Resolve Media Asset Detail",
+      "name": "Confirm S3 Upload",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/media/:id/confirm",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "media",
+            ":id",
+            "confirm"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "media-uuid-here"
+            }
+          ]
+        },
+        "description": "Confirm that direct binary upload to S3 completed successfully."
+      }
+    },
+    {
+      "name": "Get Media Asset Detail",
       "request": {
         "method": "GET",
         "header": [
@@ -67,7 +120,7 @@
             }
           ]
         },
-        "description": "Resolve metadata and direct URL of a uploaded media asset."
+        "description": "Resolve metadata and signed AWS S3 GET download URL for an uploaded media asset."
       }
     }
   ]
