@@ -1,6 +1,10 @@
+import { generatePresignedDownloadUrl } from "../utils/s3.js";
 import { resolveMediaUrl, toIso } from "./common.js";
 
-export function toConversationSummaryDto(conversation, { peerName, peerAvatarUrl, unreadCount, lastMessage }) {
+export function toConversationSummaryDto(
+  conversation,
+  { peerName, peerAvatarUrl, unreadCount, lastMessage }
+) {
   return {
     id: conversation.id,
     expertId: conversation.expertId,
@@ -13,7 +17,27 @@ export function toConversationSummaryDto(conversation, { peerName, peerAvatarUrl
   };
 }
 
-export function toMessageDto(message, attachments = []) {
+export async function toMessageDto(message, attachments = []) {
+  const mappedAttachments = await Promise.all(
+    attachments.map(async (a) => {
+      let url = null;
+      if (a.media?.storageKey) {
+        url = await generatePresignedDownloadUrl(a.media.storageKey);
+        if (!url) {
+          url = resolveMediaUrl(a.media.storageKey);
+        }
+      }
+
+      return {
+        mediaId: a.mediaId,
+        url,
+        mimeType: a.media?.mimeType ?? null,
+        sizeBytes: a.media?.sizeBytes ?? null,
+        purpose: a.media?.purpose ?? null,
+      };
+    })
+  );
+
   return {
     id: message.id,
     conversationId: message.conversationId,
@@ -21,13 +45,7 @@ export function toMessageDto(message, attachments = []) {
     body: message.body,
     type: message.type,
     deliveryStatus: message.deliveryStatus,
-    attachments: attachments.map((a) => ({
-      mediaId: a.mediaId,
-      url: resolveMediaUrl(a.media?.storageKey),
-      mimeType: a.media?.mimeType ?? null,
-      sizeBytes: a.media?.sizeBytes ?? null,
-      purpose: a.media?.purpose ?? null,
-    })),
+    attachments: mappedAttachments,
     createdAt: toIso(message.createdAt),
   };
 }
