@@ -101,7 +101,14 @@ All request events use **Socket.IO Acknowledgment Callbacks** for instant respon
           "unreadCount": 2
         }
       ],
-      "pagination": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
+      "pagination": {
+        "page": 1,
+        "limit": 20,
+        "total": 1,
+        "totalPages": 1,
+        "hasNextPage": false,
+        "hasPrevPage": false
+      }
     }
   }
   ```
@@ -186,7 +193,7 @@ Call this when popping/exiting the conversation screen.
           "attachments": [
             {
               "mediaId": "f2ff2731-e61e-4892-aa23-358bec791f43",
-              "url": "http://localhost:4000/api/v1/media/files/.../doc.pdf",
+              "url": "https://xprtlink-static.s3.us-west-2.amazonaws.com/c717f6e4.../document/f2ff2731.pdf?X-Amz-...",
               "mimeType": "application/pdf",
               "sizeBytes": 245120,
               "purpose": "chat_attachment"
@@ -195,7 +202,14 @@ Call this when popping/exiting the conversation screen.
           "createdAt": "2026-08-14T10:15:37.420Z"
         }
       ],
-      "pagination": { "page": 1, "limit": 50, "total": 1, "totalPages": 1 }
+      "pagination": {
+        "page": 1,
+        "limit": 50,
+        "total": 1,
+        "totalPages": 1,
+        "hasNextPage": false,
+        "hasPrevPage": false
+      }
     }
   }
   ```

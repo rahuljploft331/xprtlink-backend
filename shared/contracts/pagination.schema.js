@@ -4,22 +4,16 @@ export const paginationMetaSchema = z.object({
   page: z.number().int().positive(),
   limit: z.number().int().positive(),
   total: z.number().int().nonnegative(),
-  totalPages: z.number().int().positive().optional(),
-  hasNextPage: z.boolean().optional(),
-  hasPrevPage: z.boolean().optional(),
+  totalPages: z.number().int().positive(),
+  hasNextPage: z.boolean(),
+  hasPrevPage: z.boolean(),
 });
 
 /** @param {import('zod').ZodTypeAny} itemSchema */
 export function paginatedListSchema(itemSchema) {
   return z.object({
     items: z.array(itemSchema),
-    pagination: paginationMetaSchema.optional(),
-    page: z.number().int().positive(),
-    limit: z.number().int().positive(),
-    total: z.number().int().nonnegative(),
-    totalPages: z.number().int().positive().optional(),
-    hasNextPage: z.boolean().optional(),
-    hasPrevPage: z.boolean().optional(),
+    pagination: paginationMetaSchema,
   });
 }
 

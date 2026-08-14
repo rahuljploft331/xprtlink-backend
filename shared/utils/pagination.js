@@ -10,24 +10,15 @@ export function paginatedResult(items = [], { page = 1, limit = 20, total = 0 } 
   const hasNextPage = page * limit < total;
   const hasPrevPage = page > 1;
 
-  const paginationMeta = {
-    page,
-    limit,
-    total,
-    totalPages,
-    hasNextPage,
-    hasPrevPage,
-  };
-
   return {
     items,
-    pagination: paginationMeta,
-    // Top-level properties for maximum client convenience & backwards-compatibility
-    page,
-    limit,
-    total,
-    totalPages,
-    hasNextPage,
-    hasPrevPage,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages,
+      hasNextPage,
+      hasPrevPage,
+    },
   };
 }
