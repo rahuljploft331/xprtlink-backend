@@ -25,7 +25,7 @@
     body { background: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; display: flex; flex-direction: column; gap: 16px; }
     
     /* Header */
-    .top-header { text-align: center; margin-bottom: 4px; }
+    .top-header { text-align: center; margin-bottom: 2px; }
     .top-header h1 { font-size: 22px; color: #fff; font-weight: 700; letter-spacing: -0.02em; }
     .top-header p { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
 
@@ -65,6 +65,8 @@
     button.primary-btn:hover { background: #2563eb; }
     button.secondary-btn { background: #243049; color: #cbd5e1; }
     button.secondary-btn:hover { background: #334155; color: #fff; }
+    button.expert-btn { background: #10b981; color: #fff; }
+    button.expert-btn:hover { background: #059669; }
 
     /* Grid Layout */
     .chat-grid {
@@ -166,11 +168,26 @@
     }
 
     .typing-status {
-      font-size: 11px;
+      font-size: 12px;
       font-style: italic;
       color: #38bdf8;
-      min-height: 16px;
-      padding: 0 4px;
+      min-height: 20px;
+      padding: 2px 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #38bdf8;
+      animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.3; transform: scale(0.8); }
+      100% { opacity: 1; transform: scale(1.2); }
     }
 
     .send-row {
@@ -193,7 +210,7 @@
       margin-bottom: 8px;
     }
     .logs-content {
-      height: 130px;
+      height: 140px;
       background: #070a12;
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -228,10 +245,10 @@
 
     <div class="ctrl-group">
       <label>Conversation ID:</label>
-      <input id="sharedConvId" value="" placeholder="UUID / Click Create" style="width: 250px;" />
-      <button class="primary-btn" onclick="createOrLinkThread()">Create / Link Thread</button>
-      <button class="secondary-btn" onclick="connectBoth()">⚡ Connect Both</button>
+      <input id="sharedConvId" value="" placeholder="UUID of thread" style="width: 250px;" />
+      <button class="primary-btn" onclick="connectAndStartBoth()">⚡ Connect & Start Both</button>
       <button class="secondary-btn" onclick="joinBoth()">Join Both</button>
+      <button class="secondary-btn" onclick="disconnectBoth()">Disconnect Both</button>
     </div>
   </div>
 
@@ -243,7 +260,7 @@
       <div class="card-header">
         <div class="card-title customer">
           <span>👤 Customer Client</span>
-          <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Jordan Customer)</span>
+          <span id="custUserLabel" style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Jordan Customer)</span>
         </div>
         <span id="custBadge" class="status-badge">Disconnected</span>
       </div>
@@ -286,7 +303,7 @@
       <div class="card-header">
         <div class="card-title expert">
           <span>👨‍💼 Expert Client</span>
-          <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Jordan Expert)</span>
+          <span id="expUserLabel" style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Jordan Expert)</span>
         </div>
         <span id="expBadge" class="status-badge">Disconnected</span>
       </div>
@@ -301,7 +318,7 @@
       </div>
 
       <div style="display: flex; gap: 8px;">
-        <button id="expBtnConnect" class="primary-btn" style="background: #10b981;" onclick="connectExp()">Connect</button>
+        <button id="expBtnConnect" class="expert-btn" onclick="connectExp()">Connect</button>
         <button id="expBtnDisconnect" class="secondary-btn" onclick="disconnectExp()" disabled>Disconnect</button>
         <button class="secondary-btn" onclick="listConversationsExp()">My Threads</button>
         <button class="secondary-btn" onclick="joinExp()">Join Room</button>
@@ -319,7 +336,7 @@
           oninput="handleTyping('exp')"
           onkeydown="if(event.key==='Enter') sendExpMsg()"
         />
-        <button class="primary-btn" style="background: #10b981;" onclick="sendExpMsg()">Send</button>
+        <button class="expert-btn" onclick="sendExpMsg()">Send</button>
         <button class="secondary-btn" onclick="markReadExp()">Mark Read</button>
       </div>
     </div>
@@ -338,6 +355,7 @@
   <script>
     let socketCust = null;
     let socketExp = null;
+
     let custUserId = "c717f6e4-104f-4ade-b3c3-5d157cb306d3";
     let expUserId = "66009a47-87a2-42bf-80aa-de99add8aa8c";
     let expProfileId = "5768b787-261d-4c16-8640-b0287a3227d9";
@@ -365,11 +383,28 @@
       document.getElementById("logsBox").innerHTML = "";
     }
 
+    function parseJwt(token) {
+      try {
+        return JSON.parse(atob(token.split(".")[1]));
+      } catch (e) {
+        return null;
+      }
+    }
+
     /* CUSTOMER SOCKET */
-    function connectCust() {
+    function connectCust(callback) {
       const url = document.getElementById("globalUrl").value.trim();
       const token = document.getElementById("custToken").value.trim();
-      if (!token) return alert("Customer token required");
+      if (!token) {
+        alert("Customer token required");
+        return;
+      }
+
+      const payload = parseJwt(token);
+      if (payload?.sub) {
+        custUserId = payload.sub;
+        log("system", `Customer identity parsed from JWT: sub=${custUserId}`);
+      }
 
       log("customer", `Connecting to ${url}...`);
       socketCust = io(url, {
@@ -378,11 +413,19 @@
       });
 
       socketCust.on("connect", () => {
-        log("customer", `Connected! ID: ${socketCust.id}`);
+        log("customer", `Connected! Socket ID: ${socketCust.id}`);
         document.getElementById("custBadge").className = "status-badge connected";
         document.getElementById("custBadge").textContent = `Connected (${socketCust.id.slice(0, 5)})`;
         document.getElementById("custBtnConnect").disabled = true;
         document.getElementById("custBtnDisconnect").disabled = false;
+
+        // Auto join conversation if already set
+        const convId = document.getElementById("sharedConvId").value.trim();
+        if (convId) {
+          joinCust();
+        }
+
+        if (typeof callback === "function") callback();
       });
 
       socketCust.on("connect_error", (err) => {
@@ -397,22 +440,36 @@
         document.getElementById("custBtnDisconnect").disabled = true;
       });
 
+      // Realtime incoming message
       socketCust.on("message:new", (data) => {
         log("customer", "Received message:new", data);
         appendMsgTo("cust", data.message, custUserId, "mine-cust");
       });
 
+      // Read receipt
       socketCust.on("conversation:read", (data) => {
         log("customer", "Received conversation:read", data);
+        const area = document.getElementById("custChatArea");
+        const note = document.createElement("div");
+        note.style.cssText = "font-size: 11px; color: #64748b; text-align: center; margin: 4px 0;";
+        note.textContent = `✓ Read by peer at ${new Date(data.readAt).toLocaleTimeString()}`;
+        area.appendChild(note);
+        area.scrollTop = area.scrollHeight;
       });
 
       socketCust.on("conversation:updated", (data) => {
         log("customer", "Inbox alert: conversation:updated", data);
       });
 
+      // Peer typing indicator
       socketCust.on("typing:status", (data) => {
+        log("customer", "Received typing:status", data);
         const bar = document.getElementById("custTyping");
-        bar.textContent = data.isTyping ? "Expert is typing..." : "";
+        if (data.isTyping) {
+          bar.innerHTML = '<span class="pulse-dot"></span> Expert is typing...';
+        } else {
+          bar.innerHTML = "";
+        }
       });
     }
 
@@ -424,10 +481,20 @@
     }
 
     /* EXPERT SOCKET */
-    function connectExp() {
+    function connectExp(callback) {
       const url = document.getElementById("globalUrl").value.trim();
       const token = document.getElementById("expToken").value.trim();
-      if (!token) return alert("Expert token required");
+      if (!token) {
+        alert("Expert token required");
+        return;
+      }
+
+      const payload = parseJwt(token);
+      if (payload?.sub) {
+        expUserId = payload.sub;
+        if (payload.expertProfileId) expProfileId = payload.expertProfileId;
+        log("system", `Expert identity parsed from JWT: sub=${expUserId}, profile=${expProfileId}`);
+      }
 
       log("expert", `Connecting to ${url}...`);
       socketExp = io(url, {
@@ -436,11 +503,19 @@
       });
 
       socketExp.on("connect", () => {
-        log("expert", `Connected! ID: ${socketExp.id}`);
+        log("expert", `Connected! Socket ID: ${socketExp.id}`);
         document.getElementById("expBadge").className = "status-badge connected";
         document.getElementById("expBadge").textContent = `Connected (${socketExp.id.slice(0, 5)})`;
         document.getElementById("expBtnConnect").disabled = true;
         document.getElementById("expBtnDisconnect").disabled = false;
+
+        // Auto join conversation if already set
+        const convId = document.getElementById("sharedConvId").value.trim();
+        if (convId) {
+          joinExp();
+        }
+
+        if (typeof callback === "function") callback();
       });
 
       socketExp.on("connect_error", (err) => {
@@ -455,22 +530,36 @@
         document.getElementById("expBtnDisconnect").disabled = true;
       });
 
+      // Realtime incoming message
       socketExp.on("message:new", (data) => {
         log("expert", "Received message:new", data);
         appendMsgTo("exp", data.message, expUserId, "mine-exp");
       });
 
+      // Read receipt
       socketExp.on("conversation:read", (data) => {
         log("expert", "Received conversation:read", data);
+        const area = document.getElementById("expChatArea");
+        const note = document.createElement("div");
+        note.style.cssText = "font-size: 11px; color: #64748b; text-align: center; margin: 4px 0;";
+        note.textContent = `✓ Read by peer at ${new Date(data.readAt).toLocaleTimeString()}`;
+        area.appendChild(note);
+        area.scrollTop = area.scrollHeight;
       });
 
       socketExp.on("conversation:updated", (data) => {
         log("expert", "Inbox alert: conversation:updated", data);
       });
 
+      // Peer typing indicator
       socketExp.on("typing:status", (data) => {
+        log("expert", "Received typing:status", data);
         const bar = document.getElementById("expTyping");
-        bar.textContent = data.isTyping ? "Customer is typing..." : "";
+        if (data.isTyping) {
+          bar.innerHTML = '<span class="pulse-dot"></span> Customer is typing...';
+        } else {
+          bar.innerHTML = "";
+        }
       });
     }
 
@@ -481,24 +570,29 @@
       }
     }
 
-    /* BATCH OPERATIONS */
-    function connectBoth() {
-      connectCust();
-      connectExp();
+    function disconnectBoth() {
+      disconnectCust();
+      disconnectExp();
     }
 
-    function createOrLinkThread() {
-      if (!socketCust) {
-        alert("Please connect Customer socket first");
-        return;
-      }
-      log("customer", "Creating/getting conversation with expert...");
-      socketCust.emit("conversation:create", { expertId: expProfileId }, (res) => {
-        log("customer", "conversation:create response", res);
-        if (res.success && res.data?.id) {
-          document.getElementById("sharedConvId").value = res.data.id;
-          joinBoth();
-        }
+    /* ALL IN ONE CONNECT & START */
+    function connectAndStartBoth() {
+      // Connect customer first
+      connectCust(() => {
+        // Connect expert
+        connectExp(() => {
+          // Both connected: create/get conversation thread
+          log("system", "Both connected! Establishing conversation thread...");
+          socketCust.emit("conversation:create", { expertId: expProfileId }, (res) => {
+            log("customer", "conversation:create", res);
+            if (res.success && res.data?.id) {
+              const convId = res.data.id;
+              document.getElementById("sharedConvId").value = convId;
+              joinCust();
+              joinExp();
+            }
+          });
+        });
       });
     }
 
@@ -512,7 +606,9 @@
       if (!socketCust || !convId) return;
       socketCust.emit("conversation:join", { conversationId: convId }, (res) => {
         log("customer", "conversation:join", res);
-        if (res.success) loadHistory("cust", convId, custUserId, "mine-cust");
+        if (res.success) {
+          loadHistory("cust", convId, custUserId, "mine-cust");
+        }
       });
     }
 
@@ -521,17 +617,21 @@
       if (!socketExp || !convId) return;
       socketExp.emit("conversation:join", { conversationId: convId }, (res) => {
         log("expert", "conversation:join", res);
-        if (res.success) loadHistory("exp", convId, expUserId, "mine-exp");
+        if (res.success) {
+          loadHistory("exp", convId, expUserId, "mine-exp");
+        }
       });
     }
 
     function loadHistory(actor, convId, myId, myClass) {
       const s = actor === "cust" ? socketCust : socketExp;
+      if (!s) return;
       s.emit("message:history", { conversationId: convId, page: 1, limit: 50 }, (res) => {
+        log(actor, `message:history (${res.data?.items?.length || 0} messages)`);
         if (res.success) {
           const area = document.getElementById(actor + "ChatArea");
           area.innerHTML = "";
-          (res.data.items || []).reverse().forEach((msg) => {
+          (res.data.items || []).slice().reverse().forEach((msg) => {
             appendMsgTo(actor, msg, myId, myClass);
           });
         }
@@ -544,6 +644,7 @@
         log("customer", "conversation:list", res);
         if (res.success && res.data?.items?.length > 0) {
           document.getElementById("sharedConvId").value = res.data.items[0].id;
+          joinBoth();
         }
       });
     }
@@ -554,6 +655,7 @@
         log("expert", "conversation:list", res);
         if (res.success && res.data?.items?.length > 0) {
           document.getElementById("sharedConvId").value = res.data.items[0].id;
+          joinBoth();
         }
       });
     }
@@ -562,7 +664,9 @@
       const input = document.getElementById("custMsgInput");
       const convId = document.getElementById("sharedConvId").value.trim();
       const body = input.value.trim();
-      if (!socketCust || !convId || !body) return;
+      if (!socketCust) return alert("Connect Customer socket first");
+      if (!convId) return alert("Please specify or Create a Conversation ID");
+      if (!body) return;
 
       socketCust.emit("message:send", { conversationId: convId, body }, (res) => {
         log("customer", "message:send", res);
@@ -577,7 +681,9 @@
       const input = document.getElementById("expMsgInput");
       const convId = document.getElementById("sharedConvId").value.trim();
       const body = input.value.trim();
-      if (!socketExp || !convId || !body) return;
+      if (!socketExp) return alert("Connect Expert socket first");
+      if (!convId) return alert("Please specify or Create a Conversation ID");
+      if (!body) return;
 
       socketExp.emit("message:send", { conversationId: convId, body }, (res) => {
         log("expert", "message:send", res);
@@ -611,7 +717,10 @@
 
       if (actor === "cust") {
         if (forceStop) {
-          if (custIsTyping) { s.emit("typing:stop", { conversationId: convId }); custIsTyping = false; }
+          if (custIsTyping) {
+            s.emit("typing:stop", { conversationId: convId });
+            custIsTyping = false;
+          }
           return;
         }
         if (!custIsTyping) {
@@ -625,7 +734,10 @@
         }, 2000);
       } else {
         if (forceStop) {
-          if (expIsTyping) { s.emit("typing:stop", { conversationId: convId }); expIsTyping = false; }
+          if (expIsTyping) {
+            s.emit("typing:stop", { conversationId: convId });
+            expIsTyping = false;
+          }
           return;
         }
         if (!expIsTyping) {
@@ -642,6 +754,7 @@
 
     function appendMsgTo(actor, msg, myId, myClass) {
       const area = document.getElementById(actor + "ChatArea");
+      if (!area) return;
       const isMine = msg.senderUserId === myId;
       const bubble = document.createElement("div");
       bubble.className = `msg-bubble ${isMine ? myClass : "theirs"}`;
@@ -657,7 +770,7 @@
       return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    // Auto load thread if available
+    // Auto set default thread ID on page load
     window.addEventListener("DOMContentLoaded", () => {
       document.getElementById("sharedConvId").value = "a6e13d67-1c28-4e73-a22f-c15ec9a2684b";
     });
