@@ -1,4 +1,5 @@
 import { getDb } from "@xprtlink/shared/db";
+import crypto from "crypto";
 
 /**
  * ZegoCloud Callback Event Handlers.
@@ -161,6 +162,57 @@ async function handleRoomClose(payload) {
     `(duration=${durationSeconds}s, connected=${wasConnected})`
   );
 
-  // TODO: Trigger billing charge calculation here
+  // Basic billing amount calculation
+  let totalCents = 0;
+  let expertShareCents = 0;
+  let commissionCents = 0;
+
+  if (wasConnected && durationSeconds > 0) {
+    const minutes = Math.ceil(durationSeconds / 60);
+    totalCents = minutes * consultation.ratePerMinuteCents;
+    
+    // Default 15% commission
+    commissionCents = Math.round(totalCents * 0.15);
+    expertShareCents = totalCents - commissionCents;
+
+    // Simulate transaction and charge creation (in production, integrate with billing-service/Stripe here)
+    const transactionId = crypto.randomUUID();
+    
+    await db.transaction.create({
+      data: {
+        id: transactionId,
+        type: "charge",
+        status: "succeeded",
+        amountCents: totalCents,
+        currency: "USD",
+        metadata: { consultationId: consultation.id },
+      },
+    });
+
+    await db.consultationCharge.create({
+      data: {
+        consultationId: consultation.id,
+        transactionId: transactionId,
+        commissionCents: commissionCents,
+        expertShareCents: expertShareCents,
+      },
+    });
+
+    await db.expertEarningsLedger.create({
+      data: {
+        expertProfileId: consultation.expertId,
+        consultationId: consultation.id,
+        grossCents: totalCents,
+        commissionCents: commissionCents,
+        netCents: expertShareCents,
+      },
+    });
+
+    await db.consultation.update({
+      where: { id: consultation.id },
+      data: { billingStatus: "succeeded" },
+    });
+  }
+
   // TODO: Send push notification to both participants
 }
