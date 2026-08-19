@@ -1,5 +1,6 @@
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import { hasPermission } from "#middlewares/adminAuth.js";
 
 const MAX_PER_GROUP = 5;
 
@@ -18,6 +19,12 @@ export async function globalSearch(req, res, next) {
 
     const db = getDb();
     const ci = { mode: "insensitive" };
+
+    // Admin accounts are only searchable by callers who actually have
+    // "admins" module access (i.e. super_admin — the admins module is not
+    // delegable to subadmins). A dashboard-view permission on this route
+    // must not be usable to enumerate admin users.
+    const canViewAdmins = hasPermission(req.adminUser, "admins", "view");
 
     const [
       customers,
@@ -88,16 +95,18 @@ export async function globalSearch(req, res, next) {
         },
       }),
 
-      // Admins — match name or email
-      db.adminUser.findMany({
-        where: {
-          OR: [
-            { name: { contains: q, ...ci } },
-            { email: { contains: q, ...ci } },
-          ],
-        },
-        take: MAX_PER_GROUP,
-      }),
+      // Admins — match name or email (only when caller has admins:view)
+      canViewAdmins
+        ? db.adminUser.findMany({
+            where: {
+              OR: [
+                { name: { contains: q, ...ci } },
+                { email: { contains: q, ...ci } },
+              ],
+            },
+            take: MAX_PER_GROUP,
+          })
+        : Promise.resolve([]),
     ]);
 
     const groups = [];

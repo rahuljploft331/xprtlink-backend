@@ -8,13 +8,18 @@ import { auditLogs } from "@xprtlink/shared/db/repositories/admin/index.js";
  */
 export async function logAdminAction(req, action, entityType, entityId, payload = {}) {
   try {
+    // Callers often spread partial request bodies (e.g. { name, status } from
+    // a PATCH where only one field was sent) straight into payload — strip
+    // undefined values so the Json column always gets a clean object.
+    const cleanPayload = JSON.parse(JSON.stringify(payload ?? {}));
+
     await auditLogs().create({
       data: {
         actorAdminId: req.adminUser.id,
         action,
         entityType,
         entityId: entityId != null ? String(entityId) : null,
-        payload,
+        payload: cleanPayload,
         ipAddress: req.ip,
       },
     });
