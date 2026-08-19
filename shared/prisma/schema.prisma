@@ -229,6 +229,15 @@ enum AdminPermissionLevel {
   @@map("admin_permission_level")
 }
 
+enum SupportTicketStatus {
+  open
+  in_progress
+  resolved
+  closed
+
+  @@map("support_ticket_status")
+}
+
 // ─── Identity (user-service) ─────────────────────────────────────────────────
 
 model User {
@@ -257,6 +266,7 @@ model User {
   messagesSent     Message[]              @relation("MessageSender")
   conversationReads ConversationReadState[]
   quoteStatusEvents QuoteStatusEvent[]   @relation("QuoteStatusActor")
+  supportTickets    SupportTicket[]
 
   @@index([status])
   @@map("users")
@@ -453,6 +463,25 @@ model SubscriptionPlan {
   subscriptions      ExpertSubscription[]
 
   @@map("subscription_plans")
+}
+
+model SupportTicket {
+  id             String              @id @default(uuid()) @db.Uuid
+  userId         String              @map("user_id") @db.Uuid
+  subject        String              @db.VarChar(200)
+  body           String
+  category       String              @db.VarChar(64)
+  status         SupportTicketStatus @default(open)
+  resolutionNote String?             @map("resolution_note")
+  resolvedAt     DateTime?           @map("resolved_at") @db.Timestamptz(6)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("support_tickets")
 }
 
 // ─── Experts (expert-service) ───────────────────────────────────────────────

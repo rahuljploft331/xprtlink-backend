@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { hashPassword } from "@xprtlink/shared/auth/password.js";
@@ -10,7 +11,8 @@ import {
 } from "@xprtlink/shared/contracts/admin.schema.js";
 import { toAdminUserDto } from "@xprtlink/shared/mappers/admin.mapper.js";
 import { logAdminAction } from "#utils/audit.js";
-import { notFound } from "@xprtlink/shared/utils/errors.js";
+import { notFound, badRequest } from "@xprtlink/shared/utils/errors.js";
+import { sendEmail } from "@xprtlink/shared/lib/email.js";
 
 export async function list(req, res, next) {
   try {
@@ -60,6 +62,39 @@ export async function update(req, res, next) {
     });
     await logAdminAction(req, "admin.update", "AdminUser", admin.id, { name, status });
     return ResponseFormatter.success(res, { data: toAdminUserDto(admin) });
+  } catch (err) { next(err); }
+}
+
+function generateTempPassword() {
+  // 12 chars, mixed alphanumeric — avoids visually ambiguous chars.
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+  const bytes = crypto.randomBytes(12);
+  return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("");
+}
+
+export async function resetPassword(req, res, next) {
+  try {
+    const admin = await adminUsers().findUnique({ where: { id: req.params.id } });
+    if (!admin) throw notFound("Admin not found");
+    if (admin.role === "super_admin") {
+      throw badRequest("Super admin passwords can't be reset from here", "NOT_SUPPORTED");
+    }
+
+    const tempPassword = generateTempPassword();
+    await adminUsers().update({
+      where: { id: admin.id },
+      data: { passwordHash: await hashPassword(tempPassword) },
+    });
+
+    await sendEmail({
+      to: admin.email,
+      subject: "Your XprtLink admin password has been reset",
+      text: `Hi ${admin.name},\n\nYour XprtLink admin password was reset by a super admin. Your new temporary password is:\n\n${tempPassword}\n\nPlease sign in and change it as soon as possible.`,
+      html: `<p>Hi ${admin.name},</p><p>Your XprtLink admin password was reset by a super admin. Your new temporary password is:</p><p style="font-size:18px;font-weight:600;letter-spacing:1px;">${tempPassword}</p><p>Please sign in and change it as soon as possible.</p>`,
+    });
+
+    await logAdminAction(req, "admin.password_reset", "AdminUser", admin.id, { email: admin.email });
+    return ResponseFormatter.success(res, { message: `Password reset. New password sent to ${admin.email}.` });
   } catch (err) { next(err); }
 }
 

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { list, getById, create, update, setPermissions } from "#controllers/admins.controller.js";
+import { list, getById, create, update, setPermissions, resetPassword } from "#controllers/admins.controller.js";
 import { requireAdmin, requireSuperAdmin } from "#middlewares/adminAuth.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 const router = Router();
@@ -9,4 +9,5 @@ router.post("/", asyncHandler(create));
 router.get("/:id", asyncHandler(getById));
 router.patch("/:id", asyncHandler(update));
 router.put("/:id/permissions", asyncHandler(setPermissions));
+router.put("/:id/reset-password", asyncHandler(resetPassword));
 export default router;

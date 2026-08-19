@@ -162,3 +162,10 @@ export const ADMIN_PERMISSION_LEVEL = {
   VIEW: "view",
   EDIT: "edit",
 };
+
+export const SUPPORT_TICKET_STATUS = {
+  OPEN: "open",
+  IN_PROGRESS: "in_progress",
+  RESOLVED: "resolved",
+  CLOSED: "closed",
+};
