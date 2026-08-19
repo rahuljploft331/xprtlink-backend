@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { generateZegoToken } from "@xprtlink/shared/lib/zegoToken.js";
 import { getDb } from "@xprtlink/shared/db";
+import { consultationCharges } from "@xprtlink/shared/db/repositories/billing/index.js";
 import { amountToCents } from "@xprtlink/shared/mappers/common.js";
 import {
   toQuoteSummaryDto,
@@ -501,7 +502,7 @@ export async function getBillingSummary(auth, consultationId) {
     throw badRequest("Billing summary is available after consultation ends", "INVALID_STATUS");
   }
 
-  const charge = await getDb().consultationCharge.findUnique({
+  const charge = await consultationCharges().findUnique({
     where: { consultationId },
   });
 
