@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { list, getById, create, update, setPermissions } from "#controllers/admins.controller.js";
-import { requireAdmin } from "#middlewares/adminAuth.js";
+import { requireAdmin, requireSuperAdmin } from "#middlewares/adminAuth.js";
 const router = Router();
-router.use(requireAdmin);
+router.use(requireAdmin, requireSuperAdmin);
 router.get("/", list);
 router.post("/", create);
 router.get("/:id", getById);

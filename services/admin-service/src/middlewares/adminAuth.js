@@ -61,3 +61,14 @@ export function requirePermission(module, level = "view") {
     next();
   };
 }
+
+/**
+ * Express middleware — restrict a route to super_admin only.
+ * Must run after requireAdmin (relies on req.adminUser).
+ */
+export function requireSuperAdmin(req, _res, next) {
+  if (req.adminUser?.role !== "super_admin") {
+    return next(forbidden("Super admin access required"));
+  }
+  next();
+}
