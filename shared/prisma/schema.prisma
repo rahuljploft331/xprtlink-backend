@@ -284,6 +284,7 @@ model CustomerProfile {
   expertReports   ExpertReport[]
   reviews         Review[]
 
+  @@index([avatarMediaId])
   @@map("customer_profiles")
 }
 
@@ -541,6 +542,7 @@ model ExpertVerificationDocument {
   media            MediaAsset          @relation(fields: [mediaId], references: [id], onDelete: Restrict)
 
   @@index([verificationId])
+  @@index([mediaId])
   @@map("expert_verification_documents")
 }
 
@@ -613,6 +615,7 @@ model QuoteAttachment {
   media     MediaAsset   @relation(fields: [mediaId], references: [id], onDelete: Restrict)
 
   @@unique([quoteId, mediaId])
+  @@index([mediaId])
   @@map("quote_attachments")
 }
 
@@ -719,6 +722,7 @@ model Message {
   readStates       ConversationReadState[] @relation("LastReadMessage")
 
   @@index([conversationId, createdAt])
+  @@index([senderUserId])
   @@map("messages")
 }
 
@@ -732,6 +736,7 @@ model MessageAttachment {
   media     MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Restrict)
 
   @@unique([messageId, mediaId])
+  @@index([mediaId])
   @@map("message_attachments")
 }
 
@@ -845,6 +850,7 @@ model ExpertSubscription {
   @@unique([store, externalSubscriptionId])
   @@index([expertProfileId])
   @@index([status])
+  @@index([planId])
   @@map("expert_subscriptions")
 }
 
