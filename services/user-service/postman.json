@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "f5b66d80-5a3d-4c3e-8848-12cd80a1c6a1",
+    "_postman_id": "ea16c2da-ed0f-4b72-9796-12cac4fafa35",
     "name": "User Service",
     "description": "REST APIs for registration (2-step OTP flow), login, OTP validation, password management, social auth, and customer profile/discoveries.\n\n**Registration (2 steps):**\n1. POST /auth/register — requires email + phone (E.164), confirmPassword, termsAccepted, MFS password rules\n2. POST /auth/otp/verify { purpose: register } → auth tokens\n\n**Social signup (when phone missing):**\n1. POST /auth/social → may return completionToken\n2. POST /auth/social/complete → OTP to phone\n3. POST /auth/otp/verify { purpose: verify_phone } → auth tokens",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
@@ -90,7 +90,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "login"]
             },
-            "description": "Log in and obtain access & refresh tokens.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead)."
+            "description": "Log in and obtain access & refresh tokens.\n\nIf using `email`, `password` is required and tokens are returned instantly.\nIf using `phone`, `password` is optional. The API will generate an OTP and return `{ needsOtp: true, ... }` instead of tokens. The mobile app must then call `/auth/otp/verify` with `purpose: login`.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead)."
           }
         },
         {
@@ -182,7 +182,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "otp", "verify"]
             },
-            "description": "Verify an OTP code.\n\nField is 'code', NOT 'otp'.\n\nBehaviour by purpose:\n- 'register'       → returns auth tokens (see 'Register — Step 2')\n- 'verify_email'   → stamps emailVerifiedAt, returns { verified: true }\n- 'verify_phone'   → stamps phoneVerifiedAt, returns { verified: true }\n- 'reset_password' → validates code only, returns { verified: true }"
+            "description": "Verify an OTP code.\n\nField is 'code', NOT 'otp'.\n\nBehaviour by purpose:\n- 'register'       → returns auth tokens (see 'Register — Step 2')\n- 'login'          → returns auth tokens (used after phone login)\n- 'verify_email'   → stamps emailVerifiedAt, returns { verified: true }\n- 'verify_phone'   → stamps phoneVerifiedAt, returns { verified: true }\n- 'reset_password' → validates code only, returns { verified: true }"
           }
         },
         {
@@ -303,14 +303,14 @@
             "header": [{ "key": "Content-Type", "value": "application/json" }],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone\": \"+14155552671\",\n  \"password\": \"Password123!\",\n  \"role\": \"customer\"\n}"
+              "raw": "{\n  \"phone\": \"+14155552671\",\n  \"role\": \"customer\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/login",
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "login"]
             },
-            "description": "Log in with mobile number (E.164) + password."
+            "description": "Log in with mobile number (E.164). Password is not required. This triggers an OTP SMS and returns `{ needsOtp: true, ... }`."
           }
         },
         {

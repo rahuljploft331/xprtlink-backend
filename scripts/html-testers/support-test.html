@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Support Chat Tester (Flutter Simulator)</title>
+  <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 20px; background: #f3f4f6; }
+    .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); display: flex; flex-direction: column; height: 90vh; }
+    .header { padding: 20px; border-bottom: 1px solid #e5e7eb; background: #3b82f6; color: white; border-radius: 12px 12px 0 0; }
+    .header h2 { margin: 0 0 10px 0; font-size: 18px; }
+    
+    /* Login / Setup section */
+    .setup-panel { padding: 20px; border-bottom: 1px solid #e5e7eb; background: #f8fafc; }
+    .input-group { margin-bottom: 10px; }
+    .input-group label { display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #64748b; }
+    .input-group input { width: 100%; padding: 8px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; }
+    button { background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600; }
+    button:hover { background: #2563eb; }
+    button:disabled { background: #94a3b8; cursor: not-allowed; }
+    
+    /* Chat section */
+    .chat-container { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 10px; }
+    .message { max-width: 80%; padding: 10px 14px; border-radius: 16px; font-size: 14px; }
+    .message.user { background: #3b82f6; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .message.admin { background: #f1f5f9; color: #1e293b; align-self: flex-start; border-bottom-left-radius: 4px; }
+    
+    .input-area { padding: 15px; border-top: 1px solid #e5e7eb; display: flex; gap: 10px; }
+    .input-area input { flex: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 20px; outline: none; }
+    .input-area input:focus { border-color: #3b82f6; }
+    
+    .status { font-size: 12px; margin-top: 10px; display: flex; align-items: center; gap: 5px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: #ef4444; }
+    .dot.connected { background: #22c55e; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <div class="header">
+      <h2>Mobile App Support Simulator</h2>
+      <div class="status">
+        <div id="statusDot" class="dot"></div>
+        <span id="statusText">Disconnected</span>
+      </div>
+    </div>
+
+    <!-- Login section -->
+    <div class="setup-panel" id="loginPanel">
+      <h3>1. Login to get token</h3>
+      <div class="input-group">
+        <label>Email</label>
+        <input type="email" id="emailInput" placeholder="user@example.com" value="user@example.com">
+      </div>
+      <div class="input-group">
+        <label>Password</label>
+        <input type="password" id="passwordInput" placeholder="password123" value="password123">
+      </div>
+      <button id="loginBtn" onclick="login()">Login</button>
+      <div id="loginError" style="color: red; font-size: 12px; margin-top: 10px;"></div>
+    </div>
+
+    <!-- Token Entry -->
+    <div class="setup-panel" id="setupPanel">
+      <h3>2. Connect to Support Chat</h3>
+      <div class="input-group">
+        <label>User JWT Token (Auto-filled on login)</label>
+        <input type="text" id="jwtToken" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+      </div>
+      <div style="display: flex; gap: 10px;">
+        <button id="connectBtn" onclick="connect()">Connect to Last Ticket</button>
+        <button id="newTicketBtn" onclick="createNewTicket()" style="background: #10b981;">Create New Ticket</button>
+      </div>
+    </div>
+
+    <!-- Chat Interface -->
+    <div class="chat-container">
+      <div class="messages" id="messagesArea">
+        <div style="text-align: center; color: #94a3b8; font-size: 12px; margin-top: 20px;">
+          Enter a valid token and connect to start chatting
+        </div>
+      </div>
+      <div class="input-area">
+        <input type="text" id="messageInput" placeholder="Type a message..." disabled onkeypress="handleKeyPress(event)">
+        <button id="sendBtn" onclick="sendMessage()" disabled>Send</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_URL = 'http://localhost:4000/api/v1';
+    const WS_URL = 'ws://localhost:4000/support';
+    
+    let socket = null;
+    let activeConversationId = null;
+
+    const emailInput = document.getElementById('emailInput');
+    const passwordInput = document.getElementById('passwordInput');
+    const loginBtn = document.getElementById('loginBtn');
+    const loginError = document.getElementById('loginError');
+
+    const tokenInput = document.getElementById('jwtToken');
+    const connectBtn = document.getElementById('connectBtn');
+    const newTicketBtn = document.getElementById('newTicketBtn');
+    const messageInput = document.getElementById('messageInput');
+    const sendBtn = document.getElementById('sendBtn');
+    const messagesArea = document.getElementById('messagesArea');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+
+    function updateStatus(connected) {
+      if (connected) {
+        statusDot.className = 'dot connected';
+        statusText.innerText = 'Connected';
+        messageInput.disabled = false;
+        sendBtn.disabled = false;
+        tokenInput.disabled = true;
+        connectBtn.disabled = true;
+        connectBtn.innerText = 'Connected';
+      } else {
+        statusDot.className = 'dot';
+        statusText.innerText = 'Disconnected';
+        messageInput.disabled = true;
+        sendBtn.disabled = true;
+        tokenInput.disabled = false;
+        connectBtn.disabled = false;
+        newTicketBtn.disabled = false;
+        connectBtn.innerText = 'Connect to Last Ticket';
+      }
+    }
+
+    function addMessage(text, sender) {
+      const div = document.createElement('div');
+      div.className = `message ${sender}`;
+      div.innerText = text;
+      messagesArea.appendChild(div);
+      messagesArea.scrollTop = messagesArea.scrollHeight;
+    }
+
+    async function login() {
+      const email = emailInput.value.trim();
+      const password = passwordInput.value.trim();
+      if (!email || !password) return;
+
+      loginBtn.disabled = true;
+      loginError.innerText = '';
+
+      try {
+        const res = await fetch(`${API_URL}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password, role: 'customer' }) // assuming customer, adjust if needed
+        });
+        const data = await res.json();
+        
+        if (data.success) {
+          tokenInput.value = data.data.accessToken;
+          loginError.style.color = 'green';
+          loginError.innerText = 'Login successful! Now click Connect.';
+        } else {
+          // If customer login fails, try expert login
+          const expertRes = await fetch(`${API_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, role: 'expert' })
+          });
+          const expertData = await expertRes.json();
+          if (expertData.success) {
+            tokenInput.value = expertData.data.accessToken;
+            loginError.style.color = 'green';
+            loginError.innerText = 'Login successful (Expert)! Now click Connect.';
+          } else {
+            loginError.style.color = 'red';
+            loginError.innerText = data.message || 'Login failed';
+          }
+        }
+      } catch (err) {
+        loginError.style.color = 'red';
+        loginError.innerText = err.message;
+      } finally {
+        loginBtn.disabled = false;
+      }
+    }
+
+    function connect() {
+      const token = tokenInput.value.trim();
+      if (!token) return alert("Please enter a JWT token first.");
+
+      messagesArea.innerHTML = ''; // clear old messages
+
+      // Connect to the specific namespace
+      socket = io(WS_URL, {
+        auth: { token },
+        transports: ['websocket']
+      });
+
+      socket.on('connect', () => {
+        console.log('Connected to socket server');
+        updateStatus(true);
+        
+        // Emulate Flutter connecting and requesting chat history
+        socket.emit('support:connect', {}, (res) => {
+          if (res.success) {
+            activeConversationId = res.data.conversation.id;
+            const msgs = res.data.messages.items.reverse(); // oldest first
+            
+            if (msgs.length === 0) {
+              addMessage("Hi! How can we help you today?", "admin");
+            } else {
+              msgs.forEach(m => {
+                addMessage(m.body, m.senderAdminId ? 'admin' : 'user');
+              });
+              }
+            } else {
+              addMessage(`Error: ${res.message}`, "admin");
+            }
+          });
+        });
+
+        socket.on('disconnect', () => {
+        updateStatus(false);
+        activeConversationId = null;
+      });
+
+      // Listen for incoming messages from Admin
+      socket.on('support:message:new', (payload) => {
+        const msg = payload.message;
+        // If senderAdminId exists, it's from the admin. Otherwise, it's our own echo.
+        if (msg.senderAdminId) {
+          addMessage(msg.body, "admin");
+        }
+      });
+
+      socket.on('support:conversation:resolved', () => {
+        addMessage("--- Support has marked this conversation as resolved ---", "admin");
+      });
+    }
+
+    function createNewTicket() {
+      const token = tokenInput.value.trim();
+      if (!token) return alert("Please enter a JWT token first.");
+
+      messagesArea.innerHTML = ''; // clear old messages
+
+      if (socket) {
+        socket.disconnect();
+      }
+
+      socket = io(WS_URL, {
+        auth: { token },
+        transports: ['websocket']
+      });
+
+      socket.on('connect', () => {
+        console.log('Connected to socket server');
+        updateStatus(true);
+        
+        socket.emit('support:ticket:create', {}, (res) => {
+          if (res.success) {
+            activeConversationId = res.data.conversation.id;
+            addMessage("--- New Ticket Created ---", "admin");
+            addMessage("Hi! How can we help you today?", "admin");
+          } else {
+            addMessage(`Error: ${res.message}`, "admin");
+          }
+        });
+      });
+
+      socket.on('disconnect', () => {
+        updateStatus(false);
+        activeConversationId = null;
+      });
+
+      socket.on('support:message:new', (payload) => {
+        const msg = payload.message;
+        if (msg.senderAdminId) {
+          addMessage(msg.body, "admin");
+        }
+      });
+
+      socket.on('support:conversation:resolved', () => {
+        addMessage("--- Support has marked this conversation as resolved ---", "admin");
+      });
+    }
+
+    function sendMessage() {
+      const text = messageInput.value.trim();
+      if (!text || !activeConversationId || !socket) return;
+
+      // Optimistic UI update
+      addMessage(text, "user");
+      messageInput.value = '';
+
+      // Send to server
+      socket.emit('support:message:send', {
+        conversationId: activeConversationId,
+        body: text
+      }, (res) => {
+        if (!res.success) {
+          addMessage(`Failed to send: ${res.message}`, "admin");
+        }
+      });
+    }
+
+    function handleKeyPress(e) {
+      if (e.key === 'Enter') {
+        sendMessage();
+      }
+    }
+  </script>
+</body>
+</html>
