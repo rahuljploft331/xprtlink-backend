@@ -192,6 +192,7 @@ enum PayoutStatus {
 
 enum OtpPurpose {
   register
+  login
   reset_password
   verify_email
   verify_phone
