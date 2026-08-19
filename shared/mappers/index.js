@@ -8,3 +8,4 @@ export * from "./messaging.mapper.js";
 export * from "./billing.mapper.js";
 export * from "./notification.mapper.js";
 export * from "./media.mapper.js";
+export * from "./admin.mapper.js";

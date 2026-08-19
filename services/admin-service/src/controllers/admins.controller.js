@@ -8,6 +8,7 @@ import {
   updateAdminSchema,
   setPermissionsSchema,
 } from "@xprtlink/shared/contracts/admin.schema.js";
+import { toAdminUserDto } from "@xprtlink/shared/mappers/admin.mapper.js";
 
 export async function list(req, res, next) {
   try {
@@ -19,10 +20,7 @@ export async function list(req, res, next) {
         include: { permissions: true },
       }),
     ]);
-    const safe = items.map(({ passwordHash: _ph, ...a }) => ({
-      ...a,
-      permissionsMap: a.permissions.reduce((acc, p) => { acc[p.module] = p.level; return acc; }, {}),
-    }));
+    const safe = items.map(toAdminUserDto);
     return ResponseFormatter.paginated(res, { items: safe, page, limit, total });
   } catch (err) { next(err); }
 }
@@ -33,8 +31,7 @@ export async function getById(req, res, next) {
       where: { id: req.params.id }, include: { permissions: true },
     });
     if (!admin) return res.status(404).json({ success: false, message: "Not found", code: "NOT_FOUND" });
-    const { passwordHash: _ph, ...safe } = admin;
-    return ResponseFormatter.success(res, { data: safe });
+    return ResponseFormatter.success(res, { data: toAdminUserDto(admin) });
   } catch (err) { next(err); }
 }
 
@@ -44,9 +41,9 @@ export async function create(req, res, next) {
     const passwordHash = await hashPassword(password);
     const admin = await adminUsers().create({
       data: { name, email: email.toLowerCase(), passwordHash, role },
+      include: { permissions: true },
     });
-    const { passwordHash: _ph, ...safe } = admin;
-    return ResponseFormatter.success(res, { data: safe, status: 201 });
+    return ResponseFormatter.success(res, { data: toAdminUserDto(admin), status: 201 });
   } catch (err) { next(err); }
 }
 
@@ -56,9 +53,9 @@ export async function update(req, res, next) {
     const admin = await adminUsers().update({
       where: { id: req.params.id },
       data: { ...(name ? { name } : {}), ...(status ? { status } : {}) },
+      include: { permissions: true },
     });
-    const { passwordHash: _ph, ...safe } = admin;
-    return ResponseFormatter.success(res, { data: safe });
+    return ResponseFormatter.success(res, { data: toAdminUserDto(admin) });
   } catch (err) { next(err); }
 }
 
