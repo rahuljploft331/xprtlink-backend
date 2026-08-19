@@ -16,6 +16,7 @@ import cmsRoutes from "./cms.routes.js";
 import adminsRoutes from "./admins.routes.js";
 import notificationsRoutes from "./notifications.routes.js";
 import reportsRoutes from "./reports.routes.js";
+import eventsRoutes from "./events.routes.js";
 
 const router = Router();
 
@@ -39,6 +40,6 @@ router.use("/cms", cmsRoutes);
 router.use("/admins", adminsRoutes);
 router.use("/notifications", notificationsRoutes);
 router.use("/reports", reportsRoutes);
+router.use("/events", eventsRoutes);
 
 export default router;
-
