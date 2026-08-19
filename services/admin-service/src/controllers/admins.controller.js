@@ -9,6 +9,7 @@ import {
   setPermissionsSchema,
 } from "@xprtlink/shared/contracts/admin.schema.js";
 import { toAdminUserDto } from "@xprtlink/shared/mappers/admin.mapper.js";
+import { logAdminAction } from "#utils/audit.js";
 
 export async function list(req, res, next) {
   try {
@@ -43,6 +44,7 @@ export async function create(req, res, next) {
       data: { name, email: email.toLowerCase(), passwordHash, role },
       include: { permissions: true },
     });
+    await logAdminAction(req, "admin.create", "AdminUser", admin.id, { name, email: admin.email, role });
     return ResponseFormatter.success(res, { data: toAdminUserDto(admin), status: 201 });
   } catch (err) { next(err); }
 }
@@ -55,6 +57,7 @@ export async function update(req, res, next) {
       data: { ...(name ? { name } : {}), ...(status ? { status } : {}) },
       include: { permissions: true },
     });
+    await logAdminAction(req, "admin.update", "AdminUser", admin.id, { name, status });
     return ResponseFormatter.success(res, { data: toAdminUserDto(admin) });
   } catch (err) { next(err); }
 }
@@ -72,6 +75,7 @@ export async function setPermissions(req, res, next) {
         })
       )
     );
+    await logAdminAction(req, "admin.setPermissions", "AdminUser", req.params.id, { permissions });
     return ResponseFormatter.success(res, { message: "Permissions updated" });
   } catch (err) { next(err); }
 }

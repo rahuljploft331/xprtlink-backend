@@ -1,5 +1,6 @@
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import { logAdminAction } from "#utils/audit.js";
 
 export async function list(_req, res, next) {
   try {
@@ -31,6 +32,7 @@ export async function update(req, res, next) {
         updatedByAdminId: req.adminUser.id,
       },
     });
+    await logAdminAction(req, "cms.update", "CmsPage", page.id, { slug: page.slug, title, status });
     return ResponseFormatter.success(res, { message: "Page updated", data: page });
   } catch (err) { next(err); }
 }

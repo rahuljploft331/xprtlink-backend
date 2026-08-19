@@ -1,6 +1,7 @@
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
+import { logAdminAction } from "#utils/audit.js";
 
 /** GET /api/v1/admin/verifications */
 export async function list(req, res, next) {
@@ -97,6 +98,9 @@ export async function approve(req, res, next) {
       return v;
     });
 
+    await logAdminAction(req, "verification.approve", "ExpertVerification", result.id, {
+      notes: req.body?.notes ?? null,
+    });
     return ResponseFormatter.success(res, { message: "Verification approved", data: result });
   } catch (err) {
     next(err);
@@ -118,6 +122,9 @@ export async function reject(req, res, next) {
     await db.expertProfile.update({
       where: { id: v.expertProfileId },
       data: { verificationStatus: "rejected" },
+    });
+    await logAdminAction(req, "verification.reject", "ExpertVerification", v.id, {
+      notes: req.body?.notes ?? null,
     });
     return ResponseFormatter.success(res, { message: "Verification rejected", data: v });
   } catch (err) {
