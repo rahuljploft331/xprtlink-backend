@@ -514,6 +514,17 @@ export async function getTransaction(auth, transactionId) {
   return toTransactionDto(tx);
 }
 
+/**
+ * Internal-only: return the ConsultationCharge for a given consultation.
+ * Called by engagement-service via the internal GET /consultations/:id/charge endpoint.
+ * Returns null if no charge exists yet (pre-billing state).
+ */
+export async function getConsultationCharge(consultationId) {
+  return getDb().consultationCharge.findUnique({
+    where: { consultationId },
+  });
+}
+
 export async function listSubscriptionPlans() {
   const plans = await getDb().subscriptionPlan.findMany({
     where: { isActive: true },

@@ -47,6 +47,23 @@ router.post(
   })
 );
 
+/**
+ * GET /api/v1/billing/consultations/:id/charge
+ * Internal-only — called by engagement-service to retrieve the charge breakdown
+ * for a completed consultation without crossing the DB boundary.
+ * Guarded by x-internal-service header.
+ */
+router.get(
+  "/consultations/:id/charge",
+  asyncHandler(async (req, res) => {
+    if (!req.headers["x-internal-service"]) {
+      return res.status(403).json({ success: false, message: "Internal endpoint" });
+    }
+    const data = await svc.getConsultationCharge(req.params.id);
+    return ResponseFormatter.success(res, { data });
+  })
+);
+
 
 router.use(authenticate);
 

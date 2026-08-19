@@ -40,7 +40,10 @@ export async function getSession(req) {
 // Step 2 → POST /auth/otp/verify  { purpose: "register" }
 //   Verifies OTP, creates profile, activates account, issues tokens.
 
-const claimedAvailabilityFilter = { status: { notIn: ["pending_verification", "deleted"] } };
+const claimedAvailabilityFilter = {
+  status: { notIn: ["pending_verification", "deleted"] },
+  deletedAt: null,
+};
 
 async function assertIdentifierAvailable({ email, phone, excludeUserId }) {
   const db = getDb();

@@ -824,7 +824,7 @@ model ConsultationCharge {
   expertShareCents Int         @map("expert_share_cents")
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  consultation    Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  consultation    Consultation @relation(fields: [consultationId], references: [id], onDelete: Restrict)
   transaction     Transaction  @relation(fields: [transactionId], references: [id], onDelete: Restrict)
 
   @@map("consultation_charges")
@@ -884,7 +884,7 @@ model ExpertEarningsLedger {
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
 
   expert          ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
-  consultation    Consultation  @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  consultation    Consultation  @relation(fields: [consultationId], references: [id], onDelete: Restrict)
 
   @@unique([consultationId])
   @@index([expertProfileId, createdAt(sort: Desc)])
