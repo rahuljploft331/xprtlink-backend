@@ -267,6 +267,8 @@ model User {
   conversationReads ConversationReadState[]
   quoteStatusEvents QuoteStatusEvent[]   @relation("QuoteStatusActor")
   supportTickets    SupportTicket[]
+  supportConversations SupportConversation[]
+  supportMessagesSent  SupportMessage[]
 
   @@index([status])
   @@map("users")
@@ -965,6 +967,8 @@ model AdminUser {
   permissions  AdminPermission[]
   auditLogs    AdminAuditLog[]
   cmsPages     CmsPage[]
+  supportConversationsAssigned SupportConversation[]
+  supportMessagesSent          SupportMessage[]
 
   @@map("admin_users")
 }
@@ -996,4 +1000,46 @@ model AdminAuditLog {
   @@index([actorAdminId])
   @@index([entityType, entityId])
   @@map("admin_audit_logs")
+}
+
+enum SupportConversationStatus {
+  open
+  assigned
+  resolved
+  closed
+}
+
+model SupportConversation {
+  id            String                    @id @default(uuid()) @db.Uuid
+  userId        String                    @map("user_id") @db.Uuid
+  adminUserId   String?                   @map("admin_user_id") @db.Uuid
+  status        SupportConversationStatus @default(open)
+  createdAt     DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastMessageAt DateTime?                 @map("last_message_at") @db.Timestamptz(6)
+
+  user          User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admin         AdminUser?                @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  messages      SupportMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("support_conversations")
+}
+
+model SupportMessage {
+  id             String              @id @default(uuid()) @db.Uuid
+  conversationId String              @map("conversation_id") @db.Uuid
+  senderUserId   String?             @map("sender_user_id") @db.Uuid
+  senderAdminId  String?             @map("sender_admin_id") @db.Uuid
+  body           String?
+  type           MessageType         @default(text)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderUser     User?               @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
+  senderAdmin    AdminUser?          @relation(fields: [senderAdminId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@map("support_messages")
 }

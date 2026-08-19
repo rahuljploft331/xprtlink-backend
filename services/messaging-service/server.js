@@ -3,6 +3,7 @@ import { getConfig } from "@xprtlink/shared/config/loadEnv.js";
 import { createApp, startService } from "@xprtlink/shared/config/serviceTemplate.js";
 import { errorHandler, notFoundHandler } from "@xprtlink/shared/middleware/errorHandler.js";
 import { registerMessagingSockets } from "./src/sockets/messagingSocket.js";
+import { registerSupportSockets } from "./src/sockets/supportSocket.js";
 
 import routes from "./src/routes/index.js";
 
@@ -29,5 +30,6 @@ const io = new Server(server, {
   pingInterval: 25000,
 });
 
+// 3. Register namespaces
 registerMessagingSockets(io);
-
+registerSupportSockets(io);
