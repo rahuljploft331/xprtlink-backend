@@ -1,5 +1,6 @@
 import { getSecretSync } from "../config/secrets.js";
 import { badRequest } from "../utils/errors.js";
+import { sendEmail } from "../lib/email.js";
 
 const OTP_PURPOSE_LABELS = {
   register: "account verification",
@@ -19,10 +20,7 @@ function logDevOtp(channel, destination, code, purpose) {
 }
 
 async function sendEmailOtp({ email, code, purpose }) {
-  const apiKey = getSecretSync("SENDGRID_API_KEY");
-  const fromEmail = getSecretSync("SENDGRID_FROM_EMAIL", "noreply@xpertlink.local");
-
-  if (!apiKey) {
+  if (!getSecretSync("SENDGRID_API_KEY")) {
     logDevOtp("email", email, code, purpose);
     if (isDevFallbackEnabled()) return;
     throw badRequest(
@@ -32,14 +30,10 @@ async function sendEmailOtp({ email, code, purpose }) {
     );
   }
 
-  const { default: sgMail } = await import("@sendgrid/mail");
-  sgMail.setApiKey(apiKey);
-
   const label = OTP_PURPOSE_LABELS[purpose] ?? "verification";
 
-  await sgMail.send({
+  await sendEmail({
     to: email,
-    from: fromEmail,
     subject: `Your XprtLink ${label} code`,
     text: `Your verification code is ${code}. It expires in 10 minutes.`,
     html: `<p>Your verification code is <strong>${code}</strong>.</p><p>It expires in 10 minutes.</p>`,
