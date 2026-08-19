@@ -8,3 +8,4 @@ export * from "./messaging.schema.js";
 export * from "./billing.schema.js";
 export * from "./notification.schema.js";
 export * from "./media.schema.js";
+export * from "./admin.schema.js";

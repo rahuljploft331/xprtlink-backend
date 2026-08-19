@@ -3,6 +3,11 @@ import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { hashPassword } from "@xprtlink/shared/auth/password.js";
 import { adminUsers } from "@xprtlink/shared/db/repositories/admin/index.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
+import {
+  createAdminSchema,
+  updateAdminSchema,
+  setPermissionsSchema,
+} from "@xprtlink/shared/contracts/admin.schema.js";
 
 export async function list(req, res, next) {
   try {
@@ -35,7 +40,7 @@ export async function getById(req, res, next) {
 
 export async function create(req, res, next) {
   try {
-    const { name, email, password, role = "subadmin" } = req.body;
+    const { name, email, password, role } = createAdminSchema.parse(req.body);
     const passwordHash = await hashPassword(password);
     const admin = await adminUsers().create({
       data: { name, email: email.toLowerCase(), passwordHash, role },
@@ -47,7 +52,7 @@ export async function create(req, res, next) {
 
 export async function update(req, res, next) {
   try {
-    const { name, status } = req.body;
+    const { name, status } = updateAdminSchema.parse(req.body);
     const admin = await adminUsers().update({
       where: { id: req.params.id },
       data: { ...(name ? { name } : {}), ...(status ? { status } : {}) },
@@ -59,7 +64,7 @@ export async function update(req, res, next) {
 
 export async function setPermissions(req, res, next) {
   try {
-    const { permissions } = req.body; // { moduleName: "view"|"edit"|"none" }
+    const { permissions } = setPermissionsSchema.parse(req.body); // { moduleName: "view"|"edit"|"none" }
     const db = getDb();
     await db.$transaction(
       Object.entries(permissions).map(([module, level]) =>
