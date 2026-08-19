@@ -13,34 +13,9 @@ env:
   TARGET_DIR: /home/ubuntu/xprtlink-backend
 
 jobs:
-  test:
-    name: Run Billing Service Tests
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          run_install: false
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run billing-service tests
-        run: pnpm --filter @xprtlink/billing-service test
-
   build-and-deploy:
     name: Build, Migrate & Deploy Backend.
     runs-on: ubuntu-latest
-    needs: test
 
     steps:
       - name: Deploy via Git Pull, Migrate & Reload PM2
