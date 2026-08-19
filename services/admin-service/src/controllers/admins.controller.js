@@ -10,6 +10,7 @@ import {
 } from "@xprtlink/shared/contracts/admin.schema.js";
 import { toAdminUserDto } from "@xprtlink/shared/mappers/admin.mapper.js";
 import { logAdminAction } from "#utils/audit.js";
+import { notFound } from "@xprtlink/shared/utils/errors.js";
 
 export async function list(req, res, next) {
   try {
@@ -65,6 +66,9 @@ export async function update(req, res, next) {
 export async function setPermissions(req, res, next) {
   try {
     const { permissions } = setPermissionsSchema.parse(req.body); // { moduleName: "view"|"edit"|"none" }
+    const existing = await adminUsers().findUnique({ where: { id: req.params.id } });
+    if (!existing) throw notFound("Admin not found");
+
     const db = getDb();
     await db.$transaction(
       Object.entries(permissions).map(([module, level]) =>
