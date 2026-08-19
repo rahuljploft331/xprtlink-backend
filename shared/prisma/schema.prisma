@@ -628,7 +628,7 @@ model Consultation {
   endedAt             DateTime?                 @map("ended_at") @db.Timestamptz(6)
   durationSeconds     Int?                      @map("duration_seconds")
   zegoRoomId          String?                   @map("zego_room_id") @db.VarChar(128)
-  stripePaymentIntentId String?                 @map("stripe_payment_intent_id") @db.VarChar(128)
+  stripePaymentIntentId String?                 @unique @map("stripe_payment_intent_id") @db.VarChar(128)
   billingStatus       ConsultationBillingStatus @default(pending) @map("billing_status")
   createdAt           DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -799,7 +799,7 @@ model Transaction {
   amountCents           Int               @map("amount_cents")
   currency              String            @default("USD") @db.Char(3)
   status                TransactionStatus @default(pending)
-  stripePaymentIntentId String?           @map("stripe_payment_intent_id") @db.VarChar(128)
+  stripePaymentIntentId String?           @unique @map("stripe_payment_intent_id") @db.VarChar(128)
   metadata              Json              @default("{}")
   createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -842,6 +842,7 @@ model ExpertSubscription {
   expert                 ExpertProfile            @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
   plan                   SubscriptionPlan         @relation(fields: [planId], references: [id])
 
+  @@unique([store, externalSubscriptionId])
   @@index([expertProfileId])
   @@index([status])
   @@map("expert_subscriptions")
@@ -861,6 +862,7 @@ model ExpertPayout {
 
   expert           ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
 
+  @@unique([expertProfileId, periodStart, periodEnd])
   @@index([expertProfileId])
   @@index([status])
   @@map("expert_payouts")
@@ -878,6 +880,7 @@ model ExpertEarningsLedger {
   expert          ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
   consultation    Consultation  @relation(fields: [consultationId], references: [id], onDelete: Cascade)
 
+  @@unique([consultationId])
   @@index([expertProfileId, createdAt(sort: Desc)])
   @@map("expert_earnings_ledger")
 }
