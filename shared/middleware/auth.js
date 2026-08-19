@@ -1,10 +1,17 @@
 import { verifyAccessToken } from "../auth/jwt.js";
 import { forbidden, unauthorized } from "../utils/errors.js";
 
+/**
+ * Extract a Bearer token from the request.
+ * Checks (in order):
+ *   1. Authorization: Bearer <token>  header  (all normal API calls)
+ *   2. ?token=<token>                 query   (SSE / EventSource — browsers can't send headers)
+ */
 function parseBearer(req) {
   const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) return null;
-  return header.slice(7);
+  if (header?.startsWith("Bearer ")) return header.slice(7);
+  if (req.query?.token) return req.query.token;
+  return null;
 }
 
 export function authenticate(req, _res, next) {
