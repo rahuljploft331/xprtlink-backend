@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: backend-deploy
+  cancel-in-progress: false
+
 env:
   TARGET_DIR: /home/ubuntu/xprtlink-backend
 
