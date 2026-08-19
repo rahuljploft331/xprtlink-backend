@@ -1,6 +1,7 @@
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
+import { logAdminAction } from "#utils/audit.js";
 
 export async function list(req, res, next) {
   try {
@@ -38,6 +39,7 @@ export async function markPaid(req, res, next) {
       where: { id: req.params.id },
       data: { status: "paid", updatedAt: new Date() },
     });
+    await logAdminAction(req, "payout.markPaid", "ExpertPayout", p.id);
     return ResponseFormatter.success(res, { message: "Payout marked as paid", data: p });
   } catch (err) { next(err); }
 }

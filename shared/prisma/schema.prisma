@@ -229,12 +229,21 @@ enum AdminPermissionLevel {
   @@map("admin_permission_level")
 }
 
+enum SupportTicketStatus {
+  open
+  in_progress
+  resolved
+  closed
+
+  @@map("support_ticket_status")
+}
+
 // ─── Identity (user-service) ─────────────────────────────────────────────────
 
 model User {
   id               String     @id @default(uuid()) @db.Uuid
-  email            String?    @unique @db.VarChar(320)
-  phone            String?    @unique @db.VarChar(32)
+  email            String?    @db.VarChar(320)
+  phone            String?    @db.VarChar(32)
   passwordHash     String?    @map("password_hash") @db.VarChar(255)
   firebaseUid      String?    @unique @map("firebase_uid") @db.VarChar(128)
   emailVerifiedAt  DateTime?  @map("email_verified_at") @db.Timestamptz(6)
@@ -257,6 +266,9 @@ model User {
   messagesSent     Message[]              @relation("MessageSender")
   conversationReads ConversationReadState[]
   quoteStatusEvents QuoteStatusEvent[]   @relation("QuoteStatusActor")
+  supportTickets    SupportTicket[]
+  supportConversations SupportConversation[]
+  supportMessagesSent  SupportMessage[]
 
   @@index([status])
   @@map("users")
@@ -284,6 +296,7 @@ model CustomerProfile {
   expertReports   ExpertReport[]
   reviews         Review[]
 
+  @@index([avatarMediaId])
   @@map("customer_profiles")
 }
 
@@ -454,6 +467,25 @@ model SubscriptionPlan {
   @@map("subscription_plans")
 }
 
+model SupportTicket {
+  id             String              @id @default(uuid()) @db.Uuid
+  userId         String              @map("user_id") @db.Uuid
+  subject        String              @db.VarChar(200)
+  body           String
+  category       String              @db.VarChar(64)
+  status         SupportTicketStatus @default(open)
+  resolutionNote String?             @map("resolution_note")
+  resolvedAt     DateTime?           @map("resolved_at") @db.Timestamptz(6)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("support_tickets")
+}
+
 // ─── Experts (expert-service) ───────────────────────────────────────────────
 
 model ExpertProfile {
@@ -541,6 +573,7 @@ model ExpertVerificationDocument {
   media            MediaAsset          @relation(fields: [mediaId], references: [id], onDelete: Restrict)
 
   @@index([verificationId])
+  @@index([mediaId])
   @@map("expert_verification_documents")
 }
 
@@ -613,6 +646,7 @@ model QuoteAttachment {
   media     MediaAsset   @relation(fields: [mediaId], references: [id], onDelete: Restrict)
 
   @@unique([quoteId, mediaId])
+  @@index([mediaId])
   @@map("quote_attachments")
 }
 
@@ -628,12 +662,13 @@ model Consultation {
   endedAt             DateTime?                 @map("ended_at") @db.Timestamptz(6)
   durationSeconds     Int?                      @map("duration_seconds")
   zegoRoomId          String?                   @map("zego_room_id") @db.VarChar(128)
+  stripePaymentIntentId String?                 @unique @map("stripe_payment_intent_id") @db.VarChar(128)
   billingStatus       ConsultationBillingStatus @default(pending) @map("billing_status")
   createdAt           DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  customer            CustomerProfile           @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  expert              ExpertProfile             @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  customer            CustomerProfile           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  expert              ExpertProfile             @relation(fields: [expertId], references: [id], onDelete: Restrict)
   review              Review?
   charge              ConsultationCharge?
   earningsLedger      ExpertEarningsLedger[]
@@ -718,6 +753,7 @@ model Message {
   readStates       ConversationReadState[] @relation("LastReadMessage")
 
   @@index([conversationId, createdAt])
+  @@index([senderUserId])
   @@map("messages")
 }
 
@@ -731,6 +767,7 @@ model MessageAttachment {
   media     MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Restrict)
 
   @@unique([messageId, mediaId])
+  @@index([mediaId])
   @@map("message_attachments")
 }
 
@@ -798,7 +835,7 @@ model Transaction {
   amountCents           Int               @map("amount_cents")
   currency              String            @default("USD") @db.Char(3)
   status                TransactionStatus @default(pending)
-  stripePaymentIntentId String?           @map("stripe_payment_intent_id") @db.VarChar(128)
+  stripePaymentIntentId String?           @unique @map("stripe_payment_intent_id") @db.VarChar(128)
   metadata              Json              @default("{}")
   createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -818,7 +855,7 @@ model ConsultationCharge {
   expertShareCents Int         @map("expert_share_cents")
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  consultation    Consultation @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  consultation    Consultation @relation(fields: [consultationId], references: [id], onDelete: Restrict)
   transaction     Transaction  @relation(fields: [transactionId], references: [id], onDelete: Restrict)
 
   @@map("consultation_charges")
@@ -841,8 +878,10 @@ model ExpertSubscription {
   expert                 ExpertProfile            @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
   plan                   SubscriptionPlan         @relation(fields: [planId], references: [id])
 
+  @@unique([store, externalSubscriptionId])
   @@index([expertProfileId])
   @@index([status])
+  @@index([planId])
   @@map("expert_subscriptions")
 }
 
@@ -860,6 +899,7 @@ model ExpertPayout {
 
   expert           ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
 
+  @@unique([expertProfileId, periodStart, periodEnd])
   @@index([expertProfileId])
   @@index([status])
   @@map("expert_payouts")
@@ -875,8 +915,9 @@ model ExpertEarningsLedger {
   createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
 
   expert          ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
-  consultation    Consultation  @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  consultation    Consultation  @relation(fields: [consultationId], references: [id], onDelete: Restrict)
 
+  @@unique([consultationId])
   @@index([expertProfileId, createdAt(sort: Desc)])
   @@map("expert_earnings_ledger")
 }
@@ -926,6 +967,8 @@ model AdminUser {
   permissions  AdminPermission[]
   auditLogs    AdminAuditLog[]
   cmsPages     CmsPage[]
+  supportConversationsAssigned SupportConversation[]
+  supportMessagesSent          SupportMessage[]
 
   @@map("admin_users")
 }
@@ -957,4 +1000,46 @@ model AdminAuditLog {
   @@index([actorAdminId])
   @@index([entityType, entityId])
   @@map("admin_audit_logs")
+}
+
+enum SupportConversationStatus {
+  open
+  assigned
+  resolved
+  closed
+}
+
+model SupportConversation {
+  id            String                    @id @default(uuid()) @db.Uuid
+  userId        String                    @map("user_id") @db.Uuid
+  adminUserId   String?                   @map("admin_user_id") @db.Uuid
+  status        SupportConversationStatus @default(open)
+  createdAt     DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastMessageAt DateTime?                 @map("last_message_at") @db.Timestamptz(6)
+
+  user          User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admin         AdminUser?                @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  messages      SupportMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("support_conversations")
+}
+
+model SupportMessage {
+  id             String              @id @default(uuid()) @db.Uuid
+  conversationId String              @map("conversation_id") @db.Uuid
+  senderUserId   String?             @map("sender_user_id") @db.Uuid
+  senderAdminId  String?             @map("sender_admin_id") @db.Uuid
+  body           String?
+  type           MessageType         @default(text)
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderUser     User?               @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
+  senderAdmin    AdminUser?          @relation(fields: [senderAdminId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt(sort: Desc)])
+  @@map("support_messages")
 }

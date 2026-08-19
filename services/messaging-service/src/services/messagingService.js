@@ -1,4 +1,5 @@
 import { getDb } from "@xprtlink/shared/db";
+import { moveS3Object } from "@xprtlink/shared/utils/s3.js";
 import { customerDisplayName } from "@xprtlink/shared/mappers/common.js";
 import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
 import {
@@ -18,7 +19,7 @@ function conversationWhere(auth) {
   throw forbidden("Messaging requires customer or expert role");
 }
 
-async function loadConversation(auth, conversationId) {
+export async function loadConversation(auth, conversationId) {
   const conversation = await getDb().conversation.findFirst({
     where: { id: conversationId, ...conversationWhere(auth) },
     include: {
@@ -28,6 +29,21 @@ async function loadConversation(auth, conversationId) {
   });
   if (!conversation) throw notFound("Conversation not found");
   return conversation;
+}
+
+export async function getConversationPeerUserId(conversationId, currentUserId) {
+  const conversation = await getDb().conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      customer: { select: { userId: true } },
+      expert: { select: { userId: true } },
+    },
+  });
+  if (!conversation) return null;
+  if (conversation.customer?.userId === currentUserId) {
+    return conversation.expert?.userId ?? null;
+  }
+  return conversation.customer?.userId ?? null;
 }
 
 async function countUnreadMessages(conversationId, userId, lastReadMessage) {
@@ -145,6 +161,27 @@ export async function createConversation(auth, body) {
   });
 }
 
+function getCategoryFromMime(mimeType) {
+  if (mimeType?.startsWith("image/")) return "image";
+  if (mimeType?.startsWith("video/")) return "video";
+  return "document";
+}
+
+function getExtFromKey(storageKey, mimeType) {
+  if (storageKey && storageKey.includes(".")) {
+    return "." + storageKey.split(".").pop();
+  }
+  const map = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+    "application/pdf": ".pdf",
+    "video/mp4": ".mp4",
+  };
+  return map[mimeType] || "";
+}
+
 export async function listMessages(auth, conversationId, query) {
   await loadConversation(auth, conversationId);
   const { page, limit, skip } = parsePagination(query);
@@ -163,7 +200,9 @@ export async function listMessages(auth, conversationId, query) {
     db.message.count({ where: { conversationId } }),
   ]);
 
-  const items = rows.map((message) => toMessageDto(message, message.attachments));
+  const items = await Promise.all(
+    rows.map((message) => toMessageDto(message, message.attachments))
+  );
   return paginatedResult(items, { page, limit, total });
 }
 
@@ -177,15 +216,43 @@ export async function sendMessage(auth, conversationId, body) {
   const type = body.mediaIds?.length ? "attachment" : "text";
 
   if (body.mediaIds?.length) {
-    const ownedCount = await db.mediaAsset.count({
+    const assets = await db.mediaAsset.findMany({
       where: {
         id: { in: body.mediaIds },
         ownerUserId: auth.userId,
         status: { not: "deleted" },
       },
     });
-    if (ownedCount !== body.mediaIds.length) {
+
+    if (assets.length !== body.mediaIds.length) {
       throw badRequest("One or more media assets are invalid", "INVALID_MEDIA");
+    }
+
+    // Move any temporary staged media assets to permanent user/category/ path in S3
+    for (const asset of assets) {
+      if (asset.storageKey?.startsWith("temp/")) {
+        const category = getCategoryFromMime(asset.mimeType);
+        const ext = getExtFromKey(asset.storageKey, asset.mimeType);
+        const permanentKey = `${auth.userId}/${category}/${asset.id}${ext}`;
+
+        try {
+          await moveS3Object(asset.storageKey, permanentKey);
+          await db.mediaAsset.update({
+            where: { id: asset.id },
+            data: {
+              storageKey: permanentKey,
+              status: "ready",
+            },
+          });
+          asset.storageKey = permanentKey;
+          asset.status = "ready";
+        } catch (err) {
+          console.error(
+            `[messagingService] Could not relocate S3 object (${asset.storageKey} -> ${permanentKey}):`,
+            err.message
+          );
+        }
+      }
     }
   }
 
@@ -218,7 +285,7 @@ export async function sendMessage(auth, conversationId, body) {
     return created;
   });
 
-  return toMessageDto(message, message.attachments);
+  return await toMessageDto(message, message.attachments);
 }
 
 export async function markConversationRead(auth, conversationId) {

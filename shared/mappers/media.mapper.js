@@ -1,6 +1,13 @@
+import { generatePresignedDownloadUrl } from "../utils/s3.js";
 import { resolveMediaUrl, toIso } from "./common.js";
 
-export function toMediaAssetDto(asset, { uploadUrl } = {}) {
+export async function toMediaAssetDto(asset, { uploadUrl } = {}) {
+  let url = null;
+  if (asset.status === "ready" && asset.storageKey) {
+    url = await generatePresignedDownloadUrl(asset.storageKey);
+    if (!url) url = resolveMediaUrl(asset.storageKey);
+  }
+
   return {
     id: asset.id,
     purpose: asset.purpose,
@@ -8,7 +15,7 @@ export function toMediaAssetDto(asset, { uploadUrl } = {}) {
     sizeBytes: asset.sizeBytes,
     status: asset.status,
     ...(uploadUrl ? { uploadUrl } : {}),
-    url: asset.status === "ready" ? resolveMediaUrl(asset.storageKey) : null,
+    url,
     createdAt: toIso(asset.createdAt),
   };
 }

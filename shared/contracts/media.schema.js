@@ -25,6 +25,7 @@ export const createUploadRequestSchema = z.object({
   ]),
   mimeType: z.string().min(1),
   sizeBytes: z.number().int().positive(),
+  fileName: z.string().optional(),
 });
 
 export const appConfigDtoSchema = z.object({

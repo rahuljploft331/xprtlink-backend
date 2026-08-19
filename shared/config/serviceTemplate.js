@@ -10,26 +10,39 @@ import { disconnectDb, getDb } from "../db/getClient.js";
  * - "a.com,b.com,..."    → string[] of trimmed origins
  * - single origin        → string
  */
-function parseCorsOrigin() {
+function getCorsOriginValidator() {
   const raw = process.env.CORS_ORIGIN ?? "*";
   if (raw === "*") return true;
-  const origins = raw.split(",").map((o) => o.trim()).filter(Boolean);
-  return origins.length === 1 ? origins[0] : origins;
+
+  const allowedOrigins = raw.split(",").map((o) => o.trim()).filter(Boolean);
+
+  return (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl) or file:// ('null') or local dev origins
+    if (!origin || origin === "null" || process.env.NODE_ENV !== "production") {
+      return callback(null, true);
+    }
+    if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+      return callback(null, true);
+    }
+    callback(new Error(`CORS origin '${origin}' not allowed`));
+  };
 }
 
 export function createApp() {
   const app = express();
   app.set("trust proxy", 1);
-  app.use(helmet());
+  app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(
     cors({
-      origin: parseCorsOrigin(),
+      origin: getCorsOriginValidator(),
       credentials: true,
+      methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
     })
   );
 
-  app.use(express.json({ limit: "10mb" }));
-  app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+  app.use(express.json({ limit: "100mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "100mb" }));
 
   app.get("/health", (_req, res) => {
     res.status(200).json({

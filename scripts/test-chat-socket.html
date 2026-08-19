@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XprtLink — Dual WebSocket Chat & Attachments Test</title>
+  <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
+  <style>
+    :root {
+      --bg: #0b0f19;
+      --card-bg: #151d30;
+      --customer-color: #3b82f6;
+      --customer-hover: #2563eb;
+      --expert-color: #10b981;
+      --expert-hover: #059669;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --border: #23304d;
+      --badge-conn: rgba(16, 185, 129, 0.2);
+      --badge-conn-text: #34d399;
+      --badge-dis: rgba(239, 68, 68, 0.2);
+      --badge-dis-text: #f87171;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 20px; min-height: 100vh; display: flex; flex-direction: column; gap: 16px; }
+    
+    /* Header */
+    .top-header { text-align: center; margin-bottom: 2px; }
+    .top-header h1 { font-size: 22px; color: #fff; font-weight: 700; letter-spacing: -0.02em; }
+    .top-header p { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
+    /* Control Panel */
+    .control-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .ctrl-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+    input {
+      background: #0b1120;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: #fff;
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+    input:focus { outline: none; border-color: #60a5fa; }
+    button {
+      border: none;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    button.primary-btn { background: #3b82f6; color: #fff; }
+    button.primary-btn:hover { background: #2563eb; }
+    button.secondary-btn { background: #243049; color: #cbd5e1; }
+    button.secondary-btn:hover { background: #334155; color: #fff; }
+    button.expert-btn { background: #10b981; color: #fff; }
+    button.expert-btn:hover { background: #059669; }
+
+    /* Attachment Limits Bar */
+    .limits-bar {
+      background: #101828;
+      border: 1px dashed var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+    }
+    .limit-tag { display: inline-flex; align-items: center; gap: 5px; background: #1e293b; padding: 2px 8px; border-radius: 4px; color: #e2e8f0; }
+
+    /* Grid Layout */
+    .chat-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 900px) {
+      .chat-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Client Cards */
+    .client-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .card-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 16px;
+      font-weight: 700;
+    }
+    .card-title.customer { color: #60a5fa; }
+    .card-title.expert { color: #34d399; }
+    .status-badge {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--badge-dis);
+      color: var(--badge-dis-text);
+    }
+    .status-badge.connected {
+      background: var(--badge-conn);
+      color: var(--badge-conn-text);
+    }
+
+    .token-box {
+      font-family: monospace;
+      font-size: 11px;
+      width: 100%;
+    }
+
+    .chat-area {
+      height: 320px;
+      background: #090d16;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .msg-bubble {
+      max-width: 82%;
+      padding: 8px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.4;
+      word-break: break-word;
+    }
+    .msg-bubble.mine-cust {
+      align-self: flex-end;
+      background: #1d4ed8;
+      color: #ffffff;
+      border-bottom-right-radius: 2px;
+    }
+    .msg-bubble.mine-exp {
+      align-self: flex-end;
+      background: #047857;
+      color: #ffffff;
+      border-bottom-right-radius: 2px;
+    }
+    .msg-bubble.theirs {
+      align-self: flex-start;
+      background: #1e293b;
+      color: #e2e8f0;
+      border-bottom-left-radius: 2px;
+    }
+    .msg-meta {
+      font-size: 10px;
+      opacity: 0.75;
+      margin-top: 4px;
+      text-align: right;
+    }
+
+    /* Attachment Display in Bubbles */
+    .att-preview-img {
+      max-width: 220px;
+      max-height: 160px;
+      border-radius: 8px;
+      margin-top: 6px;
+      display: block;
+      cursor: pointer;
+      object-fit: cover;
+    }
+    .att-preview-video {
+      max-width: 260px;
+      max-height: 180px;
+      border-radius: 8px;
+      margin-top: 6px;
+      display: block;
+    }
+    .att-preview-doc {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin-top: 6px;
+      text-decoration: none;
+      color: #fff;
+    }
+    .att-preview-doc:hover { background: rgba(0, 0, 0, 0.4); }
+
+    /* Pending Attachment Chip */
+    .pending-att-box {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #1e293b;
+      border: 1px solid #3b82f6;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: #93c5fd;
+    }
+
+    .typing-status {
+      font-size: 12px;
+      font-style: italic;
+      color: #38bdf8;
+      min-height: 20px;
+      padding: 2px 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .pulse-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #38bdf8;
+      animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.3; transform: scale(0.8); }
+      100% { opacity: 1; transform: scale(1.2); }
+    }
+
+    .attach-buttons-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .attach-btn {
+      background: #1e293b;
+      border: 1px solid var(--border);
+      color: #cbd5e1;
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .attach-btn:hover { background: #334155; color: #fff; }
+
+    .send-row {
+      display: flex;
+      gap: 8px;
+    }
+    .send-row input { flex: 1; }
+
+    /* Console / Logs */
+    .logs-panel {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px 18px;
+    }
+    .logs-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .logs-content {
+      height: 140px;
+      background: #070a12;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      overflow-y: auto;
+      color: #94a3b8;
+    }
+    .log-entry { margin-bottom: 3px; }
+    .log-entry.customer { color: #93c5fd; }
+    .log-entry.expert { color: #86efac; }
+    .log-entry.system { color: #cbd5e1; }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header -->
+  <div class="top-header">
+    <h1>💬 XprtLink Dual-Card WebSocket Chat & Media Test</h1>
+    <p>Live simultaneous Customer ↔ Expert Socket.IO messaging with Document, Image & Video Attachments</p>
+  </div>
+
+  <!-- Attachment Limits from .env -->
+  <div class="limits-bar" id="limitsBar">
+    <strong style="color: #fff;">⚙️ .env Attachment Limits:</strong>
+    <span class="limit-tag">🖼️ Image: <b id="lblImgLimit">Max 10 MB</b> (JPEG, PNG, WEBP, GIF, HEIC)</span>
+    <span class="limit-tag">📄 Doc: <b id="lblDocLimit">Max 15 MB</b> (PDF, DOC, DOCX, XLS, XLSX, TXT, CSV)</span>
+    <span class="limit-tag">🎥 Video: <b id="lblVidLimit">Max 50 MB</b> (MP4, MOV, WEBM, MKV, 3GP)</span>
+  </div>
+
+  <!-- Global Controls -->
+  <div class="control-panel">
+    <div class="ctrl-group">
+      <label>Server URL:</label>
+      <input id="globalUrl" value="http://localhost:4000" style="width: 180px;" />
+      <button class="secondary-btn" onclick="setUrl('http://localhost:4000')">Gateway (:4000)</button>
+      <button class="secondary-btn" onclick="setUrl('http://localhost:4005')">Direct (:4005)</button>
+    </div>
+
+    <div class="ctrl-group">
+      <label>Conversation ID:</label>
+      <input id="sharedConvId" value="" placeholder="UUID of thread" style="width: 250px;" />
+      <button class="primary-btn" onclick="connectAndStartBoth()">⚡ Connect & Start Both</button>
+      <button class="secondary-btn" onclick="joinBoth()">Join Both</button>
+      <button class="secondary-btn" onclick="disconnectBoth()">Disconnect Both</button>
+    </div>
+  </div>
+
+  <!-- Dual Client Cards -->
+  <div class="chat-grid">
+    
+    <!-- Customer Card -->
+    <div class="client-card" id="cardCustomer">
+      <div class="card-header">
+        <div class="card-title customer">
+          <span>👤 Customer Client</span>
+          <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Jordan Customer)</span>
+        </div>
+        <span id="custBadge" class="status-badge">Disconnected</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <label>Customer JWT Token:</label>
+        <input
+          id="custToken"
+          class="token-box"
+          value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjNzE3ZjZlNC0xMDRmLTRhZGUtYjNjMy01ZDE1N2NiMzA2ZDMiLCJyb2xlIjoiY3VzdG9tZXIiLCJjdXN0b21lclByb2ZpbGVJZCI6IjRiOGYyODJmLTMwMTYtNDFiOC05OGY3LTFiOTY3NjM5YjY5YyIsImlhdCI6MTc4NjcwMTgwNCwiZXhwIjoxNzg3MzA2NjA0fQ.JU4t4oMlOYn5h7OvkPDwiQiel6Bcizcw8zuvhlWRBPE"
+        />
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button id="custBtnConnect" class="primary-btn" onclick="connectCust()">Connect</button>
+        <button id="custBtnDisconnect" class="secondary-btn" onclick="disconnectCust()" disabled>Disconnect</button>
+        <button class="secondary-btn" onclick="listConversationsCust()">My Threads</button>
+        <button class="secondary-btn" onclick="joinCust()">Join Room</button>
+      </div>
+
+      <!-- Chat Feed -->
+      <div id="custChatArea" class="chat-area"></div>
+      <div id="custTyping" class="typing-status"></div>
+
+      <!-- Pending Attachment Display -->
+      <div id="custPendingAtt" style="display: none;" class="pending-att-box">
+        <span id="custPendingAttLabel">📎 Attachment</span>
+        <button style="background: none; border: none; color: #f87171; cursor: pointer; padding: 0 4px;" onclick="clearPendingAtt('cust')">✕</button>
+      </div>
+
+      <!-- Attachment Pickers -->
+      <div class="attach-buttons-row">
+        <label style="font-size: 11px;">Attach:</label>
+        <button class="attach-btn" onclick="triggerFileInput('cust', 'image/*')">🖼️ Image</button>
+        <button class="attach-btn" onclick="triggerFileInput('cust', '.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv')">📄 Document</button>
+        <button class="attach-btn" onclick="triggerFileInput('cust', 'video/*')">🎥 Video</button>
+        <input type="file" id="custFileInput" style="display: none;" onchange="handleFileSelect('cust', event)" />
+      </div>
+
+      <!-- Message input -->
+      <div class="send-row">
+        <input
+          id="custMsgInput"
+          placeholder="Type message as Customer..."
+          oninput="handleTyping('cust')"
+          onkeydown="if(event.key==='Enter') sendCustMsg()"
+        />
+        <button class="primary-btn" onclick="sendCustMsg()">Send</button>
+        <button class="secondary-btn" onclick="markReadCust()">Mark Read</button>
+      </div>
+    </div>
+
+    <!-- Expert Card -->
+    <div class="client-card" id="cardExpert">
+      <div class="card-header">
+        <div class="card-title expert">
+          <span>👨‍💼 Expert Client</span>
+          <span style="font-size: 12px; color: var(--text-muted); font-weight: normal;">(Jordan Expert)</span>
+        </div>
+        <span id="expBadge" class="status-badge">Disconnected</span>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <label>Expert JWT Token:</label>
+        <input
+          id="expToken"
+          class="token-box"
+          value="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI2NjAwOWE0Ny04N2EyLTQyYmYtODBhYS1kZTk5YWRkOGFhOGMiLCJyb2xlIjoiZXhwZXJ0IiwiZXhwZXJ0UHJvZmlsZUlkIjoiNTc2OGI3ODctMjYxZC00YzE2LTg2NDAtYjAyODdhMzIyN2Q5IiwiaWF0IjoxNzg2NzAxODA0LCJleHAiOjE3ODczMDY2MDR9.ys_v7Xo0x4aMRzc9gekrkAcSabujbmK9mop0bLiltSc"
+        />
+      </div>
+
+      <div style="display: flex; gap: 8px;">
+        <button id="expBtnConnect" class="expert-btn" onclick="connectExp()">Connect</button>
+        <button id="expBtnDisconnect" class="secondary-btn" onclick="disconnectExp()" disabled>Disconnect</button>
+        <button class="secondary-btn" onclick="listConversationsExp()">My Threads</button>
+        <button class="secondary-btn" onclick="joinExp()">Join Room</button>
+      </div>
+
+      <!-- Chat Feed -->
+      <div id="expChatArea" class="chat-area"></div>
+      <div id="expTyping" class="typing-status"></div>
+
+      <!-- Pending Attachment Display -->
+      <div id="expPendingAtt" style="display: none;" class="pending-att-box">
+        <span id="expPendingAttLabel">📎 Attachment</span>
+        <button style="background: none; border: none; color: #f87171; cursor: pointer; padding: 0 4px;" onclick="clearPendingAtt('exp')">✕</button>
+      </div>
+
+      <!-- Attachment Pickers -->
+      <div class="attach-buttons-row">
+        <label style="font-size: 11px;">Attach:</label>
+        <button class="attach-btn" onclick="triggerFileInput('exp', 'image/*')">🖼️ Image</button>
+        <button class="attach-btn" onclick="triggerFileInput('exp', '.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv')">📄 Document</button>
+        <button class="attach-btn" onclick="triggerFileInput('exp', 'video/*')">🎥 Video</button>
+        <input type="file" id="expFileInput" style="display: none;" onchange="handleFileSelect('exp', event)" />
+      </div>
+
+      <!-- Message input -->
+      <div class="send-row">
+        <input
+          id="expMsgInput"
+          placeholder="Type message as Expert..."
+          oninput="handleTyping('exp')"
+          onkeydown="if(event.key==='Enter') sendExpMsg()"
+        />
+        <button class="expert-btn" onclick="sendExpMsg()">Send</button>
+        <button class="secondary-btn" onclick="markReadExp()">Mark Read</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Realtime Logs -->
+  <div class="logs-panel">
+    <div class="logs-header">
+      <span style="font-size: 13px; font-weight: 600; color: var(--text-muted);">Real-Time Socket Event Stream</span>
+      <button class="secondary-btn" style="padding: 4px 10px; font-size: 11px;" onclick="clearLogs()">Clear</button>
+    </div>
+    <div id="logsBox" class="logs-content"></div>
+  </div>
+
+  <script>
+    let socketCust = null;
+    let socketExp = null;
+
+    let custUserId = "c717f6e4-104f-4ade-b3c3-5d157cb306d3";
+    let expUserId = "66009a47-87a2-42bf-80aa-de99add8aa8c";
+    let expProfileId = "5768b787-261d-4c16-8640-b0287a3227d9";
+
+    let custPendingFile = null;
+    let expPendingFile = null;
+
+    let attachmentLimits = {
+      image: { maxSizeMb: 10, mimes: ["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic"] },
+      document: { maxSizeMb: 15, mimes: ["application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/plain", "text/csv"] },
+      video: { maxSizeMb: 50, mimes: ["video/mp4", "video/quicktime", "video/webm", "video/x-matroska", "video/3gpp"] },
+    };
+
+    let custTypingTimer = null;
+    let expTypingTimer = null;
+    let custIsTyping = false;
+    let expIsTyping = false;
+
+    function setUrl(url) {
+      document.getElementById("globalUrl").value = url;
+      loadAttachmentConfig();
+    }
+
+    function log(actor, msg, data) {
+      const box = document.getElementById("logsBox");
+      const time = new Date().toLocaleTimeString();
+      const line = document.createElement("div");
+      line.className = `log-entry ${actor}`;
+      line.textContent = `[${time}] [${actor.toUpperCase()}] ${msg} ${data ? JSON.stringify(data) : ""}`;
+      box.appendChild(line);
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function clearLogs() {
+      document.getElementById("logsBox").innerHTML = "";
+    }
+
+    function parseJwt(token) {
+      try {
+        return JSON.parse(atob(token.split(".")[1]));
+      } catch (e) {
+        return null;
+      }
+    }
+
+    // Load .env Attachment Limits from Server
+    async function loadAttachmentConfig() {
+      const url = document.getElementById("globalUrl").value.trim();
+      try {
+        const res = await fetch(`${url}/api/v1/media/config/attachments`);
+        const json = await res.json();
+        if (json.success && json.data) {
+          attachmentLimits = json.data;
+          document.getElementById("lblImgLimit").textContent = `Max ${attachmentLimits.image.maxSizeMb} MB`;
+          document.getElementById("lblDocLimit").textContent = `Max ${attachmentLimits.document.maxSizeMb} MB`;
+          document.getElementById("lblVidLimit").textContent = `Max ${attachmentLimits.video.maxSizeMb} MB`;
+          log("system", "Loaded .env attachment limits", attachmentLimits);
+        }
+      } catch (err) {
+        log("system", "Could not fetch dynamic attachment config, using defaults");
+      }
+    }
+
+    /* CUSTOMER SOCKET */
+    function connectCust(callback) {
+      const url = document.getElementById("globalUrl").value.trim();
+      const token = document.getElementById("custToken").value.trim();
+      if (!token) {
+        alert("Customer token required");
+        return;
+      }
+
+      const payload = parseJwt(token);
+      if (payload?.sub) {
+        custUserId = payload.sub;
+        log("system", `Customer identity parsed from JWT: sub=${custUserId}`);
+      }
+
+      log("customer", `Connecting to ${url}...`);
+      socketCust = io(url, {
+        auth: { token },
+        transports: ["websocket", "polling"],
+      });
+
+      socketCust.on("connect", () => {
+        log("customer", `Connected! Socket ID: ${socketCust.id}`);
+        document.getElementById("custBadge").className = "status-badge connected";
+        document.getElementById("custBadge").textContent = `Connected (${socketCust.id.slice(0, 5)})`;
+        document.getElementById("custBtnConnect").disabled = true;
+        document.getElementById("custBtnDisconnect").disabled = false;
+
+        const convId = document.getElementById("sharedConvId").value.trim();
+        if (convId) joinCust();
+        if (typeof callback === "function") callback();
+      });
+
+      socketCust.on("connect_error", (err) => {
+        log("customer", `Connect Error: ${err.message}`);
+      });
+
+      socketCust.on("disconnect", (reason) => {
+        log("customer", `Disconnected: ${reason}`);
+        document.getElementById("custBadge").className = "status-badge";
+        document.getElementById("custBadge").textContent = "Disconnected";
+        document.getElementById("custBtnConnect").disabled = false;
+        document.getElementById("custBtnDisconnect").disabled = true;
+      });
+
+      socketCust.on("message:new", (data) => {
+        log("customer", "Received message:new", data);
+        appendMsgTo("cust", data.message, custUserId, "mine-cust");
+      });
+
+      socketCust.on("conversation:read", (data) => {
+        log("customer", "Received conversation:read", data);
+        renderReadReceipt("cust", data.readAt);
+      });
+
+      socketCust.on("conversation:updated", (data) => {
+        log("customer", "Inbox alert: conversation:updated", data);
+      });
+
+      socketCust.on("typing:status", (data) => {
+        const bar = document.getElementById("custTyping");
+        if (data.isTyping) {
+          bar.innerHTML = '<span class="pulse-dot"></span> Expert is typing...';
+        } else {
+          bar.innerHTML = "";
+        }
+      });
+    }
+
+    function disconnectCust() {
+      if (socketCust) {
+        socketCust.disconnect();
+        socketCust = null;
+      }
+    }
+
+    /* EXPERT SOCKET */
+    function connectExp(callback) {
+      const url = document.getElementById("globalUrl").value.trim();
+      const token = document.getElementById("expToken").value.trim();
+      if (!token) {
+        alert("Expert token required");
+        return;
+      }
+
+      const payload = parseJwt(token);
+      if (payload?.sub) {
+        expUserId = payload.sub;
+        if (payload.expertProfileId) expProfileId = payload.expertProfileId;
+        log("system", `Expert identity parsed from JWT: sub=${expUserId}, profile=${expProfileId}`);
+      }
+
+      log("expert", `Connecting to ${url}...`);
+      socketExp = io(url, {
+        auth: { token },
+        transports: ["websocket", "polling"],
+      });
+
+      socketExp.on("connect", () => {
+        log("expert", `Connected! Socket ID: ${socketExp.id}`);
+        document.getElementById("expBadge").className = "status-badge connected";
+        document.getElementById("expBadge").textContent = `Connected (${socketExp.id.slice(0, 5)})`;
+        document.getElementById("expBtnConnect").disabled = true;
+        document.getElementById("expBtnDisconnect").disabled = false;
+
+        const convId = document.getElementById("sharedConvId").value.trim();
+        if (convId) joinExp();
+        if (typeof callback === "function") callback();
+      });
+
+      socketExp.on("connect_error", (err) => {
+        log("expert", `Connect Error: ${err.message}`);
+      });
+
+      socketExp.on("disconnect", (reason) => {
+        log("expert", `Disconnected: ${reason}`);
+        document.getElementById("expBadge").className = "status-badge";
+        document.getElementById("expBadge").textContent = "Disconnected";
+        document.getElementById("expBtnConnect").disabled = false;
+        document.getElementById("expBtnDisconnect").disabled = true;
+      });
+
+      socketExp.on("message:new", (data) => {
+        log("expert", "Received message:new", data);
+        appendMsgTo("exp", data.message, expUserId, "mine-exp");
+      });
+
+      socketExp.on("conversation:read", (data) => {
+        log("expert", "Received conversation:read", data);
+        renderReadReceipt("exp", data.readAt);
+      });
+
+      socketExp.on("conversation:updated", (data) => {
+        log("expert", "Inbox alert: conversation:updated", data);
+      });
+
+      socketExp.on("typing:status", (data) => {
+        const bar = document.getElementById("expTyping");
+        if (data.isTyping) {
+          bar.innerHTML = '<span class="pulse-dot"></span> Customer is typing...';
+        } else {
+          bar.innerHTML = "";
+        }
+      });
+    }
+
+    function disconnectExp() {
+      if (socketExp) {
+        socketExp.disconnect();
+        socketExp = null;
+      }
+    }
+
+    function disconnectBoth() {
+      disconnectCust();
+      disconnectExp();
+    }
+
+    /* ALL IN ONE CONNECT & START */
+    function connectAndStartBoth() {
+      connectCust(() => {
+        connectExp(() => {
+          log("system", "Both connected! Establishing conversation thread...");
+          socketCust.emit("conversation:create", { expertId: expProfileId }, (res) => {
+            log("customer", "conversation:create", res);
+            if (res.success && res.data?.id) {
+              const convId = res.data.id;
+              document.getElementById("sharedConvId").value = convId;
+              joinCust();
+              joinExp();
+            }
+          });
+        });
+      });
+    }
+
+    function joinBoth() {
+      joinCust();
+      joinExp();
+    }
+
+    function joinCust() {
+      const convId = document.getElementById("sharedConvId").value.trim();
+      if (!socketCust || !convId) return;
+      socketCust.emit("conversation:join", { conversationId: convId }, (res) => {
+        log("customer", "conversation:join", res);
+        if (res.success) loadHistory("cust", convId, custUserId, "mine-cust");
+      });
+    }
+
+    function joinExp() {
+      const convId = document.getElementById("sharedConvId").value.trim();
+      if (!socketExp || !convId) return;
+      socketExp.emit("conversation:join", { conversationId: convId }, (res) => {
+        log("expert", "conversation:join", res);
+        if (res.success) loadHistory("exp", convId, expUserId, "mine-exp");
+      });
+    }
+
+    function loadHistory(actor, convId, myId, myClass) {
+      const s = actor === "cust" ? socketCust : socketExp;
+      if (!s) return;
+      s.emit("message:history", { conversationId: convId, page: 1, limit: 50 }, (res) => {
+        log(actor, `message:history (${res.data?.items?.length || 0} messages)`);
+        if (res.success) {
+          const area = document.getElementById(actor + "ChatArea");
+          area.innerHTML = "";
+          (res.data.items || []).slice().reverse().forEach((msg) => {
+            appendMsgTo(actor, msg, myId, myClass);
+          });
+        }
+      });
+    }
+
+    function listConversationsCust() {
+      if (!socketCust) return alert("Connect Customer first");
+      socketCust.emit("conversation:list", {}, (res) => {
+        log("customer", "conversation:list", res);
+        if (res.success && res.data?.items?.length > 0) {
+          document.getElementById("sharedConvId").value = res.data.items[0].id;
+          joinBoth();
+        }
+      });
+    }
+
+    function listConversationsExp() {
+      if (!socketExp) return alert("Connect Expert first");
+      socketExp.emit("conversation:list", {}, (res) => {
+        log("expert", "conversation:list", res);
+        if (res.success && res.data?.items?.length > 0) {
+          document.getElementById("sharedConvId").value = res.data.items[0].id;
+          joinBoth();
+        }
+      });
+    }
+
+    /* ATTACHMENT HANDLING & VALIDATION */
+    function triggerFileInput(actor, accept) {
+      const input = document.getElementById(actor + "FileInput");
+      input.accept = accept;
+      input.click();
+    }
+
+    function handleFileSelect(actor, event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const mimeType = file.type || getMimeFromExtension(file.name);
+      let category = "document";
+      if (mimeType.startsWith("image/")) category = "image";
+      else if (mimeType.startsWith("video/")) category = "video";
+
+      const catLimit = attachmentLimits[category];
+      const maxBytes = catLimit.maxSizeMb * 1024 * 1024;
+
+      // Validate Format
+      const isAllowedMime = catLimit.mimes.some((m) => m === mimeType || m === mimeType.split(";")[0]);
+      if (!isAllowedMime) {
+        alert(`❌ Invalid format for ${category}!\nFile type '${mimeType}' is not allowed.\nAllowed: ${catLimit.mimes.join(", ")}`);
+        event.target.value = "";
+        return;
+      }
+
+      // Validate Size
+      if (file.size > maxBytes) {
+        alert(`❌ File too large for ${category}!\nFile size: ${(file.size / (1024 * 1024)).toFixed(2)} MB\nMaximum allowed: ${catLimit.maxSizeMb} MB`);
+        event.target.value = "";
+        return;
+      }
+
+      const fileData = {
+        fileBlob: file,
+        name: file.name,
+        sizeBytes: file.size,
+        mimeType,
+        category,
+      };
+
+      if (actor === "cust") custPendingFile = fileData;
+      else expPendingFile = fileData;
+
+      // Update UI Chip
+      const chip = document.getElementById(actor + "PendingAtt");
+      const label = document.getElementById(actor + "PendingAttLabel");
+      chip.style.display = "flex";
+      label.textContent = `📎 ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+      log(actor, `Selected ${category} attachment:`, { name: file.name, size: file.size, mime: mimeType });
+    }
+
+    function clearPendingAtt(actor) {
+      if (actor === "cust") {
+        custPendingFile = null;
+        document.getElementById("custFileInput").value = "";
+        document.getElementById("custPendingAtt").style.display = "none";
+      } else {
+        expPendingFile = null;
+        document.getElementById("expFileInput").value = "";
+        document.getElementById("expPendingAtt").style.display = "none";
+      }
+    }
+
+    function getMimeFromExtension(filename) {
+      const ext = filename.split(".").pop().toLowerCase();
+      const map = {
+        pdf: "application/pdf",
+        doc: "application/msword",
+        docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        xls: "application/vnd.ms-excel",
+        xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        txt: "text/plain",
+        csv: "text/csv",
+        jpg: "image/jpeg",
+        jpeg: "image/jpeg",
+        png: "image/png",
+        webp: "image/webp",
+        gif: "image/gif",
+        mp4: "video/mp4",
+        mov: "video/quicktime",
+        webm: "video/webm",
+        mkv: "video/x-matroska",
+      };
+      return map[ext] || "application/octet-stream";
+    }
+
+    // Step 1: POST /api/v1/media/uploads -> gets Presigned S3 PUT URL
+    // Step 2: HTTP PUT binary directly to AWS S3
+    async function uploadAttachment(actor, fileData) {
+      const url = document.getElementById("globalUrl").value.trim();
+      const token = document.getElementById(actor + "Token").value.trim();
+
+      log(actor, `[1/2] Requesting S3 Presigned Upload URL for ${fileData.name}...`);
+      const presignRes = await fetch(`${url}/api/v1/media/uploads`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          purpose: "chat_attachment",
+          mimeType: fileData.mimeType,
+          fileName: fileData.name,
+          sizeBytes: fileData.sizeBytes,
+        }),
+      });
+
+      const presignJson = await presignRes.json();
+      if (!presignRes.ok || !presignJson.success) {
+        throw new Error(presignJson.message || "Failed to create S3 upload URL");
+      }
+
+      const { id, uploadUrl } = presignJson.data;
+      log(actor, `[2/2] Uploading binary directly to S3 (temp stage)...`);
+
+      const s3PutRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": fileData.mimeType,
+        },
+        body: fileData.fileBlob,
+      });
+
+      if (!s3PutRes.ok) {
+        throw new Error(`S3 PUT failed with status: ${s3PutRes.status}`);
+      }
+
+      log(actor, `S3 upload completed for asset ID: ${id}`);
+      return id;
+    }
+
+    async function sendCustMsg() {
+      const input = document.getElementById("custMsgInput");
+      const convId = document.getElementById("sharedConvId").value.trim();
+      const body = input.value.trim();
+      if (!socketCust) return alert("Connect Customer socket first");
+      if (!convId) return alert("Please specify or Create a Conversation ID");
+      if (!body && !custPendingFile) return;
+
+      let mediaIds = [];
+      if (custPendingFile) {
+        try {
+          const mediaId = await uploadAttachment("cust", custPendingFile);
+          mediaIds.push(mediaId);
+          clearPendingAtt("cust");
+        } catch (err) {
+          alert("Media upload error: " + err.message);
+          return;
+        }
+      }
+
+      socketCust.emit("message:send", { conversationId: convId, body, mediaIds }, (res) => {
+        log("customer", "message:send", res);
+        if (res.success) {
+          input.value = "";
+          handleTyping("cust", true);
+        }
+      });
+    }
+
+    async function sendExpMsg() {
+      const input = document.getElementById("expMsgInput");
+      const convId = document.getElementById("sharedConvId").value.trim();
+      const body = input.value.trim();
+      if (!socketExp) return alert("Connect Expert socket first");
+      if (!convId) return alert("Please specify or Create a Conversation ID");
+      if (!body && !expPendingFile) return;
+
+      let mediaIds = [];
+      if (expPendingFile) {
+        try {
+          const mediaId = await uploadAttachment("exp", expPendingFile);
+          mediaIds.push(mediaId);
+          clearPendingAtt("exp");
+        } catch (err) {
+          alert("Media upload error: " + err.message);
+          return;
+        }
+      }
+
+      socketExp.emit("message:send", { conversationId: convId, body, mediaIds }, (res) => {
+        log("expert", "message:send", res);
+        if (res.success) {
+          input.value = "";
+          handleTyping("exp", true);
+        }
+      });
+    }
+
+    function markReadCust() {
+      const convId = document.getElementById("sharedConvId").value.trim();
+      if (!socketCust || !convId) return;
+      socketCust.emit("message:read", { conversationId: convId }, (res) => {
+        log("customer", "message:read", res);
+      });
+    }
+
+    function markReadExp() {
+      const convId = document.getElementById("sharedConvId").value.trim();
+      if (!socketExp || !convId) return;
+      socketExp.emit("message:read", { conversationId: convId }, (res) => {
+        log("expert", "message:read", res);
+      });
+    }
+
+    function handleTyping(actor, forceStop = false) {
+      const convId = document.getElementById("sharedConvId").value.trim();
+      const s = actor === "cust" ? socketCust : socketExp;
+      if (!s || !convId) return;
+
+      if (actor === "cust") {
+        if (forceStop) {
+          if (custIsTyping) {
+            s.emit("typing:stop", { conversationId: convId });
+            custIsTyping = false;
+          }
+          return;
+        }
+        if (!custIsTyping) {
+          s.emit("typing:start", { conversationId: convId });
+          custIsTyping = true;
+        }
+        clearTimeout(custTypingTimer);
+        custTypingTimer = setTimeout(() => {
+          s.emit("typing:stop", { conversationId: convId });
+          custIsTyping = false;
+        }, 2000);
+      } else {
+        if (forceStop) {
+          if (expIsTyping) {
+            s.emit("typing:stop", { conversationId: convId });
+            expIsTyping = false;
+          }
+          return;
+        }
+        if (!expIsTyping) {
+          s.emit("typing:start", { conversationId: convId });
+          expIsTyping = true;
+        }
+        clearTimeout(expTypingTimer);
+        expTypingTimer = setTimeout(() => {
+          s.emit("typing:stop", { conversationId: convId });
+          expIsTyping = false;
+        }, 2000);
+      }
+    }
+
+    function appendMsgTo(actor, msg, myId, myClass) {
+      const area = document.getElementById(actor + "ChatArea");
+      if (!area) return;
+      const isMine = msg.senderUserId === myId;
+      const bubble = document.createElement("div");
+      bubble.className = `msg-bubble ${isMine ? myClass : "theirs"}`;
+
+      let bodyHtml = msg.body ? `<div>${escapeHtml(msg.body)}</div>` : "";
+
+      // Attachments rendering
+      if (msg.attachments && msg.attachments.length > 0) {
+        msg.attachments.forEach((att) => {
+          const mime = (att.mimeType || "").toLowerCase();
+          const fileUrl = att.url || "#";
+
+          if (mime.startsWith("image/")) {
+            bodyHtml += `<a href="${fileUrl}" target="_blank"><img src="${fileUrl}" class="att-preview-img" alt="Image" onerror="this.alt='Image attachment'" /></a>`;
+          } else if (mime.startsWith("video/")) {
+            bodyHtml += `<video src="${fileUrl}" controls class="att-preview-video"></video>`;
+          } else {
+            const sizeStr = att.sizeBytes ? ` (${(att.sizeBytes / 1024).toFixed(1)} KB)` : "";
+            bodyHtml += `
+              <a href="${fileUrl}" target="_blank" class="att-preview-doc">
+                <span style="font-size: 18px;">📄</span>
+                <div>
+                  <div style="font-weight: 600; font-size: 12px;">Document Attachment</div>
+                  <div style="font-size: 10px; opacity: 0.8;">${mime}${sizeStr}</div>
+                </div>
+              </a>`;
+          }
+        });
+      }
+
+      bubble.innerHTML = `
+        ${bodyHtml}
+        <div class="msg-meta">${new Date(msg.createdAt).toLocaleTimeString()} • ${msg.deliveryStatus}</div>
+      `;
+      area.appendChild(bubble);
+      area.scrollTop = area.scrollHeight;
+    }
+
+    function renderReadReceipt(actor, readAt) {
+      const area = document.getElementById(actor + "ChatArea");
+      if (!area) return;
+      const note = document.createElement("div");
+      note.style.cssText = "font-size: 11px; color: #64748b; text-align: center; margin: 4px 0;";
+      note.textContent = `✓ Read by peer at ${new Date(readAt).toLocaleTimeString()}`;
+      area.appendChild(note);
+      area.scrollTop = area.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("sharedConvId").value = "a6e13d67-1c28-4e73-a22f-c15ec9a2684b";
+      loadAttachmentConfig();
+    });
+  </script>
+</body>
+</html>

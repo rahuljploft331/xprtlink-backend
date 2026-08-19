@@ -4,15 +4,16 @@ export const paginationMetaSchema = z.object({
   page: z.number().int().positive(),
   limit: z.number().int().positive(),
   total: z.number().int().nonnegative(),
+  totalPages: z.number().int().positive(),
+  hasNextPage: z.boolean(),
+  hasPrevPage: z.boolean(),
 });
 
 /** @param {import('zod').ZodTypeAny} itemSchema */
 export function paginatedListSchema(itemSchema) {
   return z.object({
     items: z.array(itemSchema),
-    page: z.number().int().positive(),
-    limit: z.number().int().positive(),
-    total: z.number().int().nonnegative(),
+    pagination: paginationMetaSchema,
   });
 }
 

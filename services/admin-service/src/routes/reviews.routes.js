@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { list, getById, hide, publish } from "#controllers/reviews.controller.js";
-import { requireAdmin } from "#middlewares/adminAuth.js";
+import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
+import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 const router = Router();
 router.use(requireAdmin);
-router.get("/", list);
-router.get("/:id", getById);
-router.patch("/:id/hide", hide);
-router.patch("/:id/publish", publish);
+router.get("/", requirePermission("reviews", "view"), asyncHandler(list));
+router.get("/:id", requirePermission("reviews", "view"), asyncHandler(getById));
+router.patch("/:id/hide", requirePermission("reviews", "edit"), asyncHandler(hide));
+router.patch("/:id/publish", requirePermission("reviews", "edit"), asyncHandler(publish));
 export default router;

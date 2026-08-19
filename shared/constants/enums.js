@@ -4,6 +4,7 @@
  */
 
 export const USER_STATUS = {
+  PENDING_VERIFICATION: "pending_verification",
   ACTIVE: "active",
   SUSPENDED: "suspended",
   DELETED: "deleted",
@@ -144,4 +145,27 @@ export const DEVICE_PLATFORM = {
   IOS: "ios",
   ANDROID: "android",
   WEB: "web",
+};
+
+export const ADMIN_ROLE = {
+  SUPER_ADMIN: "super_admin",
+  SUBADMIN: "subadmin",
+};
+
+export const ADMIN_USER_STATUS = {
+  ACTIVE: "active",
+  SUSPENDED: "suspended",
+};
+
+export const ADMIN_PERMISSION_LEVEL = {
+  NONE: "none",
+  VIEW: "view",
+  EDIT: "edit",
+};
+
+export const SUPPORT_TICKET_STATUS = {
+  OPEN: "open",
+  IN_PROGRESS: "in_progress",
+  RESOLVED: "resolved",
+  CLOSED: "closed",
 };

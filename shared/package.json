@@ -24,6 +24,8 @@
     "db:studio": "npx prisma studio --schema=./prisma/schema.prisma"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1109.0",
+    "@aws-sdk/s3-request-presigner": "^3.1109.0",
     "@prisma/client": "^6.19.0",
     "@sendgrid/mail": "^8.1.5",
     "bcryptjs": "^3.0.2",

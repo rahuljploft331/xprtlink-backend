@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { list, getBySlug, update } from "#controllers/cms.controller.js";
-import { requireAdmin } from "#middlewares/adminAuth.js";
+import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
+import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 const router = Router();
 router.use(requireAdmin);
-router.get("/", list);
-router.get("/:slug", getBySlug);
-router.put("/:slug", update);
+router.get("/", requirePermission("cms", "view"), asyncHandler(list));
+router.get("/:slug", requirePermission("cms", "view"), asyncHandler(getBySlug));
+router.put("/:slug", requirePermission("cms", "edit"), asyncHandler(update));
 export default router;

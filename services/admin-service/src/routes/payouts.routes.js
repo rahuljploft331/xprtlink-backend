@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { list, getById, markPaid } from "#controllers/payouts.controller.js";
-import { requireAdmin } from "#middlewares/adminAuth.js";
+import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
+import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 const router = Router();
 router.use(requireAdmin);
-router.get("/", list);
-router.get("/:id", getById);
-router.patch("/:id/mark-paid", markPaid);
+router.get("/", requirePermission("payouts", "view"), asyncHandler(list));
+router.get("/:id", requirePermission("payouts", "view"), asyncHandler(getById));
+router.patch("/:id/mark-paid", requirePermission("payouts", "edit"), asyncHandler(markPaid));
 export default router;

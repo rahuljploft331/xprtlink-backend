@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { generateZegoToken } from "@xprtlink/shared/lib/zegoToken.js";
 import { getDb } from "@xprtlink/shared/db";
+import { internalGet } from "@xprtlink/shared/lib/internalFetch.js";
 import { amountToCents } from "@xprtlink/shared/mappers/common.js";
 import {
   toQuoteSummaryDto,
@@ -501,9 +502,13 @@ export async function getBillingSummary(auth, consultationId) {
     throw badRequest("Billing summary is available after consultation ends", "INVALID_STATUS");
   }
 
-  const charge = await getDb().consultationCharge.findUnique({
-    where: { consultationId },
-  });
+  // Fetch the charge breakdown from billing-service via internal HTTP call
+  // instead of directly querying the billing DB (service boundary).
+  const billingUrl = process.env.BILLING_SERVICE_URL ?? "http://localhost:4006";
+  const charge = await internalGet(
+    billingUrl,
+    `/api/v1/billing/consultations/${consultationId}/charge`
+  ).catch(() => null); // charge may not exist yet for legacy consultations
 
   return toConsultationBillingSummaryDto(consultation, {
     commissionCents: charge?.commissionCents ?? 0,

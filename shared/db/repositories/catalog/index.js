@@ -19,3 +19,7 @@ export function appConfig() {
 export function subscriptionPlans() {
   return getDb().subscriptionPlan;
 }
+
+export function supportTickets() {
+  return getDb().supportTicket;
+}

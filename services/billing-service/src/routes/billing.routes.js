@@ -29,8 +29,44 @@ router.post(
   })
 );
 
+/**
+ * POST /api/v1/billing/consultations/:id/capture
+ * Internal-only — called by engagement-service on ZegoCloud room_close.
+ * Must be BEFORE router.use(authenticate) — guarded by x-internal-service header.
+ */
+router.post(
+  "/consultations/:id/capture",
+  asyncHandler(async (req, res) => {
+    const internalHeader = req.headers["x-internal-service"];
+    if (!internalHeader) {
+      return res.status(403).json({ success: false, message: "Internal endpoint" });
+    }
+    const { durationSeconds } = req.body;
+    const data = await svc.captureConsultation(req.params.id, durationSeconds);
+    return ResponseFormatter.success(res, { message: "Capture processed", data });
+  })
+);
+
+/**
+ * GET /api/v1/billing/consultations/:id/charge
+ * Internal-only — called by engagement-service to retrieve the charge breakdown
+ * for a completed consultation without crossing the DB boundary.
+ * Guarded by x-internal-service header.
+ */
+router.get(
+  "/consultations/:id/charge",
+  asyncHandler(async (req, res) => {
+    if (!req.headers["x-internal-service"]) {
+      return res.status(403).json({ success: false, message: "Internal endpoint" });
+    }
+    const data = await svc.getConsultationCharge(req.params.id);
+    return ResponseFormatter.success(res, { data });
+  })
+);
+
 
 router.use(authenticate);
+
 
 router.get(
   "/payment-methods",
@@ -71,6 +107,8 @@ router.post(
     return ResponseFormatter.success(res, { message: "Pre-authorization hold placed", data });
   })
 );
+
+
 
 router.post(
   "/consultations/:id/pay",

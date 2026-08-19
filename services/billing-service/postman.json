@@ -450,6 +450,33 @@
             },
             "description": "Internal cron endpoint to expire subscriptions past their period end. Should be protected with internal secret header or restricted to localhost in production."
           }
+        },
+        {
+          "id": "57225879-77777777-0000-4000-8000-000000000003",
+          "name": "Get Consultation Charge (Internal)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-internal-service",
+                "value": "true",
+                "description": "Required — guards this endpoint from public access. Only service-to-service calls include this header."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/consultations/:id/charge",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "consultations", ":id", "charge"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{consultationId}}",
+                  "description": "UUID of the consultation"
+                }
+              ]
+            },
+            "description": "Internal-only endpoint — called by engagement-service to retrieve the ConsultationCharge breakdown (commissionCents, expertShareCents) for a completed consultation.\n\nRequires the x-internal-service: true header. Returns 403 if called without it.\n\nReturns null data if no charge record exists yet (pre-billing state).\n\nThis endpoint was introduced to remove engagement-service's direct cross-boundary access to the billing DB."
+          }
         }
       ]
     }

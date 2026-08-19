@@ -40,7 +40,10 @@ export async function getSession(req) {
 // Step 2 → POST /auth/otp/verify  { purpose: "register" }
 //   Verifies OTP, creates profile, activates account, issues tokens.
 
-const claimedAvailabilityFilter = { status: { notIn: ["pending_verification", "deleted"] } };
+const claimedAvailabilityFilter = {
+  status: { notIn: ["pending_verification", "deleted"] },
+  deletedAt: null,
+};
 
 async function assertIdentifierAvailable({ email, phone, excludeUserId }) {
   const db = getDb();
@@ -184,7 +187,7 @@ export async function login(body) {
 
   const db = getDb();
   const user = await db.user.findFirst({
-    where: email ? { email } : { phone },
+    where: email ? { email, deletedAt: null } : { phone, deletedAt: null },
     include: {
       customerProfile: true,
       expertProfile: { include: { subscriptions: { where: { status: "active" }, take: 1 } } },
@@ -389,7 +392,9 @@ export async function resetPassword(body) {
   const challenge = await findValidOtpChallenge({ email, phone, purpose: "reset_password" });
   await verifyOtpCode(challenge, code);
 
-  const user = await getDb().user.findFirst({ where: email ? { email } : { phone } });
+  const user = await getDb().user.findFirst({
+    where: email ? { email, deletedAt: null } : { phone, deletedAt: null },
+  });
   if (!user) throw notFound("User not found");
 
   await getDb().$transaction([
@@ -461,7 +466,7 @@ export async function socialLogin(body) {
   let user = await db.user.findUnique({ where: { firebaseUid }, include });
 
   if (!user && email) {
-    user = await db.user.findUnique({ where: { email }, include });
+    user = await db.user.findFirst({ where: { email, deletedAt: null }, include });
     if (user) {
       user = await db.user.update({
         where: { id: user.id },

@@ -15,3 +15,7 @@ export function payouts() {
 export function earningsLedger() {
   return getDb().expertEarningsLedger;
 }
+
+export function consultationCharges() {
+  return getDb().consultationCharge;
+}
