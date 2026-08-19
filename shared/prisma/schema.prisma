@@ -633,8 +633,8 @@ model Consultation {
   createdAt           DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt           DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  customer            CustomerProfile           @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  expert              ExpertProfile             @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  customer            CustomerProfile           @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  expert              ExpertProfile             @relation(fields: [expertId], references: [id], onDelete: Restrict)
   review              Review?
   charge              ConsultationCharge?
   earningsLedger      ExpertEarningsLedger[]

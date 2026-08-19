@@ -1,8 +1,8 @@
 import { Router } from "express";
 import { list, getById } from "#controllers/consultations.controller.js";
-import { requireAdmin } from "#middlewares/adminAuth.js";
+import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
 const router = Router();
 router.use(requireAdmin);
-router.get("/", list);
-router.get("/:id", getById);
+router.get("/", requirePermission("consultations", "view"), list);
+router.get("/:id", requirePermission("consultations", "view"), getById);
 export default router;
