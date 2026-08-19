@@ -233,8 +233,8 @@ enum AdminPermissionLevel {
 
 model User {
   id               String     @id @default(uuid()) @db.Uuid
-  email            String?    @unique @db.VarChar(320)
-  phone            String?    @unique @db.VarChar(32)
+  email            String?    @db.VarChar(320)
+  phone            String?    @db.VarChar(32)
   passwordHash     String?    @map("password_hash") @db.VarChar(255)
   firebaseUid      String?    @unique @map("firebase_uid") @db.VarChar(128)
   emailVerifiedAt  DateTime?  @map("email_verified_at") @db.Timestamptz(6)
