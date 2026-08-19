@@ -66,18 +66,25 @@ export const loginRequestSchema = z
     role: sessionRoleSchema,
     email: z.string().email().optional(),
     phone: e164PhoneSchema.optional(),
-    password: z.string().min(1),
+    password: z.string().optional(),
   })
   .refine((data) => data.email || data.phone, {
     message: "Email or phone is required",
     path: ["email"],
+  })
+  .refine((data) => {
+    if (data.email && (!data.password || data.password.length === 0)) return false;
+    return true;
+  }, {
+    message: "Password is required for email login",
+    path: ["password"],
   });
 
 export const otpSendRequestSchema = z
   .object({
     email: z.string().email().optional(),
     phone: e164PhoneSchema.optional(),
-    purpose: z.enum(["register", "reset_password", "verify_email", "verify_phone"]),
+    purpose: z.enum(["register", "login", "reset_password", "verify_email", "verify_phone"]),
   })
   .refine((data) => data.email || data.phone, {
     message: "Email or phone is required",
@@ -89,7 +96,7 @@ export const otpVerifyRequestSchema = z
     email: z.string().email().optional(),
     phone: e164PhoneSchema.optional(),
     code: z.string().regex(/^\d{6}$/, "OTP must be exactly 6 digits"),
-    purpose: z.enum(["register", "reset_password", "verify_email", "verify_phone"]),
+    purpose: z.enum(["register", "login", "reset_password", "verify_email", "verify_phone"]),
   })
   .refine((data) => data.email || data.phone, {
     message: "Email or phone is required",

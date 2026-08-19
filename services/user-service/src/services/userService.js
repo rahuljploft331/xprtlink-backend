@@ -206,6 +206,17 @@ export async function login(body) {
 
   if (user.status !== "active") throw unauthorized("Invalid credentials");
 
+  if (phone) {
+    const otpResult = await createAndDeliverOtp({
+      phone,
+      purpose: "login",
+      channel: "phone",
+      userId: user.id,
+      registrationData: { role },
+    });
+    return { needsOtp: true, ...otpResult };
+  }
+
   const valid = await verifyPassword(password, user.passwordHash);
   if (!valid) throw unauthorized("Invalid credentials");
 
@@ -301,6 +312,26 @@ export async function verifyOtp(body) {
 
   if (purpose === "reset_password") {
     return { verified: true };
+  }
+
+  if (purpose === "login") {
+    const user = await db.$transaction(async (tx) => {
+      await tx.otpChallenge.update({
+        where: { id: challenge.id },
+        data: { consumedAt: new Date() },
+      });
+      return tx.user.findUnique({
+        where: { id: challenge.userId },
+        include: {
+          customerProfile: true,
+          expertProfile: { include: { subscriptions: { where: { status: "active" }, take: 1 } } },
+        },
+      });
+    });
+
+    const tokens = await issueTokens(user, challenge.registrationData?.role || "customer");
+    if (!tokens) throw badRequest("Failed to create session");
+    return tokens;
   }
 
   if (purpose === "register") {
