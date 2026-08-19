@@ -1,8 +1,9 @@
 import { Router } from "express";
 import { list, getById } from "#controllers/quotes.controller.js";
 import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
+import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 const router = Router();
 router.use(requireAdmin);
-router.get("/", requirePermission("quotes", "view"), list);
-router.get("/:id", requirePermission("quotes", "view"), getById);
+router.get("/", requirePermission("quotes", "view"), asyncHandler(list));
+router.get("/:id", requirePermission("quotes", "view"), asyncHandler(getById));
 export default router;

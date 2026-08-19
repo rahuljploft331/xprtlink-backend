@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { list, getById, create, update, setPermissions } from "#controllers/admins.controller.js";
 import { requireAdmin, requireSuperAdmin } from "#middlewares/adminAuth.js";
+import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 const router = Router();
 router.use(requireAdmin, requireSuperAdmin);
-router.get("/", list);
-router.post("/", create);
-router.get("/:id", getById);
-router.patch("/:id", update);
-router.put("/:id/permissions", setPermissions);
+router.get("/", asyncHandler(list));
+router.post("/", asyncHandler(create));
+router.get("/:id", asyncHandler(getById));
+router.patch("/:id", asyncHandler(update));
+router.put("/:id/permissions", asyncHandler(setPermissions));
 export default router;
