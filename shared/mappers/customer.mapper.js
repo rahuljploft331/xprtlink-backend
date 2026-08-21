@@ -1,6 +1,7 @@
-import { toIso } from "./common.js";
+import { resolveMediaUrl, toIso } from "./common.js";
 
 export function toCustomerMeDto({ profile, user, avatarUrl = null }) {
+  const finalAvatarUrl = avatarUrl || resolveMediaUrl(profile.avatarMedia?.storageKey);
   return {
     id: profile.id,
     userId: user.id,
@@ -8,7 +9,7 @@ export function toCustomerMeDto({ profile, user, avatarUrl = null }) {
     phone: user.phone,
     firstName: profile.firstName,
     lastName: profile.lastName,
-    avatarUrl,
+    avatarUrl: finalAvatarUrl,
     status: user.status,
     createdAt: toIso(profile.createdAt),
     updatedAt: toIso(profile.updatedAt),
