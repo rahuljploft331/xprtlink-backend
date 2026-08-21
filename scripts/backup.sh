@@ -27,8 +27,11 @@ TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 BACKUP_FILE="$BACKUP_DIR/xpertlink_db_$TIMESTAMP.dump"
 
 echo "Starting database backup..."
+# Remove query parameters like ?schema=public which pg_dump doesn't support
+CLEAN_URL=$(echo "$DATABASE_URL" | cut -d '?' -f 1)
+
 # Use custom format (-F c) for easy restoration with pg_restore
-pg_dump "$DATABASE_URL" -F c -f "$BACKUP_FILE"
+pg_dump "$CLEAN_URL" -F c -f "$BACKUP_FILE"
 
 if [ $? -eq 0 ]; then
   echo "✅ Backup successfully saved to $BACKUP_FILE"
