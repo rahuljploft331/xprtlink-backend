@@ -39,9 +39,9 @@
     "test:verify-phone": "npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared exec node scripts/test-communications.js verify-sms"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1109.0",
-    "@aws-sdk/s3-request-presigner": "^3.1109.0",
-    "@aws-sdk/client-secrets-manager": "^3.1109.0",
+    "@aws-sdk/client-s3": "3.1115.0",
+    "@aws-sdk/client-secrets-manager": "3.1115.0",
+    "@aws-sdk/s3-request-presigner": "3.1115.0",
     "@xprtlink/shared": "workspace:*",
     "bcryptjs": "^3.0.3",
     "stripe": "^17.7.0"
@@ -50,12 +50,12 @@
     "dotenv": "^16.6.1",
     "dotenv-cli": "^8.0.0",
     "fast-check": "3.22.0",
-    "newman": "^6.2.1",
+    "newman": "^6.2.2",
     "nodemon": "^3.1.14",
     "pm2": "^5.4.3",
-    "prisma": "^6.19.0",
+    "prisma": "^6.19.3",
     "socket.io-client": "^4.8.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.11"
   },
   "engines": {
     "node": ">=20"
