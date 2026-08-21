@@ -25,9 +25,12 @@ const malePhotos = [
   "seeder/data/photos/male/jurica-koletic-7YVZYZeITc8-unsplash.jpg",
 ];
 
+import { loadSecret } from "@xprtlink/shared/config/secrets.js";
+
 const allPhotos = [...femalePhotos, ...malePhotos];
 
 async function main() {
+  await loadSecret();
   const s3 = getS3Client();
   const bucket = getS3BucketName();
   

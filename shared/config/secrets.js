@@ -20,9 +20,17 @@ let cachedSecret = null;
 export async function loadSecret() {
   if (cachedSecret) return cachedSecret;
 
+  const credentials = process.env.AWS_SECRETS_MANAGER_ACCESS_KEY_ID && process.env.AWS_SECRETS_MANAGER_SECRET_ACCESS_KEY
+    ? {
+        accessKeyId: process.env.AWS_SECRETS_MANAGER_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRETS_MANAGER_SECRET_ACCESS_KEY,
+      }
+    : undefined;
+
   const client = new SecretsManagerClient({
     region: AWS_REGION,
     endpoint: AWS_ENDPOINT, // undefined → uses real AWS endpoint
+    credentials,
     requestHandler: new NodeHttpHandler({
       httpsAgent: new Agent({ family: 4 })
     }),

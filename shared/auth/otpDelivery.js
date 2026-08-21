@@ -20,7 +20,9 @@ function logDevOtp(channel, destination, code, purpose) {
 }
 
 async function sendEmailOtp({ email, code, purpose }) {
-  if (!getSecretSync("SENDGRID_API_KEY")) {
+  const useHardcode = process.env.OTP_ENABLE_HARDCODE === "true" && isDevFallbackEnabled();
+
+  if (!getSecretSync("SENDGRID_API_KEY") || useHardcode) {
     logDevOtp("email", email, code, purpose);
     if (isDevFallbackEnabled()) return;
     throw badRequest(
@@ -45,9 +47,11 @@ async function sendSmsOtp({ phone, purpose }) {
   const authToken = getSecretSync("TWILIO_AUTH_TOKEN");
   const verifyServiceSid = getSecretSync("TWILIO_VERIFY_SERVICE_SID");
 
-  if (!accountSid || !authToken || !verifyServiceSid) {
+  const useHardcode = process.env.OTP_ENABLE_HARDCODE === "true" && isDevFallbackEnabled();
+
+  if (!accountSid || !authToken || !verifyServiceSid || useHardcode) {
     if (isDevFallbackEnabled()) {
-      const devCode = process.env.OTP_ENABLE_HARDCODE === "true" ? process.env.OTP_HARDCODE_CODE : "<twilio-verify-simulated>";
+      const devCode = useHardcode ? process.env.OTP_HARDCODE_CODE : "<twilio-verify-simulated>";
       console.log(`[otp] ${purpose} verify SMS via Twilio to ${phone}: ${devCode}`);
       return;
     }

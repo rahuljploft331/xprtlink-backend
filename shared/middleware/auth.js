@@ -27,6 +27,7 @@ export function authenticate(req, _res, next) {
     };
     next();
   } catch (err) {
+    console.error("[Auth] Token verification failed:", err);
     if (err.name === "TokenExpiredError" || err.name === "JsonWebTokenError") {
       next(unauthorized("Invalid or expired token"));
       return;

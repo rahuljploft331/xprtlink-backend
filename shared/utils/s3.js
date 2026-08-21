@@ -7,14 +7,16 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+import { getSecretSync } from "../config/secrets.js";
+
 let s3ClientInstance = null;
 
 export function getS3Client() {
   if (s3ClientInstance) return s3ClientInstance;
 
-  const region = process.env.AWS_REGION || "us-west-2";
-  const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-  const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+  const region = getSecretSync("AWS_REGION", "us-west-2");
+  const accessKeyId = getSecretSync("AWS_ACCESS_KEY_ID");
+  const secretAccessKey = getSecretSync("AWS_SECRET_ACCESS_KEY");
 
   if (accessKeyId && secretAccessKey) {
     s3ClientInstance = new S3Client({
