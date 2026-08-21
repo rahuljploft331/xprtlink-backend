@@ -163,7 +163,7 @@ async function runAllFlows() {
   const consultationSpecs = [
     { cIdx: 0, eIdx: 0, status: "completed", durationMins: 18, rateCents: 400, daysAgo: 2 },
     { cIdx: 1, eIdx: 1, status: "completed", durationMins: 12, rateCents: 350, daysAgo: 3 },
-    { cIdx: 2, eIdx: 2, status: "cancelled", durationMins: 0, rateCents: 300, daysAgo: 5 },
+    { cIdx: 2, eIdx: 2, status: "canceled", durationMins: 0, rateCents: 300, daysAgo: 5 },
     { cIdx: 3, eIdx: 3, status: "completed", durationMins: 25, rateCents: 450, daysAgo: 7 },
     { cIdx: 0, eIdx: 1, status: "completed", durationMins: 15, rateCents: 350, daysAgo: 10 },
     { cIdx: 1, eIdx: 3, status: "completed", durationMins: 32, rateCents: 450, daysAgo: 14 },

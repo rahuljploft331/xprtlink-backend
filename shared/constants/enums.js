@@ -43,7 +43,7 @@ export const QUOTE_STATUS = {
   ACCEPTED: "accepted",
   REJECTED: "rejected",
   EXPIRED: "expired",
-  CANCELLED: "cancelled",
+  CANCELED: "canceled",
 };
 
 export const CONSULTATION_STATUS = {
@@ -53,7 +53,7 @@ export const CONSULTATION_STATUS = {
   IN_PROGRESS: "in_progress",
   COMPLETED: "completed",
   DECLINED: "declined",
-  CANCELLED: "cancelled",
+  CANCELED: "canceled",
   FAILED: "failed",
 };
 
@@ -123,7 +123,7 @@ export const SUBSCRIPTION_STORE = {
 export const EXPERT_SUBSCRIPTION_STATUS = {
   ACTIVE: "active",
   EXPIRED: "expired",
-  CANCELLED: "cancelled",
+  CANCELED: "canceled",
   GRACE_PERIOD: "grace_period",
 };
 

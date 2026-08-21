@@ -3,6 +3,8 @@ import { verifyPassword } from "@xprtlink/shared/auth/password.js";
 import { signAccessToken } from "@xprtlink/shared/auth/jwt.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { unauthorized, badRequest } from "@xprtlink/shared/utils/errors.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 /** POST /api/auth/login */
 export async function login(req, res, next) {
@@ -32,7 +34,7 @@ export async function login(req, res, next) {
     const { passwordHash: _ph, ...adminSafe } = admin;
 
     return ResponseFormatter.success(res, {
-      message: "Login successful",
+      message: getMessage("loginSuccessful"),
       data: {
         accessToken,
         adminUser: {
@@ -51,7 +53,7 @@ export async function login(req, res, next) {
 
 /** POST /api/auth/logout — stateless JWT; just acknowledge */
 export async function logout(_req, res) {
-  return ResponseFormatter.success(res, { message: "Logged out" });
+  return ResponseFormatter.success(res, { message: getMessage("loggedOut") });
 }
 
 /** GET /api/auth/me — return current admin from DB */

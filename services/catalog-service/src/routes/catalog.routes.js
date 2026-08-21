@@ -3,6 +3,8 @@ import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { optionalAuthenticate } from "@xprtlink/shared/middleware/auth.js";
 import * as svc from "../services/catalogService.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 const router = Router();
 
@@ -10,7 +12,7 @@ router.get(
   "/app-config",
   asyncHandler(async (_req, res) => {
     const data = await svc.getAppConfig();
-    return ResponseFormatter.success(res, { message: "App config", data });
+    return ResponseFormatter.success(res, { message: getMessage("appConfig"), data });
   })
 );
 
@@ -19,7 +21,7 @@ router.get(
   optionalAuthenticate,
   asyncHandler(async (_req, res) => {
     const data = await svc.getCategories();
-    return ResponseFormatter.success(res, { message: "Categories", data });
+    return ResponseFormatter.success(res, { message: getMessage("categories"), data });
   })
 );
 

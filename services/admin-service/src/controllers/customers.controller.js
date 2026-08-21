@@ -2,6 +2,8 @@ import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 /** GET /api/v1/admin/customers */
 export async function list(req, res, next) {
@@ -96,7 +98,7 @@ export async function getById(req, res, next) {
       },
     });
     if (!user || !user.customerProfile) {
-      return res.status(404).json({ success: false, message: "Customer not found", code: "NOT_FOUND" });
+      return res.status(404).json({ success: false, message: getMessage("customerNotFound"), code: "NOT_FOUND" });
     }
     const { passwordHash: _ph, ...safe } = user;
     if (safe.customerProfile) {

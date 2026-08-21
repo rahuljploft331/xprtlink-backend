@@ -42,7 +42,7 @@ export function toExpertSubscriptionDto(subscription, plan, currency = "USD") {
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd ?? false,
     currentPeriodStart: toIso(subscription.currentPeriodStart),
     currentPeriodEnd: toIso(subscription.currentPeriodEnd),
-    cancelledAt: toIso(subscription.cancelledAt),
+    canceledAt: toIso(subscription.canceledAt),
   };
 }
 

@@ -7,7 +7,7 @@ export const consultationStatusSchema = z.enum([
   "in_progress",
   "completed",
   "declined",
-  "cancelled",
+  "canceled",
   "failed",
 ]);
 

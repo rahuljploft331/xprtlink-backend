@@ -585,7 +585,7 @@ export async function subscribe(auth, body) {
     if (existingActive) {
       await tx.expertSubscription.update({
         where: { id: existingActive.id },
-        data: { status: "cancelled", cancelledAt: now, cancelAtPeriodEnd: false },
+        data: { status: "canceled", canceledAt: now, cancelAtPeriodEnd: false },
       });
     }
 
@@ -690,7 +690,7 @@ export async function cancelSubscription(auth) {
 /**
  * Called by a scheduled cron job (e.g. nightly).
  * Finds all active subscriptions where cancelAtPeriodEnd=true AND currentPeriodEnd
- * has passed, then flips them to 'cancelled'.
+ * has passed, then flips them to 'canceled'.
  */
 export async function expireSubscriptions() {
   const db = getDb();
@@ -703,8 +703,8 @@ export async function expireSubscriptions() {
       currentPeriodEnd: { lte: now },
     },
     data: {
-      status: "cancelled",
-      cancelledAt: now,
+      status: "canceled",
+      canceledAt: now,
     },
   });
 

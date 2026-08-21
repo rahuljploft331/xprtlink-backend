@@ -4,6 +4,8 @@ import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { authenticate, optionalAuthenticate, requireRole } from "@xprtlink/shared/middleware/auth.js";
 import { expertMeUpdateRequestSchema } from "@xprtlink/shared/contracts";
 import * as svc from "../services/expertService.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 const router = Router();
 
@@ -12,7 +14,7 @@ router.get(
   optionalAuthenticate,
   asyncHandler(async (_req, res) => {
     const data = await svc.getFeatured();
-    return ResponseFormatter.success(res, { message: "Featured experts", data });
+    return ResponseFormatter.success(res, { message: getMessage("featuredExperts"), data });
   })
 );
 
@@ -22,7 +24,7 @@ router.get(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.getExpertMe(req.auth);
-    return ResponseFormatter.success(res, { message: "Expert profile", data });
+    return ResponseFormatter.success(res, { message: getMessage("expertProfile"), data });
   })
 );
 
@@ -33,7 +35,7 @@ router.patch(
   asyncHandler(async (req, res) => {
     const body = expertMeUpdateRequestSchema.parse(req.body);
     const data = await svc.updateExpertMe(req.auth, body);
-    return ResponseFormatter.success(res, { message: "Expert profile updated", data });
+    return ResponseFormatter.success(res, { message: getMessage("expertProfileUpdated"), data });
   })
 );
 
@@ -43,7 +45,7 @@ router.post(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.saveOnboarding(req.auth, req.body);
-    return ResponseFormatter.success(res, { message: "Onboarding saved", data });
+    return ResponseFormatter.success(res, { message: getMessage("onboardingSaved"), data });
   })
 );
 
@@ -53,7 +55,7 @@ router.post(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.submitOnboarding(req.auth);
-    return ResponseFormatter.success(res, { message: "Onboarding submitted", data });
+    return ResponseFormatter.success(res, { message: getMessage("onboardingSubmitted"), data });
   })
 );
 
@@ -63,7 +65,7 @@ router.get(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.getVerification(req.auth);
-    return ResponseFormatter.success(res, { message: "Verification status", data });
+    return ResponseFormatter.success(res, { message: getMessage("verificationStatus"), data });
   })
 );
 
@@ -73,7 +75,7 @@ router.post(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.submitVerificationDocuments(req.auth, req.body);
-    return ResponseFormatter.success(res, { message: "Documents submitted", data });
+    return ResponseFormatter.success(res, { message: getMessage("documentsSubmitted"), data });
   })
 );
 
@@ -83,7 +85,7 @@ router.get(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.getDashboard(req.auth);
-    return ResponseFormatter.success(res, { message: "Dashboard", data });
+    return ResponseFormatter.success(res, { message: getMessage("dashboard"), data });
   })
 );
 
@@ -93,7 +95,7 @@ router.get(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.getRatingSummary(req.auth);
-    return ResponseFormatter.success(res, { message: "Rating summary", data });
+    return ResponseFormatter.success(res, { message: getMessage("ratingSummary"), data });
   })
 );
 
@@ -103,7 +105,7 @@ router.get(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.getMyReviews(req.auth, req.query);
-    return ResponseFormatter.paginated(res, { message: "Reviews", ...data });
+    return ResponseFormatter.paginated(res, { message: getMessage("reviews"), ...data });
   })
 );
 
@@ -113,7 +115,7 @@ router.get(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.getSettings(req.auth);
-    return ResponseFormatter.success(res, { message: "Settings", data });
+    return ResponseFormatter.success(res, { message: getMessage("settings"), data });
   })
 );
 
@@ -123,7 +125,7 @@ router.patch(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.updateSettings(req.auth, req.body);
-    return ResponseFormatter.success(res, { message: "Settings updated", data });
+    return ResponseFormatter.success(res, { message: getMessage("settingsUpdated"), data });
   })
 );
 
@@ -132,7 +134,7 @@ router.get(
   optionalAuthenticate,
   asyncHandler(async (req, res) => {
     const data = await svc.getExpertReviews(req.params.id, req.query);
-    return ResponseFormatter.paginated(res, { message: "Expert reviews", ...data });
+    return ResponseFormatter.paginated(res, { message: getMessage("expertReviews"), ...data });
   })
 );
 
@@ -141,7 +143,7 @@ router.get(
   optionalAuthenticate,
   asyncHandler(async (req, res) => {
     const data = await svc.getExpertAvailability(req.params.id);
-    return ResponseFormatter.success(res, { message: "Availability", data });
+    return ResponseFormatter.success(res, { message: getMessage("availability"), data });
   })
 );
 
@@ -150,7 +152,7 @@ router.get(
   optionalAuthenticate,
   asyncHandler(async (req, res) => {
     const data = await svc.getExpertById(req.params.id, req.auth);
-    return ResponseFormatter.success(res, { message: "Expert profile", data });
+    return ResponseFormatter.success(res, { message: getMessage("expertProfile"), data });
   })
 );
 

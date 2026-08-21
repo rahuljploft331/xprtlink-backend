@@ -3,6 +3,8 @@ import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { logAdminAction } from "#utils/audit.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 /** GET /api/v1/admin/verifications */
 export async function list(req, res, next) {
@@ -54,7 +56,7 @@ export async function getById(req, res, next) {
       },
     });
     if (!v) {
-      return res.status(404).json({ success: false, message: "Verification not found", code: "NOT_FOUND" });
+      return res.status(404).json({ success: false, message: getMessage("verificationNotFound"), code: "NOT_FOUND" });
     }
 
     // Attach a resolved public URL to each document's media so the admin
@@ -115,7 +117,7 @@ export async function approve(req, res, next) {
     await logAdminAction(req, "verification.approve", "ExpertVerification", result.id, {
       notes: req.body?.notes ?? null,
     });
-    return ResponseFormatter.success(res, { message: "Verification approved", data: result });
+    return ResponseFormatter.success(res, { message: getMessage("verificationApproved"), data: result });
   } catch (err) {
     next(err);
   }
@@ -140,7 +142,7 @@ export async function reject(req, res, next) {
     await logAdminAction(req, "verification.reject", "ExpertVerification", v.id, {
       notes: req.body?.notes ?? null,
     });
-    return ResponseFormatter.success(res, { message: "Verification rejected", data: v });
+    return ResponseFormatter.success(res, { message: getMessage("verificationRejected"), data: v });
   } catch (err) {
     next(err);
   }

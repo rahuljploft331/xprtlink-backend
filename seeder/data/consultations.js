@@ -2,7 +2,7 @@
 export const seedConsultations = [
   { customerIndex: 0, expertIndex: 0, status: "completed", durationMins: 18, amountCents: 7200, daysAgo: 2 },
   { customerIndex: 1, expertIndex: 1, status: "completed", durationMins: 12, amountCents: 4800, daysAgo: 4 },
-  { customerIndex: 2, expertIndex: 2, status: "cancelled", durationMins: 0, amountCents: 0, daysAgo: 6 },
+  { customerIndex: 2, expertIndex: 2, status: "canceled", durationMins: 0, amountCents: 0, daysAgo: 6 },
   { customerIndex: 3, expertIndex: 3, status: "completed", durationMins: 25, amountCents: 9500, daysAgo: 8 },
   { customerIndex: 0, expertIndex: 1, status: "completed", durationMins: 15, amountCents: 5500, daysAgo: 11 },
   { customerIndex: 1, expertIndex: 3, status: "completed", durationMins: 32, amountCents: 12000, daysAgo: 14 },

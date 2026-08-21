@@ -1,6 +1,8 @@
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 export async function list(req, res, next) {
   try {
@@ -29,7 +31,7 @@ export async function getById(req, res, next) {
       where: { id: req.params.id },
       include: { customer: true, expert: true, statusEvents: true, attachments: true },
     });
-    if (!q) return res.status(404).json({ success: false, message: "Not found", code: "NOT_FOUND" });
+    if (!q) return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
     return ResponseFormatter.success(res, { data: q });
   } catch (err) { next(err); }
 }

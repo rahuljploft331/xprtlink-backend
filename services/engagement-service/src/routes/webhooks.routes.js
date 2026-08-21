@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { verifyZegoSignature } from "@xprtlink/shared/lib/zegoWebhook.js";
 import * as svc from "../services/zegoCallbackService.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 const router = Router();
 
@@ -21,7 +23,7 @@ router.post(
     // 1. Verify signature
     if (!verifyZegoSignature(signature, timestamp, nonce)) {
       console.warn("[zego-webhook] Invalid signature, rejecting callback");
-      return res.status(401).json({ code: 1, message: "Invalid signature" });
+      return res.status(401).json({ code: 1, message: getMessage("invalidSignature") });
     }
 
     // 2. Log every callback for debugging

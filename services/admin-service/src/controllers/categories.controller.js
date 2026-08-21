@@ -1,5 +1,7 @@
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 export async function list(_req, res, next) {
   try {
@@ -20,7 +22,7 @@ export async function getById(req, res, next) {
       where: { id: req.params.id },
       include: { _count: { select: { experts: true } } },
     });
-    if (!c) return res.status(404).json({ success: false, message: "Not found", code: "NOT_FOUND" });
+    if (!c) return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
     return ResponseFormatter.success(res, { data: c });
   } catch (err) { next(err); }
 }
@@ -54,6 +56,6 @@ export async function remove(req, res, next) {
   try {
     const db = getDb();
     await db.category.delete({ where: { id: req.params.id } });
-    return ResponseFormatter.success(res, { message: "Category deleted" });
+    return ResponseFormatter.success(res, { message: getMessage("categoryDeleted") });
   } catch (err) { next(err); }
 }

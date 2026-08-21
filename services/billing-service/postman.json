@@ -388,7 +388,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "billing", "subscriptions", "me"]
             },
-            "description": "Cancels the expert's active subscription immediately. Sets status to 'cancelled'. Returns 404 if no active subscription exists."
+            "description": "Cancels the expert's active subscription immediately. Sets status to 'canceled'. Returns 404 if no active subscription exists."
           }
         }
       ]

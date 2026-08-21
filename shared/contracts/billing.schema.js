@@ -31,11 +31,11 @@ export const expertSubscriptionDtoSchema = z.object({
   id: z.string().uuid(),
   plan: subscriptionPlanDtoSchema,
   store: z.enum(["apple", "google"]),
-  status: z.enum(["active", "expired", "cancelled", "grace_period"]),
+  status: z.enum(["active", "expired", "canceled", "grace_period"]),
   cancelAtPeriodEnd: z.boolean(),
   currentPeriodStart: z.string().datetime(),
   currentPeriodEnd: z.string().datetime(),
-  cancelledAt: z.string().datetime().nullable(),
+  canceledAt: z.string().datetime().nullable(),
 });
 
 export const earningsEntryDtoSchema = z.object({

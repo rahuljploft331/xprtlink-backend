@@ -2,6 +2,8 @@ import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { logAdminAction } from "#utils/audit.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 export async function list(req, res, next) {
   try {
@@ -27,7 +29,7 @@ export async function getById(req, res, next) {
       where: { id: req.params.id },
       include: { expert: true },
     });
-    if (!p) return res.status(404).json({ success: false, message: "Not found", code: "NOT_FOUND" });
+    if (!p) return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
     return ResponseFormatter.success(res, { data: p });
   } catch (err) { next(err); }
 }
@@ -40,6 +42,6 @@ export async function markPaid(req, res, next) {
       data: { status: "paid", updatedAt: new Date() },
     });
     await logAdminAction(req, "payout.markPaid", "ExpertPayout", p.id);
-    return ResponseFormatter.success(res, { message: "Payout marked as paid", data: p });
+    return ResponseFormatter.success(res, { message: getMessage("payoutMarkedAsPaid"), data: p });
   } catch (err) { next(err); }
 }

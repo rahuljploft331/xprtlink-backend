@@ -325,16 +325,16 @@ export async function cancelQuote(auth, quoteId) {
   const quote = await loadQuote(quoteId);
   assertQuoteCustomer(auth, quote);
   if (!CANCELLABLE_QUOTE_STATUSES.has(quote.status)) {
-    throw badRequest("Quote cannot be cancelled in its current status", "INVALID_STATUS");
+    throw badRequest("Quote cannot be canceled in its current status", "INVALID_STATUS");
   }
 
   const updated = await getDb().$transaction((tx) =>
     recordQuoteTransition(tx, {
       quoteId,
       fromStatus: quote.status,
-      toStatus: "cancelled",
+      toStatus: "canceled",
       actorUserId: auth.userId,
-      note: "Customer cancelled quote request",
+      note: "Customer canceled quote request",
       data: { resolvedAt: new Date() },
     })
   );

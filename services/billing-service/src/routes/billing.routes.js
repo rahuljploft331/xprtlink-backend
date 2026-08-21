@@ -12,6 +12,8 @@ import {
 } from "@xprtlink/shared/contracts";
 import { stripeGuard } from "../middleware/stripeGuard.js";
 import * as svc from "../services/billingService.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 
 const router = Router();
@@ -39,11 +41,11 @@ router.post(
   asyncHandler(async (req, res) => {
     const internalHeader = req.headers["x-internal-service"];
     if (!internalHeader) {
-      return res.status(403).json({ success: false, message: "Internal endpoint" });
+      return res.status(403).json({ success: false, message: getMessage("internalEndpoint") });
     }
     const { durationSeconds } = req.body;
     const data = await svc.captureConsultation(req.params.id, durationSeconds);
-    return ResponseFormatter.success(res, { message: "Capture processed", data });
+    return ResponseFormatter.success(res, { message: getMessage("captureProcessed"), data });
   })
 );
 
@@ -57,7 +59,7 @@ router.get(
   "/consultations/:id/charge",
   asyncHandler(async (req, res) => {
     if (!req.headers["x-internal-service"]) {
-      return res.status(403).json({ success: false, message: "Internal endpoint" });
+      return res.status(403).json({ success: false, message: getMessage("internalEndpoint") });
     }
     const data = await svc.getConsultationCharge(req.params.id);
     return ResponseFormatter.success(res, { data });
@@ -73,7 +75,7 @@ router.get(
   requireRole("customer"),
   asyncHandler(async (req, res) => {
     const data = await svc.listPaymentMethods(req.auth);
-    return ResponseFormatter.success(res, { message: "Payment methods", data });
+    return ResponseFormatter.success(res, { message: getMessage("paymentMethods"), data });
   })
 );
 
@@ -84,7 +86,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = addPaymentMethodRequestSchema.parse(req.body);
     const data = await svc.addPaymentMethod(req.auth, body);
-    return ResponseFormatter.success(res, { message: "Payment method added", data, status: 201 });
+    return ResponseFormatter.success(res, { message: getMessage("paymentMethodAdded"), data, status: 201 });
   })
 );
 
@@ -93,7 +95,7 @@ router.delete(
   requireRole("customer"),
   asyncHandler(async (req, res) => {
     const data = await svc.removePaymentMethod(req.auth, req.params.id);
-    return ResponseFormatter.success(res, { message: "Payment method removed", data });
+    return ResponseFormatter.success(res, { message: getMessage("paymentMethodRemoved"), data });
   })
 );
 
@@ -104,7 +106,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = preAuthHoldRequestSchema.parse(req.body);
     const data = await svc.holdConsultationFunds(req.auth, req.params.id, body);
-    return ResponseFormatter.success(res, { message: "Pre-authorization hold placed", data });
+    return ResponseFormatter.success(res, { message: getMessage("preauthorizationHoldPlaced"), data });
   })
 );
 
@@ -117,7 +119,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = payConsultationRequestSchema.parse(req.body);
     const data = await svc.payConsultation(req.auth, req.params.id, body);
-    return ResponseFormatter.success(res, { message: "Payment successful", data });
+    return ResponseFormatter.success(res, { message: getMessage("paymentSuccessful"), data });
   })
 );
 
@@ -125,7 +127,7 @@ router.get(
   "/transactions/:id",
   asyncHandler(async (req, res) => {
     const data = await svc.getTransaction(req.auth, req.params.id);
-    return ResponseFormatter.success(res, { message: "Transaction", data });
+    return ResponseFormatter.success(res, { message: getMessage("transaction"), data });
   })
 );
 
@@ -135,7 +137,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = customConnectKycRequestSchema.parse(req.body);
     const data = await svc.submitCustomConnectKyc(req.auth, body);
-    return ResponseFormatter.success(res, { message: "Custom KYC account created", data, status: 201 });
+    return ResponseFormatter.success(res, { message: getMessage("customKycAccountCreated"), data, status: 201 });
   })
 );
 
@@ -145,7 +147,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = attachBankAccountRequestSchema.parse(req.body);
     const data = await svc.attachBankAccount(req.auth, body);
-    return ResponseFormatter.success(res, { message: "Bank account attached", data, status: 201 });
+    return ResponseFormatter.success(res, { message: getMessage("bankAccountAttached"), data, status: 201 });
   })
 );
 
@@ -154,7 +156,7 @@ router.get(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.listSubscriptionPlans();
-    return ResponseFormatter.success(res, { message: "Subscription plans", data });
+    return ResponseFormatter.success(res, { message: getMessage("subscriptionPlans"), data });
   })
 );
 
@@ -164,7 +166,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = subscribeRequestSchema.parse(req.body);
     const data = await svc.subscribe(req.auth, body);
-    return ResponseFormatter.success(res, { message: "Subscribed", data, status: 201 });
+    return ResponseFormatter.success(res, { message: getMessage("subscribed"), data, status: 201 });
   })
 );
 
@@ -173,7 +175,7 @@ router.get(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.getMySubscription(req.auth);
-    return ResponseFormatter.success(res, { message: "Current subscription", data });
+    return ResponseFormatter.success(res, { message: getMessage("currentSubscription"), data });
   })
 );
 
@@ -182,7 +184,7 @@ router.delete(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.cancelSubscription(req.auth);
-    return ResponseFormatter.success(res, { message: "Subscription cancelled", data });
+    return ResponseFormatter.success(res, { message: getMessage("subscriptionCanceled"), data });
   })
 );
 
@@ -192,7 +194,7 @@ router.get(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const data = await svc.getEarnings(req.auth, req.query);
-    return ResponseFormatter.paginated(res, { message: "Earnings", ...data });
+    return ResponseFormatter.paginated(res, { message: getMessage("earnings"), ...data });
   })
 );
 

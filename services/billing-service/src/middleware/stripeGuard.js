@@ -1,3 +1,5 @@
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 /**
  * Stripe Guard Middleware
  *
@@ -12,7 +14,7 @@ export function stripeGuard(req, res, next) {
       success: false,
       error: {
         code: "STRIPE_UNAVAILABLE",
-        message: "Stripe integration is not configured",
+        message: getMessage("stripeIntegrationIsNotConfigured"),
       },
     });
   }

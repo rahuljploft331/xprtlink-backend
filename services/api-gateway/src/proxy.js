@@ -1,5 +1,7 @@
 import { createProxyMiddleware, fixRequestBody } from "http-proxy-middleware";
 import { getConfig } from "@xprtlink/shared/config/loadEnv.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 export function createSocketProxy() {
   const { serviceUrls } = getConfig("api-gateway");
@@ -16,7 +18,7 @@ export function createSocketProxy() {
           res.end(
             JSON.stringify({
               success: false,
-              message: "Messaging service unavailable",
+              message: getMessage("messagingServiceUnavailable"),
               code: "BAD_GATEWAY",
             })
           );
@@ -56,7 +58,7 @@ export function createGatewayProxies() {
         error(err, _req, res) {
           console.error(`[gateway] proxy error ${path}:`, err.message);
           res.writeHead(502, { "Content-Type": "application/json" });
-          res.end(JSON.stringify({ success: false, message: "Service unavailable", code: "BAD_GATEWAY" }));
+          res.end(JSON.stringify({ success: false, message: getMessage("serviceUnavailable"), code: "BAD_GATEWAY" }));
         },
       },
     })

@@ -13,6 +13,8 @@ import { toAdminUserDto } from "@xprtlink/shared/mappers/admin.mapper.js";
 import { logAdminAction } from "#utils/audit.js";
 import { notFound, badRequest } from "@xprtlink/shared/utils/errors.js";
 import { sendEmail } from "@xprtlink/shared/lib/email.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 export async function list(req, res, next) {
   try {
@@ -34,7 +36,7 @@ export async function getById(req, res, next) {
     const admin = await adminUsers().findUnique({
       where: { id: req.params.id }, include: { permissions: true },
     });
-    if (!admin) return res.status(404).json({ success: false, message: "Not found", code: "NOT_FOUND" });
+    if (!admin) return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
     return ResponseFormatter.success(res, { data: toAdminUserDto(admin) });
   } catch (err) { next(err); }
 }
@@ -115,6 +117,6 @@ export async function setPermissions(req, res, next) {
       )
     );
     await logAdminAction(req, "admin.setPermissions", "AdminUser", req.params.id, { permissions });
-    return ResponseFormatter.success(res, { message: "Permissions updated" });
+    return ResponseFormatter.success(res, { message: getMessage("permissionsUpdated") });
   } catch (err) { next(err); }
 }

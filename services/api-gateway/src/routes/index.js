@@ -1,12 +1,14 @@
 import { Router } from "express";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { createGatewayProxies } from "../proxy.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 const router = Router();
 
 router.get("/", (_req, res) => {
   return ResponseFormatter.success(res, {
-    message: "XprtLink API Gateway",
+    message: getMessage("xprtlinkApiGateway"),
     data: { service: "api-gateway", version: "v1" },
   });
 });

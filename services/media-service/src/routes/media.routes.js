@@ -5,6 +5,8 @@ import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { authenticate, optionalAuthenticate } from "@xprtlink/shared/middleware/auth.js";
 import { createUploadRequestSchema } from "@xprtlink/shared/contracts";
 import * as svc from "../services/mediaService.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 const router = Router();
 
@@ -14,7 +16,7 @@ router.get(
   asyncHandler(async (_req, res) => {
     const data = svc.getAttachmentSettings();
     return ResponseFormatter.success(res, {
-      message: "Chat attachment configuration",
+      message: getMessage("chatAttachmentConfiguration"),
       data,
     });
   })
@@ -32,7 +34,7 @@ router.post(
     const body = createUploadRequestSchema.parse(req.body);
     const data = await svc.createUpload(req.auth, body);
     return ResponseFormatter.success(res, {
-      message: "Upload created",
+      message: getMessage("uploadCreated"),
       data,
       status: 201,
     });
@@ -45,7 +47,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const data = await svc.confirmUpload(req.auth, req.params.id);
     return ResponseFormatter.success(res, {
-      message: "Upload confirmed",
+      message: getMessage("uploadConfirmed"),
       data,
     });
   })
@@ -57,7 +59,7 @@ router.get(
   asyncHandler(async (req, res) => {
     const data = await svc.getMediaAsset(req.auth, req.params.id);
     return ResponseFormatter.success(res, {
-      message: "Media asset",
+      message: getMessage("mediaAsset"),
       data,
     });
   })

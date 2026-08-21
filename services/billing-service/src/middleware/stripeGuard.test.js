@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { stripeGuard } from "./stripeGuard.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 describe("stripeGuard middleware", () => {
   let req;
@@ -29,7 +31,7 @@ describe("stripeGuard middleware", () => {
       success: false,
       error: {
         code: "STRIPE_UNAVAILABLE",
-        message: "Stripe integration is not configured",
+        message: getMessage("stripeIntegrationIsNotConfigured"),
       },
     });
     expect(next).not.toHaveBeenCalled();
@@ -45,7 +47,7 @@ describe("stripeGuard middleware", () => {
       success: false,
       error: {
         code: "STRIPE_UNAVAILABLE",
-        message: "Stripe integration is not configured",
+        message: getMessage("stripeIntegrationIsNotConfigured"),
       },
     });
     expect(next).not.toHaveBeenCalled();
@@ -61,7 +63,7 @@ describe("stripeGuard middleware", () => {
       success: false,
       error: {
         code: "STRIPE_UNAVAILABLE",
-        message: "Stripe integration is not configured",
+        message: getMessage("stripeIntegrationIsNotConfigured"),
       },
     });
     expect(next).not.toHaveBeenCalled();

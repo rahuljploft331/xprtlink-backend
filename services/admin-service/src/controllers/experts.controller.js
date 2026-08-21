@@ -2,6 +2,8 @@ import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
 
 /** GET /api/v1/admin/experts */
 export async function list(req, res, next) {
@@ -88,7 +90,7 @@ export async function getById(req, res, next) {
       },
     });
     if (!expert) {
-      return res.status(404).json({ success: false, message: "Expert not found", code: "NOT_FOUND" });
+      return res.status(404).json({ success: false, message: getMessage("expertNotFound"), code: "NOT_FOUND" });
     }
     if (expert) {
       expert.avatarUrl = resolveMediaUrl(expert.avatarMedia?.storageKey);

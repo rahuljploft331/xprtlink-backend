@@ -8,7 +8,7 @@ export const quoteStatusSchema = z.enum([
   "accepted",
   "rejected",
   "expired",
-  "cancelled",
+  "canceled",
 ]);
 
 export const quoteAttachmentDtoSchema = z.object({
