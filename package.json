@@ -33,7 +33,10 @@
     "db:migrate:dev": "npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared run db:migrate:dev",
     "db:studio": "npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared run db:studio",
     "seed:verification-docs": "node scripts/seed-verification-docs.mjs",
-    "seed:verification-docs:pending": "node scripts/seed-verification-docs.mjs --no-approve"
+    "seed:verification-docs:pending": "node scripts/seed-verification-docs.mjs --no-approve",
+    "test:email": "npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared exec node scripts/test-communications.js email",
+    "test:phone": "npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared exec node scripts/test-communications.js sms",
+    "test:verify-phone": "npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared exec node scripts/test-communications.js verify-sms"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1109.0",

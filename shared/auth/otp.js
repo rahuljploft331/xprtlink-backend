@@ -88,7 +88,22 @@ export async function findValidOtpChallenge({ email, phone, purpose }) {
  */
 export async function verifyOtpCode(challenge, code) {
   const { maxAttempts, blockDurationMs } = getOtpConfig();
-  const valid = await verifyTokenHash(code, challenge.codeHash);
+  let valid = false;
+
+  if (challenge.codeHash === "TWILIO_VERIFY" && challenge.phone) {
+    if (
+      process.env.OTP_ENABLE_HARDCODE === "true" &&
+      process.env.NODE_ENV !== "production" &&
+      process.env.OTP_HARDCODE_CODE === code
+    ) {
+      valid = true;
+    } else {
+      const { verifySmsOtp } = await import("./otpDelivery.js");
+      valid = await verifySmsOtp({ phone: challenge.phone, code });
+    }
+  } else {
+    valid = await verifyTokenHash(code, challenge.codeHash);
+  }
 
   if (valid) return true;
 
@@ -131,9 +146,17 @@ export async function createAndDeliverOtp({
   await assertOtpResendAllowed({ email, phone, purpose });
   await revokePendingOtpChallenges({ email, phone, purpose, userId });
 
-  const code = generateOtpCode();
-  const codeHash = await hashToken(code);
-  const deliveredChannel = await deliverOtp({ email, phone, code, purpose, channel });
+  const resolvedChannel = channel ?? (phone ? "phone" : "email");
+  let code = null;
+  let codeHash = "TWILIO_VERIFY";
+
+  if (resolvedChannel === "phone") {
+    await deliverOtp({ email, phone, code: null, purpose, channel: resolvedChannel });
+  } else {
+    code = generateOtpCode();
+    codeHash = await hashToken(code);
+    await deliverOtp({ email, phone, code, purpose, channel: resolvedChannel });
+  }
 
   await getDb().otpChallenge.create({
     data: {
@@ -150,6 +173,6 @@ export async function createAndDeliverOtp({
   return {
     sent: true,
     expiresInSeconds: ttlMs / 1000,
-    channel: deliveredChannel,
+    channel: resolvedChannel,
   };
 }

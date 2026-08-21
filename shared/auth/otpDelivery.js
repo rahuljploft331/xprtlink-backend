@@ -40,14 +40,17 @@ async function sendEmailOtp({ email, code, purpose }) {
   });
 }
 
-async function sendSmsOtp({ phone, code, purpose }) {
+async function sendSmsOtp({ phone, purpose }) {
   const accountSid = getSecretSync("TWILIO_ACCOUNT_SID");
   const authToken = getSecretSync("TWILIO_AUTH_TOKEN");
-  const fromNumber = getSecretSync("TWILIO_FROM_NUMBER");
+  const verifyServiceSid = getSecretSync("TWILIO_VERIFY_SERVICE_SID");
 
-  if (!accountSid || !authToken || !fromNumber) {
-    logDevOtp("sms", phone, code, purpose);
-    if (isDevFallbackEnabled()) return;
+  if (!accountSid || !authToken || !verifyServiceSid) {
+    if (isDevFallbackEnabled()) {
+      const devCode = process.env.OTP_ENABLE_HARDCODE === "true" ? process.env.OTP_HARDCODE_CODE : "<twilio-verify-simulated>";
+      console.log(`[otp] ${purpose} verify SMS via Twilio to ${phone}: ${devCode}`);
+      return;
+    }
     throw badRequest(
       "Unable to send verification code. Please try again.",
       "OTP_DELIVERY_FAILED",
@@ -57,13 +60,34 @@ async function sendSmsOtp({ phone, code, purpose }) {
 
   const twilio = await import("twilio");
   const client = twilio.default(accountSid, authToken);
-  const label = OTP_PURPOSE_LABELS[purpose] ?? "verification";
 
-  await client.messages.create({
+  await client.verify.v2.services(verifyServiceSid).verifications.create({
     to: phone,
-    from: fromNumber,
-    body: `Your XprtLink ${label} code is ${code}. It expires in 10 minutes.`,
+    channel: "sms",
   });
+}
+
+export async function verifySmsOtp({ phone, code }) {
+  const accountSid = getSecretSync("TWILIO_ACCOUNT_SID");
+  const authToken = getSecretSync("TWILIO_AUTH_TOKEN");
+  const verifyServiceSid = getSecretSync("TWILIO_VERIFY_SERVICE_SID");
+
+  if (!accountSid || !authToken || !verifyServiceSid) {
+    throw badRequest("Twilio Verify configuration is missing.", "OTP_CONFIG_ERROR");
+  }
+
+  const twilio = await import("twilio");
+  const client = twilio.default(accountSid, authToken);
+
+  try {
+    const verificationCheck = await client.verify.v2.services(verifyServiceSid).verificationChecks.create({
+      to: phone,
+      code,
+    });
+    return verificationCheck.status === "approved";
+  } catch (err) {
+    return false;
+  }
 }
 
 /**
@@ -75,7 +99,7 @@ export async function deliverOtp({ email, phone, code, purpose, channel }) {
 
   if (resolvedChannel === "phone") {
     if (!phone) throw badRequest("Phone is required for SMS OTP", "VALIDATION_ERROR", "phone");
-    await sendSmsOtp({ phone, code, purpose });
+    await sendSmsOtp({ phone, purpose });
     return "phone";
   }
 
