@@ -23,6 +23,7 @@
     "reset": "node scripts/reset.js",
     "db:seed": "node scripts/seed.js",
     "db:reset": "node scripts/reset.js",
+    "db:backup": "bash scripts/backup.sh",
     "seed:platform": "node scripts/seed-platform.js",
     "init:flows": "node scripts/init-flows.js",
     "init:flows:fresh": "node scripts/init-flows.js --fresh",
