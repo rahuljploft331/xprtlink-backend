@@ -18,7 +18,7 @@ export async function getFeatured(limit = 10) {
     where: PUBLIC_WHERE,
     take: limit,
     orderBy: [{ ratingAvg: "desc" }, { foundingMember: "desc" }],
-    include: { category: true },
+    include: { category: true, avatarMedia: true },
   });
   return experts.map((e) => toExpertPublicDto(e, { category: e.category }));
 }
@@ -53,7 +53,7 @@ export async function searchExperts(query, auth) {
 
   const db = getDb();
   const [experts, total] = await Promise.all([
-    db.expertProfile.findMany({ where, skip, take: limit, orderBy, include: { category: true } }),
+    db.expertProfile.findMany({ where, skip, take: limit, orderBy, include: { category: true, avatarMedia: true } }),
     db.expertProfile.count({ where }),
   ]);
 
@@ -85,7 +85,7 @@ function buildSort(sort) {
 export async function getExpertById(id, auth) {
   const expert = await getDb().expertProfile.findUnique({
     where: { id },
-    include: { category: true },
+    include: { category: true, avatarMedia: true },
   });
   if (!expert) throw notFound("Expert not found");
 
@@ -133,6 +133,7 @@ async function getExpertProfileOrThrow(auth) {
     where: { userId: auth.userId },
     include: {
       category: true,
+      avatarMedia: true,
       subscriptions: { where: { status: "active" }, take: 1 },
       settings: true,
     },
@@ -153,6 +154,14 @@ export async function getExpertMe(auth) {
 
 export async function updateExpertMe(auth, body) {
   const { expert, user, subscriptionActive } = await getExpertProfileOrThrow(auth);
+  
+  if (body.avatarMediaId) {
+    const media = await getDb().mediaAsset.findFirst({
+      where: { id: body.avatarMediaId, ownerUserId: auth.userId, status: "ready" }
+    });
+    if (!media) throw badRequest("Invalid or unready avatar media asset");
+  }
+
   const updated = await getDb().expertProfile.update({
     where: { id: expert.id },
     data: {
@@ -164,8 +173,9 @@ export async function updateExpertMe(auth, body) {
       ...(body.experienceYears !== undefined ? { experienceYears: body.experienceYears } : {}),
       ...(body.availabilityStatus ? { availabilityStatus: body.availabilityStatus } : {}),
       ...(body.categoryId ? { categoryId: body.categoryId } : {}),
+      ...(body.avatarMediaId !== undefined ? { avatarMediaId: body.avatarMediaId } : {}),
     },
-    include: { category: true, subscriptions: { where: { status: "active" }, take: 1 } },
+    include: { category: true, avatarMedia: true, subscriptions: { where: { status: "active" }, take: 1 } },
   });
   return toExpertMeDto(updated, {
     user,
@@ -177,6 +187,14 @@ export async function updateExpertMe(auth, body) {
 export async function saveOnboarding(auth, body) {
   const expert = await getDb().expertProfile.findFirst({ where: { userId: auth.userId } });
   if (!expert) throw notFound("Expert profile not found");
+  
+  if (body.avatarMediaId) {
+    const media = await getDb().mediaAsset.findFirst({
+      where: { id: body.avatarMediaId, ownerUserId: auth.userId, status: "ready" }
+    });
+    if (!media) throw badRequest("Invalid or unready avatar media asset");
+  }
+
   await getDb().expertProfile.update({
     where: { id: expert.id },
     data: {
@@ -187,6 +205,7 @@ export async function saveOnboarding(auth, body) {
         : {}),
       ...(body.experienceYears !== undefined ? { experienceYears: body.experienceYears } : {}),
       ...(body.categoryId ? { categoryId: body.categoryId } : {}),
+      ...(body.avatarMediaId !== undefined ? { avatarMediaId: body.avatarMediaId } : {}),
       onboardingStep: { increment: 1 },
     },
   });

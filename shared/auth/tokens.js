@@ -28,7 +28,9 @@ export async function loadUserContext(userId) {
   return db.user.findUnique({
     where: { id: userId },
     include: {
-      customerProfile: true,
+      customerProfile: {
+        include: { avatarMedia: true },
+      },
       expertProfile: {
         include: {
           subscriptions: {

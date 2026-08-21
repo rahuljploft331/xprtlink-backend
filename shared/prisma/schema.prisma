@@ -242,32 +242,32 @@ enum SupportTicketStatus {
 // ─── Identity (user-service) ─────────────────────────────────────────────────
 
 model User {
-  id               String     @id @default(uuid()) @db.Uuid
-  email            String?    @db.VarChar(320)
-  phone            String?    @db.VarChar(32)
-  passwordHash     String?    @map("password_hash") @db.VarChar(255)
-  firebaseUid      String?    @unique @map("firebase_uid") @db.VarChar(128)
-  emailVerifiedAt  DateTime?  @map("email_verified_at") @db.Timestamptz(6)
-  phoneVerifiedAt  DateTime?  @map("phone_verified_at") @db.Timestamptz(6)
-  termsAcceptedAt  DateTime?  @map("terms_accepted_at") @db.Timestamptz(6)
-  status           UserStatus @default(active)
-  deletedAt        DateTime?  @map("deleted_at") @db.Timestamptz(6)
-  createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String?    @db.VarChar(320)
+  phone           String?    @db.VarChar(32)
+  passwordHash    String?    @map("password_hash") @db.VarChar(255)
+  firebaseUid     String?    @unique @map("firebase_uid") @db.VarChar(128)
+  emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamptz(6)
+  phoneVerifiedAt DateTime?  @map("phone_verified_at") @db.Timestamptz(6)
+  termsAcceptedAt DateTime?  @map("terms_accepted_at") @db.Timestamptz(6)
+  status          UserStatus @default(active)
+  deletedAt       DateTime?  @map("deleted_at") @db.Timestamptz(6)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  customerProfile  CustomerProfile?
-  expertProfile    ExpertProfile?
-  refreshTokens    RefreshToken[]
-  authSessions     AuthSession[]
-  otpChallenges    OtpChallenge[]
-  deviceTokens     DeviceToken[]
-  mediaAssets      MediaAsset[]
-  notifications    Notification[]
-  notificationPref NotificationPreference?
-  messagesSent     Message[]              @relation("MessageSender")
-  conversationReads ConversationReadState[]
-  quoteStatusEvents QuoteStatusEvent[]   @relation("QuoteStatusActor")
-  supportTickets    SupportTicket[]
+  customerProfile      CustomerProfile?
+  expertProfile        ExpertProfile?
+  refreshTokens        RefreshToken[]
+  authSessions         AuthSession[]
+  otpChallenges        OtpChallenge[]
+  deviceTokens         DeviceToken[]
+  mediaAssets          MediaAsset[]
+  notifications        Notification[]
+  notificationPref     NotificationPreference?
+  messagesSent         Message[]               @relation("MessageSender")
+  conversationReads    ConversationReadState[]
+  quoteStatusEvents    QuoteStatusEvent[]      @relation("QuoteStatusActor")
+  supportTickets       SupportTicket[]
   supportConversations SupportConversation[]
   supportMessagesSent  SupportMessage[]
 
@@ -286,30 +286,30 @@ model CustomerProfile {
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  avatarMedia     MediaAsset? @relation("CustomerAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
-  savedExperts    CustomerSavedExpert[]
-  recentlyViewed  CustomerRecentlyViewed[]
-  quoteRequests   QuoteRequest[]
-  consultations   Consultation[]
-  conversations   Conversation[]
-  paymentMethods  PaymentMethod[]
-  expertReports   ExpertReport[]
-  reviews         Review[]
+  user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  avatarMedia    MediaAsset?              @relation("CustomerAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
+  savedExperts   CustomerSavedExpert[]
+  recentlyViewed CustomerRecentlyViewed[]
+  quoteRequests  QuoteRequest[]
+  consultations  Consultation[]
+  conversations  Conversation[]
+  paymentMethods PaymentMethod[]
+  expertReports  ExpertReport[]
+  reviews        Review[]
 
   @@index([avatarMediaId])
   @@map("customer_profiles")
 }
 
 model RefreshToken {
-  id          String    @id @default(uuid()) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
-  tokenHash   String    @map("token_hash") @db.VarChar(255)
-  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
-  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -317,15 +317,15 @@ model RefreshToken {
 }
 
 model AuthSession {
-  id          String    @id @default(uuid()) @db.Uuid
-  userId      String    @map("user_id") @db.Uuid
-  userAgent   String?   @map("user_agent") @db.VarChar(512)
-  ipAddress   String?   @map("ip_address") @db.VarChar(45)
-  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
-  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  userAgent String?   @map("user_agent") @db.VarChar(512)
+  ipAddress String?   @map("ip_address") @db.VarChar(45)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("auth_sessions")
@@ -347,7 +347,7 @@ model OtpChallenge {
   consumedAt       DateTime?  @map("consumed_at") @db.Timestamptz(6)
   createdAt        DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user             User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([email])
   @@index([phone])
@@ -356,14 +356,14 @@ model OtpChallenge {
 }
 
 model DeviceToken {
-  id          String         @id @default(uuid()) @db.Uuid
-  userId      String         @map("user_id") @db.Uuid
-  platform    DevicePlatform
-  token       String         @db.VarChar(512)
-  lastSeenAt  DateTime       @default(now()) @map("last_seen_at") @db.Timestamptz(6)
-  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  id         String         @id @default(uuid()) @db.Uuid
+  userId     String         @map("user_id") @db.Uuid
+  platform   DevicePlatform
+  token      String         @db.VarChar(512)
+  lastSeenAt DateTime       @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, token])
   @@index([userId])
@@ -371,13 +371,13 @@ model DeviceToken {
 }
 
 model CustomerSavedExpert {
-  id                String          @id @default(uuid()) @db.Uuid
-  customerProfileId String          @map("customer_profile_id") @db.Uuid
-  expertProfileId   String          @map("expert_profile_id") @db.Uuid
-  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                String   @id @default(uuid()) @db.Uuid
+  customerProfileId String   @map("customer_profile_id") @db.Uuid
+  expertProfileId   String   @map("expert_profile_id") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  customer          CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
-  expert            ExpertProfile   @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  customer CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  expert   ExpertProfile   @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
 
   @@unique([customerProfileId, expertProfileId])
   @@index([customerProfileId])
@@ -385,13 +385,13 @@ model CustomerSavedExpert {
 }
 
 model CustomerRecentlyViewed {
-  id                String          @id @default(uuid()) @db.Uuid
-  customerProfileId String          @map("customer_profile_id") @db.Uuid
-  expertProfileId   String          @map("expert_profile_id") @db.Uuid
-  viewedAt          DateTime        @default(now()) @map("viewed_at") @db.Timestamptz(6)
+  id                String   @id @default(uuid()) @db.Uuid
+  customerProfileId String   @map("customer_profile_id") @db.Uuid
+  expertProfileId   String   @map("expert_profile_id") @db.Uuid
+  viewedAt          DateTime @default(now()) @map("viewed_at") @db.Timestamptz(6)
 
-  customer          CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
-  expert            ExpertProfile   @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  customer CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  expert   ExpertProfile   @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
 
   @@unique([customerProfileId, expertProfileId])
   @@index([customerProfileId, viewedAt(sort: Desc)])
@@ -409,24 +409,24 @@ model Category {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  experts   ExpertProfile[]
+  experts ExpertProfile[]
 
   @@index([isActive, sortOrder])
   @@map("categories")
 }
 
 model CmsPage {
-  id              String        @id @default(uuid()) @db.Uuid
-  slug            String        @unique @db.VarChar(64)
-  title           String        @db.VarChar(200)
-  bodyHtml        String        @default("") @map("body_html")
-  status          CmsPageStatus @default(draft)
-  publishedAt     DateTime?     @map("published_at") @db.Timestamptz(6)
-  updatedByAdminId String?      @map("updated_by_admin_id") @db.Uuid
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String        @id @default(uuid()) @db.Uuid
+  slug             String        @unique @db.VarChar(64)
+  title            String        @db.VarChar(200)
+  bodyHtml         String        @default("") @map("body_html")
+  status           CmsPageStatus @default(draft)
+  publishedAt      DateTime?     @map("published_at") @db.Timestamptz(6)
+  updatedByAdminId String?       @map("updated_by_admin_id") @db.Uuid
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  updatedByAdmin  AdminUser?    @relation(fields: [updatedByAdminId], references: [id], onDelete: SetNull)
+  updatedByAdmin AdminUser? @relation(fields: [updatedByAdminId], references: [id], onDelete: SetNull)
 
   @@index([status])
   @@map("cms_pages")
@@ -452,18 +452,18 @@ model AppConfig {
 }
 
 model SubscriptionPlan {
-  id                 String          @id @default(uuid()) @db.Uuid
-  code               String          @unique @db.VarChar(32)
-  name               String          @db.VarChar(120)
-  priceMonthlyCents  Int             @map("price_monthly_cents")
-  visibilityBoost    VisibilityBoost @map("visibility_boost")
-  isActive           Boolean         @default(true) @map("is_active")
-  stripeProductId    String?         @map("stripe_product_id") @db.VarChar(128)
-  stripePriceId      String?         @map("stripe_price_id") @db.VarChar(128)
-  createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String          @id @default(uuid()) @db.Uuid
+  code              String          @unique @db.VarChar(32)
+  name              String          @db.VarChar(120)
+  priceMonthlyCents Int             @map("price_monthly_cents")
+  visibilityBoost   VisibilityBoost @map("visibility_boost")
+  isActive          Boolean         @default(true) @map("is_active")
+  stripeProductId   String?         @map("stripe_product_id") @db.VarChar(128)
+  stripePriceId     String?         @map("stripe_price_id") @db.VarChar(128)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  subscriptions      ExpertSubscription[]
+  subscriptions ExpertSubscription[]
 
   @@map("subscription_plans")
 }
@@ -480,7 +480,7 @@ model SupportTicket {
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
@@ -495,6 +495,7 @@ model ExpertProfile {
   categoryId            String             @map("category_id") @db.Uuid
   firstName             String             @map("first_name") @db.VarChar(100)
   lastName              String             @map("last_name") @db.VarChar(100)
+  avatarMediaId         String?            @map("avatar_media_id") @db.Uuid
   headline              String?            @db.VarChar(200)
   bio                   String?
   consultationRateCents Int                @map("consultation_rate_cents")
@@ -511,23 +512,25 @@ model ExpertProfile {
   createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category              Category           @relation(fields: [categoryId], references: [id])
-  settings              ExpertSettings?
-  verifications         ExpertVerification[]
-  availabilityLogs      ExpertAvailabilityLog[]
-  subscriptions         ExpertSubscription[]
-  savedByCustomers      CustomerSavedExpert[]
-  recentlyViewedBy      CustomerRecentlyViewed[]
-  quoteRequests         QuoteRequest[]
-  consultations         Consultation[]
-  conversations         Conversation[]
-  reviews               Review[]
-  reports               ExpertReport[]
-  payouts               ExpertPayout[]
-  earningsLedger        ExpertEarningsLedger[]
+  user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category         Category                 @relation(fields: [categoryId], references: [id])
+  avatarMedia      MediaAsset?              @relation("ExpertAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
+  settings         ExpertSettings?
+  verifications    ExpertVerification[]
+  availabilityLogs ExpertAvailabilityLog[]
+  subscriptions    ExpertSubscription[]
+  savedByCustomers CustomerSavedExpert[]
+  recentlyViewedBy CustomerRecentlyViewed[]
+  quoteRequests    QuoteRequest[]
+  consultations    Consultation[]
+  conversations    Conversation[]
+  reviews          Review[]
+  reports          ExpertReport[]
+  payouts          ExpertPayout[]
+  earningsLedger   ExpertEarningsLedger[]
 
   @@index([categoryId])
+  @@index([avatarMediaId])
   @@index([verificationStatus])
   @@index([availabilityStatus])
   @@index([searchEligible])
@@ -535,13 +538,13 @@ model ExpertProfile {
 }
 
 model ExpertSettings {
-  id              String        @id @default(uuid()) @db.Uuid
-  expertProfileId String        @unique @map("expert_profile_id") @db.Uuid
-  preferences     Json          @default("{}")
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id              String   @id @default(uuid()) @db.Uuid
+  expertProfileId String   @unique @map("expert_profile_id") @db.Uuid
+  preferences     Json     @default("{}")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  expert          ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  expert ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
 
   @@map("expert_settings")
 }
@@ -555,8 +558,8 @@ model ExpertVerification {
   reviewNotes     String?            @map("review_notes")
   createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  expert          ExpertProfile      @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
-  documents       ExpertVerificationDocument[]
+  expert    ExpertProfile                @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  documents ExpertVerificationDocument[]
 
   @@index([expertProfileId])
   @@index([status])
@@ -564,14 +567,14 @@ model ExpertVerification {
 }
 
 model ExpertVerificationDocument {
-  id               String              @id @default(uuid()) @db.Uuid
-  verificationId   String              @map("verification_id") @db.Uuid
-  mediaId          String              @map("media_id") @db.Uuid
-  docType          VerificationDocType @map("doc_type")
-  createdAt        DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  id             String              @id @default(uuid()) @db.Uuid
+  verificationId String              @map("verification_id") @db.Uuid
+  mediaId        String              @map("media_id") @db.Uuid
+  docType        VerificationDocType @map("doc_type")
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  verification     ExpertVerification  @relation(fields: [verificationId], references: [id], onDelete: Cascade)
-  media            MediaAsset          @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+  verification ExpertVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  media        MediaAsset         @relation(fields: [mediaId], references: [id], onDelete: Restrict)
 
   @@index([verificationId])
   @@index([mediaId])
@@ -579,13 +582,13 @@ model ExpertVerificationDocument {
 }
 
 model ExpertAvailabilityLog {
-  id                String             @id @default(uuid()) @db.Uuid
-  expertProfileId   String             @map("expert_profile_id") @db.Uuid
-  fromStatus        AvailabilityStatus @map("from_status")
-  toStatus          AvailabilityStatus @map("to_status")
-  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  id              String             @id @default(uuid()) @db.Uuid
+  expertProfileId String             @map("expert_profile_id") @db.Uuid
+  fromStatus      AvailabilityStatus @map("from_status")
+  toStatus        AvailabilityStatus @map("to_status")
+  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  expert            ExpertProfile      @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  expert ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
 
   @@index([expertProfileId, createdAt(sort: Desc)])
   @@map("expert_availability_logs")
@@ -610,10 +613,10 @@ model QuoteRequest {
   createdAt              DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  customer               CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  expert                 ExpertProfile   @relation(fields: [expertId], references: [id], onDelete: Cascade)
-  statusEvents           QuoteStatusEvent[]
-  attachments            QuoteAttachment[]
+  customer     CustomerProfile    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  expert       ExpertProfile      @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  statusEvents QuoteStatusEvent[]
+  attachments  QuoteAttachment[]
 
   @@index([customerId])
   @@index([expertId])
@@ -630,21 +633,21 @@ model QuoteStatusEvent {
   note        String?
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  quote       QuoteRequest @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-  actor       User?        @relation("QuoteStatusActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  quote QuoteRequest @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  actor User?        @relation("QuoteStatusActor", fields: [actorUserId], references: [id], onDelete: SetNull)
 
   @@index([quoteId, createdAt])
   @@map("quote_status_events")
 }
 
 model QuoteAttachment {
-  id        String       @id @default(uuid()) @db.Uuid
-  quoteId   String       @map("quote_id") @db.Uuid
-  mediaId   String       @map("media_id") @db.Uuid
-  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  id        String   @id @default(uuid()) @db.Uuid
+  quoteId   String   @map("quote_id") @db.Uuid
+  mediaId   String   @map("media_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  quote     QuoteRequest @relation(fields: [quoteId], references: [id], onDelete: Cascade)
-  media     MediaAsset   @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+  quote QuoteRequest @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  media MediaAsset   @relation(fields: [mediaId], references: [id], onDelete: Restrict)
 
   @@unique([quoteId, mediaId])
   @@index([mediaId])
@@ -652,27 +655,27 @@ model QuoteAttachment {
 }
 
 model Consultation {
-  id                  String                    @id @default(uuid()) @db.Uuid
-  customerId          String                    @map("customer_id") @db.Uuid
-  expertId            String                    @map("expert_id") @db.Uuid
-  status              ConsultationStatus        @default(requested)
-  ratePerMinuteCents  Int                       @map("rate_per_minute_cents")
-  requestedAt         DateTime                  @default(now()) @map("requested_at") @db.Timestamptz(6)
-  acceptedAt          DateTime?                 @map("accepted_at") @db.Timestamptz(6)
-  startedAt           DateTime?                 @map("started_at") @db.Timestamptz(6)
-  endedAt             DateTime?                 @map("ended_at") @db.Timestamptz(6)
-  durationSeconds     Int?                      @map("duration_seconds")
-  zegoRoomId          String?                   @map("zego_room_id") @db.VarChar(128)
-  stripePaymentIntentId String?                 @unique @map("stripe_payment_intent_id") @db.VarChar(128)
-  billingStatus       ConsultationBillingStatus @default(pending) @map("billing_status")
-  createdAt           DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                    String                    @id @default(uuid()) @db.Uuid
+  customerId            String                    @map("customer_id") @db.Uuid
+  expertId              String                    @map("expert_id") @db.Uuid
+  status                ConsultationStatus        @default(requested)
+  ratePerMinuteCents    Int                       @map("rate_per_minute_cents")
+  requestedAt           DateTime                  @default(now()) @map("requested_at") @db.Timestamptz(6)
+  acceptedAt            DateTime?                 @map("accepted_at") @db.Timestamptz(6)
+  startedAt             DateTime?                 @map("started_at") @db.Timestamptz(6)
+  endedAt               DateTime?                 @map("ended_at") @db.Timestamptz(6)
+  durationSeconds       Int?                      @map("duration_seconds")
+  zegoRoomId            String?                   @map("zego_room_id") @db.VarChar(128)
+  stripePaymentIntentId String?                   @unique @map("stripe_payment_intent_id") @db.VarChar(128)
+  billingStatus         ConsultationBillingStatus @default(pending) @map("billing_status")
+  createdAt             DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  customer            CustomerProfile           @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  expert              ExpertProfile             @relation(fields: [expertId], references: [id], onDelete: Restrict)
-  review              Review?
-  charge              ConsultationCharge?
-  earningsLedger      ExpertEarningsLedger[]
+  customer       CustomerProfile        @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  expert         ExpertProfile          @relation(fields: [expertId], references: [id], onDelete: Restrict)
+  review         Review?
+  charge         ConsultationCharge?
+  earningsLedger ExpertEarningsLedger[]
 
   @@index([customerId])
   @@index([expertId])
@@ -681,19 +684,19 @@ model Consultation {
 }
 
 model Review {
-  id              String       @id @default(uuid()) @db.Uuid
-  consultationId  String       @unique @map("consultation_id") @db.Uuid
-  customerId      String       @map("customer_id") @db.Uuid
-  expertId        String       @map("expert_id") @db.Uuid
-  rating          Int
-  comment         String?
-  status          ReviewStatus @default(published)
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id             String       @id @default(uuid()) @db.Uuid
+  consultationId String       @unique @map("consultation_id") @db.Uuid
+  customerId     String       @map("customer_id") @db.Uuid
+  expertId       String       @map("expert_id") @db.Uuid
+  rating         Int
+  comment        String?
+  status         ReviewStatus @default(published)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  consultation    Consultation    @relation(fields: [consultationId], references: [id], onDelete: Cascade)
-  customer        CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  expert          ExpertProfile   @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  consultation Consultation    @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  customer     CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  expert       ExpertProfile   @relation(fields: [expertId], references: [id], onDelete: Cascade)
 
   @@index([customerId])
   @@index([expertId])
@@ -702,17 +705,17 @@ model Review {
 }
 
 model ExpertReport {
-  id              String             @id @default(uuid()) @db.Uuid
-  customerId      String             @map("customer_id") @db.Uuid
-  expertId        String             @map("expert_id") @db.Uuid
-  reason          String             @db.VarChar(120)
-  details         String?
-  status          ExpertReportStatus @default(open)
-  createdAt       DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id         String             @id @default(uuid()) @db.Uuid
+  customerId String             @map("customer_id") @db.Uuid
+  expertId   String             @map("expert_id") @db.Uuid
+  reason     String             @db.VarChar(120)
+  details    String?
+  status     ExpertReportStatus @default(open)
+  createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  customer        CustomerProfile    @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  expert          ExpertProfile      @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  expert   ExpertProfile   @relation(fields: [expertId], references: [id], onDelete: Cascade)
 
   @@index([expertId])
   @@index([status])
@@ -722,17 +725,17 @@ model ExpertReport {
 // ─── Messaging (messaging-service) ───────────────────────────────────────────
 
 model Conversation {
-  id              String    @id @default(uuid()) @db.Uuid
-  customerId      String    @map("customer_id") @db.Uuid
-  expertId        String    @map("expert_id") @db.Uuid
-  lastMessageAt   DateTime? @map("last_message_at") @db.Timestamptz(6)
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id            String    @id @default(uuid()) @db.Uuid
+  customerId    String    @map("customer_id") @db.Uuid
+  expertId      String    @map("expert_id") @db.Uuid
+  lastMessageAt DateTime? @map("last_message_at") @db.Timestamptz(6)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  customer        CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
-  expert          ExpertProfile   @relation(fields: [expertId], references: [id], onDelete: Cascade)
-  messages        Message[]
-  readStates      ConversationReadState[]
+  customer   CustomerProfile         @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  expert     ExpertProfile           @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  messages   Message[]
+  readStates ConversationReadState[]
 
   @@unique([customerId, expertId])
   @@index([lastMessageAt(sort: Desc)])
@@ -740,18 +743,18 @@ model Conversation {
 }
 
 model Message {
-  id               String                @id @default(uuid()) @db.Uuid
-  conversationId   String                @map("conversation_id") @db.Uuid
-  senderUserId     String                @map("sender_user_id") @db.Uuid
-  body             String?
-  type             MessageType           @default(text)
-  deliveryStatus   MessageDeliveryStatus @default(sent) @map("delivery_status")
-  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  id             String                @id @default(uuid()) @db.Uuid
+  conversationId String                @map("conversation_id") @db.Uuid
+  senderUserId   String                @map("sender_user_id") @db.Uuid
+  body           String?
+  type           MessageType           @default(text)
+  deliveryStatus MessageDeliveryStatus @default(sent) @map("delivery_status")
+  createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  conversation     Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender           User                  @relation("MessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
-  attachments      MessageAttachment[]
-  readStates       ConversationReadState[] @relation("LastReadMessage")
+  conversation Conversation            @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                    @relation("MessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+  attachments  MessageAttachment[]
+  readStates   ConversationReadState[] @relation("LastReadMessage")
 
   @@index([conversationId, createdAt])
   @@index([senderUserId])
@@ -764,8 +767,8 @@ model MessageAttachment {
   mediaId   String   @map("media_id") @db.Uuid
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  message   Message    @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  media     MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+  message Message    @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  media   MediaAsset @relation(fields: [mediaId], references: [id], onDelete: Restrict)
 
   @@unique([messageId, mediaId])
   @@index([mediaId])
@@ -773,15 +776,15 @@ model MessageAttachment {
 }
 
 model ConversationReadState {
-  id                 String       @id @default(uuid()) @db.Uuid
-  conversationId     String       @map("conversation_id") @db.Uuid
-  userId             String       @map("user_id") @db.Uuid
-  lastReadMessageId  String?      @map("last_read_message_id") @db.Uuid
-  readAt             DateTime     @default(now()) @map("read_at") @db.Timestamptz(6)
+  id                String   @id @default(uuid()) @db.Uuid
+  conversationId    String   @map("conversation_id") @db.Uuid
+  userId            String   @map("user_id") @db.Uuid
+  lastReadMessageId String?  @map("last_read_message_id") @db.Uuid
+  readAt            DateTime @default(now()) @map("read_at") @db.Timestamptz(6)
 
-  conversation       Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user               User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lastReadMessage    Message?     @relation("LastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
+  conversation    Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadMessage Message?     @relation("LastReadMessage", fields: [lastReadMessageId], references: [id], onDelete: SetNull)
 
   @@unique([conversationId, userId])
   @@map("conversation_read_states")
@@ -800,10 +803,11 @@ model MediaAsset {
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  owner       User         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  customerAvatars CustomerProfile[] @relation("CustomerAvatar")
-  quoteAttachments QuoteAttachment[]
-  messageAttachments MessageAttachment[]
+  owner                 User                         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  customerAvatars       CustomerProfile[]            @relation("CustomerAvatar")
+  expertAvatars         ExpertProfile[]              @relation("ExpertAvatar")
+  quoteAttachments      QuoteAttachment[]
+  messageAttachments    MessageAttachment[]
   verificationDocuments ExpertVerificationDocument[]
 
   @@index([ownerUserId])
@@ -814,17 +818,17 @@ model MediaAsset {
 // ─── Billing (billing-service) ───────────────────────────────────────────────
 
 model PaymentMethod {
-  id                    String          @id @default(uuid()) @db.Uuid
-  customerProfileId     String          @map("customer_profile_id") @db.Uuid
-  stripePaymentMethodId String          @unique @map("stripe_payment_method_id") @db.VarChar(128)
-  brand                 String          @db.VarChar(32)
-  last4                 String          @db.Char(4)
-  expMonth              Int             @map("exp_month")
-  expYear               Int             @map("exp_year")
-  isDefault             Boolean         @default(false) @map("is_default")
-  createdAt             DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  id                    String   @id @default(uuid()) @db.Uuid
+  customerProfileId     String   @map("customer_profile_id") @db.Uuid
+  stripePaymentMethodId String   @unique @map("stripe_payment_method_id") @db.VarChar(128)
+  brand                 String   @db.VarChar(32)
+  last4                 String   @db.Char(4)
+  expMonth              Int      @map("exp_month")
+  expYear               Int      @map("exp_year")
+  isDefault             Boolean  @default(false) @map("is_default")
+  createdAt             DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  customer              CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
+  customer CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
 
   @@index([customerProfileId])
   @@map("payment_methods")
@@ -841,7 +845,7 @@ model Transaction {
   createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  consultationCharge    ConsultationCharge?
+  consultationCharge ConsultationCharge?
 
   @@index([status])
   @@index([type])
@@ -849,15 +853,15 @@ model Transaction {
 }
 
 model ConsultationCharge {
-  id              String       @id @default(uuid()) @db.Uuid
-  consultationId  String       @unique @map("consultation_id") @db.Uuid
-  transactionId   String       @unique @map("transaction_id") @db.Uuid
-  commissionCents Int          @map("commission_cents")
-  expertShareCents Int         @map("expert_share_cents")
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  id               String   @id @default(uuid()) @db.Uuid
+  consultationId   String   @unique @map("consultation_id") @db.Uuid
+  transactionId    String   @unique @map("transaction_id") @db.Uuid
+  commissionCents  Int      @map("commission_cents")
+  expertShareCents Int      @map("expert_share_cents")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  consultation    Consultation @relation(fields: [consultationId], references: [id], onDelete: Restrict)
-  transaction     Transaction  @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Restrict)
+  transaction  Transaction  @relation(fields: [transactionId], references: [id], onDelete: Restrict)
 
   @@map("consultation_charges")
 }
@@ -876,8 +880,8 @@ model ExpertSubscription {
   createdAt              DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  expert                 ExpertProfile            @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
-  plan                   SubscriptionPlan         @relation(fields: [planId], references: [id])
+  expert ExpertProfile    @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id])
 
   @@unique([store, externalSubscriptionId])
   @@index([expertProfileId])
@@ -898,7 +902,7 @@ model ExpertPayout {
   createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  expert           ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  expert ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
 
   @@unique([expertProfileId, periodStart, periodEnd])
   @@index([expertProfileId])
@@ -907,16 +911,16 @@ model ExpertPayout {
 }
 
 model ExpertEarningsLedger {
-  id              String       @id @default(uuid()) @db.Uuid
-  expertProfileId String       @map("expert_profile_id") @db.Uuid
-  consultationId  String       @map("consultation_id") @db.Uuid
-  grossCents      Int          @map("gross_cents")
-  commissionCents Int          @map("commission_cents")
-  netCents        Int          @map("net_cents")
-  createdAt       DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  id              String   @id @default(uuid()) @db.Uuid
+  expertProfileId String   @map("expert_profile_id") @db.Uuid
+  consultationId  String   @map("consultation_id") @db.Uuid
+  grossCents      Int      @map("gross_cents")
+  commissionCents Int      @map("commission_cents")
+  netCents        Int      @map("net_cents")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  expert          ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
-  consultation    Consultation  @relation(fields: [consultationId], references: [id], onDelete: Restrict)
+  expert       ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  consultation Consultation  @relation(fields: [consultationId], references: [id], onDelete: Restrict)
 
   @@unique([consultationId])
   @@index([expertProfileId, createdAt(sort: Desc)])
@@ -935,7 +939,7 @@ model Notification {
   readAt    DateTime? @map("read_at") @db.Timestamptz(6)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, readAt])
@@ -948,7 +952,7 @@ model NotificationPreference {
   preferences Json     @default("{}")
   updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notification_preferences")
 }
@@ -965,9 +969,9 @@ model AdminUser {
   createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  permissions  AdminPermission[]
-  auditLogs    AdminAuditLog[]
-  cmsPages     CmsPage[]
+  permissions                  AdminPermission[]
+  auditLogs                    AdminAuditLog[]
+  cmsPages                     CmsPage[]
   supportConversationsAssigned SupportConversation[]
   supportMessagesSent          SupportMessage[]
 
@@ -980,23 +984,23 @@ model AdminPermission {
   module      String               @db.VarChar(64)
   level       AdminPermissionLevel @default(none)
 
-  admin       AdminUser            @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  admin AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
 
   @@unique([adminUserId, module])
   @@map("admin_permissions")
 }
 
 model AdminAuditLog {
-  id            String    @id @default(uuid()) @db.Uuid
-  actorAdminId  String    @map("actor_admin_id") @db.Uuid
-  action        String    @db.VarChar(64)
-  entityType    String    @map("entity_type") @db.VarChar(64)
-  entityId      String?   @map("entity_id") @db.VarChar(64)
-  payload       Json      @default("{}")
-  ipAddress     String?   @map("ip_address") @db.VarChar(45)
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  id           String   @id @default(uuid()) @db.Uuid
+  actorAdminId String   @map("actor_admin_id") @db.Uuid
+  action       String   @db.VarChar(64)
+  entityType   String   @map("entity_type") @db.VarChar(64)
+  entityId     String?  @map("entity_id") @db.VarChar(64)
+  payload      Json     @default("{}")
+  ipAddress    String?  @map("ip_address") @db.VarChar(45)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  actor         AdminUser @relation(fields: [actorAdminId], references: [id], onDelete: Cascade)
+  actor AdminUser @relation(fields: [actorAdminId], references: [id], onDelete: Cascade)
 
   @@index([actorAdminId])
   @@index([entityType, entityId])
@@ -1019,9 +1023,9 @@ model SupportConversation {
   updatedAt     DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
   lastMessageAt DateTime?                 @map("last_message_at") @db.Timestamptz(6)
 
-  user          User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  admin         AdminUser?                @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
-  messages      SupportMessage[]
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  admin    AdminUser?       @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  messages SupportMessage[]
 
   @@index([userId])
   @@index([status])
@@ -1029,17 +1033,17 @@ model SupportConversation {
 }
 
 model SupportMessage {
-  id             String              @id @default(uuid()) @db.Uuid
-  conversationId String              @map("conversation_id") @db.Uuid
-  senderUserId   String?             @map("sender_user_id") @db.Uuid
-  senderAdminId  String?             @map("sender_admin_id") @db.Uuid
+  id             String      @id @default(uuid()) @db.Uuid
+  conversationId String      @map("conversation_id") @db.Uuid
+  senderUserId   String?     @map("sender_user_id") @db.Uuid
+  senderAdminId  String?     @map("sender_admin_id") @db.Uuid
   body           String?
-  type           MessageType         @default(text)
-  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  type           MessageType @default(text)
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  conversation   SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderUser     User?               @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
-  senderAdmin    AdminUser?          @relation(fields: [senderAdminId], references: [id], onDelete: SetNull)
+  conversation SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderUser   User?               @relation(fields: [senderUserId], references: [id], onDelete: SetNull)
+  senderAdmin  AdminUser?          @relation(fields: [senderAdminId], references: [id], onDelete: SetNull)
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@map("support_messages")

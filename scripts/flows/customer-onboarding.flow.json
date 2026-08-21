@@ -45,7 +45,14 @@
               "pm.collectionVariables.set('customer_first_name', customerFirst);",
               "pm.collectionVariables.set('customer_last_name', customerLast);",
               "pm.collectionVariables.set('customer_email', customerFirst.toLowerCase() + '.' + customerLast.toLowerCase() + seq + '@yopmail.com');",
-              "pm.collectionVariables.set('customer_phone', '+1415' + String(ts).slice(-7));"
+              "pm.collectionVariables.set('customer_phone', '+1415' + String(ts).slice(-7));",
+              "const femalePhotos = ['seeder/data/photos/female/0ef4fb566361e80ca99f818a8b5e9200383002fc.jpg', 'seeder/data/photos/female/4be62b388ec3aa5861505e44555b314e5651c7fa.png', 'seeder/data/photos/female/b023b22825c5f5c7b1835eacc84c40fdb95f5101.jpg', 'seeder/data/photos/female/brantley-neal-UVUMHL-DzVM-unsplash.jpg'];",
+              "const malePhotos = ['seeder/data/photos/male/albert-dera-ILip77SbmOE-unsplash.jpg', 'seeder/data/photos/male/alex-suprun-ZHvM3XIOHoE-unsplash.jpg', 'seeder/data/photos/male/ali-morshedlou-WMD64tMfc4k-unsplash.jpg', 'seeder/data/photos/male/joseph-gonzalez-iFgRcqHznqg-unsplash.jpg', 'seeder/data/photos/male/jurica-koletic-7YVZYZeITc8-unsplash.jpg'];",
+              "if (Math.random() > 0.5) {",
+              "    pm.collectionVariables.set('avatar_file_src', femalePhotos[Math.floor(Math.random() * femalePhotos.length)]);",
+              "} else {",
+              "    pm.collectionVariables.set('avatar_file_src', malePhotos[Math.floor(Math.random() * malePhotos.length)]);",
+              "}"
             ],
             "type": "text/javascript"
           }
@@ -133,6 +140,128 @@
       }
     },
     {
+      "name": "Get Customer Avatar Upload URL",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status 200 or 201\", function () { pm.response.to.have.status(201); });",
+              "var res = pm.response.json();",
+              "if (res.data && res.data.uploadUrl) {",
+              "    pm.collectionVariables.set(\"avatar_upload_url\", res.data.uploadUrl);",
+              "    pm.collectionVariables.set(\"avatar_media_id\", res.data.id);",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customer_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"purpose\": \"avatar\",\n  \"mimeType\": \"image/jpeg\",\n  \"sizeBytes\": 50000\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/media/uploads",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "media",
+            "uploads"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Upload Customer Avatar to S3",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "image/jpeg"
+          }
+        ],
+        "body": {
+          "mode": "file",
+          "file": {
+            "src": "{{avatar_file_src}}"
+          }
+        },
+        "url": {
+          "raw": "{{avatar_upload_url}}",
+          "host": [
+            "{{avatar_upload_url}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Confirm Customer Avatar Upload",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test(\"Status 200\", function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customer_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/media/{{avatar_media_id}}/confirm",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "media",
+            "{{avatar_media_id}}",
+            "confirm"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
       "name": "Step 3: Update Customer Profile",
       "event": [
         {
@@ -163,7 +292,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"firstName\":\"{{customer_first_name}}\",\"lastName\":\"{{customer_last_name}}\"}"
+          "raw": "{\"firstName\":\"{{customer_first_name}}\",\"lastName\":\"{{customer_last_name}}\",\"avatarMediaId\":\"{{avatar_media_id}}\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/customers/me",

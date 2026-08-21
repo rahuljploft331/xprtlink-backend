@@ -13,6 +13,7 @@ export function toExpertPublicDto(expert, { category, isSaved } = {}) {
     id: expert.id,
     firstName: expert.firstName,
     lastName: expert.lastName,
+    avatarUrl: resolveMediaUrl(expert.avatarMedia?.storageKey),
     category: toCategoryRefDto(category),
     headline: expert.headline,
     bio: expert.bio,

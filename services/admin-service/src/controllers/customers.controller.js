@@ -1,5 +1,6 @@
-import { getDb } from "@xprtlink/shared/db/getClient.js";
+import { getDb } from "@xprtlink/shared/config/db.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 
 /** GET /api/v1/admin/customers */
@@ -37,7 +38,9 @@ export async function list(req, res, next) {
         take: limit,
         orderBy,
         include: {
-          customerProfile: true,
+          customerProfile: {
+            include: { avatarMedia: true },
+          },
           _count: { select: { authSessions: true } },
         },
       }),
@@ -61,8 +64,10 @@ export async function list(req, res, next) {
       status: u.status,
       firstName: u.customerProfile?.firstName ?? "",
       lastName: u.customerProfile?.lastName ?? "",
+      avatarUrl: resolveMediaUrl(u.customerProfile?.avatarMedia?.storageKey),
       consultationCount: countMap[u.customerProfile?.id] ?? 0,
       createdAt: u.createdAt,
+      lastActiveAt: u.customerProfile?.updatedAt ?? u.createdAt,
     }));
 
     return ResponseFormatter.paginated(res, { items, page, limit, total });
@@ -80,6 +85,7 @@ export async function getById(req, res, next) {
       include: {
         customerProfile: {
           include: {
+            avatarMedia: true,
             consultations: {
               take: 10,
               orderBy: { createdAt: "desc" },
@@ -93,6 +99,9 @@ export async function getById(req, res, next) {
       return res.status(404).json({ success: false, message: "Customer not found", code: "NOT_FOUND" });
     }
     const { passwordHash: _ph, ...safe } = user;
+    if (safe.customerProfile) {
+      safe.customerProfile.avatarUrl = resolveMediaUrl(safe.customerProfile.avatarMedia?.storageKey);
+    }
     return ResponseFormatter.success(res, { data: safe });
   } catch (err) {
     next(err);

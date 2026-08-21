@@ -632,13 +632,20 @@ export async function cleanupStalePendingUsers({ maxAgeMinutes = 60 } = {}) {
 export async function getCustomerMe(auth) {
   const user = await loadUserContext(auth.userId);
   if (!user?.customerProfile) throw notFound("Customer profile not found");
-  return toCustomerMeDto({ profile: user.customerProfile, user, avatarUrl: null });
+  return toCustomerMeDto({ profile: user.customerProfile, user });
 }
 
 export async function updateCustomerMe(auth, body) {
   const db = getDb();
   const profile = await db.customerProfile.findFirst({ where: { userId: auth.userId } });
   if (!profile) throw notFound("Customer profile not found");
+
+  if (body.avatarMediaId) {
+    const media = await db.mediaAsset.findFirst({
+      where: { id: body.avatarMediaId, ownerUserId: auth.userId, status: "ready" }
+    });
+    if (!media) throw badRequest("Invalid or unready avatar media asset");
+  }
 
   const updated = await db.customerProfile.update({
     where: { id: profile.id },
@@ -647,9 +654,10 @@ export async function updateCustomerMe(auth, body) {
       ...(body.lastName ? { lastName: body.lastName } : {}),
       ...(body.avatarMediaId !== undefined ? { avatarMediaId: body.avatarMediaId } : {}),
     },
+    include: { avatarMedia: true },
   });
   const user = await db.user.findUnique({ where: { id: auth.userId } });
-  return toCustomerMeDto({ profile: updated, user, avatarUrl: null });
+  return toCustomerMeDto({ profile: updated, user });
 }
 
 export async function deleteCustomerAccount(auth) {
