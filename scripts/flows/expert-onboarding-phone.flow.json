@@ -44,7 +44,7 @@
               "var expertLast = rand(lastNames);",
               "pm.collectionVariables.set('expert_first_name', expertFirst);",
               "pm.collectionVariables.set('expert_last_name', expertLast);",
-              "pm.collectionVariables.set('expert_email', expertFirst.toLowerCase() + '.' + expertLast.toLowerCase() + '.' + seq + '@xprtlink-test.com');",
+              "pm.collectionVariables.set('expert_email', expertFirst.toLowerCase() + '.' + expertLast.toLowerCase() + seq + '@yopmail.com');",
               "pm.collectionVariables.set('expert_phone', '+1617' + String(ts).slice(-7));"
             ],
             "type": "text/javascript"

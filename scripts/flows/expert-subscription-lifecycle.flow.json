@@ -60,7 +60,7 @@
               "var freshLast = rand(lastNames);",
               "pm.collectionVariables.set('fresh_first_name', freshFirst);",
               "pm.collectionVariables.set('fresh_last_name', freshLast);",
-              "pm.collectionVariables.set('fresh_email', freshFirst.toLowerCase() + '.' + freshLast.toLowerCase() + '.' + seq + '@xprtlink-test.com');",
+              "pm.collectionVariables.set('fresh_email', freshFirst.toLowerCase() + '.' + freshLast.toLowerCase() + seq + '@yopmail.com');",
               "pm.collectionVariables.set('fresh_phone', '+1310' + String(ts).slice(-7));"
             ],
             "type": "text/javascript"

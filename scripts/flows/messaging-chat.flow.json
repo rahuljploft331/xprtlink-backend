@@ -60,7 +60,7 @@
               "var customerLast = rand(lastNames);",
               "pm.collectionVariables.set('customer_first_name', customerFirst);",
               "pm.collectionVariables.set('customer_last_name', customerLast);",
-              "pm.collectionVariables.set('customer_email', customerFirst.toLowerCase() + '.' + customerLast.toLowerCase() + '.' + seq + '@xprtlink-test.com');",
+              "pm.collectionVariables.set('customer_email', customerFirst.toLowerCase() + '.' + customerLast.toLowerCase() + seq + '@yopmail.com');",
               "pm.collectionVariables.set('customer_phone', '+1415' + String(ts).slice(-7));"
             ],
             "type": "text/javascript"
@@ -162,7 +162,7 @@
               "var expertLast = rand(lastNames);",
               "pm.collectionVariables.set('expert_first_name', expertFirst);",
               "pm.collectionVariables.set('expert_last_name', expertLast);",
-              "pm.collectionVariables.set('expert_email', expertFirst.toLowerCase() + '.' + expertLast.toLowerCase() + '.' + seq + '@xprtlink-test.com');",
+              "pm.collectionVariables.set('expert_email', expertFirst.toLowerCase() + '.' + expertLast.toLowerCase() + seq + '@yopmail.com');",
               "pm.collectionVariables.set('expert_phone', '+1617' + String(ts).slice(-7));"
             ],
             "type": "text/javascript"
