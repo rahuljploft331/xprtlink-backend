@@ -61,7 +61,14 @@
               "pm.collectionVariables.set('customer_first_name', customerFirst);",
               "pm.collectionVariables.set('customer_last_name', customerLast);",
               "pm.collectionVariables.set('customer_email', customerFirst.toLowerCase() + '.' + customerLast.toLowerCase() + seq + '@yopmail.com');",
-              "pm.collectionVariables.set('customer_phone', '+1415' + String(ts).slice(-7));"
+              "pm.collectionVariables.set('customer_phone', '+1415' + String(ts).slice(-7));",
+              "const femalePhotos = ['seeder/data/photos/female/0ef4fb566361e80ca99f818a8b5e9200383002fc.jpg', 'seeder/data/photos/female/4be62b388ec3aa5861505e44555b314e5651c7fa.png', 'seeder/data/photos/female/b023b22825c5f5c7b1835eacc84c40fdb95f5101.jpg', 'seeder/data/photos/female/brantley-neal-UVUMHL-DzVM-unsplash.jpg'];",
+              "const malePhotos = ['seeder/data/photos/male/albert-dera-ILip77SbmOE-unsplash.jpg', 'seeder/data/photos/male/alex-suprun-ZHvM3XIOHoE-unsplash.jpg', 'seeder/data/photos/male/ali-morshedlou-WMD64tMfc4k-unsplash.jpg', 'seeder/data/photos/male/joseph-gonzalez-iFgRcqHznqg-unsplash.jpg', 'seeder/data/photos/male/jurica-koletic-7YVZYZeITc8-unsplash.jpg'];",
+              "if (Math.random() > 0.5) {",
+              "    pm.collectionVariables.set('avatar_file_src', femalePhotos[Math.floor(Math.random() * femalePhotos.length)]);",
+              "} else {",
+              "    pm.collectionVariables.set('avatar_file_src', malePhotos[Math.floor(Math.random() * malePhotos.length)]);",
+              "}"
             ],
             "type": "text/javascript"
           }

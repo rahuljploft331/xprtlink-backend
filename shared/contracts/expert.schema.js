@@ -47,6 +47,7 @@ export const expertMeUpdateRequestSchema = z.object({
   experienceYears: z.number().int().nonnegative().optional(),
   availabilityStatus: z.enum(["online", "offline", "busy"]).optional(),
   categoryId: z.string().uuid().optional(),
+  avatarMediaId: z.string().uuid().optional(),
 });
 
 export const expertReviewDtoSchema = z.object({
