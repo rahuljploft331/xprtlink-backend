@@ -1,20 +1,19 @@
 import Stripe from "stripe";
+import { getSecretSync } from "@xprtlink/shared/config/secrets.js";
 
-const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
 let stripe = null;
-
-if (stripeSecretKey && stripeSecretKey.trim() && !stripeSecretKey.includes("placeholder")) {
-  stripe = new Stripe(stripeSecretKey, { apiVersion: "2024-12-18.acacia" });
-  console.log("[Stripe Service] Stripe SDK initialized successfully.");
-} else {
-  console.warn("[Stripe Service] STRIPE_SECRET_KEY missing or placeholder. Stripe is unavailable.");
-}
 
 function requireStripe() {
   if (!stripe) {
-    const err = new Error("Stripe SDK not initialized");
-    err.code = "STRIPE_UNAVAILABLE";
-    throw err;
+    const key = getSecretSync("STRIPE_SECRET_KEY");
+    if (key && key.trim() && !key.includes("placeholder")) {
+      stripe = new Stripe(key, { apiVersion: "2024-12-18.acacia" });
+      console.log("[Stripe Service] Stripe SDK initialized successfully.");
+    } else {
+      const err = new Error("Stripe SDK not initialized (missing STRIPE_SECRET_KEY)");
+      err.code = "STRIPE_UNAVAILABLE";
+      throw err;
+    }
   }
   return stripe;
 }
@@ -215,8 +214,8 @@ export async function transferEarningsToExpert({
  */
 export function constructWebhookEvent(payload, signature) {
   const sdk = requireStripe();
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret || webhookSecret.includes("dummy")) {
+  const webhookSecret = getSecretSync("STRIPE_WEBHOOK_SECRET");
+  if (!webhookSecret || webhookSecret.includes("dummy") || webhookSecret.includes("placeholder")) {
     throw new Error("STRIPE_WEBHOOK_SECRET is not configured");
   }
   return sdk.webhooks.constructEvent(payload, signature, webhookSecret);

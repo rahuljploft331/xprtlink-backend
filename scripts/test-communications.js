@@ -1,4 +1,4 @@
-import "dotenv/config";
+import { loadSecret, getSecretSync } from "@xprtlink/shared/config/secrets.js";
 import sgMail from "@sendgrid/mail";
 import twilio from "twilio";
 
@@ -8,8 +8,9 @@ const target = args[1];  // email address or phone number
 const code = args[2];    // code for 'verify-sms'
 
 async function testEmail() {
-  const apiKey = process.env.SENDGRID_API_KEY;
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@xpertlink.local";
+  await loadSecret();
+  const apiKey = getSecretSync("SENDGRID_API_KEY");
+  const fromEmail = getSecretSync("SENDGRID_FROM_EMAIL") || "noreply@xpertlink.local";
 
   if (!apiKey) {
     console.error("❌ SENDGRID_API_KEY is not set in environment.");

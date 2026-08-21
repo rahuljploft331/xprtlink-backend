@@ -41,6 +41,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1109.0",
     "@aws-sdk/s3-request-presigner": "^3.1109.0",
+    "@aws-sdk/client-secrets-manager": "^3.1109.0",
     "@xprtlink/shared": "workspace:*",
     "bcryptjs": "^3.0.3",
     "stripe": "^17.7.0"

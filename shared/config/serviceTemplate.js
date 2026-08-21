@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import { disconnectDb, getDb } from "../db/getClient.js";
+import { loadSecret } from "./secrets.js";
 
 
 /**
@@ -58,7 +59,9 @@ export function createApp() {
   return app;
 }
 
-export function startService(app, port, label = "Service", { useDatabase = true } = {}) {
+export async function startService(app, port, label = "Service", { useDatabase = true } = {}) {
+  await loadSecret(); // Ensure secrets are fetched into memory synchronously for runtime modules
+
   if (useDatabase && process.env.DATABASE_URL) {
     getDb();
   }

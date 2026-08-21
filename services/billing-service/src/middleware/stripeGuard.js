@@ -1,5 +1,7 @@
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 
+import { getSecretSync } from "@xprtlink/shared/config/secrets.js";
+
 /**
  * Stripe Guard Middleware
  *
@@ -8,7 +10,7 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
  * explicitly rather than silently returning fake data.
  */
 export function stripeGuard(req, res, next) {
-  const key = process.env.STRIPE_SECRET_KEY;
+  const key = getSecretSync("STRIPE_SECRET_KEY");
   if (!key || key.trim() === "" || key.includes("placeholder")) {
     return res.status(503).json({
       success: false,
