@@ -1,5 +1,4 @@
-import path from "path";
-import fs from "fs";
+
 import { Router } from "express";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
@@ -21,21 +20,7 @@ router.get(
   })
 );
 
-// Public file serving for uploaded media assets
-router.get("/files/*", (req, res) => {
-  const relativePath = req.params[0];
-  const filePath = path.resolve(process.cwd(), "uploads", relativePath);
 
-  if (!fs.existsSync(filePath)) {
-    return res.status(404).json({
-      success: false,
-      message: "File not found",
-      code: "FILE_NOT_FOUND",
-    });
-  }
-
-  res.sendFile(filePath);
-});
 
 // Authenticated Routes
 router.use(authenticate);
