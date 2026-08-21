@@ -37,16 +37,33 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const args = process.argv.slice(2);
-const BASE_URL = (
-  args[args.indexOf("--url") + 1] ||
-  `http://localhost:${process.env.API_GATEWAY_PORT || 4000}`
-);
-const TAG = args[args.indexOf("--tag") + 1] || "demo";
+
+/** Safe flag value helper — returns undefined if the next token is another flag or missing */
+function getArg(flag) {
+  const idx = args.indexOf(flag);
+  if (idx === -1) return undefined;
+  const next = args[idx + 1];
+  return next && !next.startsWith("--") ? next : undefined;
+}
+
+const BASE_URL     = getArg("--url") || `http://localhost:${process.env.API_GATEWAY_PORT || 4000}`;
+const TAG          = getArg("--tag") || "demo";
 const AUTO_APPROVE = !args.includes("--no-approve");
-const OTP_BYPASS = process.env.OTP_BYPASS_CODE || "123456";
+const OTP_BYPASS   = process.env.OTP_BYPASS_CODE || "123456";
 
 const ADMIN_EMAIL    = process.env.ADMIN_EMAIL    || "admin@xpertlink.com";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "Admin@123";
+
+// Realistic mock expert personas — one is picked per run
+const EXPERT_PERSONAS = [
+  { firstName: "Sarah",   lastName: "Mitchell",  title: "Senior Business Consultant",    bio: "Seasoned business consultant with 10+ years helping startups and enterprises scale. Expert in operations, strategy, and team building.", yearsExperience: 10, hourlyRate: 120 },
+  { firstName: "James",   lastName: "Okafor",    title: "Legal & Compliance Advisor",    bio: "Corporate attorney specializing in contract law, compliance, and business regulatory matters. Based in New York, available globally.", yearsExperience: 8,  hourlyRate: 200 },
+  { firstName: "Priya",   lastName: "Sharma",    title: "Financial Planning Specialist", bio: "Chartered accountant and financial planner helping individuals and businesses with investment strategy, tax optimization, and budgeting.", yearsExperience: 7,  hourlyRate: 95  },
+  { firstName: "Carlos",  lastName: "Rivera",    title: "Digital Marketing Strategist",  bio: "Growth marketing expert with deep experience in SEO, paid media, and brand building. Helped 50+ brands grow their digital presence.", yearsExperience: 6,  hourlyRate: 85  },
+  { firstName: "Aisha",   lastName: "Abdullah",  title: "Health & Wellness Coach",       bio: "Certified health coach and nutritionist focused on sustainable lifestyle changes, mental wellness, and holistic health management.", yearsExperience: 5,  hourlyRate: 75  },
+  { firstName: "Michael", lastName: "Thompson",  title: "Software Architecture Advisor", bio: "Principal engineer and architect with expertise in distributed systems, API design, and cloud infrastructure at scale.", yearsExperience: 12, hourlyRate: 180 },
+  { firstName: "Fatima",  lastName: "Al-Hassan", title: "Education & Career Coach",      bio: "Former university professor turned career strategist. Helping students and professionals navigate academic and career transitions.", yearsExperience: 9,  hourlyRate: 80  },
+];
 
 // Dummy Unsplash images to use as "document" content (publicly accessible)
 const DUMMY_DOC_IMAGES = [
@@ -63,6 +80,7 @@ const DUMMY_DOC_IMAGES = [
     mimeType: "image/jpeg",
   },
 ];
+
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -89,9 +107,13 @@ async function api(method, path, body, token) {
   return { status: res.status, ok: res.ok, json };
 }
 
-function randomEmail(tag) {
-  const ts = Date.now();
-  return `expert.${tag}.${ts}@xprtlink-test.com`;
+function randomEmail(persona, tag) {
+  const first  = persona.firstName.toLowerCase().replace(/[^a-z]/g, "");
+  const last   = persona.lastName.toLowerCase().replace(/[^a-z]/g, "");
+  const suffix = tag !== "demo" ? `.${tag}` : "";
+  // Short numeric suffix to keep it unique across runs without exposing timestamps
+  const seq    = String(Date.now()).slice(-6);
+  return `${first}.${last}${suffix}.${seq}@xprtlink-test.com`;
 }
 
 function randomPhone() {
@@ -110,17 +132,20 @@ async function main() {
   log(`Tag     : ${TAG}`);
   log(`Approve : ${AUTO_APPROVE ? "yes (admin will approve)" : "no (leaves verification pending)"}`);
 
-  const expertEmail = randomEmail(TAG);
-  const expertPhone = randomPhone();
+  const persona     = EXPERT_PERSONAS[Math.floor(Math.random() * EXPERT_PERSONAS.length)];
+  const expertEmail  = randomEmail(persona, TAG);
+  const expertPhone  = randomPhone();
   const expertPassword = "Expert@Seed123";
 
-  // ── Step 1: Register expert ─────────────────────────────────────────────────
+  log(`Persona : ${persona.firstName} ${persona.lastName} — ${persona.title}`);
+  log(`Email   : ${expertEmail}`);
+  log(`Phone   : ${expertPhone}`);
+
   step("1/7", "Registering new expert account...");
-  log(`Email: ${expertEmail}`);
 
   const reg = await api("POST", "/api/v1/auth/register", {
-    firstName: "Demo",
-    lastName: "Expert",
+    firstName: persona.firstName,
+    lastName: persona.lastName,
     email: expertEmail,
     phone: expertPhone,
     password: expertPassword,
@@ -165,12 +190,12 @@ async function main() {
 
   const onboard = await api("POST", "/api/v1/experts/me/onboarding", {
     categories: [categoryId],
-    bio: "Experienced professional specializing in consultation and advisory services. Available for on-demand sessions.",
-    hourlyRate: 75,
-    yearsExperience: 5,
+    bio: persona.bio,
+    hourlyRate: persona.hourlyRate,
+    yearsExperience: persona.yearsExperience,
     languages: ["en"],
     timezone: "Asia/Karachi",
-    title: "Senior Consultant",
+    title: persona.title,
   }, expertToken);
 
   if (!onboard.ok) {
@@ -341,8 +366,11 @@ async function main() {
   console.log("\n" + "═".repeat(65));
   console.log("  ✅  Done! Real API-seeded verification data:");
   console.log("═".repeat(65));
+  console.log(`  Expert name     : ${persona.firstName} ${persona.lastName}`);
   console.log(`  Expert email    : ${expertEmail}`);
   console.log(`  Expert password : ${expertPassword}`);
+  console.log(`  Title           : ${persona.title}`);
+  console.log(`  Rate            : $${persona.hourlyRate}/hr  |  ${persona.yearsExperience} yrs experience`);
   console.log(`  Verification ID : ${ourVerif?.id || verificationId || "(check portal)"}`);
   console.log(`  Documents       : ${mediaIds.map((m) => m.label).join(", ")}`);
   console.log(`  Status          : ${AUTO_APPROVE ? "approved" : "pending (awaiting admin review)"}`);
