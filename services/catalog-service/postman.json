@@ -45,7 +45,7 @@
             { "key": "slug", "value": "privacy", "description": "Supported slugs: privacy, terms, help, faq, about" }
           ]
         },
-        "description": "Retrieve static CMS page HTML/Markdown by slug. Used for Privacy Policy, Terms of Service, Help Centre, FAQ, About Us screens."
+        "description": "Retrieve static CMS page by slug. Now returns raw HTML directly instead of JSON. Used for Privacy Policy, Terms of Service, Help Centre, FAQ, About Us screens."
       }
     },
     {
