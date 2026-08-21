@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { loadSecret, getSecretSync } from "@xprtlink/shared/config/secrets.js";
 import sgMail from "@sendgrid/mail";
 import twilio from "twilio";
 
@@ -8,15 +9,16 @@ const target = args[1];  // email address or phone number
 const code = args[2];    // code for 'verify-sms'
 
 async function testEmail() {
-  const apiKey = process.env.SENDGRID_API_KEY;
-  const fromEmail = process.env.SENDGRID_FROM_EMAIL || "noreply@xpertlink.local";
+  await loadSecret();
+  const apiKey = getSecretSync("SENDGRID_API_KEY");
+  const fromEmail = getSecretSync("SENDGRID_FROM_EMAIL") || "noreply@xpertlink.local";
 
   if (!apiKey) {
     console.error("❌ SENDGRID_API_KEY is not set in environment.");
     process.exit(1);
   }
   if (!target) {
-    console.error("❌ Please provide a target email address. Example: pnpm test:email user@example.com");
+    console.error("❌ Please provide a target email address. Example: node test-communications.js email user@example.com");
     process.exit(1);
   }
 
@@ -39,16 +41,17 @@ async function testEmail() {
 }
 
 async function testSms() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+  await loadSecret();
+  const accountSid = getSecretSync("TWILIO_ACCOUNT_SID");
+  const authToken = getSecretSync("TWILIO_AUTH_TOKEN");
+  const serviceSid = getSecretSync("TWILIO_VERIFY_SERVICE_SID");
 
   if (!accountSid || !authToken || !serviceSid) {
     console.error("❌ TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, or TWILIO_VERIFY_SERVICE_SID is missing.");
     process.exit(1);
   }
   if (!target) {
-    console.error("❌ Please provide a target phone number. Example: pnpm test:phone +1234567890");
+    console.error("❌ Please provide a target phone number. Example: node test-communications.js sms +1234567890");
     process.exit(1);
   }
 
@@ -62,7 +65,7 @@ async function testSms() {
     });
     console.log(`✅ Verification requested successfully! Status: ${verification.status}`);
     console.log(`To verify the code you receive, run:`);
-    console.log(`  pnpm test:verify-phone ${target} <your-code>`);
+    console.log(`  node scripts/test-communications.js verify-sms ${target} <your-code>`);
   } catch (error) {
     console.error("❌ Failed to send Twilio Verify SMS:");
     console.error(error);
@@ -70,16 +73,17 @@ async function testSms() {
 }
 
 async function verifySmsCode() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+  await loadSecret();
+  const accountSid = getSecretSync("TWILIO_ACCOUNT_SID");
+  const authToken = getSecretSync("TWILIO_AUTH_TOKEN");
+  const serviceSid = getSecretSync("TWILIO_VERIFY_SERVICE_SID");
 
   if (!accountSid || !authToken || !serviceSid) {
     console.error("❌ TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, or TWILIO_VERIFY_SERVICE_SID is missing.");
     process.exit(1);
   }
   if (!target || !code) {
-    console.error("❌ Please provide a phone number and the code. Example: pnpm test:verify-phone +1234567890 123456");
+    console.error("❌ Please provide a phone number and the code. Example: node test-communications.js verify-sms +1234567890 123456");
     process.exit(1);
   }
 
@@ -115,9 +119,13 @@ Make sure your environment variables are set (in .env or passed inline):
   - TWILIO_VERIFY_SERVICE_SID
 
 Usage:
-  pnpm test:email <email_address>
-  pnpm test:phone <phone_number>
-  pnpm test:verify-phone <phone_number> <6_digit_code>
+  node scripts/test-communications.js email <email_address>
+  node scripts/test-communications.js sms <phone_number>
+  node scripts/test-communications.js verify-sms <phone_number> <6_digit_code>
+
+Examples:
+  npx dotenv-cli -e .env -- node scripts/test-communications.js email test@example.com
+  TWILIO_VERIFY_SERVICE_SID=VA123... node scripts/test-communications.js sms +1234567890
 `);
 }
 

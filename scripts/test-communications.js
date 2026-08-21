@@ -40,9 +40,10 @@ async function testEmail() {
 }
 
 async function testSms() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+  await loadSecret();
+  const accountSid = getSecretSync("TWILIO_ACCOUNT_SID");
+  const authToken = getSecretSync("TWILIO_AUTH_TOKEN");
+  const serviceSid = getSecretSync("TWILIO_VERIFY_SERVICE_SID");
 
   if (!accountSid || !authToken || !serviceSid) {
     console.error("❌ TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, or TWILIO_VERIFY_SERVICE_SID is missing.");
@@ -71,9 +72,10 @@ async function testSms() {
 }
 
 async function verifySmsCode() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-  const serviceSid = process.env.TWILIO_VERIFY_SERVICE_SID;
+  await loadSecret();
+  const accountSid = getSecretSync("TWILIO_ACCOUNT_SID");
+  const authToken = getSecretSync("TWILIO_AUTH_TOKEN");
+  const serviceSid = getSecretSync("TWILIO_VERIFY_SERVICE_SID");
 
   if (!accountSid || !authToken || !serviceSid) {
     console.error("❌ TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, or TWILIO_VERIFY_SERVICE_SID is missing.");
