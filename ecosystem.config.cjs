@@ -20,6 +20,7 @@ const baseEnv = {
   SERVICE_SECRET: process.env.SERVICE_SECRET,
   CORS_ORIGIN: process.env.CORS_ORIGIN || "*",
   LOG_LEVEL: process.env.LOG_LEVEL || "info",
+  NODE_OPTIONS: process.env.NODE_OPTIONS || "--dns-result-order=ipv4first",
   USER_SERVICE_URL:
     process.env.USER_SERVICE_URL || `http://localhost:${portMap["user-service"]}`,
   EXPERT_SERVICE_URL:

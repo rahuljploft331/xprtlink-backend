@@ -4,6 +4,8 @@
  * Later: same API can load from AWS Secrets Manager without changing call sites.
  */
 import { SecretsManagerClient, GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
+import { NodeHttpHandler } from "@smithy/node-http-handler";
+import { Agent } from "https";
 
 // ------------------------------------------------------------------
 // Configuration – read from env (add placeholders in .env.example)
@@ -21,6 +23,9 @@ export async function loadSecret() {
   const client = new SecretsManagerClient({
     region: AWS_REGION,
     endpoint: AWS_ENDPOINT, // undefined → uses real AWS endpoint
+    requestHandler: new NodeHttpHandler({
+      httpsAgent: new Agent({ family: 4 })
+    }),
   });
 
   try {
@@ -28,11 +33,12 @@ export async function loadSecret() {
     const resp = await client.send(cmd);
     cachedSecret = JSON.parse(resp.SecretString ?? "{}");
     return cachedSecret;
-  } catch (err) {
-    console.warn("[Secrets] Unable to fetch from AWS Secrets Manager – falling back to env", err.message);
-    cachedSecret = {};
-    return cachedSecret;
+  } catch (error) {
+    console.warn("[Secrets] Unable to fetch from AWS Secrets Manager – falling back to env");
+    console.error("[Secrets] AWS Error:", error);
+    cachedSecret = {}; // Use fallback
   }
+  return cachedSecret;
 }
 
 export async function getSecret(key, fallback = undefined) {

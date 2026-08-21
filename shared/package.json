@@ -29,6 +29,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1109.0",
     "@prisma/client": "^6.19.0",
     "@sendgrid/mail": "^8.1.5",
+    "@smithy/node-http-handler": "^4.11.2",
     "bcryptjs": "^3.0.2",
     "cors": "^2.8.5",
     "express": "^4.21.2",
