@@ -1,4 +1,4 @@
-import { getDb } from "@xprtlink/shared/db/getClient.js";
+import { getDb } from "@xprtlink/shared/config/db.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
