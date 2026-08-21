@@ -35,8 +35,16 @@
           "listen": "prerequest",
           "script": {
             "exec": [
+              "var firstNames = [\"James\", \"Sarah\", \"Michael\", \"Emma\", \"William\", \"Olivia\", \"David\", \"Ava\", \"Richard\", \"Sophia\", \"Joseph\", \"Isabella\", \"Thomas\", \"Mia\", \"Charles\", \"Charlotte\", \"Daniel\", \"Amelia\", \"Matthew\", \"Harper\"];",
+              "var lastNames = [\"Smith\", \"Johnson\", \"Williams\", \"Brown\", \"Jones\", \"Garcia\", \"Miller\", \"Davis\", \"Rodriguez\", \"Martinez\", \"Hernandez\", \"Lopez\", \"Gonzalez\", \"Wilson\", \"Anderson\", \"Thomas\", \"Taylor\", \"Moore\", \"Jackson\", \"Martin\"];",
+              "function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }",
               "var ts = Date.now();",
-              "pm.collectionVariables.set('customer_email', 'customer_' + ts + '@xprtlink-test.com');",
+              "var seq = String(ts).slice(-6);",
+              "var customerFirst = rand(firstNames);",
+              "var customerLast = rand(lastNames);",
+              "pm.collectionVariables.set('customer_first_name', customerFirst);",
+              "pm.collectionVariables.set('customer_last_name', customerLast);",
+              "pm.collectionVariables.set('customer_email', customerFirst.toLowerCase() + '.' + customerLast.toLowerCase() + seq + '@yopmail.com');",
               "pm.collectionVariables.set('customer_phone', '+1415' + String(ts).slice(-7));"
             ],
             "type": "text/javascript"
@@ -64,7 +72,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"email\":\"{{customer_email}}\",\"phone\":\"{{customer_phone}}\",\"password\":\"Customer@123\",\"confirmPassword\":\"Customer@123\",\"firstName\":\"Alex\",\"lastName\":\"Testuser\",\"role\":\"customer\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
+          "raw": "{\"email\":\"{{customer_email}}\",\"phone\":\"{{customer_phone}}\",\"password\":\"Customer@123\",\"confirmPassword\":\"Customer@123\",\"firstName\":\"{{customer_first_name}}\",\"lastName\":\"{{customer_last_name}}\",\"role\":\"customer\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/auth/register",
@@ -133,8 +141,8 @@
             "exec": [
               "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
               "var json = pm.response.json();",
-              "pm.test('firstName updated', function () { pm.expect(json.data.firstName).to.eql('Alex'); });",
-              "pm.test('lastName updated', function () { pm.expect(json.data.lastName).to.eql('Johnson'); });",
+              "pm.test('firstName updated', function () { pm.expect(json.data.firstName).to.eql(pm.collectionVariables.get('customer_first_name')); });",
+              "pm.test('lastName updated', function () { pm.expect(json.data.lastName).to.eql(pm.collectionVariables.get('customer_last_name')); });",
               "pm.test('status is active', function () { pm.expect(json.data.status).to.eql('active'); });"
             ],
             "type": "text/javascript"
@@ -155,7 +163,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"firstName\":\"Alex\",\"lastName\":\"Johnson\"}"
+          "raw": "{\"firstName\":\"{{customer_first_name}}\",\"lastName\":\"{{customer_last_name}}\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/customers/me",
@@ -269,6 +277,7 @@
           "listen": "prerequest",
           "script": {
             "exec": [
+              "var ts = Date.now();",
               "// Fetch a real expert ID from the DB via the public search endpoint",
               "pm.sendRequest({",
               "  url: pm.collectionVariables.get('base_url') + '/api/v1/experts/featured',",

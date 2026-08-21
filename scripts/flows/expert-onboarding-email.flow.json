@@ -6,12 +6,30 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:4000" },
-    { "key": "expert_email", "value": "" },
-    { "key": "expert_phone", "value": "" },
-    { "key": "expert_token", "value": "" },
-    { "key": "plan_code", "value": "elite" },
-    { "key": "category_id", "value": "" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "expert_email",
+      "value": ""
+    },
+    {
+      "key": "expert_phone",
+      "value": ""
+    },
+    {
+      "key": "expert_token",
+      "value": ""
+    },
+    {
+      "key": "plan_code",
+      "value": "elite"
+    },
+    {
+      "key": "category_id",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -21,8 +39,16 @@
           "listen": "prerequest",
           "script": {
             "exec": [
+              "var firstNames = [\"James\", \"Sarah\", \"Michael\", \"Emma\", \"William\", \"Olivia\", \"David\", \"Ava\", \"Richard\", \"Sophia\", \"Joseph\", \"Isabella\", \"Thomas\", \"Mia\", \"Charles\", \"Charlotte\", \"Daniel\", \"Amelia\", \"Matthew\", \"Harper\"];",
+              "var lastNames = [\"Smith\", \"Johnson\", \"Williams\", \"Brown\", \"Jones\", \"Garcia\", \"Miller\", \"Davis\", \"Rodriguez\", \"Martinez\", \"Hernandez\", \"Lopez\", \"Gonzalez\", \"Wilson\", \"Anderson\", \"Thomas\", \"Taylor\", \"Moore\", \"Jackson\", \"Martin\"];",
+              "function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }",
               "var ts = Date.now();",
-              "pm.collectionVariables.set('expert_email', 'expert_email_' + ts + '@xprtlink-test.com');",
+              "var seq = String(ts).slice(-6);",
+              "var expertFirst = rand(firstNames);",
+              "var expertLast = rand(lastNames);",
+              "pm.collectionVariables.set('expert_first_name', expertFirst);",
+              "pm.collectionVariables.set('expert_last_name', expertLast);",
+              "pm.collectionVariables.set('expert_email', expertFirst.toLowerCase() + '.' + expertLast.toLowerCase() + seq + '@yopmail.com');",
               "pm.collectionVariables.set('expert_phone', '+1212' + String(ts).slice(-7));"
             ],
             "type": "text/javascript"
@@ -42,15 +68,27 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
-          "raw": "{\"email\":\"{{expert_email}}\",\"phone\":\"{{expert_phone}}\",\"password\":\"Expert@123\",\"confirmPassword\":\"Expert@123\",\"firstName\":\"Morgan\",\"lastName\":\"EmailExpert\",\"role\":\"expert\",\"termsAccepted\":true,\"otpChannel\":\"email\"}"
+          "raw": "{\"email\":\"{{expert_email}}\",\"phone\":\"{{expert_phone}}\",\"password\":\"Expert@123\",\"confirmPassword\":\"Expert@123\",\"firstName\":\"{{expert_first_name}}\",\"lastName\":\"{{expert_last_name}}\",\"role\":\"expert\",\"termsAccepted\":true,\"otpChannel\":\"email\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/auth/register",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "auth", "register"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "register"
+          ]
         }
       }
     },
@@ -73,15 +111,28 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\"email\":\"{{expert_email}}\",\"code\":\"123456\",\"purpose\":\"register\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/auth/otp/verify",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "auth", "otp", "verify"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "verify"
+          ]
         }
       }
     },
@@ -122,8 +173,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -131,8 +188,16 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me/onboarding",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "experts", "me", "onboarding"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "me",
+            "onboarding"
+          ]
         }
       }
     },
@@ -154,8 +219,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -163,8 +234,17 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me/verification/documents",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "experts", "me", "verification", "documents"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "me",
+            "verification",
+            "documents"
+          ]
         }
       }
     },
@@ -205,8 +285,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -214,8 +300,15 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/billing/subscriptions",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "subscriptions"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "subscriptions"
+          ]
         }
       }
     }

@@ -2,24 +2,66 @@
   "info": {
     "_postman_id": "a1c9e7f2-5d4b-4e8a-9f61-consultation-lc-f",
     "name": "XpertLink Consultation Lifecycle Flow (Verified)",
-    "description": "Flow F: Full consultation lifecycle — registers fresh customer & expert, onboards expert with profile+subscription, creates consultation, expert accepts, ends call, customer pays and submits review, verifies final state.",
+    "description": "Flow F: Full consultation lifecycle \u2014 registers fresh customer & expert, onboards expert with profile+subscription, creates consultation, expert accepts, ends call, customer pays and submits review, verifies final state.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:4000" },
-    { "key": "customer_email", "value": "" },
-    { "key": "customer_phone", "value": "" },
-    { "key": "customer_token", "value": "" },
-    { "key": "expert_email", "value": "" },
-    { "key": "expert_phone", "value": "" },
-    { "key": "expert_token", "value": "" },
-    { "key": "expert_id", "value": "" },
-    { "key": "category_id", "value": "" },
-    { "key": "plan_code", "value": "" },
-    { "key": "consultation_id", "value": "" },
-    { "key": "payment_method_id", "value": "" },
-    { "key": "stripe_pm_id", "value": "" },
-    { "key": "stripe_pi_id", "value": "" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "customer_email",
+      "value": ""
+    },
+    {
+      "key": "customer_phone",
+      "value": ""
+    },
+    {
+      "key": "customer_token",
+      "value": ""
+    },
+    {
+      "key": "expert_email",
+      "value": ""
+    },
+    {
+      "key": "expert_phone",
+      "value": ""
+    },
+    {
+      "key": "expert_token",
+      "value": ""
+    },
+    {
+      "key": "expert_id",
+      "value": ""
+    },
+    {
+      "key": "category_id",
+      "value": ""
+    },
+    {
+      "key": "plan_code",
+      "value": ""
+    },
+    {
+      "key": "consultation_id",
+      "value": ""
+    },
+    {
+      "key": "payment_method_id",
+      "value": ""
+    },
+    {
+      "key": "stripe_pm_id",
+      "value": ""
+    },
+    {
+      "key": "stripe_pi_id",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -29,8 +71,16 @@
           "listen": "prerequest",
           "script": {
             "exec": [
+              "var firstNames = [\"James\", \"Sarah\", \"Michael\", \"Emma\", \"William\", \"Olivia\", \"David\", \"Ava\", \"Richard\", \"Sophia\", \"Joseph\", \"Isabella\", \"Thomas\", \"Mia\", \"Charles\", \"Charlotte\", \"Daniel\", \"Amelia\", \"Matthew\", \"Harper\"];",
+              "var lastNames = [\"Smith\", \"Johnson\", \"Williams\", \"Brown\", \"Jones\", \"Garcia\", \"Miller\", \"Davis\", \"Rodriguez\", \"Martinez\", \"Hernandez\", \"Lopez\", \"Gonzalez\", \"Wilson\", \"Anderson\", \"Thomas\", \"Taylor\", \"Moore\", \"Jackson\", \"Martin\"];",
+              "function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }",
               "var ts = Date.now();",
-              "pm.collectionVariables.set('customer_email', 'cust_consult_' + ts + '@xprtlink-test.com');",
+              "var seq = String(ts).slice(-6);",
+              "var customerFirst = rand(firstNames);",
+              "var customerLast = rand(lastNames);",
+              "pm.collectionVariables.set('customer_first_name', customerFirst);",
+              "pm.collectionVariables.set('customer_last_name', customerLast);",
+              "pm.collectionVariables.set('customer_email', customerFirst.toLowerCase() + '.' + customerLast.toLowerCase() + seq + '@yopmail.com');",
               "pm.collectionVariables.set('customer_phone', '+1310' + String(ts).slice(-7));"
             ],
             "type": "text/javascript"
@@ -49,15 +99,27 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
-          "raw": "{\"email\":\"{{customer_email}}\",\"phone\":\"{{customer_phone}}\",\"password\":\"Customer@123\",\"confirmPassword\":\"Customer@123\",\"firstName\":\"ConsultCust\",\"lastName\":\"FlowF\",\"role\":\"customer\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
+          "raw": "{\"email\":\"{{customer_email}}\",\"phone\":\"{{customer_phone}}\",\"password\":\"Customer@123\",\"confirmPassword\":\"Customer@123\",\"firstName\":\"{{customer_first_name}}\",\"lastName\":\"{{customer_last_name}}\",\"role\":\"customer\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/auth/register",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "auth", "register"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "register"
+          ]
         }
       }
     },
@@ -79,15 +141,28 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\"phone\":\"{{customer_phone}}\",\"code\":\"123456\",\"purpose\":\"register\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/auth/otp/verify",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "auth", "otp", "verify"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "verify"
+          ]
         }
       }
     },
@@ -98,8 +173,8 @@
           "listen": "prerequest",
           "script": {
             "exec": [
-              "// Generate a unique PM ID to avoid unique constraint conflicts",
               "var ts = Date.now();",
+              "// Generate a unique PM ID to avoid unique constraint conflicts",
               "pm.collectionVariables.set('stripe_pm_id', 'pm_card_visa_' + ts);"
             ],
             "type": "text/javascript"
@@ -121,8 +196,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{customer_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customer_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -130,8 +211,15 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/billing/payment-methods",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "payment-methods"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "payment-methods"
+          ]
         }
       }
     },
@@ -142,8 +230,16 @@
           "listen": "prerequest",
           "script": {
             "exec": [
+              "var firstNames = [\"James\", \"Sarah\", \"Michael\", \"Emma\", \"William\", \"Olivia\", \"David\", \"Ava\", \"Richard\", \"Sophia\", \"Joseph\", \"Isabella\", \"Thomas\", \"Mia\", \"Charles\", \"Charlotte\", \"Daniel\", \"Amelia\", \"Matthew\", \"Harper\"];",
+              "var lastNames = [\"Smith\", \"Johnson\", \"Williams\", \"Brown\", \"Jones\", \"Garcia\", \"Miller\", \"Davis\", \"Rodriguez\", \"Martinez\", \"Hernandez\", \"Lopez\", \"Gonzalez\", \"Wilson\", \"Anderson\", \"Thomas\", \"Taylor\", \"Moore\", \"Jackson\", \"Martin\"];",
+              "function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }",
               "var ts = Date.now();",
-              "pm.collectionVariables.set('expert_email', 'expert_consult_' + ts + '@xprtlink-test.com');",
+              "var seq = String(ts).slice(-6);",
+              "var expertFirst = rand(firstNames);",
+              "var expertLast = rand(lastNames);",
+              "pm.collectionVariables.set('expert_first_name', expertFirst);",
+              "pm.collectionVariables.set('expert_last_name', expertLast);",
+              "pm.collectionVariables.set('expert_email', expertFirst.toLowerCase() + '.' + expertLast.toLowerCase() + seq + '@yopmail.com');",
               "pm.collectionVariables.set('expert_phone', '+1512' + String(ts).slice(-7));"
             ],
             "type": "text/javascript"
@@ -162,15 +258,27 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
-          "raw": "{\"email\":\"{{expert_email}}\",\"phone\":\"{{expert_phone}}\",\"password\":\"Expert@123\",\"confirmPassword\":\"Expert@123\",\"firstName\":\"ConsultExpert\",\"lastName\":\"FlowF\",\"role\":\"expert\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
+          "raw": "{\"email\":\"{{expert_email}}\",\"phone\":\"{{expert_phone}}\",\"password\":\"Expert@123\",\"confirmPassword\":\"Expert@123\",\"firstName\":\"{{expert_first_name}}\",\"lastName\":\"{{expert_last_name}}\",\"role\":\"expert\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/auth/register",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "auth", "register"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "register"
+          ]
         }
       }
     },
@@ -192,15 +300,28 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\"phone\":\"{{expert_phone}}\",\"code\":\"123456\",\"purpose\":\"register\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/auth/otp/verify",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "auth", "otp", "verify"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "verify"
+          ]
         }
       }
     },
@@ -230,8 +351,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -239,8 +366,16 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me/onboarding",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "experts", "me", "onboarding"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "me",
+            "onboarding"
+          ]
         }
       }
     },
@@ -263,12 +398,22 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
         ],
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "experts", "me"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "me"
+          ]
         }
       }
     },
@@ -298,8 +443,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -307,8 +458,15 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/billing/subscriptions",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "subscriptions"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "subscriptions"
+          ]
         }
       }
     },
@@ -332,8 +490,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{customer_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customer_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -341,8 +505,15 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/engagement/consultations",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "engagement", "consultations"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "engagement",
+            "consultations"
+          ]
         }
       }
     },
@@ -364,14 +535,32 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
-        "body": { "mode": "raw", "raw": "{}" },
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
         "url": {
           "raw": "{{base_url}}/api/v1/engagement/consultations/{{consultation_id}}/accept",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "engagement", "consultations", "{{consultation_id}}", "accept"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "engagement",
+            "consultations",
+            "{{consultation_id}}",
+            "accept"
+          ]
         }
       }
     },
@@ -394,14 +583,32 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
-        "body": { "mode": "raw", "raw": "{}" },
+        "body": {
+          "mode": "raw",
+          "raw": "{}"
+        },
         "url": {
           "raw": "{{base_url}}/api/v1/engagement/consultations/{{consultation_id}}/end",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "engagement", "consultations", "{{consultation_id}}", "end"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "engagement",
+            "consultations",
+            "{{consultation_id}}",
+            "end"
+          ]
         }
       }
     },
@@ -430,8 +637,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{customer_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customer_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -439,8 +652,17 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/billing/consultations/{{consultation_id}}/hold",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "consultations", "{{consultation_id}}", "hold"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "consultations",
+            "{{consultation_id}}",
+            "hold"
+          ]
         }
       }
     },
@@ -465,8 +687,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{customer_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customer_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -474,8 +702,17 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/billing/consultations/{{consultation_id}}/pay",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "consultations", "{{consultation_id}}", "pay"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "consultations",
+            "{{consultation_id}}",
+            "pay"
+          ]
         }
       }
     },
@@ -496,8 +733,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{customer_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customer_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -505,8 +748,17 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/engagement/consultations/{{consultation_id}}/review",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "engagement", "consultations", "{{consultation_id}}", "review"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "engagement",
+            "consultations",
+            "{{consultation_id}}",
+            "review"
+          ]
         }
       }
     },
@@ -530,12 +782,23 @@
       "request": {
         "method": "GET",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{customer_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{customer_token}}"
+          }
         ],
         "url": {
           "raw": "{{base_url}}/api/v1/engagement/consultations/{{consultation_id}}",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "engagement", "consultations", "{{consultation_id}}"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "engagement",
+            "consultations",
+            "{{consultation_id}}"
+          ]
         }
       }
     }

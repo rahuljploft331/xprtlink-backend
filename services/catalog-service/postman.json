@@ -42,7 +42,7 @@
           "host": ["{{base_url}}"],
           "path": ["api", "v1", "catalog", "cms", ":slug"],
           "variable": [
-            { "key": "slug", "value": "privacy", "description": "Supported slugs: privacy, terms, help, faq, about" }
+            { "key": "slug", "value": "privacy", "description": "Supported slugs: privacy, terms, help, faq, about, expert-standards" }
           ]
         },
         "description": "Retrieve static CMS page by slug. Now returns raw HTML directly instead of JSON. Used for Privacy Policy, Terms of Service, Help Centre, FAQ, About Us screens."

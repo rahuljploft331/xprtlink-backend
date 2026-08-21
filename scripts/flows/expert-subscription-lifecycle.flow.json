@@ -6,15 +6,42 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "base_url", "value": "http://localhost:4000" },
-    { "key": "fresh_email", "value": "" },
-    { "key": "fresh_phone", "value": "" },
-    { "key": "expert_token", "value": "" },
-    { "key": "plan_code", "value": "professional" },
-    { "key": "upgrade_plan_code", "value": "elite" },
-    { "key": "subscription_id", "value": "" },
-    { "key": "plan_id", "value": "" },
-    { "key": "category_id", "value": "" }
+    {
+      "key": "base_url",
+      "value": "http://localhost:4000"
+    },
+    {
+      "key": "fresh_email",
+      "value": ""
+    },
+    {
+      "key": "fresh_phone",
+      "value": ""
+    },
+    {
+      "key": "expert_token",
+      "value": ""
+    },
+    {
+      "key": "plan_code",
+      "value": "professional"
+    },
+    {
+      "key": "upgrade_plan_code",
+      "value": "elite"
+    },
+    {
+      "key": "subscription_id",
+      "value": ""
+    },
+    {
+      "key": "plan_id",
+      "value": ""
+    },
+    {
+      "key": "category_id",
+      "value": ""
+    }
   ],
   "item": [
     {
@@ -24,8 +51,16 @@
           "listen": "prerequest",
           "script": {
             "exec": [
+              "var firstNames = [\"James\", \"Sarah\", \"Michael\", \"Emma\", \"William\", \"Olivia\", \"David\", \"Ava\", \"Richard\", \"Sophia\", \"Joseph\", \"Isabella\", \"Thomas\", \"Mia\", \"Charles\", \"Charlotte\", \"Daniel\", \"Amelia\", \"Matthew\", \"Harper\"];",
+              "var lastNames = [\"Smith\", \"Johnson\", \"Williams\", \"Brown\", \"Jones\", \"Garcia\", \"Miller\", \"Davis\", \"Rodriguez\", \"Martinez\", \"Hernandez\", \"Lopez\", \"Gonzalez\", \"Wilson\", \"Anderson\", \"Thomas\", \"Taylor\", \"Moore\", \"Jackson\", \"Martin\"];",
+              "function rand(arr) { return arr[Math.floor(Math.random() * arr.length)]; }",
               "var ts = Date.now();",
-              "pm.collectionVariables.set('fresh_email', 'expert_sub_' + ts + '@xprtlink-test.com');",
+              "var seq = String(ts).slice(-6);",
+              "var freshFirst = rand(firstNames);",
+              "var freshLast = rand(lastNames);",
+              "pm.collectionVariables.set('fresh_first_name', freshFirst);",
+              "pm.collectionVariables.set('fresh_last_name', freshLast);",
+              "pm.collectionVariables.set('fresh_email', freshFirst.toLowerCase() + '.' + freshLast.toLowerCase() + seq + '@yopmail.com');",
               "pm.collectionVariables.set('fresh_phone', '+1310' + String(ts).slice(-7));"
             ],
             "type": "text/javascript"
@@ -45,15 +80,27 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
-          "raw": "{\"email\":\"{{fresh_email}}\",\"phone\":\"{{fresh_phone}}\",\"password\":\"Expert@123\",\"confirmPassword\":\"Expert@123\",\"firstName\":\"Taylor\",\"lastName\":\"SubFlow\",\"role\":\"expert\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
+          "raw": "{\"email\":\"{{fresh_email}}\",\"phone\":\"{{fresh_phone}}\",\"password\":\"Expert@123\",\"confirmPassword\":\"Expert@123\",\"firstName\":\"{{fresh_first_name}}\",\"lastName\":\"{{fresh_last_name}}\",\"role\":\"expert\",\"termsAccepted\":true,\"otpChannel\":\"phone\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/auth/register",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "auth", "register"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "register"
+          ]
         }
       }
     },
@@ -75,15 +122,28 @@
       ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "body": {
           "mode": "raw",
           "raw": "{\"phone\":\"{{fresh_phone}}\",\"code\":\"123456\",\"purpose\":\"register\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/auth/otp/verify",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "auth", "otp", "verify"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "verify"
+          ]
         }
       }
     },
@@ -121,8 +181,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -130,8 +196,16 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me/onboarding",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "experts", "me", "onboarding"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "me",
+            "onboarding"
+          ]
         }
       }
     },
@@ -151,12 +225,24 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
         ],
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me/onboarding/submit",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "experts", "me", "onboarding", "submit"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "me",
+            "onboarding",
+            "submit"
+          ]
         }
       }
     },
@@ -183,11 +269,24 @@
       ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{expert_token}}" }],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
+        ],
         "url": {
           "raw": "{{base_url}}/api/v1/billing/subscriptions/plans",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "subscriptions", "plans"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "subscriptions",
+            "plans"
+          ]
         }
       }
     },
@@ -210,8 +309,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -219,8 +324,15 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/billing/subscriptions",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "subscriptions"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "subscriptions"
+          ]
         }
       }
     },
@@ -241,11 +353,24 @@
       ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{expert_token}}" }],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
+        ],
         "url": {
           "raw": "{{base_url}}/api/v1/billing/subscriptions/me",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "subscriptions", "me"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "subscriptions",
+            "me"
+          ]
         }
       }
     },
@@ -266,16 +391,28 @@
       ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{expert_token}}" }],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
+        ],
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "experts", "me"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "me"
+          ]
         }
       }
     },
     {
-      "name": "Step 9: Re-Subscribe Same Plan → Expect 409",
+      "name": "Step 9: Re-Subscribe Same Plan \u2192 Expect 409",
       "event": [
         {
           "listen": "test",
@@ -292,8 +429,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -301,13 +444,20 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/billing/subscriptions",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "subscriptions"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "subscriptions"
+          ]
         }
       }
     },
     {
-      "name": "Step 10: Upgrade Plan (professional → elite)",
+      "name": "Step 10: Upgrade Plan (professional \u2192 elite)",
       "event": [
         {
           "listen": "test",
@@ -327,8 +477,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -336,8 +492,15 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/billing/subscriptions",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "subscriptions"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "subscriptions"
+          ]
         }
       }
     },
@@ -363,12 +526,23 @@
       "request": {
         "method": "DELETE",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
         ],
         "url": {
           "raw": "{{base_url}}/api/v1/billing/subscriptions/me",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "subscriptions", "me"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "subscriptions",
+            "me"
+          ]
         }
       }
     },
@@ -391,11 +565,23 @@
       ],
       "request": {
         "method": "GET",
-        "header": [{ "key": "Authorization", "value": "Bearer {{expert_token}}" }],
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
+        ],
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "experts", "me"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "me"
+          ]
         }
       }
     },
@@ -422,8 +608,14 @@
       "request": {
         "method": "POST",
         "header": [
-          { "key": "Authorization", "value": "Bearer {{expert_token}}" },
-          { "key": "Content-Type", "value": "application/json" }
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
         ],
         "body": {
           "mode": "raw",
@@ -431,8 +623,15 @@
         },
         "url": {
           "raw": "{{base_url}}/api/v1/billing/subscriptions",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "billing", "subscriptions"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "billing",
+            "subscriptions"
+          ]
         }
       }
     }
