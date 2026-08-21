@@ -42,8 +42,7 @@ export async function loadSecret() {
     cachedSecret = JSON.parse(resp.SecretString ?? "{}");
     return cachedSecret;
   } catch (error) {
-    console.warn("[Secrets] Unable to fetch from AWS Secrets Manager – falling back to env");
-    console.error("[Secrets] AWS Error:", error);
+    console.warn(`[Secrets] Unable to fetch from AWS Secrets Manager (${error.name || 'Error'}) – falling back to local .env`);
     cachedSecret = {}; // Use fallback
   }
   return cachedSecret;
