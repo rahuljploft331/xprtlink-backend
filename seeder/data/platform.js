@@ -13,6 +13,7 @@ export const cmsPages = [
   { slug: "privacy", title: "Privacy Policy", status: "published" },
   { slug: "terms", title: "Terms of Service", status: "published" },
   { slug: "contact", title: "Contact", status: "published" },
+  { slug: "expert-standards", title: "Expert Standards Agreement", status: "published" },
 ];
 
 export const subscriptionPlans = [
