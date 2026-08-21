@@ -319,6 +319,15 @@ async function main() {
     results.push({ ...flow, ...result });
   }
 
+  // 7. Backfill missing avatars for all seeded & test-generated users
+  logSection("Backfilling Avatars");
+  logStep("7", "Uploading missing avatars to S3 and attaching to profiles...");
+  try {
+    execSync("node scripts/fill-missing-avatars.js", { stdio: "inherit", cwd: path.resolve(__dirname, "..") });
+  } catch (err) {
+    log("⚠️  Failed to backfill avatars. Proceeding anyway.");
+  }
+
   // ── Summary ──────────────────────────────────────────────────────────────────
   logSection("Init Flows Summary");
 
