@@ -1,6 +1,7 @@
-import { getDb } from "@xprtlink/shared/db/getClient.js";
+import { getDb } from "@xprtlink/shared/config/db.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
+import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 
 /** GET /api/v1/admin/experts */
 export async function list(req, res, next) {
@@ -39,6 +40,7 @@ export async function list(req, res, next) {
         take: limit,
         orderBy,
         include: {
+          avatarMedia: true,
           category: { select: { id: true, name: true } },
           subscriptions: {
             where: { status: "active" },
@@ -53,6 +55,7 @@ export async function list(req, res, next) {
       id: e.id,
       firstName: e.firstName,
       lastName: e.lastName,
+      avatarUrl: resolveMediaUrl(e.avatarMedia?.storageKey),
       category: e.category,
       verificationStatus: e.verificationStatus,
       availabilityStatus: e.availabilityStatus,
@@ -75,6 +78,7 @@ export async function getById(req, res, next) {
     const expert = await db.expertProfile.findUnique({
       where: { id: req.params.id },
       include: {
+        avatarMedia: true,
         category: true,
         verifications: { include: { documents: true }, orderBy: { createdAt: "desc" }, take: 5 },
         subscriptions: { include: { plan: true }, orderBy: { createdAt: "desc" }, take: 1 },
@@ -85,6 +89,9 @@ export async function getById(req, res, next) {
     });
     if (!expert) {
       return res.status(404).json({ success: false, message: "Expert not found", code: "NOT_FOUND" });
+    }
+    if (expert) {
+      expert.avatarUrl = resolveMediaUrl(expert.avatarMedia?.storageKey);
     }
     return ResponseFormatter.success(res, { data: expert });
   } catch (err) {
