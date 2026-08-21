@@ -2,6 +2,7 @@ import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { logAdminAction } from "#utils/audit.js";
+import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 
 /** GET /api/v1/admin/verifications */
 export async function list(req, res, next) {
@@ -55,7 +56,20 @@ export async function getById(req, res, next) {
     if (!v) {
       return res.status(404).json({ success: false, message: "Verification not found", code: "NOT_FOUND" });
     }
-    return ResponseFormatter.success(res, { data: v });
+
+    // Attach a resolved public URL to each document's media so the admin
+    // frontend can display it without needing a separate signed-URL call.
+    const payload = {
+      ...v,
+      documents: v.documents.map((doc) => ({
+        ...doc,
+        media: doc.media
+          ? { ...doc.media, url: resolveMediaUrl(doc.media.storageKey) }
+          : null,
+      })),
+    };
+
+    return ResponseFormatter.success(res, { data: payload });
   } catch (err) {
     next(err);
   }
