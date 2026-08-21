@@ -9,10 +9,11 @@ node_modules/
 # Prisma generated client (regenerate via pnpm db:generate)
 shared/generated/
 
-# Local seed file store & media uploads
+# Local seed file store, media uploads & backups
 seeder/.data/
 uploads/
 services/media-service/uploads/
+backups/
 
 # Logs & runtime (PM2 writes here — never commit)
 logs/
