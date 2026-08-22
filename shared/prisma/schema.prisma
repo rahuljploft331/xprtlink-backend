@@ -509,6 +509,7 @@ model ExpertProfile {
   ratingAvg             Decimal            @default(0) @map("rating_avg") @db.Decimal(3, 2)
   ratingCount           Int                @default(0) @map("rating_count")
   searchEligible        Boolean            @default(false) @map("search_eligible")
+  stripeAccountId       String?            @map("stripe_account_id") @db.VarChar(128)
   createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 

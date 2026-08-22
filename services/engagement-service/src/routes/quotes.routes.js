@@ -18,12 +18,7 @@ router.use(authenticate);
 router.post(
   "/",
   asyncHandler(async (req, res) => {
-    let body;
-    try {
-      body = createQuoteRequestSchema.parse(req.body);
-    } catch (e) {
-      body = req.body;
-    }
+    const body = createQuoteRequestSchema.parse(req.body);
     const data = await svc.createQuote(req.auth, body);
     return ResponseFormatter.success(res, { message: getMessage("quoteRequestCreated"), data, status: 201 });
   })

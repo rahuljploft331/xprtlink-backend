@@ -16,7 +16,7 @@ import {
   toExpertReportDto,
   toVideoTokenDto,
 } from "@xprtlink/shared/mappers/consultation.mapper.js";
-import { badRequest, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
+import { badRequest, conflict, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 
 const QUOTE_INCLUDE = {

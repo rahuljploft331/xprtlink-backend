@@ -420,6 +420,12 @@ export async function submitCustomConnectKyc(auth, body) {
     userIpAddress: body.userIpAddress,
   });
 
+  // Persist the Stripe Connect account ID so attachBankAccount can reference it
+  await db.expertProfile.update({
+    where: { id: auth.expertProfileId },
+    data: { stripeAccountId: account.id },
+  });
+
   return {
     expertProfileId: auth.expertProfileId,
     stripeAccountId: account.id,
