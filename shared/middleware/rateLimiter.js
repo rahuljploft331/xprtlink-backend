@@ -53,3 +53,38 @@ export const authRateLimiter = createRateLimiter({
     },
   },
 });
+
+/**
+ * Ultra-strict limiter for OTP send / resend endpoints.
+ * These trigger real email / SMS sends (SendGrid cost + spam risk).
+ * 5 requests per IP per hour.
+ */
+export const otpRateLimiter = createRateLimiter({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: Number(process.env.RATE_LIMIT_OTP_MAX || 5),
+  message: {
+    success: false,
+    message: "Too many OTP requests. Please wait before requesting a new code.",
+    error: {
+      code: "OTP_RATE_LIMIT_EXCEEDED",
+      details: "Maximum OTP send attempts reached. Please try again in an hour.",
+    },
+  },
+});
+
+/**
+ * Strict limiter for password reset endpoint.
+ * 5 requests per IP per 15 minutes.
+ */
+export const passwordRateLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_PASSWORD_MAX || 5),
+  message: {
+    success: false,
+    message: "Too many password reset attempts. Please try again later.",
+    error: {
+      code: "PASSWORD_RATE_LIMIT_EXCEEDED",
+      details: "Maximum password reset attempts reached.",
+    },
+  },
+});
