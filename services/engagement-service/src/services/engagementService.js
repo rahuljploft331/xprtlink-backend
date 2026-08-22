@@ -533,7 +533,7 @@ export async function submitReview(auth, consultationId, body) {
     throw badRequest("Reviews are allowed only after consultation completion", "INVALID_STATUS");
   }
   if (consultation.review) {
-    throw badRequest("Review already submitted", "REVIEW_EXISTS");
+    throw conflict("Review already submitted", "REVIEW_EXISTS");
   }
 
   const db = getDb();

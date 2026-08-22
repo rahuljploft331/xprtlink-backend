@@ -56,7 +56,7 @@ async function assertIdentifierAvailable({ email, phone, excludeUserId }) {
       },
     });
     if (row) {
-      throw badRequest("An account with this email already exists.", "EMAIL_TAKEN", "email");
+      throw conflict("An account with this email already exists.", "EMAIL_TAKEN");
     }
   }
   if (phone) {
@@ -68,7 +68,7 @@ async function assertIdentifierAvailable({ email, phone, excludeUserId }) {
       },
     });
     if (row) {
-      throw badRequest("This mobile number is already in use.", "PHONE_TAKEN", "phone");
+      throw conflict("This mobile number is already in use.", "PHONE_TAKEN");
     }
   }
 }
@@ -194,7 +194,12 @@ export async function login(body) {
     },
   });
 
-  if (!user) throw unauthorized("Invalid credentials");
+  if (!user) {
+    // M7: constant-time dummy compare to prevent timing-based email enumeration.
+    // Without this, nonexistent emails return ~0ms while valid ones take ~100ms (bcrypt).
+    await verifyPassword("__dummy_password_that_never_matches__", "$2b$10$abcdefghijklmnopqrstuvuXzGO7fMC7VYzWH4HmM0vXcB9tBr7bq");
+    throw unauthorized("Invalid credentials");
+  }
 
   // Give a clear, actionable error instead of a generic 401
   if (user.status === "pending_verification") {

@@ -144,7 +144,7 @@ export async function holdConsultationFunds(auth, consultationId, body) {
     include: { expert: true },
   });
   if (!consultation) throw notFound("Consultation not found");
-  if (consultation.billingStatus === "charged") throw badRequest("Consultation already paid", "ALREADY_PAID");
+  if (consultation.billingStatus === "charged") throw conflict("Consultation already paid", "ALREADY_PAID");
 
   // Retrieve customer with stripeCustomerId
   const customerProfile = await db.customerProfile.findUnique({
@@ -200,7 +200,7 @@ export async function payConsultation(auth, consultationId, body) {
     throw badRequest("Consultation must be completed before payment", "INVALID_STATE");
   }
   if (consultation.billingStatus === "charged" || consultation.charge) {
-    throw badRequest("Consultation already paid", "ALREADY_PAID");
+    throw conflict("Consultation already paid", "ALREADY_PAID");
   }
 
   const paymentMethod = await db.paymentMethod.findFirst({

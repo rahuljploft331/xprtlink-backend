@@ -1,6 +1,8 @@
 import { authenticate } from "@xprtlink/shared/middleware/auth.js";
 import { adminUsers } from "@xprtlink/shared/db/repositories/admin/index.js";
 import { forbidden, unauthorized } from "@xprtlink/shared/utils/errors.js";
+import { getDb } from "@xprtlink/shared/db";
+import { createHash } from "crypto";
 
 const ADMIN_ROLES = ["super_admin", "subadmin"];
 
@@ -19,6 +21,19 @@ export async function requireAdmin(req, res, next) {
     }
 
     try {
+      // M8: Check that the token hasn't been revoked via logout
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        const token = authHeader.slice(7);
+        const tokenHash = createHash("sha256").update(token).digest("hex");
+        const session = await getDb().adminSession.findFirst({
+          where: { tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
+        });
+        if (!session) {
+          return next(unauthorized("Session has been revoked. Please log in again."));
+        }
+      }
+
       const admin = await adminUsers().findUnique({
         where: { id: req.auth.userId },
         include: { permissions: true },
