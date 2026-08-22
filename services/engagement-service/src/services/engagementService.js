@@ -362,6 +362,14 @@ export async function createConsultation(auth, body) {
   const expert = await db.expertProfile.findUnique({ where: { id: body.expertId } });
   if (!expert) throw notFound("Expert not found");
 
+  // Guard: only allow consultations with verified, available experts
+  if (expert.verificationStatus !== "approved") {
+    throw badRequest("This expert is not yet verified and cannot accept consultations.", "EXPERT_NOT_VERIFIED");
+  }
+  if (expert.availabilityStatus !== "online") {
+    throw badRequest("This expert is currently offline. Please try again when they are available.", "EXPERT_OFFLINE");
+  }
+
   const consultation = await db.consultation.create({
     data: {
       customerId: auth.customerProfileId,

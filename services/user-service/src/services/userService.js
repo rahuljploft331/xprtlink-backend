@@ -610,17 +610,46 @@ export async function socialComplete(body) {
  *
  * @param {number} maxAgeMinutes  Default: 60. Ghost accounts older than this are removed.
  */
-export async function cleanupStalePendingUsers({ maxAgeMinutes = 60 } = {}) {
+export async function cleanupStalePendingUsers({ maxAgeMinutes = 1440 } = {}) {
   const db = getDb();
   const cutoff = new Date(Date.now() - maxAgeMinutes * 60 * 1000);
-  const result = await db.user.deleteMany({
+
+  // Find candidate users — pending_verification, no profile, created before cutoff
+  const candidates = await db.user.findMany({
     where: {
       status: "pending_verification",
       createdAt: { lt: cutoff },
       customerProfile: null,
       expertProfile: null,
     },
+    select: { id: true, email: true, phone: true },
+    take: 500,
   });
+
+  if (candidates.length === 0) return { deleted: 0 };
+
+  const candidateIds = candidates.map((u) => u.id);
+
+  // Exclude users who still have a live (non-expired, unconsumed) OTP challenge
+  // so we don't delete someone who is in the middle of verifying
+  const activeOtps = await db.otpChallenge.findMany({
+    where: {
+      userId: { in: candidateIds },
+      consumedAt: null,
+      expiresAt: { gt: new Date() },
+    },
+    select: { userId: true },
+  });
+
+  const protectedIds = new Set(activeOtps.map((o) => o.userId));
+  const deletableIds = candidateIds.filter((id) => !protectedIds.has(id));
+
+  if (deletableIds.length === 0) return { deleted: 0 };
+
+  const result = await db.user.deleteMany({
+    where: { id: { in: deletableIds } },
+  });
+
   return { deleted: result.count };
 }
 

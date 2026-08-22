@@ -1,12 +1,11 @@
 
-import { Router } from "express";
+import { Router, json as expressJson } from "express";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { authenticate, optionalAuthenticate } from "@xprtlink/shared/middleware/auth.js";
 import { createUploadRequestSchema } from "@xprtlink/shared/contracts";
 import * as svc from "../services/mediaService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
-
 
 const router = Router();
 
@@ -61,6 +60,22 @@ router.get(
     return ResponseFormatter.success(res, {
       message: getMessage("mediaAsset"),
       data,
+    });
+  })
+);
+
+// Direct Upload (base64) — needs its own 100MB body limit override
+// All other routes use the global 1MB limit from serviceTemplate
+router.post(
+  "/uploads/direct",
+  expressJson({ limit: "100mb" }),
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const data = await svc.directUpload(req.auth, req.body);
+    return ResponseFormatter.success(res, {
+      message: getMessage("uploadCreated"),
+      data,
+      status: 201,
     });
   })
 );
