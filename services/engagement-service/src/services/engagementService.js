@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { generateZegoToken } from "@xprtlink/shared/lib/zegoToken.js";
 import { getDb } from "@xprtlink/shared/db";
-import { internalGet } from "@xprtlink/shared/lib/internalFetch.js";
+import { internalGet, internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { amountToCents } from "@xprtlink/shared/mappers/common.js";
 import {
   toQuoteSummaryDto,
@@ -178,12 +178,15 @@ export async function createQuote(auth, body) {
 export async function updateQuote(auth, quoteId, body) {
   const quote = await loadQuote(quoteId);
   assertQuoteCustomer(auth, quote);
-  if (!EDITABLE_QUOTE_STATUSES.has(quote.status)) {
-    throw badRequest("Quote cannot be edited in its current status", "INVALID_STATUS");
-  }
 
   const db = getDb();
   const updated = await db.$transaction(async (tx) => {
+    // Re-check status inside transaction to prevent TOCTOU race
+    const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
+    if (!current || !EDITABLE_QUOTE_STATUSES.has(current.status)) {
+      throw badRequest("Quote cannot be edited in its current status", "INVALID_STATUS");
+    }
+
     const data = {
       ...(body.title ? { title: body.title } : {}),
       ...(body.description ? { description: body.description } : {}),
@@ -251,17 +254,20 @@ export async function getQuote(auth, quoteId) {
 
 export async function submitQuotation(auth, quoteId, body) {
   assertExpert(auth);
+  // Pre-flight check (authorization only — status re-checked inside transaction)
   const quote = await loadQuote(quoteId);
   assertQuoteExpert(auth, quote);
-  if (quote.status !== "pending_expert_review") {
-    throw badRequest("Quote is not awaiting a quotation", "INVALID_STATUS");
-  }
 
   const now = new Date();
-  const updated = await getDb().$transaction((tx) =>
-    recordQuoteTransition(tx, {
+  const updated = await getDb().$transaction(async (tx) => {
+    // Re-read inside transaction with optimistic status guard
+    const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
+    if (!current || current.status !== "pending_expert_review") {
+      throw badRequest("Quote is not awaiting a quotation", "INVALID_STATUS");
+    }
+    return recordQuoteTransition(tx, {
       quoteId,
-      fromStatus: quote.status,
+      fromStatus: current.status,
       toStatus: "quoted",
       actorUserId: auth.userId,
       note: body.notes ?? "Expert quotation submitted",
@@ -270,30 +276,32 @@ export async function submitQuotation(auth, quoteId, body) {
         expertQuoteNotes: body.notes ?? null,
         quotedAt: now,
       },
-    })
-  );
+    });
+  });
 
   return toQuoteDetailDto(updated, quoteContext(updated));
 }
 
 export async function acceptQuote(auth, quoteId) {
   assertCustomer(auth);
+  // Pre-flight check (authorization only — status re-checked inside transaction)
   const quote = await loadQuote(quoteId);
   assertQuoteCustomer(auth, quote);
-  if (quote.status !== "quoted") {
-    throw badRequest("Only quoted requests can be accepted", "INVALID_STATUS");
-  }
 
-  const updated = await getDb().$transaction((tx) =>
-    recordQuoteTransition(tx, {
+  const updated = await getDb().$transaction(async (tx) => {
+    const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
+    if (!current || current.status !== "quoted") {
+      throw badRequest("Only quoted requests can be accepted", "INVALID_STATUS");
+    }
+    return recordQuoteTransition(tx, {
       quoteId,
-      fromStatus: quote.status,
+      fromStatus: current.status,
       toStatus: "accepted",
       actorUserId: auth.userId,
       note: "Customer accepted quotation",
       data: { resolvedAt: new Date() },
-    })
-  );
+    });
+  });
 
   return toQuoteDetailDto(updated, quoteContext(updated));
 }
@@ -302,20 +310,21 @@ export async function rejectQuote(auth, quoteId) {
   assertCustomer(auth);
   const quote = await loadQuote(quoteId);
   assertQuoteCustomer(auth, quote);
-  if (quote.status !== "quoted") {
-    throw badRequest("Only quoted requests can be rejected", "INVALID_STATUS");
-  }
 
-  const updated = await getDb().$transaction((tx) =>
-    recordQuoteTransition(tx, {
+  const updated = await getDb().$transaction(async (tx) => {
+    const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
+    if (!current || current.status !== "quoted") {
+      throw badRequest("Only quoted requests can be rejected", "INVALID_STATUS");
+    }
+    return recordQuoteTransition(tx, {
       quoteId,
-      fromStatus: quote.status,
+      fromStatus: current.status,
       toStatus: "rejected",
       actorUserId: auth.userId,
       note: "Customer rejected quotation",
       data: { resolvedAt: new Date() },
-    })
-  );
+    });
+  });
 
   return toQuoteDetailDto(updated, quoteContext(updated));
 }
@@ -324,20 +333,21 @@ export async function cancelQuote(auth, quoteId) {
   assertCustomer(auth);
   const quote = await loadQuote(quoteId);
   assertQuoteCustomer(auth, quote);
-  if (!CANCELLABLE_QUOTE_STATUSES.has(quote.status)) {
-    throw badRequest("Quote cannot be canceled in its current status", "INVALID_STATUS");
-  }
 
-  const updated = await getDb().$transaction((tx) =>
-    recordQuoteTransition(tx, {
+  const updated = await getDb().$transaction(async (tx) => {
+    const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
+    if (!current || !CANCELLABLE_QUOTE_STATUSES.has(current.status)) {
+      throw badRequest("Quote cannot be canceled in its current status", "INVALID_STATUS");
+    }
+    return recordQuoteTransition(tx, {
       quoteId,
-      fromStatus: quote.status,
+      fromStatus: current.status,
       toStatus: "canceled",
       actorUserId: auth.userId,
       note: "Customer canceled quote request",
       data: { resolvedAt: new Date() },
-    })
-  );
+    });
+  });
 
   return toQuoteDetailDto(updated, quoteContext(updated));
 }
@@ -420,21 +430,29 @@ export async function getConsultation(auth, consultationId) {
 
 export async function acceptConsultation(auth, consultationId) {
   assertExpert(auth);
+  // Pre-flight authorization check (status re-verified inside transaction)
   const consultation = await loadConsultation(consultationId);
   assertConsultationParticipant(auth, consultation);
-  if (!["requested", "ringing"].includes(consultation.status)) {
-    throw badRequest("Consultation is not awaiting acceptance", "INVALID_STATUS");
-  }
 
   const now = new Date();
-  const updated = await getDb().consultation.update({
-    where: { id: consultationId },
-    data: {
-      status: "in_progress",
-      acceptedAt: now,
-      startedAt: now,
-    },
-    include: CONSULTATION_INCLUDE,
+  const db = getDb();
+  const updated = await db.$transaction(async (tx) => {
+    // Optimistic concurrency: only update if status is still valid
+    const result = await tx.consultation.updateMany({
+      where: { id: consultationId, status: { in: ["requested", "ringing"] } },
+      data: {
+        status: "in_progress",
+        acceptedAt: now,
+        startedAt: now,
+      },
+    });
+    if (result.count === 0) {
+      throw badRequest("Consultation is not awaiting acceptance", "INVALID_STATUS");
+    }
+    return tx.consultation.findUnique({
+      where: { id: consultationId },
+      include: CONSULTATION_INCLUDE,
+    });
   });
 
   return toConsultationDetailDto(updated, consultationContext(updated));
@@ -444,14 +462,20 @@ export async function declineConsultation(auth, consultationId) {
   assertExpert(auth);
   const consultation = await loadConsultation(consultationId);
   assertConsultationParticipant(auth, consultation);
-  if (!["requested", "ringing"].includes(consultation.status)) {
-    throw badRequest("Consultation is not awaiting a response", "INVALID_STATUS");
-  }
 
-  const updated = await getDb().consultation.update({
-    where: { id: consultationId },
-    data: { status: "declined", endedAt: new Date() },
-    include: CONSULTATION_INCLUDE,
+  const db = getDb();
+  const updated = await db.$transaction(async (tx) => {
+    const result = await tx.consultation.updateMany({
+      where: { id: consultationId, status: { in: ["requested", "ringing"] } },
+      data: { status: "declined", endedAt: new Date() },
+    });
+    if (result.count === 0) {
+      throw badRequest("Consultation is not awaiting a response", "INVALID_STATUS");
+    }
+    return tx.consultation.findUnique({
+      where: { id: consultationId },
+      include: CONSULTATION_INCLUDE,
+    });
   });
 
   return toConsultationDetailDto(updated, consultationContext(updated));
@@ -460,24 +484,49 @@ export async function declineConsultation(auth, consultationId) {
 export async function endConsultation(auth, consultationId) {
   const consultation = await loadConsultation(consultationId);
   assertConsultationParticipant(auth, consultation);
-  if (!ACTIVE_CONSULTATION_STATUSES.has(consultation.status)) {
-    throw badRequest("Consultation cannot be ended in its current status", "INVALID_STATUS");
-  }
 
   const now = new Date();
   const startedAt = consultation.startedAt ?? consultation.acceptedAt ?? consultation.requestedAt;
   const durationSeconds = Math.max(0, Math.floor((now.getTime() - startedAt.getTime()) / 1000));
+  const wasConnected = Boolean(consultation.startedAt);
 
-  const updated = await getDb().consultation.update({
-    where: { id: consultationId },
-    data: {
-      status: "completed",
-      endedAt: now,
-      durationSeconds,
-      ...(consultation.startedAt ? {} : { startedAt }),
-    },
-    include: CONSULTATION_INCLUDE,
+  const db = getDb();
+  const updated = await db.$transaction(async (tx) => {
+    const result = await tx.consultation.updateMany({
+      where: {
+        id: consultationId,
+        status: { in: [...ACTIVE_CONSULTATION_STATUSES] },
+      },
+      data: {
+        status: "completed",
+        endedAt: now,
+        durationSeconds,
+        ...(consultation.startedAt ? {} : { startedAt }),
+      },
+    });
+    if (result.count === 0) {
+      throw badRequest("Consultation cannot be ended in its current status", "INVALID_STATUS");
+    }
+    return tx.consultation.findUnique({
+      where: { id: consultationId },
+      include: CONSULTATION_INCLUDE,
+    });
   });
+
+  // Trigger billing capture (same as ZegoCloud room_close webhook)
+  if (wasConnected && durationSeconds > 0) {
+    try {
+      const billingUrl = process.env.BILLING_SERVICE_URL ?? "http://localhost:4006";
+      await internalPost(
+        billingUrl,
+        `/api/v1/billing/consultations/${consultationId}/capture`,
+        { durationSeconds }
+      );
+    } catch (err) {
+      // Non-fatal — consultation is already marked completed; billing can be retried
+      console.error(`[endConsultation] Billing capture failed: ${err.message}`);
+    }
+  }
 
   return toConsultationDetailDto(updated, consultationContext(updated));
 }
@@ -549,24 +598,14 @@ export async function submitReview(auth, consultationId, body) {
       },
     });
 
-    // Atomically update rating using a single query — avoids the read-modify-write race
-    // condition where two concurrent reviews both read the same ratingCount and overwrite each other.
-    const expert = await tx.expertProfile.findUnique({
-      where: { id: consultation.expertId },
-      select: { ratingCount: true, ratingAvg: true },
-    });
-
-    if (expert) {
-      const newCount = expert.ratingCount + 1;
-      const newAvg = (Number(expert.ratingAvg) * expert.ratingCount + body.rating) / newCount;
-      await tx.expertProfile.update({
-        where: { id: consultation.expertId },
-        data: {
-          ratingCount: { increment: 1 },
-          ratingAvg: newAvg.toFixed(2),
-        },
-      });
-    }
+    // Atomically update rating using raw SQL — prevents the read-modify-write race
+    // where two concurrent reviews both read the same ratingCount and overwrite each other.
+    await tx.$executeRaw`
+      UPDATE expert_profiles
+      SET rating_count = rating_count + 1,
+          rating_avg   = ROUND(((rating_avg * rating_count) + ${body.rating}::numeric) / (rating_count + 1), 2)
+      WHERE id = ${consultation.expertId}::uuid
+    `;
 
     return created;
   });

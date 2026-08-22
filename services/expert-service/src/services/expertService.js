@@ -213,20 +213,35 @@ export async function saveOnboarding(auth, body) {
 }
 
 export async function submitOnboarding(auth) {
-  const expert = await getDb().expertProfile.findFirst({ where: { userId: auth.userId } });
+  const db = getDb();
+  const expert = await db.expertProfile.findFirst({ where: { userId: auth.userId } });
   if (!expert) throw notFound("Expert profile not found");
-  await getDb().expertProfile.update({
-    where: { id: expert.id },
-    data: {
-      onboardingCompletedAt: new Date(),
-      verificationStatus: "pending",
-    },
+
+  await db.$transaction(async (tx) => {
+    await tx.expertProfile.update({
+      where: { id: expert.id },
+      data: {
+        onboardingCompletedAt: new Date(),
+        verificationStatus: "pending",
+      },
+    });
+
+    const existing = await tx.expertVerification.findFirst({
+      where: { expertProfileId: expert.id },
+      orderBy: { submittedAt: "desc" },
+    });
+    if (existing) {
+      await tx.expertVerification.update({
+        where: { id: existing.id },
+        data: { status: "pending", submittedAt: new Date() },
+      });
+    } else {
+      await tx.expertVerification.create({
+        data: { expertProfileId: expert.id, status: "pending" },
+      });
+    }
   });
-  await getDb().expertVerification.upsert({
-    where: { expertProfileId: expert.id },
-    create: { expertProfileId: expert.id, status: "pending" },
-    update: { status: "pending", submittedAt: new Date() },
-  });
+
   return { submitted: true };
 }
 
@@ -273,29 +288,31 @@ export async function submitVerificationDocuments(auth, body) {
     );
   }
 
-  let verification = await db.expertVerification.findFirst({
-    where: { expertProfileId: expert.id },
-    orderBy: { submittedAt: "desc" },
-  });
-  if (!verification) {
-    verification = await db.expertVerification.create({
-      data: { expertProfileId: expert.id, status: "pending" },
+  await db.$transaction(async (tx) => {
+    let verification = await tx.expertVerification.findFirst({
+      where: { expertProfileId: expert.id },
+      orderBy: { submittedAt: "desc" },
     });
-  }
+    if (!verification) {
+      verification = await tx.expertVerification.create({
+        data: { expertProfileId: expert.id, status: "pending" },
+      });
+    }
 
-  for (const media of mediaAssets) {
-    await db.expertVerificationDocument.create({
-      data: {
-        verificationId: verification.id,
-        mediaId: media.id,
-        docType: body.docType || "government_id",
-      },
+    for (const media of mediaAssets) {
+      await tx.expertVerificationDocument.create({
+        data: {
+          verificationId: verification.id,
+          mediaId: media.id,
+          docType: body.docType || "government_id",
+        },
+      });
+    }
+
+    await tx.expertProfile.update({
+      where: { id: expert.id },
+      data: { verificationStatus: "pending" },
     });
-  }
-
-  await db.expertProfile.update({
-    where: { id: expert.id },
-    data: { verificationStatus: "pending" },
   });
 
   return {

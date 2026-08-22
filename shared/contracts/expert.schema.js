@@ -105,3 +105,28 @@ export const expertVerificationDtoSchema = z.object({
 export const expertSettingsDtoSchema = z.object({
   preferences: z.record(z.unknown()),
 });
+
+// ─── Request Schemas (input validation) ───────────────────────────────────────
+
+export const expertOnboardingRequestSchema = z.object({
+  headline: z.string().max(200).optional(),
+  bio: z.string().max(5000).optional(),
+  consultationRate: z.number().positive().optional(),
+  experienceYears: z.number().int().nonnegative().optional(),
+  categoryId: z.string().uuid().optional(),
+  avatarMediaId: z.string().uuid().nullable().optional(),
+});
+
+export const expertSettingsUpdateRequestSchema = z.object({
+  preferences: z
+    .record(z.unknown())
+    .refine((val) => JSON.stringify(val).length <= 10_000, {
+      message: "Preferences payload too large (max 10KB)",
+    }),
+});
+
+export const expertVerificationDocumentsRequestSchema = z.object({
+  primaryId: z.string().uuid({ message: "primaryId must be a valid UUID" }),
+  secondaryId: z.string().uuid({ message: "secondaryId must be a valid UUID" }).optional(),
+  docType: z.enum(["government_id", "credential", "other"]).default("government_id"),
+});

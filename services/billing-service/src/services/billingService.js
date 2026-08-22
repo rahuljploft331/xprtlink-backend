@@ -159,7 +159,10 @@ export async function holdConsultationFunds(auth, consultationId, body) {
   });
   if (!paymentMethod) throw notFound("Payment method not found");
 
-  const estimatedCents = body.estimatedCents || Math.max(30 * consultation.ratePerMinuteCents, 3000);
+  // Enforce server-calculated minimum: at least 30 minutes at the expert's rate or $30,
+  // whichever is larger — prevents malicious clients from holding too little.
+  const serverMinimumCents = Math.max(30 * consultation.ratePerMinuteCents, 3000);
+  const estimatedCents = Math.max(body.estimatedCents || 0, serverMinimumCents);
 
   try {
     const holdResult = await stripeSvc.createPreAuthHold({

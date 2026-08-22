@@ -10,7 +10,7 @@ import { verifyFirebaseIdToken, isFirebaseConfigured } from "@xprtlink/shared/au
 import { signCompletionToken, verifyCompletionToken } from "@xprtlink/shared/auth/jwt.js";
 import { toAuthSessionDto } from "@xprtlink/shared/mappers/auth.mapper.js";
 import { toCustomerMeDto } from "@xprtlink/shared/mappers/customer.mapper.js";
-import { badRequest, notFound, unauthorized, forbidden } from "@xprtlink/shared/utils/errors.js";
+import { badRequest, conflict, notFound, unauthorized, forbidden } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 
 // ─── Session ──────────────────────────────────────────────────────────────────
@@ -136,37 +136,79 @@ export async function register(body) {
     otpChannel = "phone",
   } = body;
 
+  // Pre-flight availability check (fast-fails common case; real enforcement is inside the transaction)
   await assertIdentifierAvailable({ email, phone });
 
   const db = getDb();
   const passwordHash = await hashPassword(password);
   const termsAcceptedAt = new Date();
 
-  const pending = await db.user.findFirst({
-    where: {
-      status: "pending_verification",
-      OR: [{ email }, { phone }],
-    },
-  });
-
   let userId;
-  if (pending) {
-    await db.user.update({
-      where: { id: pending.id },
-      data: { email, phone, passwordHash, termsAcceptedAt },
+
+  try {
+    userId = await db.$transaction(async (tx) => {
+      // Re-check availability inside the transaction to close the TOCTOU window.
+      // The partial unique indexes (added in Phase 1) provide the ultimate guard,
+      // but this gives a clearer error message before hitting the constraint.
+      if (email) {
+        const dup = await tx.user.findFirst({
+          where: { email, ...claimedAvailabilityFilter },
+        });
+        if (dup) throw conflict("An account with this email already exists.", "EMAIL_TAKEN");
+      }
+      if (phone) {
+        const dup = await tx.user.findFirst({
+          where: { phone, ...claimedAvailabilityFilter },
+        });
+        if (dup) throw conflict("This mobile number is already in use.", "PHONE_TAKEN");
+      }
+
+      // Look for a pending user that matches BOTH identifiers (not just one).
+      // This prevents cross-contamination where a pending user with matching email
+      // but different phone gets its phone overwritten.
+      const pendingWhere = { status: "pending_verification" };
+      if (email && phone) {
+        pendingWhere.email = email;
+        pendingWhere.phone = phone;
+      } else if (email) {
+        pendingWhere.email = email;
+      } else if (phone) {
+        pendingWhere.phone = phone;
+      }
+
+      const pending = await tx.user.findFirst({ where: pendingWhere });
+
+      if (pending) {
+        await tx.user.update({
+          where: { id: pending.id },
+          data: { email, phone, passwordHash, termsAcceptedAt },
+        });
+        return pending.id;
+      }
+
+      const user = await tx.user.create({
+        data: {
+          email,
+          phone,
+          passwordHash,
+          termsAcceptedAt,
+          status: "pending_verification",
+        },
+      });
+      return user.id;
     });
-    userId = pending.id;
-  } else {
-    const user = await db.user.create({
-      data: {
-        email,
-        phone,
-        passwordHash,
-        termsAcceptedAt,
-        status: "pending_verification",
-      },
-    });
-    userId = user.id;
+  } catch (err) {
+    // Handle Prisma unique constraint violation (P2002) from the partial unique indexes
+    if (err?.code === "P2002") {
+      const field = err.meta?.target?.includes("email") ? "email" : "phone";
+      throw conflict(
+        field === "email"
+          ? "An account with this email already exists."
+          : "This mobile number is already in use.",
+        field === "email" ? "EMAIL_TAKEN" : "PHONE_TAKEN"
+      );
+    }
+    throw err;
   }
 
   return createAndDeliverOtp({
