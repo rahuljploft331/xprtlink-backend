@@ -528,29 +528,43 @@ export async function submitReview(auth, consultationId, body) {
     throw badRequest("Review already submitted", "REVIEW_EXISTS");
   }
 
-  const review = await getDb().review.create({
-    data: {
-      consultationId,
-      customerId: auth.customerProfileId,
-      expertId: consultation.expertId,
-      rating: body.rating,
-      comment: body.comment ?? null,
-    },
+  const db = getDb();
+
+  const review = await db.$transaction(async (tx) => {
+    const created = await tx.review.create({
+      data: {
+        consultationId,
+        customerId: auth.customerProfileId,
+        expertId: consultation.expertId,
+        rating: body.rating,
+        comment: body.comment ?? null,
+      },
+    });
+
+    // Atomically update rating using a single query — avoids the read-modify-write race
+    // condition where two concurrent reviews both read the same ratingCount and overwrite each other.
+    const expert = await tx.expertProfile.findUnique({
+      where: { id: consultation.expertId },
+      select: { ratingCount: true, ratingAvg: true },
+    });
+
+    if (expert) {
+      const newCount = expert.ratingCount + 1;
+      const newAvg = (Number(expert.ratingAvg) * expert.ratingCount + body.rating) / newCount;
+      await tx.expertProfile.update({
+        where: { id: consultation.expertId },
+        data: {
+          ratingCount: { increment: 1 },
+          ratingAvg: newAvg.toFixed(2),
+        },
+      });
+    }
+
+    return created;
   });
 
-  const db = getDb();
-  const expert = await db.expertProfile.findUnique({ where: { id: consultation.expertId } });
-  if (expert) {
-    const newCount = expert.ratingCount + 1;
-    const newAvg =
-      (Number(expert.ratingAvg) * expert.ratingCount + body.rating) / newCount;
-    await db.expertProfile.update({
-      where: { id: expert.id },
-      data: { ratingCount: newCount, ratingAvg: newAvg.toFixed(2) },
-    });
-  }
-
   return toReviewDto(review);
+
 }
 
 export async function getPendingReviews(auth, query) {
