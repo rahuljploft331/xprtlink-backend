@@ -60,14 +60,17 @@ async function countUnreadMessages(conversationId, userId, lastReadMessage) {
 
 function peerInfo(conversation, auth) {
   if (auth.role === "customer") {
+    const avatarMedia = conversation.expert?.avatarMedia;
     return {
       peerName: expertDisplayName(conversation.expert),
-      peerAvatarUrl: null,
+      peerAvatarUrl: avatarMedia?.storageKey
+        ? `${process.env.MEDIA_PUBLIC_BASE_URL ?? ""}/${avatarMedia.storageKey}`
+        : null,
     };
   }
   return {
     peerName: customerDisplayName(conversation.customer.user),
-    peerAvatarUrl: null,
+    peerAvatarUrl: null, // customer avatars not yet stored in conversations include
   };
 }
 
@@ -83,7 +86,7 @@ export async function listConversations(auth, query) {
       take: limit,
       include: {
         customer: { include: { user: true } },
-        expert: true,
+        expert: { include: { avatarMedia: true } },
         messages: { orderBy: { createdAt: "desc" }, take: 1 },
         readStates: {
           where: { userId: auth.userId },
@@ -170,7 +173,7 @@ export async function createConversation(auth, body) {
     update: {},
     include: {
       customer: { include: { user: true } },
-      expert: true,
+      expert: { include: { avatarMedia: true } },
       messages: { orderBy: { createdAt: "desc" }, take: 1 },
     },
   });

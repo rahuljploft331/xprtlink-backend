@@ -243,6 +243,34 @@ export async function submitVerificationDocuments(auth, body) {
   const db = getDb();
   const expert = await db.expertProfile.findFirst({ where: { userId: auth.userId } });
   if (!expert) throw notFound("Expert profile not found");
+
+  // Validate submitted media IDs — must exist, belong to this user, and be ready
+  const docIds = [];
+  if (body.primaryId) docIds.push(body.primaryId);
+  if (body.secondaryId) docIds.push(body.secondaryId);
+
+  if (docIds.length === 0) {
+    throw badRequest("At least one document (primaryId) is required", "VALIDATION_ERROR", "primaryId");
+  }
+
+  const mediaAssets = await db.mediaAsset.findMany({
+    where: {
+      id: { in: docIds },
+      ownerUserId: auth.userId,
+      status: "ready",
+    },
+  });
+
+  if (mediaAssets.length !== docIds.length) {
+    const foundIds = new Set(mediaAssets.map((m) => m.id));
+    const missing = docIds.filter((id) => !foundIds.has(id));
+    throw badRequest(
+      `Document media asset(s) not found or not ready: ${missing.join(", ")}`,
+      "INVALID_MEDIA",
+      "primaryId"
+    );
+  }
+
   let verification = await db.expertVerification.findFirst({
     where: { expertProfileId: expert.id },
     orderBy: { submittedAt: "desc" },
@@ -252,27 +280,8 @@ export async function submitVerificationDocuments(auth, body) {
       data: { expertProfileId: expert.id, status: "pending" },
     });
   }
-  const docIds = [];
-  if (body.primaryId) docIds.push(body.primaryId);
-  if (body.secondaryId) docIds.push(body.secondaryId);
-  if (docIds.length === 0) {
-    docIds.push(crypto.randomUUID());
-  }
-  for (const mediaId of docIds) {
-    let media = await db.mediaAsset.findUnique({ where: { id: mediaId } });
-    if (!media) {
-      media = await db.mediaAsset.create({
-        data: {
-          id: mediaId,
-          ownerUserId: auth.userId,
-          purpose: "verification_doc",
-          storageKey: `verification/${mediaId}.jpg`,
-          mimeType: "image/jpeg",
-          sizeBytes: 102400,
-          status: "ready",
-        },
-      });
-    }
+
+  for (const media of mediaAssets) {
     await db.expertVerificationDocument.create({
       data: {
         verificationId: verification.id,
@@ -281,10 +290,12 @@ export async function submitVerificationDocuments(auth, body) {
       },
     });
   }
+
   await db.expertProfile.update({
     where: { id: expert.id },
     data: { verificationStatus: "pending" },
   });
+
   return {
     submitted: true,
     documentCount: docIds.length,
@@ -292,6 +303,7 @@ export async function submitVerificationDocuments(auth, body) {
     secondaryId: docIds[1] || null,
   };
 }
+
 
 export async function getDashboard(auth) {
   const { expert, subscriptionActive } = await getExpertProfileOrThrow(auth);
