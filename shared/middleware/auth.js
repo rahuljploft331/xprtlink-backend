@@ -27,11 +27,13 @@ export function authenticate(req, _res, next) {
     };
     next();
   } catch (err) {
-    console.error("[Auth] Token verification failed:", err);
     if (err.name === "TokenExpiredError" || err.name === "JsonWebTokenError") {
-      next(unauthorized("Invalid or expired token"));
-      return;
+      return next(unauthorized("Invalid or expired token"));
     }
+    if (err.statusCode === 401) {
+      return next(err);
+    }
+    console.error("[Auth] Unexpected error during authentication:", err);
     next(err);
   }
 }
