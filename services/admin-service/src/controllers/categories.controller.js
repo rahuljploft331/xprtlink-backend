@@ -1,22 +1,11 @@
-import { z } from "zod";
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { logAdminAction } from "#utils/audit.js";
-
-const createCategorySchema = z.object({
-  name: z.string().min(1, "Name is required").max(120),
-  slug: z.string().min(1, "Slug is required").max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens"),
-  sortOrder: z.number().int().nonnegative().default(0),
-  isActive: z.boolean().default(true),
-});
-
-const updateCategorySchema = z.object({
-  name: z.string().min(1).max(120).optional(),
-  slug: z.string().min(1).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens").optional(),
-  sortOrder: z.number().int().nonnegative().optional(),
-  isActive: z.boolean().optional(),
-});
+import {
+  createCategoryRequestSchema,
+  updateCategoryRequestSchema,
+} from "@xprtlink/shared/contracts/catalog.schema.js";
 
 
 export async function list(_req, res, next) {
@@ -45,7 +34,7 @@ export async function getById(req, res, next) {
 
 export async function create(req, res, next) {
   try {
-    const { name, slug, sortOrder, isActive } = createCategorySchema.parse(req.body);
+    const { name, slug, sortOrder, isActive } = createCategoryRequestSchema.parse(req.body);
     const db = getDb();
     const c = await db.category.create({ data: { name, slug, sortOrder, isActive } });
     await logAdminAction(req, "category.create", "Category", c.id, { name, slug });
@@ -55,7 +44,7 @@ export async function create(req, res, next) {
 
 export async function update(req, res, next) {
   try {
-    const body = updateCategorySchema.parse(req.body);
+    const body = updateCategoryRequestSchema.parse(req.body);
     const db = getDb();
     const c = await db.category.update({
       where: { id: req.params.id },
