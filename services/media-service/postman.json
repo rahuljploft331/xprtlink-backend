@@ -61,6 +61,40 @@
       }
     },
     {
+      "name": "Direct Upload (Base64)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"purpose\": \"chat_attachment\",\n  \"mimeType\": \"image/png\",\n  \"fileName\": \"receipt.png\",\n  \"base64Data\": \"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==\",\n  \"sizeBytes\": 68\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/media/uploads/direct",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "media",
+            "uploads",
+            "direct"
+          ]
+        },
+        "description": "Upload a file directly as base64 payload (up to 100MB). The server streams the decoded buffer to S3 and returns the media asset immediately in 'ready' status."
+      }
+    },
+    {
       "name": "Confirm S3 Upload",
       "request": {
         "method": "POST",
@@ -89,7 +123,7 @@
             }
           ]
         },
-        "description": "Confirm that direct binary upload to S3 completed successfully."
+        "description": "Confirm that direct binary upload to S3 completed successfully. Only the asset owner may confirm."
       }
     },
     {
@@ -120,7 +154,7 @@
             }
           ]
         },
-        "description": "Resolve metadata and signed AWS S3 GET download URL for an uploaded media asset."
+        "description": "Resolve metadata and signed AWS S3 GET download URL for an uploaded media asset. Access control is relationship-based: the asset owner always has access; avatars are readable by any authenticated user; chat_attachment requires the requester to be a participant in the conversation; quote_attachment requires the requester to be a participant in the quote; verification_doc is restricted to the owner and admin roles. Returns 403 if access is denied."
       }
     }
   ]
