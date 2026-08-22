@@ -533,11 +533,22 @@ export async function getTransaction(auth, transactionId) {
 
   const consultation = tx.consultationCharge?.consultation;
   if (consultation) {
+    // Consultation-linked transaction: check participant ownership
     const isCustomer = consultation.customerId === auth.customerProfileId;
     const isExpert = consultation.expertId === auth.expertProfileId;
     if (!isCustomer && !isExpert) throw forbidden("Access denied");
-  } else if (auth.role !== "expert" && auth.role !== "customer") {
-    throw forbidden("Access denied");
+  } else {
+    // C7: Subscription / other transaction: check ownership via metadata
+    // metadata is stored as { expertProfileId, customerProfileId, ... } at creation time
+    const meta = tx.metadata ?? {};
+    const ownerExpertId = meta.expertProfileId ?? null;
+    const ownerCustomerId = meta.customerProfileId ?? null;
+
+    const isOwner =
+      (auth.expertProfileId && ownerExpertId === auth.expertProfileId) ||
+      (auth.customerProfileId && ownerCustomerId === auth.customerProfileId);
+
+    if (!isOwner) throw forbidden("Access denied");
   }
 
   return toTransactionDto(tx);

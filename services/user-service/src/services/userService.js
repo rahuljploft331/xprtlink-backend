@@ -321,7 +321,10 @@ export async function verifyOtp(body) {
       );
     }
 
-    const { role, firstName, lastName } = challenge.registrationData;
+    const { role, firstName, lastName, otpChannel } = challenge.registrationData;
+    // C1: Only stamp the channel that was actually verified.
+    // The other channel remains null until it is separately verified.
+    const verifiedViaPhone = otpChannel === "phone" || (!otpChannel && challenge.phone);
 
     const user = await db.$transaction(async (tx) => {
       await tx.otpChallenge.update({
@@ -333,8 +336,10 @@ export async function verifyOtp(body) {
         where: { id: challenge.userId },
         data: {
           status: "active",
-          emailVerifiedAt: new Date(),
-          phoneVerifiedAt: new Date(),
+          // Only stamp what was actually verified
+          ...(verifiedViaPhone
+            ? { phoneVerifiedAt: new Date() }
+            : { emailVerifiedAt: new Date() }),
         },
       });
 
@@ -376,11 +381,13 @@ export async function verifyOtp(body) {
       where: { id: challenge.id },
       data: { consumedAt: new Date() },
     }),
-    ...(purpose === "verify_email" && email
-      ? [db.user.updateMany({ where: { email }, data: { emailVerifiedAt: new Date() } })]
+    // H6: scope to challenge.userId — not by email/phone string (soft-deleted rows
+    // can share an identifier due to the partial unique index on deletedAt IS NULL)
+    ...(purpose === "verify_email"
+      ? [db.user.update({ where: { id: challenge.userId }, data: { emailVerifiedAt: new Date() } })]
       : []),
-    ...(purpose === "verify_phone" && phone
-      ? [db.user.updateMany({ where: { phone }, data: { phoneVerifiedAt: new Date() } })]
+    ...(purpose === "verify_phone"
+      ? [db.user.update({ where: { id: challenge.userId }, data: { phoneVerifiedAt: new Date() } })]
       : []),
   ]);
 
