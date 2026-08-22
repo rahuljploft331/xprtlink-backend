@@ -91,12 +91,6 @@ export async function verifyOtpCode(challenge, code) {
   let valid = false;
 
   if (challenge.codeHash === "TWILIO_VERIFY" && challenge.phone) {
-    console.log("[DEBUG] Verify Twilio:", {
-      hardcodeEnabled: process.env.OTP_ENABLE_HARDCODE,
-      nodeEnv: process.env.NODE_ENV,
-      hardcodeCode: process.env.OTP_HARDCODE_CODE,
-      inputCode: code
-    });
     if (
       process.env.OTP_ENABLE_HARDCODE === "true" &&
       process.env.NODE_ENV !== "production" &&

@@ -26,6 +26,9 @@ app.use("/api/v1/auth/password/reset", passwordRateLimiter);
 // All other auth routes — login, register, refresh (10/15min/IP)
 app.use("/api/v1/auth", authRateLimiter);
 
+// H3: Admin login — same strict limit as user auth (was using weak defaultRateLimiter = 100/15min)
+app.use("/api/v1/admin/auth", authRateLimiter);
+
 // Global fallback for all other API routes (100/15min/IP)
 app.use(defaultRateLimiter);
 

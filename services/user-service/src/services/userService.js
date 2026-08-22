@@ -1,5 +1,5 @@
 import { getDb } from "@xprtlink/shared/db";
-import { issueTokens, loadUserContext, revokeRefreshToken, lookupRefreshToken } from "@xprtlink/shared/auth/tokens.js";
+import { issueTokens, loadUserContext, revokeRefreshToken, lookupRefreshToken, revokeAllUserSessions } from "@xprtlink/shared/auth/tokens.js";
 import { hashPassword, verifyPassword, verifyTokenHash } from "@xprtlink/shared/auth/password.js";
 import {
   createAndDeliverOtp,
@@ -436,20 +436,34 @@ export async function resetPassword(body) {
       where: { id: challenge.id },
       data: { consumedAt: new Date() },
     }),
+    // C3: Revoke ALL existing sessions so attacker is immediately locked out
+    db.refreshToken.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
   ]);
   return { reset: true };
 }
 
 export async function changePassword(userId, body) {
   const { currentPassword, newPassword } = body;
-  const user = await getDb().user.findUnique({ where: { id: userId } });
+  const db = getDb();
+  const user = await db.user.findUnique({ where: { id: userId } });
   if (!user) throw notFound("User not found");
   const valid = await verifyPassword(currentPassword, user.passwordHash);
   if (!valid) throw unauthorized("Current password is incorrect");
-  await getDb().user.update({
-    where: { id: userId },
-    data: { passwordHash: await hashPassword(newPassword) },
-  });
+
+  await db.$transaction([
+    db.user.update({
+      where: { id: userId },
+      data: { passwordHash: await hashPassword(newPassword) },
+    }),
+    // C3: Revoke ALL existing sessions on password change
+    db.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
   return { changed: true };
 }
 

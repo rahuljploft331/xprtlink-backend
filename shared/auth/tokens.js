@@ -183,8 +183,20 @@ export async function revokeRefreshToken(refreshToken) {
 }
 
 /**
+ * Revoke ALL active refresh tokens for a given userId.
+ * Called by password reset and password change to invalidate attacker sessions.
+ */
+export async function revokeAllUserSessions(userId) {
+  const db = getDb();
+  await db.refreshToken.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+}
+
+/**
  * Called by user-service refresh endpoint.
- * Returns { row, resolvedRole } or null if token is invalid.
+ * Returns { user, resolvedRole } or null if token is invalid.
  */
 export async function lookupRefreshToken(refreshToken, preferredRole) {
   const db = getDb();
@@ -192,13 +204,22 @@ export async function lookupRefreshToken(refreshToken, preferredRole) {
   if (!row) return null;
 
   const user = row.user;
+
+  // C2: Enforce bans/suspensions/deletions at token refresh time.
+  // A banned user must not be able to obtain new tokens — ever.
+  if (user.status !== "active") {
+    // Revoke this token so it can never be used again
+    await db.refreshToken.update({ where: { id: row.id }, data: { revokedAt: new Date() } });
+    return null;
+  }
+
   const resolvedRole =
     preferredRole ||
     (user.customerProfile ? "customer" : user.expertProfile ? "expert" : null);
 
   if (!resolvedRole) return null;
 
-  // Rotate: revoke old token
+  // Rotate: revoke old token, new one issued by issueTokens()
   await db.refreshToken.update({ where: { id: row.id }, data: { revokedAt: new Date() } });
 
   return { user, resolvedRole };
