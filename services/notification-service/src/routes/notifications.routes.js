@@ -9,9 +9,34 @@ import {
 import * as svc from "../services/notificationService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 
-
 const router = Router();
 
+// ── Internal dispatch endpoint (no JWT) — guarded by SERVICE_SECRET ──────────
+function internalServiceGuard(req, res, next) {
+  const secret = process.env.SERVICE_SECRET;
+  const header = req.headers["x-internal-service"];
+  if (!header) return res.status(403).json({ success: false, message: "Forbidden" });
+  if (secret && process.env.NODE_ENV === "production" && header !== secret) {
+    return res.status(403).json({ success: false, message: "Forbidden" });
+  }
+  next();
+}
+
+/**
+ * POST /api/v1/notifications/dispatch
+ * Internal-only — creates in-app notification records for one or more users.
+ * Body: { userIds: string[], title: string, body: string, data?: object }
+ */
+router.post(
+  "/dispatch",
+  internalServiceGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.dispatchNotification(req.body);
+    return ResponseFormatter.success(res, { message: "Notifications dispatched", data });
+  })
+);
+
+// All routes below require authentication
 router.use(authenticate);
 
 router.post(

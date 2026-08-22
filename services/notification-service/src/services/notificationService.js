@@ -109,3 +109,27 @@ export async function updatePreferences(auth, body) {
 
   return toNotificationPreferencesDto(pref);
 }
+
+/**
+ * Internal dispatch — create in-app notification records for a list of users.
+ * Called by other microservices via POST /api/v1/notifications/dispatch.
+ * Does NOT send push notifications yet (FCM/APNs integration is a future task).
+ *
+ * @param {{ userIds: string[], title: string, body: string, data?: object }} payload
+ */
+export async function dispatchNotification({ userIds, title, body: bodyText, data = {} }) {
+  if (!Array.isArray(userIds) || userIds.length === 0) return { dispatched: 0 };
+
+  const db = getDb();
+  await db.notification.createMany({
+    data: userIds.map((userId) => ({
+      userId,
+      title: title ?? "Notification",
+      body: bodyText ?? "",
+      data: data ?? {},
+    })),
+    skipDuplicates: true,
+  });
+
+  return { dispatched: userIds.length };
+}

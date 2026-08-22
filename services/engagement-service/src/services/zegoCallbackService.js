@@ -125,6 +125,10 @@ async function handleRoomClose(payload) {
   const db = getDb();
   const consultation = await db.consultation.findFirst({
     where: { zegoRoomId: roomId },
+    include: {
+      customer: { include: { user: true } },
+      expert: true,
+    },
   });
 
   if (!consultation) {
@@ -179,5 +183,31 @@ async function handleRoomClose(payload) {
     console.log(`[zego-callback] Consultation ${consultation.id} — no charge (wasConnected=${wasConnected}, duration=${durationSeconds}s)`);
   }
 
-  // TODO: Send push notification to both participants
+  // Notify both participants that the call has ended
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+    const durationLabel = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
+    // Collect both participant userIds
+    const userIds = [
+      consultation.customer?.user?.id,
+      consultation.expert?.userId,
+    ].filter(Boolean);
+
+    if (userIds.length > 0) {
+      await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+        userIds,
+        title: "Call Ended",
+        body: wasConnected
+          ? `Your consultation has ended. Duration: ${durationLabel}.`
+          : "Your consultation has ended.",
+        data: { consultationId: consultation.id, type: "call_ended" },
+      });
+    }
+  } catch (err) {
+    // Non-fatal — consultation is already marked completed
+    console.error(`[zego-callback] Post-call notification failed: ${err.message}`);
+  }
 }

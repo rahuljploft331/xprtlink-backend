@@ -222,8 +222,10 @@ export async function submitOnboarding(auth) {
       verificationStatus: "pending",
     },
   });
-  await getDb().expertVerification.create({
-    data: { expertProfileId: expert.id, status: "pending" },
+  await getDb().expertVerification.upsert({
+    where: { expertProfileId: expert.id },
+    create: { expertProfileId: expert.id, status: "pending" },
+    update: { status: "pending", submittedAt: new Date() },
   });
   return { submitted: true };
 }
