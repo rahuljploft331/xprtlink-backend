@@ -37,6 +37,21 @@ export async function attachPaymentMethod({ stripePaymentMethodId, stripeCustome
 }
 
 /**
+ * Retrieves a PaymentMethod's details (brand, last4, exp) from Stripe.
+ */
+export async function retrievePaymentMethod({ stripePaymentMethodId }) {
+  const sdk = requireStripe();
+  return await sdk.paymentMethods.retrieve(stripePaymentMethodId);
+}
+
+/**
+ * Detaches a PaymentMethod from a Stripe Customer.
+ */
+export async function detachPaymentMethod({ stripePaymentMethodId }) {
+  const sdk = requireStripe();
+  return await sdk.paymentMethods.detach(stripePaymentMethodId);
+}
+/**
  * Pre-authorizes (holds) funds on a customer's card prior to a consultation.
  * Uses `capture_method: 'manual'` to check and reserve funds without charging immediately.
  */

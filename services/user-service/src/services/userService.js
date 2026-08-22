@@ -6,6 +6,7 @@ import {
   findValidOtpChallenge,
   verifyOtpCode,
 } from "@xprtlink/shared/auth/otp.js";
+import { getOtpConfig } from "@xprtlink/shared/auth/otpDelivery.js";
 import { verifyFirebaseIdToken, isFirebaseConfigured } from "@xprtlink/shared/auth/firebaseAdmin.js";
 import { signCompletionToken, verifyCompletionToken } from "@xprtlink/shared/auth/jwt.js";
 import { toAuthSessionDto } from "@xprtlink/shared/mappers/auth.mapper.js";
@@ -468,8 +469,10 @@ export async function forgotPassword(body) {
   });
 
   if (!user) {
-    // Return a plausible response without sending anything or revealing the email isn't registered
-    return { sent: true, expiresInSeconds: 600, channel: email ? "email" : "phone" };
+    // Return a plausible response without sending anything or revealing the email isn't registered.
+    // Use the real OTP TTL config so the response is indistinguishable from a genuine send.
+    const { ttlMs } = getOtpConfig();
+    return { sent: true, expiresInSeconds: ttlMs / 1000, channel: email ? "email" : "phone" };
   }
 
   return sendOtp({ ...body, purpose: "reset_password" });

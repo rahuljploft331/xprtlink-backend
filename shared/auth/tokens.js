@@ -83,6 +83,7 @@ export async function issueTokens(user, role) {
     data: {
       userId: user.id,
       tokenHash: refreshHash,
+      role: ctx.role,
       expiresAt,
     },
   });
@@ -108,7 +109,7 @@ export async function issueTokens(user, role) {
  * Falls back to bcrypt loop for legacy tokens issued before this migration.
  */
 async function findRefreshTokenRow(db, refreshToken) {
-  // Fast path: SHA-256 direct lookup (new tokens)
+  // SHA-256 HMAC indexed lookup — O(1) direct DB query
   const fastHash = hashRefreshToken(refreshToken);
   const fast = await db.refreshToken.findFirst({
     where: { tokenHash: fastHash, revokedAt: null, expiresAt: { gt: new Date() } },
@@ -121,42 +122,13 @@ async function findRefreshTokenRow(db, refreshToken) {
       },
     },
   });
-  if (fast) return fast;
-
-  // Slow fallback: bcrypt loop for tokens issued before this migration
-  // This branch can be removed once all pre-migration tokens expire (after REFRESH_TOKEN_EXPIRES_IN)
-  const legacyCandidates = await db.refreshToken.findMany({
-    where: {
-      revokedAt: null,
-      expiresAt: { gt: new Date() },
-      // Legacy bcrypt hashes are 60 chars; SHA-256 hex is 64 chars — filter to only legacy
-      tokenHash: { not: fastHash },
-    },
-    take: 200,
-    orderBy: { createdAt: "desc" },
-    include: {
-      user: {
-        include: {
-          customerProfile: true,
-          expertProfile: { include: { subscriptions: { where: { status: "active" }, take: 1 } } },
-        },
-      },
-    },
-  });
-
-  for (const row of legacyCandidates) {
-    // Only bcrypt hashes start with $2 — skip SHA-256 hashes (64-char hex)
-    if (row.tokenHash.length === 64) continue;
-    if (await verifyTokenHash(refreshToken, row.tokenHash)) return row;
-  }
-
-  return null;
+  return fast || null;
 }
 
 export async function revokeRefreshToken(refreshToken) {
   const db = getDb();
 
-  // Fast path: SHA-256 lookup
+  // SHA-256 HMAC indexed lookup
   const fastHash = hashRefreshToken(refreshToken);
   const fast = await db.refreshToken.findFirst({
     where: { tokenHash: fastHash, revokedAt: null },
@@ -166,19 +138,6 @@ export async function revokeRefreshToken(refreshToken) {
     return fast.userId;
   }
 
-  // Legacy bcrypt fallback
-  const tokens = await db.refreshToken.findMany({
-    where: { revokedAt: null, expiresAt: { gt: new Date() } },
-    take: 200,
-    orderBy: { createdAt: "desc" },
-  });
-  for (const row of tokens) {
-    if (row.tokenHash.length === 64) continue; // skip SHA-256 hashes
-    if (await verifyTokenHash(refreshToken, row.tokenHash)) {
-      await db.refreshToken.update({ where: { id: row.id }, data: { revokedAt: new Date() } });
-      return row.userId;
-    }
-  }
   return null;
 }
 
@@ -215,6 +174,7 @@ export async function lookupRefreshToken(refreshToken, preferredRole) {
 
   const resolvedRole =
     preferredRole ||
+    row.role ||
     (user.customerProfile ? "customer" : user.expertProfile ? "expert" : null);
 
   if (!resolvedRole) return null;

@@ -96,14 +96,33 @@ export async function addPaymentMethod(auth, body) {
   }
 
   const isFirst = (await db.paymentMethod.count({ where: { customerProfileId: auth.customerProfileId } })) === 0;
+
+  // Attempt to fetch real card metadata from Stripe (falls back to client-supplied values)
+  let brand = body.brand;
+  let last4 = body.last4;
+  let expMonth = body.expMonth;
+  let expYear = body.expYear;
+  try {
+    const pmDetails = await stripeSvc.retrievePaymentMethod({ stripePaymentMethodId: body.stripePaymentMethodId });
+    if (pmDetails?.card) {
+      brand = pmDetails.card.brand || brand;
+      last4 = pmDetails.card.last4 || last4;
+      expMonth = pmDetails.card.exp_month || expMonth;
+      expYear = pmDetails.card.exp_year || expYear;
+    }
+  } catch (err) {
+    // Non-fatal — use client-supplied values (test mode pm_card_* may not be retrievable)
+    console.warn(`[billing] Stripe retrieve PM metadata failed (non-fatal): ${err.message}`);
+  }
+
   const method = await db.paymentMethod.create({
     data: {
       customerProfileId: auth.customerProfileId,
       stripePaymentMethodId: body.stripePaymentMethodId,
-      brand: body.brand,
-      last4: body.last4,
-      expMonth: body.expMonth,
-      expYear: body.expYear,
+      brand,
+      last4,
+      expMonth,
+      expYear,
       isDefault: body.setDefault ?? isFirst,
     },
   });
@@ -117,6 +136,13 @@ export async function removePaymentMethod(auth, methodId) {
     where: { id: methodId, customerProfileId: auth.customerProfileId },
   });
   if (!method) throw notFound("Payment method not found");
+
+  // Detach from Stripe (non-fatal — local record is still deleted regardless)
+  try {
+    await stripeSvc.detachPaymentMethod({ stripePaymentMethodId: method.stripePaymentMethodId });
+  } catch (err) {
+    console.warn(`[billing] Stripe detach PM failed (non-fatal): ${err.message}`);
+  }
 
   await db.paymentMethod.delete({ where: { id: method.id } });
 

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { logAdminAction } from "#utils/audit.js";
 
 const createCategorySchema = z.object({
   name: z.string().min(1, "Name is required").max(120),
@@ -47,6 +48,7 @@ export async function create(req, res, next) {
     const { name, slug, sortOrder, isActive } = createCategorySchema.parse(req.body);
     const db = getDb();
     const c = await db.category.create({ data: { name, slug, sortOrder, isActive } });
+    await logAdminAction(req, "category.create", "Category", c.id, { name, slug });
     return ResponseFormatter.success(res, { data: c, status: 201 });
   } catch (err) { next(err); }
 }
@@ -64,6 +66,7 @@ export async function update(req, res, next) {
         ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
       },
     });
+    await logAdminAction(req, "category.update", "Category", c.id, body);
     return ResponseFormatter.success(res, { data: c });
   } catch (err) { next(err); }
 }
@@ -72,6 +75,7 @@ export async function remove(req, res, next) {
   try {
     const db = getDb();
     await db.category.delete({ where: { id: req.params.id } });
+    await logAdminAction(req, "category.delete", "Category", req.params.id, {});
     return ResponseFormatter.success(res, { message: getMessage("categoryDeleted") });
   } catch (err) { next(err); }
 }

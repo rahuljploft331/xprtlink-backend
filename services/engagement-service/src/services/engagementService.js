@@ -537,7 +537,7 @@ export async function endConsultation(auth, consultationId) {
 export async function getVideoToken(auth, consultationId) {
   const consultation = await loadConsultation(consultationId);
   assertConsultationParticipant(auth, consultation);
-  if (!["accepted", "in_progress", "ringing", "requested"].includes(consultation.status)) {
+  if (!["accepted", "in_progress", "ringing"].includes(consultation.status)) {
     throw badRequest("Video is not available for this consultation", "INVALID_STATUS");
   }
 
