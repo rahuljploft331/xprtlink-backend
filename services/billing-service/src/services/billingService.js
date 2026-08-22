@@ -470,6 +470,15 @@ export async function handleStripeWebhook(payload, signature) {
   const event = stripeSvc.constructWebhookEvent(payload, signature);
   const db = getDb();
 
+  // Webhook event deduplication — prevent processing the same event twice on retries
+  const alreadyProcessed = await db.processedWebhookEvent.findUnique({
+    where: { id: event.id },
+  });
+  if (alreadyProcessed) {
+    console.log(`[billing-webhook] Skipping duplicate event: ${event.id} (${event.type})`);
+    return { received: true, eventType: event.type, duplicate: true };
+  }
+
   switch (event.type) {
     case "payment_intent.succeeded": {
       // Final capture confirmed by Stripe — sync transaction status
@@ -518,6 +527,14 @@ export async function handleStripeWebhook(payload, signature) {
     default:
       break;
   }
+
+  // Record processed event for deduplication
+  await db.processedWebhookEvent.create({
+    data: { id: event.id, eventType: event.type },
+  }).catch((err) => {
+    // Non-fatal — if insert fails (e.g., duplicate from race), the event was still processed
+    console.warn(`[billing-webhook] Failed to record processed event ${event.id}: ${err.message}`);
+  });
 
   return { received: true, eventType: event.type };
 }

@@ -274,8 +274,13 @@ export async function login(body) {
 
 // ─── Logout & Token Refresh ───────────────────────────────────────────────────
 
-export async function logout(refreshToken) {
-  if (refreshToken) await revokeRefreshToken(refreshToken);
+export async function logout(userId, refreshToken) {
+  if (refreshToken) {
+    await revokeRefreshToken(refreshToken);
+  } else {
+    // No specific token provided — revoke ALL sessions for this user as a safety measure
+    await revokeAllUserSessions(userId);
+  }
 }
 
 export async function refresh(refreshToken, role) {

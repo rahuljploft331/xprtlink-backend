@@ -130,13 +130,16 @@ export async function createQuote(auth, body) {
   assertCustomer(auth);
   const db = getDb();
   let expert = null;
+
   if (body.expertId) {
+    // If client specified an expert, it MUST exist — no silent fallback
     expert = await db.expertProfile.findFirst({ where: { id: body.expertId } });
+    if (!expert) throw notFound("Expert not found");
+  } else {
+    // No specific expert requested — find any approved expert (discovery-style quote)
+    expert = await db.expertProfile.findFirst({ where: { verificationStatus: "approved" } });
+    if (!expert) throw notFound("No approved experts available to receive quotes");
   }
-  if (!expert) {
-    expert = (await db.expertProfile.findFirst({ where: { verificationStatus: "approved" } })) || (await db.expertProfile.findFirst());
-  }
-  if (!expert) throw notFound("No expert profile found in system");
 
   const now = new Date();
   const quote = await db.$transaction(async (tx) => {

@@ -50,7 +50,7 @@ router.post(
   "/logout",
   authenticate,
   asyncHandler(async (req, res) => {
-    await svc.logout(req.body.refreshToken);
+    await svc.logout(req.auth.userId, req.body.refreshToken);
     return ResponseFormatter.success(res, { message: getMessage("loggedOut"), data: null });
   })
 );

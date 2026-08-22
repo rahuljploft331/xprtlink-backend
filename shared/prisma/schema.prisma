@@ -1065,3 +1065,14 @@ model SupportMessage {
   @@index([conversationId, createdAt(sort: Desc)])
   @@map("support_messages")
 }
+
+// ─── Webhook Deduplication (billing-service) ─────────────────────────────────
+
+model ProcessedWebhookEvent {
+  id          String   @id @db.VarChar(128) // Stripe event ID (evt_xxx)
+  eventType   String   @map("event_type") @db.VarChar(64)
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz(6)
+
+  @@index([processedAt])
+  @@map("processed_webhook_events")
+}

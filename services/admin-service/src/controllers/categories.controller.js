@@ -1,6 +1,21 @@
+import { z } from "zod";
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+
+const createCategorySchema = z.object({
+  name: z.string().min(1, "Name is required").max(120),
+  slug: z.string().min(1, "Slug is required").max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens"),
+  sortOrder: z.number().int().nonnegative().default(0),
+  isActive: z.boolean().default(true),
+});
+
+const updateCategorySchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  slug: z.string().min(1).max(64).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "Slug must be lowercase alphanumeric with hyphens").optional(),
+  sortOrder: z.number().int().nonnegative().optional(),
+  isActive: z.boolean().optional(),
+});
 
 
 export async function list(_req, res, next) {
@@ -29,8 +44,8 @@ export async function getById(req, res, next) {
 
 export async function create(req, res, next) {
   try {
+    const { name, slug, sortOrder, isActive } = createCategorySchema.parse(req.body);
     const db = getDb();
-    const { name, slug, sortOrder = 0, isActive = true } = req.body;
     const c = await db.category.create({ data: { name, slug, sortOrder, isActive } });
     return ResponseFormatter.success(res, { data: c, status: 201 });
   } catch (err) { next(err); }
@@ -38,14 +53,15 @@ export async function create(req, res, next) {
 
 export async function update(req, res, next) {
   try {
+    const body = updateCategorySchema.parse(req.body);
     const db = getDb();
-    const { name, isActive, sortOrder } = req.body;
     const c = await db.category.update({
       where: { id: req.params.id },
       data: {
-        ...(name !== undefined ? { name } : {}),
-        ...(isActive !== undefined ? { isActive } : {}),
-        ...(sortOrder !== undefined ? { sortOrder } : {}),
+        ...(body.name !== undefined ? { name: body.name } : {}),
+        ...(body.slug !== undefined ? { slug: body.slug } : {}),
+        ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
+        ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
       },
     });
     return ResponseFormatter.success(res, { data: c });
