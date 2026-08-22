@@ -1,4 +1,4 @@
-import { Prisma } from "@prisma/client";
+import { Prisma } from "../generated/prisma/index.js";
 
 export function notFoundHandler(_req, res) {
   res.status(404).json({

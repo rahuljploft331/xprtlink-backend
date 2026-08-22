@@ -18,3 +18,11 @@ CREATE UNIQUE INDEX "idx_users_phone_active"
 -- 3. Performance indexes for login queries (Audit #33)
 CREATE INDEX "idx_users_email" ON "users" ("email") WHERE "email" IS NOT NULL;
 CREATE INDEX "idx_users_phone" ON "users" ("phone") WHERE "phone" IS NOT NULL;
+
+-- 4. Fix enum spelling drift: init migration used 'cancelled' (British) but schema uses 'canceled' (American)
+ALTER TYPE "consultation_status" RENAME VALUE 'cancelled' TO 'canceled';
+ALTER TYPE "quote_status" RENAME VALUE 'cancelled' TO 'canceled';
+ALTER TYPE "expert_subscription_status" RENAME VALUE 'cancelled' TO 'canceled';
+
+-- 5. Fix column spelling drift: init migration has 'cancelled_at' but schema maps to 'canceled_at'
+ALTER TABLE "expert_subscriptions" RENAME COLUMN "cancelled_at" TO "canceled_at";
