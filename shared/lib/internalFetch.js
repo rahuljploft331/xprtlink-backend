@@ -7,7 +7,12 @@
  * can distinguish internal calls from public traffic.
  */
 
-const INTERNAL_HEADER = { "x-internal-service": "true" };
+function getInternalHeaders() {
+  const secret = process.env.SERVICE_SECRET;
+  return {
+    "x-internal-service": secret || "true",
+  };
+}
 
 /**
  * GET an internal service endpoint and return the parsed JSON body.
@@ -18,7 +23,7 @@ const INTERNAL_HEADER = { "x-internal-service": "true" };
  */
 export async function internalGet(serviceUrl, path) {
   const url = `${serviceUrl}${path}`;
-  const res = await fetch(url, { headers: INTERNAL_HEADER });
+  const res = await fetch(url, { headers: getInternalHeaders() });
   if (!res.ok) {
     throw new Error(
       `[internalFetch] GET ${url} failed: ${res.status} ${res.statusText}`
@@ -41,7 +46,7 @@ export async function internalPost(serviceUrl, path, body = {}) {
   const url = `${serviceUrl}${path}`;
   const res = await fetch(url, {
     method: "POST",
-    headers: { ...INTERNAL_HEADER, "Content-Type": "application/json" },
+    headers: { ...getInternalHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
   if (!res.ok) {

@@ -14,9 +14,30 @@ import { stripeGuard } from "../middleware/stripeGuard.js";
 import * as svc from "../services/billingService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 
-
-
 const router = Router();
+
+/**
+ * Guard for internal service-to-service endpoints.
+ * Validates that x-internal-service header matches SERVICE_SECRET env var.
+ * Falls back to checking header presence only in development (for backward compat).
+ */
+function internalServiceGuard(req, res, next) {
+  const secret = process.env.SERVICE_SECRET;
+  const header = req.headers["x-internal-service"];
+
+  if (!header) {
+    return res.status(403).json({ success: false, message: getMessage("internalEndpoint") });
+  }
+
+  // In production, always validate the secret. In dev, accept any non-empty header
+  // so existing tooling without secrets configured still works.
+  if (secret && process.env.NODE_ENV === "production" && header !== secret) {
+    return res.status(403).json({ success: false, message: getMessage("internalEndpoint") });
+  }
+
+  next();
+}
+
 
 // Unauthenticated Webhook Listener Endpoint (uses raw body parsing for Stripe signature check)
 router.post(
@@ -34,15 +55,12 @@ router.post(
 /**
  * POST /api/v1/billing/consultations/:id/capture
  * Internal-only — called by engagement-service on ZegoCloud room_close.
- * Must be BEFORE router.use(authenticate) — guarded by x-internal-service header.
+ * Must be BEFORE router.use(authenticate) — guarded by SERVICE_SECRET.
  */
 router.post(
   "/consultations/:id/capture",
+  internalServiceGuard,
   asyncHandler(async (req, res) => {
-    const internalHeader = req.headers["x-internal-service"];
-    if (!internalHeader) {
-      return res.status(403).json({ success: false, message: getMessage("internalEndpoint") });
-    }
     const { durationSeconds } = req.body;
     const data = await svc.captureConsultation(req.params.id, durationSeconds);
     return ResponseFormatter.success(res, { message: getMessage("captureProcessed"), data });
@@ -51,20 +69,18 @@ router.post(
 
 /**
  * GET /api/v1/billing/consultations/:id/charge
- * Internal-only — called by engagement-service to retrieve the charge breakdown
- * for a completed consultation without crossing the DB boundary.
- * Guarded by x-internal-service header.
+ * Internal-only — called by engagement-service for charge breakdown.
+ * Guarded by SERVICE_SECRET.
  */
 router.get(
   "/consultations/:id/charge",
+  internalServiceGuard,
   asyncHandler(async (req, res) => {
-    if (!req.headers["x-internal-service"]) {
-      return res.status(403).json({ success: false, message: getMessage("internalEndpoint") });
-    }
     const data = await svc.getConsultationCharge(req.params.id);
     return ResponseFormatter.success(res, { data });
   })
 );
+
 
 
 router.use(authenticate);
@@ -199,10 +215,10 @@ router.get(
 );
 
 // ── Internal cron endpoint — expire subscriptions past their period end ──────
-// Should only be called by your PM2 cron task or an internal scheduler.
-// Protect this in production with an internal secret header or restrict to localhost.
+// Protected by SERVICE_SECRET header (same guard as other internal endpoints).
 router.post(
   "/subscriptions/expire",
+  internalServiceGuard,
   asyncHandler(async (_req, res) => {
     const data = await svc.expireSubscriptions();
     return ResponseFormatter.success(res, { message: `Expired ${data.expired} subscription(s)`, data });

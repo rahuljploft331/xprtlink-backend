@@ -1,4 +1,5 @@
 import { getDb } from "@xprtlink/shared/db";
+import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 
 /**
  * ZegoCloud Callback Event Handlers.
@@ -163,17 +164,13 @@ async function handleRoomClose(payload) {
   // Trigger real Stripe capture via billing-service (internal call, no JWT needed)
   if (wasConnected && durationSeconds > 0) {
     try {
-      const billingUrl = `http://localhost:${process.env.BILLING_SERVICE_PORT || 4006}/api/v1/billing/consultations/${consultation.id}/capture`;
-      const resp = await fetch(billingUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-internal-service": "engagement-service",
-        },
-        body: JSON.stringify({ durationSeconds }),
-      });
-      const result = await resp.json();
-      console.log(`[zego-callback] Billing capture result:`, JSON.stringify(result?.data ?? result));
+      const billingUrl = process.env.BILLING_SERVICE_URL ?? "http://localhost:4006";
+      const result = await internalPost(
+        billingUrl,
+        `/api/v1/billing/consultations/${consultation.id}/capture`,
+        { durationSeconds }
+      );
+      console.log(`[zego-callback] Billing capture result:`, JSON.stringify(result));
     } catch (err) {
       // Non-fatal — consultation is already marked completed; billing can be retried
       console.error(`[zego-callback] Billing capture call failed: ${err.message}`);
