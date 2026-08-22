@@ -66,12 +66,33 @@ export async function addPaymentMethod(auth, body) {
     console.warn(`[billing] Stripe attach PM failed (non-fatal): ${attachErr.message}`);
   }
 
-  // 4. Persist locally
+  // 4. Persist locally — upsert to avoid duplicate stripe_payment_method_id constraint errors
+  //    (Stripe may resend the same payment method token on retries or duplicate client calls)
   if (body.setDefault) {
     await db.paymentMethod.updateMany({
       where: { customerProfileId: auth.customerProfileId },
       data: { isDefault: false },
     });
+  }
+
+  // Check if this stripe PM already exists for this customer (idempotency)
+  const existing = await db.paymentMethod.findFirst({
+    where: {
+      customerProfileId: auth.customerProfileId,
+      stripePaymentMethodId: body.stripePaymentMethodId,
+    },
+  });
+
+  if (existing) {
+    // Already stored — update default flag if needed and return it
+    if (body.setDefault && !existing.isDefault) {
+      const updated = await db.paymentMethod.update({
+        where: { id: existing.id },
+        data: { isDefault: true },
+      });
+      return toPaymentMethodDto(updated);
+    }
+    return toPaymentMethodDto(existing);
   }
 
   const isFirst = (await db.paymentMethod.count({ where: { customerProfileId: auth.customerProfileId } })) === 0;
@@ -414,8 +435,16 @@ export async function attachBankAccount(auth, body) {
 
   if (!expert) throw notFound("Expert profile not found");
 
+  // Expert must have completed KYC (Stripe Custom Connect account) before adding a bank account
+  if (!expert.stripeAccountId) {
+    throw badRequest(
+      "Please complete identity verification (KYC) before adding a bank account.",
+      "KYC_REQUIRED"
+    );
+  }
+
   const externalAccount = await stripeSvc.attachExternalBankAccount({
-    stripeAccountId: expert.stripeAccountId || `acct_stub_${auth.expertProfileId}`,
+    stripeAccountId: expert.stripeAccountId,
     routingNumber: body.routingNumber,
     accountNumber: body.accountNumber,
     accountHolderName: body.accountHolderName,

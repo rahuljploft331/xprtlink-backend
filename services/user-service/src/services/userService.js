@@ -1,5 +1,5 @@
 import { getDb } from "@xprtlink/shared/db";
-import { issueTokens, loadUserContext, revokeRefreshToken } from "@xprtlink/shared/auth/tokens.js";
+import { issueTokens, loadUserContext, revokeRefreshToken, lookupRefreshToken } from "@xprtlink/shared/auth/tokens.js";
 import { hashPassword, verifyPassword, verifyTokenHash } from "@xprtlink/shared/auth/password.js";
 import {
   createAndDeliverOtp,
@@ -234,34 +234,13 @@ export async function logout(refreshToken) {
 export async function refresh(refreshToken, role) {
   if (!refreshToken) throw unauthorized("Refresh token required");
 
-  const db = getDb();
-  const tokens = await db.refreshToken.findMany({
-    where: { revokedAt: null, expiresAt: { gt: new Date() } },
-    take: 200,
-    orderBy: { createdAt: "desc" },
-    include: {
-      user: {
-        include: {
-          customerProfile: true,
-          expertProfile: { include: { subscriptions: { where: { status: "active" }, take: 1 } } },
-        },
-      },
-    },
-  });
+  // O(1) SHA-256 indexed lookup — no more linear scan of all active tokens
+  const result = await lookupRefreshToken(refreshToken, role);
+  if (!result) throw unauthorized("Invalid refresh token");
 
-  for (const row of tokens) {
-    if (await verifyTokenHash(refreshToken, row.tokenHash)) {
-      const resolvedRole =
-        role ||
-        (row.user.customerProfile ? "customer" : row.user.expertProfile ? "expert" : null);
-      if (!resolvedRole) throw unauthorized("Invalid account");
-      await db.refreshToken.update({ where: { id: row.id }, data: { revokedAt: new Date() } });
-      const issued = await issueTokens(row.user, resolvedRole);
-      if (!issued) throw unauthorized("Session invalid");
-      return issued;
-    }
-  }
-  throw unauthorized("Invalid refresh token");
+  const issued = await issueTokens(result.user, result.resolvedRole);
+  if (!issued) throw unauthorized("Session invalid");
+  return issued;
 }
 
 // ─── OTP ──────────────────────────────────────────────────────────────────────
@@ -415,6 +394,25 @@ export async function resendOtp(body) {
 // ─── Password ─────────────────────────────────────────────────────────────────
 
 export async function forgotPassword(body) {
+  const { email, phone } = body;
+  const db = getDb();
+
+  // Check whether this email/phone actually belongs to an active account.
+  // If not found, we silently return the same success-shaped response to
+  // prevent user enumeration (attacker cannot tell if an email is registered).
+  const user = await db.user.findFirst({
+    where: {
+      ...(email ? { email } : { phone }),
+      deletedAt: null,
+      status: { not: "pending_verification" },
+    },
+  });
+
+  if (!user) {
+    // Return a plausible response without sending anything or revealing the email isn't registered
+    return { sent: true, expiresInSeconds: 600, channel: email ? "email" : "phone" };
+  }
+
   return sendOtp({ ...body, purpose: "reset_password" });
 }
 
@@ -423,17 +421,18 @@ export async function resetPassword(body) {
   const challenge = await findValidOtpChallenge({ email, phone, purpose: "reset_password" });
   await verifyOtpCode(challenge, code);
 
-  const user = await getDb().user.findFirst({
+  const db = getDb();
+  const user = await db.user.findFirst({
     where: email ? { email, deletedAt: null } : { phone, deletedAt: null },
   });
   if (!user) throw notFound("User not found");
 
-  await getDb().$transaction([
-    getDb().user.update({
+  await db.$transaction([
+    db.user.update({
       where: { id: user.id },
       data: { passwordHash: await hashPassword(newPassword) },
     }),
-    getDb().otpChallenge.update({
+    db.otpChallenge.update({
       where: { id: challenge.id },
       data: { consumedAt: new Date() },
     }),
