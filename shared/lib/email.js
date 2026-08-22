@@ -21,12 +21,12 @@ export async function renderEmailTemplate({
   ctaUrl = null,
   bottomNoteHtml = null,
 }) {
-  const templatePath = path.join(__dirname, "../templates/base-email.html");
+  const templatePath = path.join(__dirname, "../templates/base-email.hbs");
   let html = await fs.readFile(templatePath, "utf-8");
 
   html = html.replace(/{{TITLE}}/g, title || "");
   html = html.replace(/{{BODY_HTML}}/g, bodyHtml || "");
-  
+
   if (badgeText) {
     html = html.replace(/{{SHOW_BADGE}}/g, "table");
     html = html.replace(/{{BADGE_TEXT}}/g, badgeText);
