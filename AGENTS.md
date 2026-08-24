@@ -70,18 +70,19 @@ pnpm reset -- --no-seed   # wipe only
 
 # ── API-Driven Init (real data via Newman flows) ────────────────────────────
 pnpm seed:platform          # seed only system prereqs (categories, plans, admins)
-pnpm init:flows             # seed prereqs + run all 4 verified Postman flows
+pnpm init:flows             # seed prereqs + run all 5 verified Postman flows
 pnpm init:flows:fresh       # wipe DB first, then seed + run flows (clean slate)
-pnpm init:flows -- --flow A # run only flow A (A=Expert phone, B=Expert email,
-                             #   C=Customer, D=Subscription lifecycle)
+pnpm init:flows -- --flow B # run only flow B (B=Expert email, C=Customer,
+                             #   D=Subscription lifecycle, E=Verification, F=Consultation)
 pnpm init:flows -- --no-seed  # skip platform seed, just run flows
 ```
 
-**init:flows** runs these 4 verified collections against the live backend (Newman):
-- **Flow A**: Expert Onboarding (phone OTP) — `scripts/flows/expert-onboarding-phone.flow.json`
+**init:flows** runs these 5 verified collections against the live backend (Newman):
 - **Flow B**: Email Expert Onboarding — `scripts/flows/expert-onboarding-email.flow.json`
 - **Flow C**: Customer Onboarding & Quote Flow — `scripts/flows/customer-onboarding.flow.json`
 - **Flow D**: Expert Subscription Lifecycle (13 steps) — `scripts/flows/expert-subscription-lifecycle.flow.json`
+- **Flow E**: Expert Verification Approval — `scripts/flows/expert-verification-approval.flow.json`
+- **Flow F**: Consultation Lifecycle (12 steps) — `scripts/flows/consultation-lifecycle.flow.json`
 
 Needs: `pm2 start` first, `DATABASE_URL` in `.env`, `newman` (auto-installed if missing).
 
