@@ -448,7 +448,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"expertId\":\"{{expert_id}}\",\"title\":\"API Init Flow: Test Quote Request\",\"description\":\"This quote was submitted by the automated init:flows script to test the full quote submission lifecycle.\",\"budgetCents\":25000}"
+          "raw": "{\"expertId\":\"{{expert_id}}\",\"title\":\"API Init Flow: Test Quote Request\",\"description\":\"This quote was submitted by the automated init:flows script to test the full quote submission lifecycle.\",\"budget\":250}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/engagement/quotes",
