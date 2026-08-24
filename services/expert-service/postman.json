@@ -35,7 +35,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/search/experts?q=development&category=software&sort=rating&page=1&limit=20",
+              "raw": "{{base_url}}/api/v1/search/experts?q=development&category=software&sort=rating&page=1&limit=20&lat=37.7749&lng=-122.4194&radius=50",
               "host": [
                 "{{base_url}}"
               ],
@@ -65,10 +65,25 @@
                 {
                   "key": "limit",
                   "value": "20"
+                },
+                {
+                  "key": "lat",
+                  "value": "37.7749",
+                  "description": "Customer latitude for geo-distance filter (optional)"
+                },
+                {
+                  "key": "lng",
+                  "value": "-122.4194",
+                  "description": "Customer longitude for geo-distance filter (optional)"
+                },
+                {
+                  "key": "radius",
+                  "value": "50",
+                  "description": "Search radius in km (default: 50, optional)"
                 }
               ]
             },
-            "description": "Search for experts in the marketplace. Query parameters include q, category, priceMin, priceMax, rating, experience, online, verified, sort, page, limit."
+            "description": "Search for experts in the marketplace.\n\nQuery parameters: q, category, priceMin, priceMax, rating, experience, online, verified, sort, page, limit.\n\nGeo-distance filter (optional): lat, lng, radius (km, default 50). When lat+lng are provided, results are filtered to experts with at least one serviceArea location within the radius, sorted by nearest distance. Response includes a `distance` field (km) per expert."
           }
         },
         {
@@ -207,7 +222,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"bio\": \"Senior Cloud Architect with 10+ years experience.\",\n  \"title\": \"Cloud Solutions Architect\",\n  \"businessName\": \"CloudPro Consulting\",\n  \"languages\": [\"English\", \"Spanish\"],\n  \"serviceAreas\": [\"AWS\", \"Azure\", \"GCP\"],\n  \"consultationRate\": 120,\n  \"experienceYears\": 10,\n  \"availabilityStatus\": \"online\"\n}"
+              "raw": "{\n  \"bio\": \"Senior Cloud Architect with 10+ years experience.\",\n  \"title\": \"Cloud Solutions Architect\",\n  \"businessName\": \"CloudPro Consulting\",\n  \"languages\": [\"English\", \"Spanish\"],\n  \"serviceAreas\": [{\"name\": \"New York, NY\", \"lat\": 40.7128, \"lng\": -74.006}, {\"name\": \"San Francisco, CA\", \"lat\": 37.7749, \"lng\": -122.4194}],\n  \"consultationRate\": 120,\n  \"experienceYears\": 10,\n  \"availabilityStatus\": \"online\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/experts/me",
@@ -221,7 +236,7 @@
                 "me"
               ]
             },
-            "description": "Update professional information, rates, and availability. Accepts: headline, bio, title, businessName, languages (string[]), serviceAreas (string[]), consultationRate, experienceYears, availabilityStatus, categoryId, avatarMediaId."
+            "description": "Update professional information, rates, and availability. Accepts: headline, bio, title, businessName, languages (string[]), serviceAreas (array of {name, lat, lng} objects), consultationRate, experienceYears, availabilityStatus, categoryId, avatarMediaId."
           }
         },
         {
@@ -240,7 +255,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"headline\": \"Expert Cloud Architect\",\n  \"bio\": \"Onboarding draft biography.\",\n  \"title\": \"Senior Consultant\",\n  \"businessName\": \"My Consulting LLC\",\n  \"languages\": [\"English\"],\n  \"serviceAreas\": [\"Cloud Architecture\", \"DevOps\"],\n  \"consultationRate\": 100,\n  \"experienceYears\": 5,\n  \"categoryId\": \"category-uuid-here\"\n}"
+              "raw": "{\n  \"headline\": \"Expert Cloud Architect\",\n  \"bio\": \"Onboarding draft biography.\",\n  \"title\": \"Senior Consultant\",\n  \"businessName\": \"My Consulting LLC\",\n  \"languages\": [\"English\"],\n  \"serviceAreas\": [{\"name\": \"Austin, TX\", \"lat\": 30.2672, \"lng\": -97.7431}],\n  \"consultationRate\": 100,\n  \"experienceYears\": 5,\n  \"categoryId\": \"category-uuid-here\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/experts/me/onboarding",
@@ -255,7 +270,7 @@
                 "onboarding"
               ]
             },
-            "description": "Draft/save professional profile onboarding information. Accepts: headline, bio, title, businessName, languages (string[]), serviceAreas (string[]), consultationRate, experienceYears, categoryId, avatarMediaId."
+            "description": "Draft/save professional profile onboarding information. Accepts: headline, bio, title, businessName, languages (string[]), serviceAreas (array of {name, lat, lng} objects), consultationRate, experienceYears, categoryId, avatarMediaId."
           }
         },
         {
