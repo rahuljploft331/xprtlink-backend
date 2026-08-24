@@ -446,12 +446,12 @@ export async function verifyOtp(body) {
       where: { id: challenge.id },
       data: { consumedAt: new Date() },
     }),
-    // H6: scope to challenge.userId — not by email/phone string (soft-deleted rows
-    // can share an identifier due to the partial unique index on deletedAt IS NULL)
-    ...(purpose === "verify_email"
+    // Only stamp verified timestamps if the challenge is linked to an existing user
+    // (pre-registration phone verification won't have a userId)
+    ...(purpose === "verify_email" && challenge.userId
       ? [db.user.update({ where: { id: challenge.userId }, data: { emailVerifiedAt: new Date() } })]
       : []),
-    ...(purpose === "verify_phone"
+    ...(purpose === "verify_phone" && challenge.userId
       ? [db.user.update({ where: { id: challenge.userId }, data: { phoneVerifiedAt: new Date() } })]
       : []),
   ]);
