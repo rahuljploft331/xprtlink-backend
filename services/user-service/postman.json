@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "ea16c2da-ed0f-4b72-9796-12cac4fafa35",
     "name": "User Service",
-    "description": "REST APIs for registration (2-step OTP flow), login, OTP validation, password management, social auth, and customer profile/discoveries.\n\n**Registration (2 steps):**\n1. POST /auth/register — requires email + phone (E.164), confirmPassword, termsAccepted, MFS password rules\n2. POST /auth/otp/verify { purpose: register } → auth tokens\n\n**Social signup (when phone missing):**\n1. POST /auth/social → may return completionToken\n2. POST /auth/social/complete → OTP to phone\n3. POST /auth/otp/verify { purpose: verify_phone } → auth tokens",
+    "description": "REST APIs for registration (3-step OTP flow with phone pre-verification), login, OTP validation, password management, social auth, and customer profile/discoveries.\n\n**Registration (3 steps — phone must be pre-verified):**\n1. POST /auth/otp/send { phone, purpose: 'verify_phone' } — send OTP to phone\n2. POST /auth/otp/verify { phone, code, purpose: 'verify_phone' } — verify phone ownership\n3. POST /auth/register — requires email + phone (E.164), confirmPassword, termsAccepted, MFS password rules; phone must have been verified within 30 min\n4. POST /auth/otp/verify { purpose: 'register' } → auth tokens\n\n**Social signup (when phone missing):**\n1. POST /auth/social → may return completionToken\n2. POST /auth/social/complete → OTP to phone\n3. POST /auth/otp/verify { purpose: verify_phone } → auth tokens",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -28,7 +28,51 @@
           }
         },
         {
-          "name": "Register — Step 1 Customer (send OTP)",
+          "name": "Pre-verify Phone (before register)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+14155552671\",\n  \"purpose\": \"verify_phone\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/otp/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "send"]
+            },
+            "description": "**Pre-registration phone verification (Step 1 of 4).**\n\nBefore calling POST /auth/register, the phone number MUST be verified via OTP. This sends a verify_phone OTP to the given phone number.\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'verify_phone' } to consume the challenge. Registration must happen within 30 minutes of verification."
+          }
+        },
+        {
+          "name": "Verify Phone OTP (before register)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+14155552671\",\n  \"code\": \"123456\",\n  \"purpose\": \"verify_phone\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/otp/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "verify"]
+            },
+            "description": "**Pre-registration phone verification (Step 2 of 4).**\n\nVerifies the phone OTP sent in the previous step. Consumes the verify_phone challenge so POST /auth/register will succeed.\n\nThe phone must be verified within 30 minutes before calling /auth/register.\n\n**Next step:** Call POST /auth/register with the verified phone number."
+          }
+        },
+        {
+          "name": "Register — Customer (send OTP)",
           "request": {
             "method": "POST",
             "header": [
@@ -46,11 +90,11 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "register"]
             },
-            "description": "Step 1 of 2-step CUSTOMER registration.\n\nCreates a pending_verification User with both email and phone. Sends a 6-digit OTP (default: phone).\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'customer'.\nOptional: otpChannel ('email' | 'phone', default phone).\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens."
+            "description": "**Registration Step 3 of 4 (CUSTOMER).**\n\n**PREREQUISITE:** The phone number MUST be pre-verified via POST /auth/otp/send + POST /auth/otp/verify (purpose: verify_phone) within the last 30 minutes. Without this, registration will fail with PHONE_NOT_VERIFIED.\n\nCreates a pending_verification User with both email and phone. Sends a 6-digit registration OTP (default: phone).\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'customer'.\nOptional: otpChannel ('email' | 'phone', default phone).\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens."
           }
         },
         {
-          "name": "Register — Step 1 Expert (send OTP)",
+          "name": "Register — Expert (send OTP)",
           "request": {
             "method": "POST",
             "header": [
@@ -68,11 +112,11 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "register"]
             },
-            "description": "Step 1 of 2-step EXPERT registration.\n\nSame endpoint as customer but with role='expert' and optional categoryId.\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'expert'.\nOptional: otpChannel ('email' | 'phone', default phone), categoryId (UUID — selects expert's category; falls back to first active category if omitted or invalid).\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens."
+            "description": "**Registration Step 3 of 4 (EXPERT).**\n\n**PREREQUISITE:** The phone number MUST be pre-verified via POST /auth/otp/send + POST /auth/otp/verify (purpose: verify_phone) within the last 30 minutes. Without this, registration will fail with PHONE_NOT_VERIFIED.\n\nSame endpoint as customer but with role='expert' and optional categoryId.\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'expert'.\nOptional: otpChannel ('email' | 'phone', default phone), categoryId (UUID — selects expert's category; falls back to first active category if omitted or invalid).\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens."
           }
         },
         {
-          "name": "Register — Step 2 (verify OTP → get tokens)",
+          "name": "Register — Verify OTP (get tokens)",
           "request": {
             "method": "POST",
             "header": [
@@ -90,7 +134,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "otp", "verify"]
             },
-            "description": "Step 2 of 2-step registration.\n\nVerify OTP sent to email or phone (match otpChannel from step 1). Stamps emailVerifiedAt and/or phoneVerifiedAt based on the verified channel. If the phone was pre-verified (via a prior verify_phone OTP in the signup screen flow), phoneVerifiedAt is also stamped even when the registration OTP was sent to email. Creates profile, issues tokens."
+            "description": "**Registration Step 4 of 4 (final).**\n\nVerify registration OTP sent to email or phone (match otpChannel from register step). Stamps emailVerifiedAt and/or phoneVerifiedAt based on the verified channel. If the phone was pre-verified (via a prior verify_phone OTP in the signup screen flow), phoneVerifiedAt is also stamped even when the registration OTP was sent to email. Creates profile, issues tokens."
           }
         },
         {
