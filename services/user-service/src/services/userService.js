@@ -397,11 +397,12 @@ export async function verifyOtp(body) {
     if (!verifiedViaPhone) {
       const pendingUser = await db.user.findUnique({ where: { id: challenge.userId }, select: { phone: true } });
       if (pendingUser?.phone) {
+        const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
         const consumed = await db.otpChallenge.findFirst({
           where: {
             phone: pendingUser.phone,
             purpose: "verify_phone",
-            consumedAt: { not: null },
+            consumedAt: { not: null, gte: thirtyMinAgo },
           },
           orderBy: { createdAt: "desc" },
         });
