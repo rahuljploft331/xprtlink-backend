@@ -868,7 +868,7 @@
           }
         ],
         "url": {
-          "raw": "{{base_url}}/api/v1/experts/me/settings",
+          "raw": "{{base_url}}/api/v1/experts/me",
           "host": [
             "{{base_url}}"
           ],
@@ -876,8 +876,7 @@
             "api",
             "v1",
             "experts",
-            "me",
-            "settings"
+            "me"
           ]
         },
         "body": {
