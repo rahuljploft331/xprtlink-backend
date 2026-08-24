@@ -499,6 +499,10 @@ model ExpertProfile {
   avatarMediaId         String?            @map("avatar_media_id") @db.Uuid
   headline              String?            @db.VarChar(200)
   bio                   String?
+  title                 String?            @db.VarChar(200)
+  businessName          String?            @map("business_name") @db.VarChar(200)
+  languages             String[]           @default([])
+  serviceAreas          String[]           @default([]) @map("service_areas")
   consultationRateCents Int                @map("consultation_rate_cents")
   currency              String             @default("USD") @db.Char(3)
   experienceYears       Int                @default(0) @map("experience_years")

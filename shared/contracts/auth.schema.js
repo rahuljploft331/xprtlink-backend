@@ -55,6 +55,8 @@ export const registerRequestSchema = z
     }),
     /** OTP delivery channel for step 2. Defaults to phone on the server. */
     otpChannel: z.enum(["email", "phone"]).optional(),
+    /** Category selection for expert registration (Figma sign-up screen). Optional for customers. */
+    categoryId: z.string().uuid().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",
