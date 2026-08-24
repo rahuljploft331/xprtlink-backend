@@ -207,7 +207,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"bio\": \"Senior Cloud Architect with 10+ years experience.\",\n  \"hourlyRate\": 120,\n  \"availabilityMode\": \"online\"\n}"
+              "raw": "{\n  \"bio\": \"Senior Cloud Architect with 10+ years experience.\",\n  \"title\": \"Cloud Solutions Architect\",\n  \"businessName\": \"CloudPro Consulting\",\n  \"languages\": [\"English\", \"Spanish\"],\n  \"serviceAreas\": [\"AWS\", \"Azure\", \"GCP\"],\n  \"consultationRate\": 120,\n  \"experienceYears\": 10,\n  \"availabilityStatus\": \"online\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/experts/me",
@@ -221,7 +221,7 @@
                 "me"
               ]
             },
-            "description": "Update professional information, rates, and availability."
+            "description": "Update professional information, rates, and availability. Accepts: headline, bio, title, businessName, languages (string[]), serviceAreas (string[]), consultationRate, experienceYears, availabilityStatus, categoryId, avatarMediaId."
           }
         },
         {
@@ -240,7 +240,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"categories\": [\"software-architecture\"],\n  \"bio\": \"Onboarding draft biography.\"\n}"
+              "raw": "{\n  \"headline\": \"Expert Cloud Architect\",\n  \"bio\": \"Onboarding draft biography.\",\n  \"title\": \"Senior Consultant\",\n  \"businessName\": \"My Consulting LLC\",\n  \"languages\": [\"English\"],\n  \"serviceAreas\": [\"Cloud Architecture\", \"DevOps\"],\n  \"consultationRate\": 100,\n  \"experienceYears\": 5,\n  \"categoryId\": \"category-uuid-here\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/experts/me/onboarding",
@@ -255,7 +255,7 @@
                 "onboarding"
               ]
             },
-            "description": "Draft/save professional profile onboarding information."
+            "description": "Draft/save professional profile onboarding information. Accepts: headline, bio, title, businessName, languages (string[]), serviceAreas (string[]), consultationRate, experienceYears, categoryId, avatarMediaId."
           }
         },
         {
@@ -327,7 +327,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"documentType\": \"national_id\",\n  \"mediaIds\": [\"media-uuid-1\", \"media-uuid-2\"]\n}"
+              "raw": "{\n  \"primaryId\": \"media-uuid-front\",\n  \"secondaryId\": \"media-uuid-back\",\n  \"docType\": \"government_id\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/experts/me/verification/documents",
@@ -343,7 +343,7 @@
                 "documents"
               ]
             },
-            "description": "Submit verification ID document media IDs."
+            "description": "Submit verification documents. Uses primaryId (required UUID) and secondaryId (optional UUID) for document media references. docType: government_id | credential | other."
           }
         },
         {
