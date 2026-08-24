@@ -167,6 +167,10 @@ export async function updateExpertMe(auth, body) {
     data: {
       ...(body.headline !== undefined ? { headline: body.headline } : {}),
       ...(body.bio !== undefined ? { bio: body.bio } : {}),
+      ...(body.title !== undefined ? { title: body.title } : {}),
+      ...(body.businessName !== undefined ? { businessName: body.businessName } : {}),
+      ...(body.languages !== undefined ? { languages: body.languages } : {}),
+      ...(body.serviceAreas !== undefined ? { serviceAreas: body.serviceAreas } : {}),
       ...(body.consultationRate !== undefined
         ? { consultationRateCents: amountToCents(body.consultationRate) }
         : {}),
@@ -200,6 +204,10 @@ export async function saveOnboarding(auth, body) {
     data: {
       ...(body.headline !== undefined ? { headline: body.headline } : {}),
       ...(body.bio !== undefined ? { bio: body.bio } : {}),
+      ...(body.title !== undefined ? { title: body.title } : {}),
+      ...(body.businessName !== undefined ? { businessName: body.businessName } : {}),
+      ...(body.languages !== undefined ? { languages: body.languages } : {}),
+      ...(body.serviceAreas !== undefined ? { serviceAreas: body.serviceAreas } : {}),
       ...(body.consultationRate !== undefined
         ? { consultationRateCents: amountToCents(body.consultationRate) }
         : {}),

@@ -74,7 +74,7 @@ async function assertIdentifierAvailable({ email, phone, excludeUserId }) {
   }
 }
 
-async function createProfileForRole(tx, userId, role, firstName, lastName) {
+async function createProfileForRole(tx, userId, role, firstName, lastName, { categoryId } = {}) {
   if (role === "customer") {
     return tx.user.update({
       where: { id: userId },
@@ -83,11 +83,22 @@ async function createProfileForRole(tx, userId, role, firstName, lastName) {
     });
   }
 
-  const category = await tx.category.findFirst({
-    where: { isActive: true },
-    orderBy: { sortOrder: "asc" },
-  });
-  if (!category) throw badRequest("No categories configured");
+  // Use the provided categoryId if valid, otherwise fall back to the first active category
+  let resolvedCategoryId = categoryId;
+  if (resolvedCategoryId) {
+    const cat = await tx.category.findFirst({
+      where: { id: resolvedCategoryId, isActive: true },
+    });
+    if (!cat) resolvedCategoryId = null; // invalid/inactive — fall back
+  }
+  if (!resolvedCategoryId) {
+    const category = await tx.category.findFirst({
+      where: { isActive: true },
+      orderBy: { sortOrder: "asc" },
+    });
+    if (!category) throw badRequest("No categories configured");
+    resolvedCategoryId = category.id;
+  }
 
   return tx.user.update({
     where: { id: userId },
@@ -96,7 +107,7 @@ async function createProfileForRole(tx, userId, role, firstName, lastName) {
         create: {
           firstName,
           lastName,
-          categoryId: category.id,
+          categoryId: resolvedCategoryId,
           consultationRateCents: 0,
           settings: { create: { preferences: {} } },
         },
@@ -135,6 +146,7 @@ export async function register(body) {
     firstName,
     lastName,
     otpChannel = "phone",
+    categoryId,
   } = body;
 
   // Pre-flight availability check (fast-fails common case; real enforcement is inside the transaction)
@@ -218,7 +230,7 @@ export async function register(body) {
     purpose: "register",
     channel: otpChannel,
     userId,
-    registrationData: { role, firstName, lastName, otpChannel },
+    registrationData: { role, firstName, lastName, otpChannel, categoryId },
   });
 }
 
@@ -374,7 +386,7 @@ export async function verifyOtp(body) {
       );
     }
 
-    const { role, firstName, lastName, otpChannel } = challenge.registrationData;
+    const { role, firstName, lastName, otpChannel, categoryId } = challenge.registrationData;
     // C1: Only stamp the channel that was actually verified.
     // The other channel remains null until it is separately verified.
     const verifiedViaPhone = otpChannel === "phone" || (!otpChannel && challenge.phone);
@@ -396,7 +408,7 @@ export async function verifyOtp(body) {
         },
       });
 
-      return createProfileForRole(tx, challenge.userId, role, firstName, lastName);
+      return createProfileForRole(tx, challenge.userId, role, firstName, lastName, { categoryId });
     });
 
     const tokens = await issueTokens(user, role);

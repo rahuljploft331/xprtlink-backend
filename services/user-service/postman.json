@@ -39,14 +39,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"phone\": \"+14155552671\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"customer\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}"
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"phone\": \"+14155552671\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"customer\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\",\n  \"categoryId\": \"category-uuid-here\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/register",
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "register"]
             },
-            "description": "Step 1 of 2-step registration.\n\nCreates a pending_verification User with both email and phone. Sends a 6-digit OTP (default: phone).\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role.\nOptional: otpChannel ('email' | 'phone', default phone)."
+            "description": "Step 1 of 2-step registration.\n\nCreates a pending_verification User with both email and phone. Sends a 6-digit OTP (default: phone).\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role.\nOptional: otpChannel ('email' | 'phone', default phone), categoryId (UUID — expert registration only, selects the expert's category at profile creation; falls back to first active category if omitted or invalid)."
           }
         },
         {
