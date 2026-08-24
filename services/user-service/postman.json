@@ -90,7 +90,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "otp", "verify"]
             },
-            "description": "Step 2 of 2-step registration.\n\nVerify OTP sent to email or phone (match otpChannel from step 1). Stamps both emailVerifiedAt and phoneVerifiedAt, creates profile, issues tokens."
+            "description": "Step 2 of 2-step registration.\n\nVerify OTP sent to email or phone (match otpChannel from step 1). Stamps emailVerifiedAt and/or phoneVerifiedAt based on the verified channel. If the phone was pre-verified (via a prior verify_phone OTP in the signup screen flow), phoneVerifiedAt is also stamped even when the registration OTP was sent to email. Creates profile, issues tokens."
           }
         },
         {
