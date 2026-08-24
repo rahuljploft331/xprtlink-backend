@@ -28,7 +28,7 @@
           }
         },
         {
-          "name": "Register — Step 1 (send OTP)",
+          "name": "Register — Step 1 Customer (send OTP)",
           "request": {
             "method": "POST",
             "header": [
@@ -39,14 +39,36 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"phone\": \"+14155552671\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"customer\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\",\n  \"categoryId\": \"category-uuid-here\"\n}"
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"phone\": \"+14155552671\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"customer\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/register",
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "register"]
             },
-            "description": "Step 1 of 2-step registration.\n\nCreates a pending_verification User with both email and phone. Sends a 6-digit OTP (default: phone).\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role.\nOptional: otpChannel ('email' | 'phone', default phone), categoryId (UUID — expert registration only, selects the expert's category at profile creation; falls back to first active category if omitted or invalid)."
+            "description": "Step 1 of 2-step CUSTOMER registration.\n\nCreates a pending_verification User with both email and phone. Sends a 6-digit OTP (default: phone).\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'customer'.\nOptional: otpChannel ('email' | 'phone', default phone).\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens."
+          }
+        },
+        {
+          "name": "Register — Step 1 Expert (send OTP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"expert@example.com\",\n  \"phone\": \"+14155552672\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Expert\",\n  \"role\": \"expert\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\",\n  \"categoryId\": \"category-uuid-here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register"]
+            },
+            "description": "Step 1 of 2-step EXPERT registration.\n\nSame endpoint as customer but with role='expert' and optional categoryId.\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'expert'.\nOptional: otpChannel ('email' | 'phone', default phone), categoryId (UUID — selects expert's category; falls back to first active category if omitted or invalid).\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens."
           }
         },
         {
