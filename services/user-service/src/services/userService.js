@@ -152,6 +152,24 @@ export async function register(body) {
   // Pre-flight availability check (fast-fails common case; real enforcement is inside the transaction)
   await assertIdentifierAvailable({ email, phone });
 
+  // Require phone to be pre-verified via OTP (consumed verify_phone challenge within 30 min)
+  const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
+  const phoneVerification = await getDb().otpChallenge.findFirst({
+    where: {
+      phone,
+      purpose: "verify_phone",
+      consumedAt: { not: null, gte: thirtyMinAgo },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!phoneVerification) {
+    throw badRequest(
+      "Phone number must be verified before registration. Please verify your phone first.",
+      "PHONE_NOT_VERIFIED",
+      "phone"
+    );
+  }
+
   const db = getDb();
   const passwordHash = await hashPassword(password);
   const termsAcceptedAt = new Date();
