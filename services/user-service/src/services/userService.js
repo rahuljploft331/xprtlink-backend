@@ -513,7 +513,7 @@ export async function changePassword(userId, body) {
   const user = await db.user.findUnique({ where: { id: userId } });
   if (!user) throw notFound("User not found");
   const valid = await verifyPassword(currentPassword, user.passwordHash);
-  if (!valid) throw unauthorized("Current password is incorrect");
+  if (!valid) throw badRequest("Current password is incorrect", "INVALID_CURRENT_PASSWORD", "currentPassword");
 
   await db.$transaction([
     db.user.update({
