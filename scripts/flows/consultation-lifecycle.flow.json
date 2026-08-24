@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a1c9e7f2-5d4b-4e8a-9f61-consultation-lc-f",
     "name": "XpertLink Consultation Lifecycle Flow (Verified)",
-    "description": "Flow F: Full consultation lifecycle — registers fresh customer & expert, onboards expert with profile+subscription, creates consultation, expert accepts, ends call, customer pays and submits review, verifies final state.",
+    "description": "Flow F: Full consultation lifecycle \u2014 registers fresh customer & expert, onboards expert with profile+subscription, creates consultation, expert accepts, ends call, customer pays and submits review, verifies final state.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -65,7 +65,7 @@
   ],
   "item": [
     {
-      "name": "Step 1: Register Fresh Customer",
+      "name": "Step 0a: Send Phone Verification OTP",
       "event": [
         {
           "listen": "prerequest",
@@ -93,6 +93,90 @@
             "type": "text/javascript"
           }
         },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('sent is true', function () { pm.expect(json.data.sent).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"{{customer_phone}}\",\"purpose\":\"verify_phone\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/otp/send",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "send"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Step 0b: Verify Phone OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('verified is true', function () { pm.expect(json.data.verified).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"{{customer_phone}}\",\"code\":\"123456\",\"purpose\":\"verify_phone\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/otp/verify",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "verify"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Step 1: Register Fresh Customer",
+      "event": [
         {
           "listen": "test",
           "script": {
@@ -231,7 +315,7 @@
       }
     },
     {
-      "name": "Step 4: Register Fresh Expert",
+      "name": "Step 3a: Send Expert Phone Verification OTP",
       "event": [
         {
           "listen": "prerequest",
@@ -252,6 +336,90 @@
             "type": "text/javascript"
           }
         },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('sent is true', function () { pm.expect(json.data.sent).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"{{expert_phone}}\",\"purpose\":\"verify_phone\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/otp/send",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "send"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Step 3b: Verify Expert Phone OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('verified is true', function () { pm.expect(json.data.verified).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"{{expert_phone}}\",\"code\":\"123456\",\"purpose\":\"verify_phone\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/otp/verify",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "verify"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Step 4: Register Fresh Expert",
+      "event": [
         {
           "listen": "test",
           "script": {

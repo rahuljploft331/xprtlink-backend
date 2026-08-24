@@ -33,7 +33,7 @@
   ],
   "item": [
     {
-      "name": "Step 1: Register New Expert via Email",
+      "name": "Step 0a: Send Phone Verification OTP",
       "event": [
         {
           "listen": "prerequest",
@@ -61,6 +61,90 @@
             "type": "text/javascript"
           }
         },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('sent is true', function () { pm.expect(json.data.sent).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"{{expert_phone}}\",\"purpose\":\"verify_phone\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/otp/send",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "send"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Step 0b: Verify Phone OTP",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test('verified is true', function () { pm.expect(json.data.verified).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\"phone\":\"{{expert_phone}}\",\"code\":\"123456\",\"purpose\":\"verify_phone\"}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/otp/verify",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "otp",
+            "verify"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Step 1: Register New Expert via Email",
+      "event": [
         {
           "listen": "test",
           "script": {
