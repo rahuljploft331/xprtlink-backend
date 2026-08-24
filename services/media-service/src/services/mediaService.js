@@ -136,10 +136,72 @@ export async function confirmUpload(auth, assetId) {
 }
 
 export async function getMediaAsset(auth, assetId) {
-  const asset = await getDb().mediaAsset.findUnique({ where: { id: assetId } });
+  const db = getDb();
+  const asset = await db.mediaAsset.findUnique({ where: { id: assetId } });
   if (!asset) throw notFound("Media not found");
-  if (asset.ownerUserId !== auth.userId) throw forbidden("Access denied");
   if (asset.status === "deleted") throw notFound("Media not found");
 
+  // Owner always has access
+  if (asset.ownerUserId === auth.userId) {
+    return toMediaAssetDto(asset);
+  }
+
+  // Relationship-based access: check if the requesting user is a participant
+  // in a conversation, quote, or other context that references this media.
+  const hasAccess = await checkRelationshipAccess(db, auth, asset);
+  if (!hasAccess) throw forbidden("Access denied");
+
   return toMediaAssetDto(asset);
+}
+
+/**
+ * Check if a non-owner user has legitimate access to a media asset
+ * based on their relationship to the resource that references it.
+ */
+async function checkRelationshipAccess(db, auth, asset) {
+  // Avatars (expert or customer) are publicly readable by any authenticated user
+  if (asset.purpose === "avatar") return true;
+
+  // Chat attachments: user must be a participant in the conversation containing this media
+  if (asset.purpose === "chat_attachment") {
+    const messageAttachment = await db.messageAttachment.findFirst({
+      where: { mediaId: asset.id },
+      include: { message: { select: { conversationId: true } } },
+    });
+    if (!messageAttachment) return false;
+
+    const conversation = await db.conversation.findFirst({
+      where: {
+        id: messageAttachment.message.conversationId,
+        OR: [
+          { customer: { userId: auth.userId } },
+          { expert: { userId: auth.userId } },
+        ],
+      },
+    });
+    return Boolean(conversation);
+  }
+
+  // Quote attachments: user must be a participant in the quote
+  if (asset.purpose === "quote_attachment") {
+    const quoteAttachment = await db.quoteAttachment.findFirst({
+      where: { mediaId: asset.id },
+      include: { quote: { select: { customerId: true, expertId: true } } },
+    });
+    if (!quoteAttachment) return false;
+
+    const quote = quoteAttachment.quote;
+    return (
+      quote.customerId === auth.customerProfileId ||
+      quote.expertId === auth.expertProfileId
+    );
+  }
+
+  // Verification documents: only owner + admin
+  if (asset.purpose === "verification_doc") {
+    return auth.role === "super_admin" || auth.role === "subadmin";
+  }
+
+  // Default: deny
+  return false;
 }

@@ -18,10 +18,18 @@ function getCorsOriginValidator() {
   const allowedOrigins = raw.split(",").map((o) => o.trim()).filter(Boolean);
 
   return (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl) or file:// ('null') or local dev origins
-    if (!origin || origin === "null" || process.env.NODE_ENV !== "production") {
+    // Allow requests with no Origin header (mobile apps, curl, server-to-server, file://)
+    if (!origin || origin === "null") {
       return callback(null, true);
     }
+
+    // H8: Use an explicit CORS_ALLOW_ALL=true flag for local dev instead of
+    // overloading NODE_ENV — a staging deployment that forgets NODE_ENV=production
+    // would otherwise open full credentialed CORS access to any origin.
+    if (process.env.CORS_ALLOW_ALL === "true") {
+      return callback(null, true);
+    }
+
     if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
       return callback(null, true);
     }

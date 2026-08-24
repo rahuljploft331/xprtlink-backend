@@ -1,10 +1,16 @@
 import { adminUsers } from "@xprtlink/shared/db/repositories/admin/index.js";
 import { verifyPassword } from "@xprtlink/shared/auth/password.js";
-import { signAccessToken } from "@xprtlink/shared/auth/jwt.js";
+import { signAccessToken, verifyAccessToken } from "@xprtlink/shared/auth/jwt.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { unauthorized, badRequest } from "@xprtlink/shared/utils/errors.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { getDb } from "@xprtlink/shared/db";
+import { createHash } from "crypto";
 
+/** Hash an admin JWT for denylist storage (SHA-256 hex, 64 chars) */
+function hashAdminToken(token) {
+  return createHash("sha256").update(token).digest("hex");
+}
 
 /** POST /api/auth/login */
 export async function login(req, res, next) {
@@ -31,6 +37,17 @@ export async function login(req, res, next) {
       role: admin.role, // "super_admin" | "subadmin"
     });
 
+    // M8: Record session so logout can actually revoke it
+    const decoded = verifyAccessToken(accessToken);
+    const expiresAt = decoded?.exp ? new Date(decoded.exp * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    await getDb().adminSession.create({
+      data: {
+        adminUserId: admin.id,
+        tokenHash: hashAdminToken(accessToken),
+        expiresAt,
+      },
+    });
+
     const { passwordHash: _ph, ...adminSafe } = admin;
 
     return ResponseFormatter.success(res, {
@@ -51,9 +68,23 @@ export async function login(req, res, next) {
   }
 }
 
-/** POST /api/auth/logout — stateless JWT; just acknowledge */
-export async function logout(_req, res) {
-  return ResponseFormatter.success(res, { message: getMessage("loggedOut") });
+/** POST /api/auth/logout — revoke the current admin session */
+export async function logout(req, res, next) {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice(7);
+      const tokenHash = hashAdminToken(token);
+      // Revoke this specific session (no-op if not found — already revoked or expired)
+      await getDb().adminSession.updateMany({
+        where: { tokenHash, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+    }
+    return ResponseFormatter.success(res, { message: getMessage("loggedOut") });
+  } catch (err) {
+    next(err);
+  }
 }
 
 /** GET /api/auth/me — return current admin from DB */

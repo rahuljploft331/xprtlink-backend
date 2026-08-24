@@ -85,6 +85,12 @@ pnpm init:flows -- --no-seed  # skip platform seed, just run flows
 
 Needs: `pm2 start` first, `DATABASE_URL` in `.env`, `newman` (auto-installed if missing).
 
+## Rate Limiting
+
+Dev `.env` uses intentionally high rate-limit values (`RATE_LIMIT_AUTH_MAX=200`, `RATE_LIMIT_OTP_MAX=100`, etc.) so that `pnpm init:flows` and automated test runs don't get blocked by the per-IP limiter. This is fine for development — production deployments must use strict values (see `.env.example` comments).
+
+If flows still fail with 429 after repeated runs without a PM2 restart, just `pm2 delete all && pm2 start ecosystem.config.cjs` — the in-memory express-rate-limit store resets with the process. Note: `pm2 restart` does NOT reload `.env` changes — only `pm2 delete` + `pm2 start` picks up new env values.
+
 ## Secrets
 
 `getSecret` / `getSecretSync` — env today, AWS Secrets Manager later.

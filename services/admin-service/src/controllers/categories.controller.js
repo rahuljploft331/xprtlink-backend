@@ -1,6 +1,11 @@
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { logAdminAction } from "#utils/audit.js";
+import {
+  createCategoryRequestSchema,
+  updateCategoryRequestSchema,
+} from "@xprtlink/shared/contracts/catalog.schema.js";
 
 
 export async function list(_req, res, next) {
@@ -29,25 +34,28 @@ export async function getById(req, res, next) {
 
 export async function create(req, res, next) {
   try {
+    const { name, slug, sortOrder, isActive } = createCategoryRequestSchema.parse(req.body);
     const db = getDb();
-    const { name, slug, sortOrder = 0, isActive = true } = req.body;
     const c = await db.category.create({ data: { name, slug, sortOrder, isActive } });
+    await logAdminAction(req, "category.create", "Category", c.id, { name, slug });
     return ResponseFormatter.success(res, { data: c, status: 201 });
   } catch (err) { next(err); }
 }
 
 export async function update(req, res, next) {
   try {
+    const body = updateCategoryRequestSchema.parse(req.body);
     const db = getDb();
-    const { name, isActive, sortOrder } = req.body;
     const c = await db.category.update({
       where: { id: req.params.id },
       data: {
-        ...(name !== undefined ? { name } : {}),
-        ...(isActive !== undefined ? { isActive } : {}),
-        ...(sortOrder !== undefined ? { sortOrder } : {}),
+        ...(body.name !== undefined ? { name: body.name } : {}),
+        ...(body.slug !== undefined ? { slug: body.slug } : {}),
+        ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
+        ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
       },
     });
+    await logAdminAction(req, "category.update", "Category", c.id, body);
     return ResponseFormatter.success(res, { data: c });
   } catch (err) { next(err); }
 }
@@ -56,6 +64,7 @@ export async function remove(req, res, next) {
   try {
     const db = getDb();
     await db.category.delete({ where: { id: req.params.id } });
+    await logAdminAction(req, "category.delete", "Category", req.params.id, {});
     return ResponseFormatter.success(res, { message: getMessage("categoryDeleted") });
   } catch (err) { next(err); }
 }

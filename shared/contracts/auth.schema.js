@@ -165,3 +165,8 @@ export const checkAvailabilityDtoSchema = z.object({
   emailAvailable: z.boolean().optional(),
   phoneAvailable: z.boolean().optional(),
 });
+
+export const refreshRequestSchema = z.object({
+  refreshToken: z.string().min(1, "Refresh token is required"),
+  role: sessionRoleSchema.optional(),
+});

@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { loadSecret, getSecretSync } from "@xprtlink/shared/config/secrets.js";
+import { renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 import sgMail from "@sendgrid/mail";
 import twilio from "twilio";
 
@@ -26,12 +27,20 @@ async function testEmail() {
   console.log(`✉️  Sending test email to ${target} from ${fromEmail}...`);
 
   try {
+    const html = await renderEmailTemplate({
+      badgeText: "SYSTEM TEST",
+      title: "SendGrid Integration Test",
+      bodyHtml: "<p>This is a test email to verify that your <strong>SendGrid</strong> integration is working perfectly.</p><p>This email was generated using the new reusable XprtLink email template.</p>",
+      ctaText: "Visit XprtLink",
+      ctaUrl: "https://xprtlink.com",
+    });
+
     await sgMail.send({
       to: target,
       from: fromEmail,
       subject: "XprtLink - SendGrid Integration Test",
       text: "This is a test email to verify that your SendGrid integration is working perfectly.",
-      html: "<p>This is a test email to verify that your <strong>SendGrid</strong> integration is working perfectly.</p>",
+      html: html,
     });
     console.log("✅ Email sent successfully! Check your inbox.");
   } catch (error) {

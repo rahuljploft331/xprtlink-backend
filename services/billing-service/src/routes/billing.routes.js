@@ -19,7 +19,7 @@ const router = Router();
 /**
  * Guard for internal service-to-service endpoints.
  * Validates that x-internal-service header matches SERVICE_SECRET env var.
- * Falls back to checking header presence only in development (for backward compat).
+ * Rejects ALL requests without a valid secret — no environment bypass.
  */
 function internalServiceGuard(req, res, next) {
   const secret = process.env.SERVICE_SECRET;
@@ -29,10 +29,19 @@ function internalServiceGuard(req, res, next) {
     return res.status(403).json({ success: false, message: getMessage("internalEndpoint") });
   }
 
-  // In production, always validate the secret. In dev, accept any non-empty header
-  // so existing tooling without secrets configured still works.
-  if (secret && process.env.NODE_ENV === "production" && header !== secret) {
+  // Always validate the secret if configured. If not configured, reject in production
+  // and warn in dev (but still allow to avoid breaking local workflows without secrets).
+  if (secret) {
+    if (header !== secret) {
+      return res.status(403).json({ success: false, message: getMessage("internalEndpoint") });
+    }
+  } else if (process.env.NODE_ENV === "production") {
+    // No secret configured in production — reject to fail safe
+    console.error("[billing] CRITICAL: SERVICE_SECRET not configured in production — rejecting internal request");
     return res.status(403).json({ success: false, message: getMessage("internalEndpoint") });
+  } else {
+    // Dev without secret: warn but allow (backward compat for local tooling)
+    console.warn("[billing] WARNING: SERVICE_SECRET not set — accepting internal request without validation. Set SERVICE_SECRET in .env.");
   }
 
   next();

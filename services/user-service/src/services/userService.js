@@ -1,16 +1,17 @@
 import { getDb } from "@xprtlink/shared/db";
-import { issueTokens, loadUserContext, revokeRefreshToken, lookupRefreshToken } from "@xprtlink/shared/auth/tokens.js";
+import { issueTokens, loadUserContext, revokeRefreshToken, lookupRefreshToken, revokeAllUserSessions } from "@xprtlink/shared/auth/tokens.js";
 import { hashPassword, verifyPassword, verifyTokenHash } from "@xprtlink/shared/auth/password.js";
 import {
   createAndDeliverOtp,
   findValidOtpChallenge,
   verifyOtpCode,
 } from "@xprtlink/shared/auth/otp.js";
+import { getOtpConfig } from "@xprtlink/shared/auth/otpDelivery.js";
 import { verifyFirebaseIdToken, isFirebaseConfigured } from "@xprtlink/shared/auth/firebaseAdmin.js";
 import { signCompletionToken, verifyCompletionToken } from "@xprtlink/shared/auth/jwt.js";
 import { toAuthSessionDto } from "@xprtlink/shared/mappers/auth.mapper.js";
 import { toCustomerMeDto } from "@xprtlink/shared/mappers/customer.mapper.js";
-import { badRequest, notFound, unauthorized, forbidden } from "@xprtlink/shared/utils/errors.js";
+import { badRequest, conflict, notFound, unauthorized, forbidden } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 
 // ─── Session ──────────────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ async function assertIdentifierAvailable({ email, phone, excludeUserId }) {
       },
     });
     if (row) {
-      throw badRequest("An account with this email already exists.", "EMAIL_TAKEN", "email");
+      throw conflict("An account with this email already exists.", "EMAIL_TAKEN");
     }
   }
   if (phone) {
@@ -68,7 +69,7 @@ async function assertIdentifierAvailable({ email, phone, excludeUserId }) {
       },
     });
     if (row) {
-      throw badRequest("This mobile number is already in use.", "PHONE_TAKEN", "phone");
+      throw conflict("This mobile number is already in use.", "PHONE_TAKEN");
     }
   }
 }
@@ -136,37 +137,79 @@ export async function register(body) {
     otpChannel = "phone",
   } = body;
 
+  // Pre-flight availability check (fast-fails common case; real enforcement is inside the transaction)
   await assertIdentifierAvailable({ email, phone });
 
   const db = getDb();
   const passwordHash = await hashPassword(password);
   const termsAcceptedAt = new Date();
 
-  const pending = await db.user.findFirst({
-    where: {
-      status: "pending_verification",
-      OR: [{ email }, { phone }],
-    },
-  });
-
   let userId;
-  if (pending) {
-    await db.user.update({
-      where: { id: pending.id },
-      data: { email, phone, passwordHash, termsAcceptedAt },
+
+  try {
+    userId = await db.$transaction(async (tx) => {
+      // Re-check availability inside the transaction to close the TOCTOU window.
+      // The partial unique indexes (added in Phase 1) provide the ultimate guard,
+      // but this gives a clearer error message before hitting the constraint.
+      if (email) {
+        const dup = await tx.user.findFirst({
+          where: { email, ...claimedAvailabilityFilter },
+        });
+        if (dup) throw conflict("An account with this email already exists.", "EMAIL_TAKEN");
+      }
+      if (phone) {
+        const dup = await tx.user.findFirst({
+          where: { phone, ...claimedAvailabilityFilter },
+        });
+        if (dup) throw conflict("This mobile number is already in use.", "PHONE_TAKEN");
+      }
+
+      // Look for a pending user that matches BOTH identifiers (not just one).
+      // This prevents cross-contamination where a pending user with matching email
+      // but different phone gets its phone overwritten.
+      const pendingWhere = { status: "pending_verification" };
+      if (email && phone) {
+        pendingWhere.email = email;
+        pendingWhere.phone = phone;
+      } else if (email) {
+        pendingWhere.email = email;
+      } else if (phone) {
+        pendingWhere.phone = phone;
+      }
+
+      const pending = await tx.user.findFirst({ where: pendingWhere });
+
+      if (pending) {
+        await tx.user.update({
+          where: { id: pending.id },
+          data: { email, phone, passwordHash, termsAcceptedAt },
+        });
+        return pending.id;
+      }
+
+      const user = await tx.user.create({
+        data: {
+          email,
+          phone,
+          passwordHash,
+          termsAcceptedAt,
+          status: "pending_verification",
+        },
+      });
+      return user.id;
     });
-    userId = pending.id;
-  } else {
-    const user = await db.user.create({
-      data: {
-        email,
-        phone,
-        passwordHash,
-        termsAcceptedAt,
-        status: "pending_verification",
-      },
-    });
-    userId = user.id;
+  } catch (err) {
+    // Handle Prisma unique constraint violation (P2002) from the partial unique indexes
+    if (err?.code === "P2002") {
+      const field = err.meta?.target?.includes("email") ? "email" : "phone";
+      throw conflict(
+        field === "email"
+          ? "An account with this email already exists."
+          : "This mobile number is already in use.",
+        field === "email" ? "EMAIL_TAKEN" : "PHONE_TAKEN"
+      );
+    }
+    throw err;
   }
 
   return createAndDeliverOtp({
@@ -194,7 +237,12 @@ export async function login(body) {
     },
   });
 
-  if (!user) throw unauthorized("Invalid credentials");
+  if (!user) {
+    // M7: constant-time dummy compare to prevent timing-based email enumeration.
+    // Without this, nonexistent emails return ~0ms while valid ones take ~100ms (bcrypt).
+    await verifyPassword("__dummy_password_that_never_matches__", "$2b$10$abcdefghijklmnopqrstuvuXzGO7fMC7VYzWH4HmM0vXcB9tBr7bq");
+    throw unauthorized("Invalid credentials");
+  }
 
   // Give a clear, actionable error instead of a generic 401
   if (user.status === "pending_verification") {
@@ -227,8 +275,13 @@ export async function login(body) {
 
 // ─── Logout & Token Refresh ───────────────────────────────────────────────────
 
-export async function logout(refreshToken) {
-  if (refreshToken) await revokeRefreshToken(refreshToken);
+export async function logout(userId, refreshToken) {
+  if (refreshToken) {
+    await revokeRefreshToken(refreshToken);
+  } else {
+    // No specific token provided — revoke ALL sessions for this user as a safety measure
+    await revokeAllUserSessions(userId);
+  }
 }
 
 export async function refresh(refreshToken, role) {
@@ -321,7 +374,10 @@ export async function verifyOtp(body) {
       );
     }
 
-    const { role, firstName, lastName } = challenge.registrationData;
+    const { role, firstName, lastName, otpChannel } = challenge.registrationData;
+    // C1: Only stamp the channel that was actually verified.
+    // The other channel remains null until it is separately verified.
+    const verifiedViaPhone = otpChannel === "phone" || (!otpChannel && challenge.phone);
 
     const user = await db.$transaction(async (tx) => {
       await tx.otpChallenge.update({
@@ -333,8 +389,10 @@ export async function verifyOtp(body) {
         where: { id: challenge.userId },
         data: {
           status: "active",
-          emailVerifiedAt: new Date(),
-          phoneVerifiedAt: new Date(),
+          // Only stamp what was actually verified
+          ...(verifiedViaPhone
+            ? { phoneVerifiedAt: new Date() }
+            : { emailVerifiedAt: new Date() }),
         },
       });
 
@@ -376,11 +434,13 @@ export async function verifyOtp(body) {
       where: { id: challenge.id },
       data: { consumedAt: new Date() },
     }),
-    ...(purpose === "verify_email" && email
-      ? [db.user.updateMany({ where: { email }, data: { emailVerifiedAt: new Date() } })]
+    // H6: scope to challenge.userId — not by email/phone string (soft-deleted rows
+    // can share an identifier due to the partial unique index on deletedAt IS NULL)
+    ...(purpose === "verify_email"
+      ? [db.user.update({ where: { id: challenge.userId }, data: { emailVerifiedAt: new Date() } })]
       : []),
-    ...(purpose === "verify_phone" && phone
-      ? [db.user.updateMany({ where: { phone }, data: { phoneVerifiedAt: new Date() } })]
+    ...(purpose === "verify_phone"
+      ? [db.user.update({ where: { id: challenge.userId }, data: { phoneVerifiedAt: new Date() } })]
       : []),
   ]);
 
@@ -409,8 +469,10 @@ export async function forgotPassword(body) {
   });
 
   if (!user) {
-    // Return a plausible response without sending anything or revealing the email isn't registered
-    return { sent: true, expiresInSeconds: 600, channel: email ? "email" : "phone" };
+    // Return a plausible response without sending anything or revealing the email isn't registered.
+    // Use the real OTP TTL config so the response is indistinguishable from a genuine send.
+    const { ttlMs } = getOtpConfig();
+    return { sent: true, expiresInSeconds: ttlMs / 1000, channel: email ? "email" : "phone" };
   }
 
   return sendOtp({ ...body, purpose: "reset_password" });
@@ -436,20 +498,34 @@ export async function resetPassword(body) {
       where: { id: challenge.id },
       data: { consumedAt: new Date() },
     }),
+    // C3: Revoke ALL existing sessions so attacker is immediately locked out
+    db.refreshToken.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
   ]);
   return { reset: true };
 }
 
 export async function changePassword(userId, body) {
   const { currentPassword, newPassword } = body;
-  const user = await getDb().user.findUnique({ where: { id: userId } });
+  const db = getDb();
+  const user = await db.user.findUnique({ where: { id: userId } });
   if (!user) throw notFound("User not found");
   const valid = await verifyPassword(currentPassword, user.passwordHash);
-  if (!valid) throw unauthorized("Current password is incorrect");
-  await getDb().user.update({
-    where: { id: userId },
-    data: { passwordHash: await hashPassword(newPassword) },
-  });
+  if (!valid) throw badRequest("Current password is incorrect", "INVALID_CURRENT_PASSWORD", "currentPassword");
+
+  await db.$transaction([
+    db.user.update({
+      where: { id: userId },
+      data: { passwordHash: await hashPassword(newPassword) },
+    }),
+    // C3: Revoke ALL existing sessions on password change
+    db.refreshToken.updateMany({
+      where: { userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    }),
+  ]);
   return { changed: true };
 }
 

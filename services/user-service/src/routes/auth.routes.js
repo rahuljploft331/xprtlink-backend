@@ -11,6 +11,7 @@ import {
   passwordChangeRequestSchema,
   socialLoginRequestSchema,
   socialCompleteRequestSchema,
+  refreshRequestSchema,
 } from "@xprtlink/shared/contracts";
 import * as svc from "../services/userService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
@@ -49,7 +50,7 @@ router.post(
   "/logout",
   authenticate,
   asyncHandler(async (req, res) => {
-    await svc.logout(req.body.refreshToken);
+    await svc.logout(req.auth.userId, req.body.refreshToken);
     return ResponseFormatter.success(res, { message: getMessage("loggedOut"), data: null });
   })
 );
@@ -57,7 +58,8 @@ router.post(
 router.post(
   "/refresh",
   asyncHandler(async (req, res) => {
-    const data = await svc.refresh(req.body.refreshToken, req.body.role);
+    const body = refreshRequestSchema.parse(req.body);
+    const data = await svc.refresh(body.refreshToken, body.role);
     return ResponseFormatter.success(res, { message: getMessage("tokenRefreshed"), data });
   })
 );

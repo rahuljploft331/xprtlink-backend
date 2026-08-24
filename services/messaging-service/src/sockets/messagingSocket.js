@@ -1,4 +1,5 @@
 import { verifyAccessToken } from "@xprtlink/shared/auth/jwt.js";
+import { getDb } from "@xprtlink/shared/db";
 import {
   createConversationRequestSchema,
   sendMessageRequestSchema,
@@ -11,7 +12,7 @@ import * as svc from "../services/messagingService.js";
  */
 export function registerMessagingSockets(io) {
   // Handshake authentication middleware
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     try {
       let token =
         socket.handshake.auth?.token ||
@@ -27,6 +28,16 @@ export function registerMessagingSockets(io) {
       }
 
       const payload = verifyAccessToken(token);
+
+      // Check user status in DB to enforce bans/suspensions on WebSocket connections
+      const user = await getDb().user.findUnique({
+        where: { id: payload.sub },
+        select: { status: true },
+      });
+      if (!user || user.status !== "active") {
+        return next(new Error("Account suspended or deleted"));
+      }
+
       socket.data.auth = {
         userId: payload.sub,
         role: payload.role,

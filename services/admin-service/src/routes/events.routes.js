@@ -1,11 +1,12 @@
 import { Router } from "express";
 import { stream, status } from "#controllers/events.controller.js";
-import { requireAdmin } from "#middlewares/adminAuth.js";
+import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
 
 const router = Router();
 
-// All SSE connections require a valid admin JWT.
+// All SSE connections require a valid admin JWT + dashboard view permission.
 router.use(requireAdmin);
+router.use(requirePermission("dashboard", "view"));
 
 /**
  * GET /api/v1/admin/events

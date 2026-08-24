@@ -305,6 +305,7 @@ model RefreshToken {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @map("user_id") @db.Uuid
   tokenHash String    @map("token_hash") @db.VarChar(255)
+  role      String?   @db.VarChar(32)
   expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
   revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -509,6 +510,7 @@ model ExpertProfile {
   ratingAvg             Decimal            @default(0) @map("rating_avg") @db.Decimal(3, 2)
   ratingCount           Int                @default(0) @map("rating_count")
   searchEligible        Boolean            @default(false) @map("search_eligible")
+  stripeAccountId       String?            @map("stripe_account_id") @db.VarChar(128)
   createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -974,8 +976,24 @@ model AdminUser {
   cmsPages                     CmsPage[]
   supportConversationsAssigned SupportConversation[]
   supportMessagesSent          SupportMessage[]
+  sessions                     AdminSession[]
 
   @@map("admin_users")
+}
+
+model AdminSession {
+  id          String    @id @default(uuid()) @db.Uuid
+  adminUserId String    @map("admin_user_id") @db.Uuid
+  tokenHash   String    @map("token_hash") @db.VarChar(64) // SHA-256 hex of the JWT
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  revokedAt   DateTime? @map("revoked_at") @db.Timestamptz(6)
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+
+  admin AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@index([adminUserId])
+  @@map("admin_sessions")
 }
 
 model AdminPermission {
@@ -1047,4 +1065,15 @@ model SupportMessage {
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@map("support_messages")
+}
+
+// ─── Webhook Deduplication (billing-service) ─────────────────────────────────
+
+model ProcessedWebhookEvent {
+  id          String   @id @db.VarChar(128) // Stripe event ID (evt_xxx)
+  eventType   String   @map("event_type") @db.VarChar(64)
+  processedAt DateTime @default(now()) @map("processed_at") @db.Timestamptz(6)
+
+  @@index([processedAt])
+  @@map("processed_webhook_events")
 }

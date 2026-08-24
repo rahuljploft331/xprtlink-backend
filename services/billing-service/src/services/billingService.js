@@ -96,14 +96,33 @@ export async function addPaymentMethod(auth, body) {
   }
 
   const isFirst = (await db.paymentMethod.count({ where: { customerProfileId: auth.customerProfileId } })) === 0;
+
+  // Attempt to fetch real card metadata from Stripe (falls back to client-supplied values)
+  let brand = body.brand;
+  let last4 = body.last4;
+  let expMonth = body.expMonth;
+  let expYear = body.expYear;
+  try {
+    const pmDetails = await stripeSvc.retrievePaymentMethod({ stripePaymentMethodId: body.stripePaymentMethodId });
+    if (pmDetails?.card) {
+      brand = pmDetails.card.brand || brand;
+      last4 = pmDetails.card.last4 || last4;
+      expMonth = pmDetails.card.exp_month || expMonth;
+      expYear = pmDetails.card.exp_year || expYear;
+    }
+  } catch (err) {
+    // Non-fatal — use client-supplied values (test mode pm_card_* may not be retrievable)
+    console.warn(`[billing] Stripe retrieve PM metadata failed (non-fatal): ${err.message}`);
+  }
+
   const method = await db.paymentMethod.create({
     data: {
       customerProfileId: auth.customerProfileId,
       stripePaymentMethodId: body.stripePaymentMethodId,
-      brand: body.brand,
-      last4: body.last4,
-      expMonth: body.expMonth,
-      expYear: body.expYear,
+      brand,
+      last4,
+      expMonth,
+      expYear,
       isDefault: body.setDefault ?? isFirst,
     },
   });
@@ -117,6 +136,13 @@ export async function removePaymentMethod(auth, methodId) {
     where: { id: methodId, customerProfileId: auth.customerProfileId },
   });
   if (!method) throw notFound("Payment method not found");
+
+  // Detach from Stripe (non-fatal — local record is still deleted regardless)
+  try {
+    await stripeSvc.detachPaymentMethod({ stripePaymentMethodId: method.stripePaymentMethodId });
+  } catch (err) {
+    console.warn(`[billing] Stripe detach PM failed (non-fatal): ${err.message}`);
+  }
 
   await db.paymentMethod.delete({ where: { id: method.id } });
 
@@ -144,7 +170,7 @@ export async function holdConsultationFunds(auth, consultationId, body) {
     include: { expert: true },
   });
   if (!consultation) throw notFound("Consultation not found");
-  if (consultation.billingStatus === "charged") throw badRequest("Consultation already paid", "ALREADY_PAID");
+  if (consultation.billingStatus === "charged") throw conflict("Consultation already paid", "ALREADY_PAID");
 
   // Retrieve customer with stripeCustomerId
   const customerProfile = await db.customerProfile.findUnique({
@@ -159,7 +185,10 @@ export async function holdConsultationFunds(auth, consultationId, body) {
   });
   if (!paymentMethod) throw notFound("Payment method not found");
 
-  const estimatedCents = body.estimatedCents || Math.max(30 * consultation.ratePerMinuteCents, 3000);
+  // Enforce server-calculated minimum: at least 30 minutes at the expert's rate or $30,
+  // whichever is larger — prevents malicious clients from holding too little.
+  const serverMinimumCents = Math.max(30 * consultation.ratePerMinuteCents, 3000);
+  const estimatedCents = Math.max(body.estimatedCents || 0, serverMinimumCents);
 
   try {
     const holdResult = await stripeSvc.createPreAuthHold({
@@ -200,7 +229,7 @@ export async function payConsultation(auth, consultationId, body) {
     throw badRequest("Consultation must be completed before payment", "INVALID_STATE");
   }
   if (consultation.billingStatus === "charged" || consultation.charge) {
-    throw badRequest("Consultation already paid", "ALREADY_PAID");
+    throw conflict("Consultation already paid", "ALREADY_PAID");
   }
 
   const paymentMethod = await db.paymentMethod.findFirst({
@@ -420,6 +449,12 @@ export async function submitCustomConnectKyc(auth, body) {
     userIpAddress: body.userIpAddress,
   });
 
+  // Persist the Stripe Connect account ID so attachBankAccount can reference it
+  await db.expertProfile.update({
+    where: { id: auth.expertProfileId },
+    data: { stripeAccountId: account.id },
+  });
+
   return {
     expertProfileId: auth.expertProfileId,
     stripeAccountId: account.id,
@@ -460,6 +495,15 @@ export async function attachBankAccount(auth, body) {
 export async function handleStripeWebhook(payload, signature) {
   const event = stripeSvc.constructWebhookEvent(payload, signature);
   const db = getDb();
+
+  // Webhook event deduplication — prevent processing the same event twice on retries
+  const alreadyProcessed = await db.processedWebhookEvent.findUnique({
+    where: { id: event.id },
+  });
+  if (alreadyProcessed) {
+    console.log(`[billing-webhook] Skipping duplicate event: ${event.id} (${event.type})`);
+    return { received: true, eventType: event.type, duplicate: true };
+  }
 
   switch (event.type) {
     case "payment_intent.succeeded": {
@@ -510,6 +554,14 @@ export async function handleStripeWebhook(payload, signature) {
       break;
   }
 
+  // Record processed event for deduplication
+  await db.processedWebhookEvent.create({
+    data: { id: event.id, eventType: event.type },
+  }).catch((err) => {
+    // Non-fatal — if insert fails (e.g., duplicate from race), the event was still processed
+    console.warn(`[billing-webhook] Failed to record processed event ${event.id}: ${err.message}`);
+  });
+
   return { received: true, eventType: event.type };
 }
 
@@ -533,11 +585,22 @@ export async function getTransaction(auth, transactionId) {
 
   const consultation = tx.consultationCharge?.consultation;
   if (consultation) {
+    // Consultation-linked transaction: check participant ownership
     const isCustomer = consultation.customerId === auth.customerProfileId;
     const isExpert = consultation.expertId === auth.expertProfileId;
     if (!isCustomer && !isExpert) throw forbidden("Access denied");
-  } else if (auth.role !== "expert" && auth.role !== "customer") {
-    throw forbidden("Access denied");
+  } else {
+    // C7: Subscription / other transaction: check ownership via metadata
+    // metadata is stored as { expertProfileId, customerProfileId, ... } at creation time
+    const meta = tx.metadata ?? {};
+    const ownerExpertId = meta.expertProfileId ?? null;
+    const ownerCustomerId = meta.customerProfileId ?? null;
+
+    const isOwner =
+      (auth.expertProfileId && ownerExpertId === auth.expertProfileId) ||
+      (auth.customerProfileId && ownerCustomerId === auth.customerProfileId);
+
+    if (!isOwner) throw forbidden("Access denied");
   }
 
   return toTransactionDto(tx);

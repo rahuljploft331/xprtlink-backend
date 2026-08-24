@@ -2,7 +2,7 @@ import { Router } from "express";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { authenticate, optionalAuthenticate, requireRole } from "@xprtlink/shared/middleware/auth.js";
-import { expertMeUpdateRequestSchema } from "@xprtlink/shared/contracts";
+import { expertMeUpdateRequestSchema, expertOnboardingRequestSchema, expertSettingsUpdateRequestSchema, expertVerificationDocumentsRequestSchema } from "@xprtlink/shared/contracts";
 import * as svc from "../services/expertService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 
@@ -44,7 +44,8 @@ router.post(
   authenticate,
   requireRole("expert"),
   asyncHandler(async (req, res) => {
-    const data = await svc.saveOnboarding(req.auth, req.body);
+    const body = expertOnboardingRequestSchema.parse(req.body);
+    const data = await svc.saveOnboarding(req.auth, body);
     return ResponseFormatter.success(res, { message: getMessage("onboardingSaved"), data });
   })
 );
@@ -74,7 +75,8 @@ router.post(
   authenticate,
   requireRole("expert"),
   asyncHandler(async (req, res) => {
-    const data = await svc.submitVerificationDocuments(req.auth, req.body);
+    const body = expertVerificationDocumentsRequestSchema.parse(req.body);
+    const data = await svc.submitVerificationDocuments(req.auth, body);
     return ResponseFormatter.success(res, { message: getMessage("documentsSubmitted"), data });
   })
 );
@@ -124,7 +126,8 @@ router.patch(
   authenticate,
   requireRole("expert"),
   asyncHandler(async (req, res) => {
-    const data = await svc.updateSettings(req.auth, req.body);
+    const body = expertSettingsUpdateRequestSchema.parse(req.body);
+    const data = await svc.updateSettings(req.auth, body);
     return ResponseFormatter.success(res, { message: getMessage("settingsUpdated"), data });
   })
 );

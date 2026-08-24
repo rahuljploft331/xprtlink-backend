@@ -83,6 +83,7 @@ export async function issueTokens(user, role) {
     data: {
       userId: user.id,
       tokenHash: refreshHash,
+      role: ctx.role,
       expiresAt,
     },
   });
@@ -108,7 +109,7 @@ export async function issueTokens(user, role) {
  * Falls back to bcrypt loop for legacy tokens issued before this migration.
  */
 async function findRefreshTokenRow(db, refreshToken) {
-  // Fast path: SHA-256 direct lookup (new tokens)
+  // SHA-256 HMAC indexed lookup — O(1) direct DB query
   const fastHash = hashRefreshToken(refreshToken);
   const fast = await db.refreshToken.findFirst({
     where: { tokenHash: fastHash, revokedAt: null, expiresAt: { gt: new Date() } },
@@ -121,42 +122,13 @@ async function findRefreshTokenRow(db, refreshToken) {
       },
     },
   });
-  if (fast) return fast;
-
-  // Slow fallback: bcrypt loop for tokens issued before this migration
-  // This branch can be removed once all pre-migration tokens expire (after REFRESH_TOKEN_EXPIRES_IN)
-  const legacyCandidates = await db.refreshToken.findMany({
-    where: {
-      revokedAt: null,
-      expiresAt: { gt: new Date() },
-      // Legacy bcrypt hashes are 60 chars; SHA-256 hex is 64 chars — filter to only legacy
-      tokenHash: { not: fastHash },
-    },
-    take: 200,
-    orderBy: { createdAt: "desc" },
-    include: {
-      user: {
-        include: {
-          customerProfile: true,
-          expertProfile: { include: { subscriptions: { where: { status: "active" }, take: 1 } } },
-        },
-      },
-    },
-  });
-
-  for (const row of legacyCandidates) {
-    // Only bcrypt hashes start with $2 — skip SHA-256 hashes (64-char hex)
-    if (row.tokenHash.length === 64) continue;
-    if (await verifyTokenHash(refreshToken, row.tokenHash)) return row;
-  }
-
-  return null;
+  return fast || null;
 }
 
 export async function revokeRefreshToken(refreshToken) {
   const db = getDb();
 
-  // Fast path: SHA-256 lookup
+  // SHA-256 HMAC indexed lookup
   const fastHash = hashRefreshToken(refreshToken);
   const fast = await db.refreshToken.findFirst({
     where: { tokenHash: fastHash, revokedAt: null },
@@ -166,25 +138,24 @@ export async function revokeRefreshToken(refreshToken) {
     return fast.userId;
   }
 
-  // Legacy bcrypt fallback
-  const tokens = await db.refreshToken.findMany({
-    where: { revokedAt: null, expiresAt: { gt: new Date() } },
-    take: 200,
-    orderBy: { createdAt: "desc" },
-  });
-  for (const row of tokens) {
-    if (row.tokenHash.length === 64) continue; // skip SHA-256 hashes
-    if (await verifyTokenHash(refreshToken, row.tokenHash)) {
-      await db.refreshToken.update({ where: { id: row.id }, data: { revokedAt: new Date() } });
-      return row.userId;
-    }
-  }
   return null;
 }
 
 /**
+ * Revoke ALL active refresh tokens for a given userId.
+ * Called by password reset and password change to invalidate attacker sessions.
+ */
+export async function revokeAllUserSessions(userId) {
+  const db = getDb();
+  await db.refreshToken.updateMany({
+    where: { userId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+}
+
+/**
  * Called by user-service refresh endpoint.
- * Returns { row, resolvedRole } or null if token is invalid.
+ * Returns { user, resolvedRole } or null if token is invalid.
  */
 export async function lookupRefreshToken(refreshToken, preferredRole) {
   const db = getDb();
@@ -192,13 +163,23 @@ export async function lookupRefreshToken(refreshToken, preferredRole) {
   if (!row) return null;
 
   const user = row.user;
+
+  // C2: Enforce bans/suspensions/deletions at token refresh time.
+  // A banned user must not be able to obtain new tokens — ever.
+  if (user.status !== "active") {
+    // Revoke this token so it can never be used again
+    await db.refreshToken.update({ where: { id: row.id }, data: { revokedAt: new Date() } });
+    return null;
+  }
+
   const resolvedRole =
     preferredRole ||
+    row.role ||
     (user.customerProfile ? "customer" : user.expertProfile ? "expert" : null);
 
   if (!resolvedRole) return null;
 
-  // Rotate: revoke old token
+  // Rotate: revoke old token, new one issued by issueTokens()
   await db.refreshToken.update({ where: { id: row.id }, data: { revokedAt: new Date() } });
 
   return { user, resolvedRole };
