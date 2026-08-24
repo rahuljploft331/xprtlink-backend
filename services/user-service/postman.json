@@ -278,7 +278,7 @@
           }
         },
         {
-          "name": "Check Availability",
+          "name": "Check Availability (email)",
           "request": {
             "method": "GET",
             "header": [],
@@ -293,7 +293,27 @@
                 }
               ]
             },
-            "description": "Check if an email or mobile is available during onboarding.\n\npending_verification users are treated as available (they can re-register to get a fresh OTP)."
+            "description": "Check if an email is available during onboarding.\n\npending_verification users are treated as available (they can re-register to get a fresh OTP).\n\nReturns: `{ emailAvailable: boolean }`"
+          }
+        },
+        {
+          "name": "Check Availability (phone)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/check-availability?mobile=%2B14155552671",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "check-availability"],
+              "query": [
+                {
+                  "key": "mobile",
+                  "value": "%2B14155552671",
+                  "description": "E.164 phone number (URL-encode the leading '+' as %2B, or omit it — server normalizes automatically)"
+                }
+              ]
+            },
+            "description": "Check if a mobile number is available during onboarding.\n\nAccepts query param `mobile` or `phone` in E.164 format. The server normalizes the value: trims whitespace, restores a leading '+' if it was decoded as a space or omitted.\n\npending_verification users are treated as available.\n\nReturns: `{ phoneAvailable: boolean }`"
           }
         },
         {

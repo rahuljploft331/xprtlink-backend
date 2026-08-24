@@ -8,17 +8,18 @@
 ## Quick Reference
 
 ```bash
-# Full fresh start: wipe DB + seed platform prereqs + run all 4 flows
+# Full fresh start: wipe DB + seed platform prereqs + run all 5 flows
 pnpm init:flows --fresh
 
 # Just run flows (platform prereqs already exist)
 pnpm init:flows --no-seed
 
 # Run a single flow
-pnpm init:flows --flow A    # Expert Onboarding (Phone OTP)
 pnpm init:flows --flow B    # Expert Onboarding (Email OTP)
 pnpm init:flows --flow C    # Customer Onboarding & Quote
 pnpm init:flows --flow D    # Expert Subscription Lifecycle (13 steps)
+pnpm init:flows --flow E    # Expert Verification Approval
+pnpm init:flows --flow F    # Consultation Lifecycle (12 steps)
 ```
 
 ---
@@ -27,20 +28,22 @@ pnpm init:flows --flow D    # Expert Subscription Lifecycle (13 steps)
 
 | Flow | File | Records Created |
 |------|------|-----------------|
-| **A** | `expert-onboarding-phone.flow.json` | Expert (phone OTP) + profile + verification docs + Elite subscription |
 | **B** | `expert-onboarding-email.flow.json` | Expert (email OTP) + profile + passport verification + Elite subscription |
 | **C** | `customer-onboarding.flow.json` | Customer + profile + payment method + quote request to an expert |
 | **D** | `expert-subscription-lifecycle.flow.json` | Expert through full subscribe → upgrade → cancel → reinstate cycle |
+| **E** | `expert-verification-approval.flow.json` | Expert verification submitted → admin approves → expert becomes search-eligible |
+| **F** | `consultation-lifecycle.flow.json` | Full consultation lifecycle (12 steps) |
 
 ---
 
 ## Running in Postman
 
 These flow collections also exist in the **Xpertlink Team Workspace** on Postman cloud:
-- Flow A: Expert Onboarding (Phone OTP)
 - Flow B: Expert Onboarding (Email OTP)
 - Flow C: Customer Onboarding & Quote
 - Flow D: Expert Subscription Lifecycle
+- Flow E: Expert Verification Approval
+- Flow F: Consultation Lifecycle
 
 **Important:** Run them using the **Collection Runner** (click "Run" on a collection), NOT the Postman Flows visual builder. Select **No Environment** — the scripts use `pm.collectionVariables` internally.
 
@@ -65,8 +68,6 @@ The following user journeys from the Figma UI designs are **not yet covered** by
 
 | Flow | Figma Screen / MFS Section | Priority |
 |------|---------------------------|----------|
-| **E. Expert Verification Approval** | Admin approves pending expert → expert becomes search-eligible | High |
-| **F. Consultation Lifecycle** | Customer requests consultation → expert accepts → video call → payment → review | High |
 | **G. Messaging / Chat** | Customer ↔ Expert real-time messaging with attachments | Medium |
 | **H. Expert Payout Cycle** | Consultation earnings → weekly payout → Stripe Connect transfer | Medium |
 | **I. Customer Quote Acceptance** | Expert responds to quote → customer accepts → consultation scheduled | Medium |
@@ -77,8 +78,6 @@ The following user journeys from the Figma UI designs are **not yet covered** by
 
 ### Why these matter for the admin panel:
 
-- **E** (Verification Approval): Without this, experts stay "pending" forever — admin Verifications page has nothing to approve
-- **F** (Consultation Lifecycle): Populates Consultations, Payments, Reviews, and Earnings admin pages
 - **G** (Messaging): Populates the future Messaging/Support admin page
 - **H** (Payouts): Populates the Payouts admin page with real payout records
 - **I** (Quote Acceptance): Shows quote status transitions in the admin Quotes page
