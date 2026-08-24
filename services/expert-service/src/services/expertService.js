@@ -46,12 +46,63 @@ export async function searchExperts(query, auth) {
       { lastName: { contains: query.q, mode: "insensitive" } },
       { headline: { contains: query.q, mode: "insensitive" } },
       { bio: { contains: query.q, mode: "insensitive" } },
+      { title: { contains: query.q, mode: "insensitive" } },
     ];
   }
+
+  // Location filter: lat, lng, radius (km) — uses Haversine post-filter on serviceAreas Json
+  const hasLocationFilter = query.lat && query.lng;
+  const customerLat = hasLocationFilter ? Number(query.lat) : null;
+  const customerLng = hasLocationFilter ? Number(query.lng) : null;
+  const radiusKm = hasLocationFilter ? Number(query.radius || 50) : null; // default 50km
 
   const orderBy = buildSort(query.sort);
 
   const db = getDb();
+
+  if (hasLocationFilter) {
+    // For geo filtering, fetch all matching experts (without pagination) then post-filter by distance
+    const allExperts = await db.expertProfile.findMany({
+      where,
+      orderBy,
+      include: { category: true, avatarMedia: true },
+    });
+
+    // Filter experts who have at least one serviceArea within the radius
+    const filtered = allExperts.filter((expert) => {
+      const areas = expert.serviceAreas;
+      if (!Array.isArray(areas) || areas.length === 0) return false;
+      return areas.some((area) =>
+        haversineKm(customerLat, customerLng, area.lat, area.lng) <= radiusKm
+      );
+    });
+
+    // Sort by nearest service area distance
+    filtered.sort((a, b) => {
+      const distA = nearestDistance(customerLat, customerLng, a.serviceAreas);
+      const distB = nearestDistance(customerLat, customerLng, b.serviceAreas);
+      return distA - distB;
+    });
+
+    const total = filtered.length;
+    const paged = filtered.slice(skip, skip + limit);
+
+    let savedIds = new Set();
+    if (auth?.customerProfileId) {
+      const saved = await db.customerSavedExpert.findMany({
+        where: { customerProfileId: auth.customerProfileId, expertProfileId: { in: paged.map((e) => e.id) } },
+      });
+      savedIds = new Set(saved.map((s) => s.expertProfileId));
+    }
+
+    const items = paged.map((e) => ({
+      ...toExpertPublicDto(e, { category: e.category, isSaved: savedIds.has(e.id) }),
+      distance: Math.round(nearestDistance(customerLat, customerLng, e.serviceAreas) * 10) / 10,
+    }));
+    return paginatedResult(items, { page, limit, total });
+  }
+
+  // Standard non-geo search with DB-level pagination
   const [experts, total] = await Promise.all([
     db.expertProfile.findMany({ where, skip, take: limit, orderBy, include: { category: true, avatarMedia: true } }),
     db.expertProfile.count({ where }),
@@ -69,6 +120,26 @@ export async function searchExperts(query, auth) {
     toExpertPublicDto(e, { category: e.category, isSaved: savedIds.has(e.id) })
   );
   return paginatedResult(items, { page, limit, total });
+}
+
+// ─── Geo helpers ──────────────────────────────────────────────────────────────
+
+function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371; // Earth radius in km
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function toRad(deg) { return deg * (Math.PI / 180); }
+
+function nearestDistance(lat, lng, serviceAreas) {
+  if (!Array.isArray(serviceAreas) || serviceAreas.length === 0) return Infinity;
+  return Math.min(...serviceAreas.map((a) => haversineKm(lat, lng, a.lat, a.lng)));
 }
 
 function buildSort(sort) {

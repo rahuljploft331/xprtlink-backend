@@ -1,5 +1,13 @@
 import { z } from "zod";
 
+// ─── Shared sub-schemas ───────────────────────────────────────────────────────
+
+export const serviceAreaLocationSchema = z.object({
+  name: z.string().min(1).max(200),
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+});
+
 export const categoryRefDtoSchema = z.object({
   id: z.string().uuid(),
   slug: z.string(),
@@ -16,7 +24,7 @@ export const expertPublicDtoSchema = z.object({
   title: z.string().nullable(),
   businessName: z.string().nullable(),
   languages: z.array(z.string()),
-  serviceAreas: z.array(z.string()),
+  serviceAreas: z.array(serviceAreaLocationSchema),
   consultationRate: z.number(),
   currency: z.string().length(3),
   experienceYears: z.number().int().nonnegative(),
@@ -50,7 +58,7 @@ export const expertMeUpdateRequestSchema = z.object({
   title: z.string().max(200).optional(),
   businessName: z.string().max(200).optional(),
   languages: z.array(z.string().max(50)).max(20).optional(),
-  serviceAreas: z.array(z.string().max(100)).max(30).optional(),
+  serviceAreas: z.array(serviceAreaLocationSchema).max(20).optional(),
   consultationRate: z.number().positive().optional(),
   experienceYears: z.number().int().nonnegative().optional(),
   availabilityStatus: z.enum(["online", "offline", "busy"]).optional(),
@@ -122,7 +130,7 @@ export const expertOnboardingRequestSchema = z.object({
   title: z.string().max(200).optional(),
   businessName: z.string().max(200).optional(),
   languages: z.array(z.string().max(50)).max(20).optional(),
-  serviceAreas: z.array(z.string().max(100)).max(30).optional(),
+  serviceAreas: z.array(serviceAreaLocationSchema).max(20).optional(),
   consultationRate: z.number().positive().optional(),
   experienceYears: z.number().int().nonnegative().optional(),
   categoryId: z.string().uuid().optional(),
