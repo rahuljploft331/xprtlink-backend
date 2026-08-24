@@ -391,6 +391,24 @@ export async function verifyOtp(body) {
     // The other channel remains null until it is separately verified.
     const verifiedViaPhone = otpChannel === "phone" || (!otpChannel && challenge.phone);
 
+    // Check if phone was pre-verified before registration (signup screen flow).
+    // When otpChannel=email, the register challenge won't have phone — look it up from the User row.
+    let phonePreVerified = false;
+    if (!verifiedViaPhone) {
+      const pendingUser = await db.user.findUnique({ where: { id: challenge.userId }, select: { phone: true } });
+      if (pendingUser?.phone) {
+        const consumed = await db.otpChallenge.findFirst({
+          where: {
+            phone: pendingUser.phone,
+            purpose: "verify_phone",
+            consumedAt: { not: null },
+          },
+          orderBy: { createdAt: "desc" },
+        });
+        phonePreVerified = Boolean(consumed);
+      }
+    }
+
     const user = await db.$transaction(async (tx) => {
       await tx.otpChallenge.update({
         where: { id: challenge.id },
@@ -401,10 +419,12 @@ export async function verifyOtp(body) {
         where: { id: challenge.userId },
         data: {
           status: "active",
-          // Only stamp what was actually verified
-          ...(verifiedViaPhone
+          ...(verifiedViaPhone || phonePreVerified
             ? { phoneVerifiedAt: new Date() }
-            : { emailVerifiedAt: new Date() }),
+            : {}),
+          ...(!verifiedViaPhone
+            ? { emailVerifiedAt: new Date() }
+            : {}),
         },
       });
 
