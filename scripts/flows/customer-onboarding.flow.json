@@ -400,27 +400,43 @@
       }
     },
     {
-      "name": "Step 6: Submit Quote Request to Expert",
+      "name": "Get Featured Expert ID",
       "event": [
         {
-          "listen": "prerequest",
+          "listen": "test",
           "script": {
+            "type": "text/javascript",
             "exec": [
-              "var ts = Date.now();",
-              "// Fetch a real expert ID from the DB via the public search endpoint",
-              "pm.sendRequest({",
-              "  url: pm.collectionVariables.get('base_url') + '/api/v1/experts/featured',",
-              "  method: 'GET'",
-              "}, function (err, res) {",
-              "  var json = res.json();",
-              "  if (json.data && json.data.length > 0) {",
-              "    pm.collectionVariables.set('expert_id', json.data[0].id);",
-              "  }",
-              "});"
-            ],
-            "type": "text/javascript"
+              "pm.test(\"Featured experts available\", function () { pm.response.to.have.status(200); });",
+              "var json = pm.response.json();",
+              "pm.test(\"At least one expert\", function () { pm.expect(json.data).to.be.an(\"array\").with.length.above(0); });",
+              "if (json.data && json.data.length > 0) {",
+              "  pm.collectionVariables.set(\"expert_id\", json.data[0].id);",
+              "}"
+            ]
           }
-        },
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/v1/experts/featured",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "featured"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Step 6: Submit Quote Request to Expert",
+      "event": [
         {
           "listen": "test",
           "script": {

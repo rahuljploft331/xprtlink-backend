@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "a1c9e7f2-5d4b-4e8a-9f61-consultation-lc-f",
     "name": "XpertLink Consultation Lifecycle Flow (Verified)",
-    "description": "Flow F: Full consultation lifecycle \u2014 registers fresh customer & expert, onboards expert with profile+subscription, creates consultation, expert accepts, ends call, customer pays and submits review, verifies final state.",
+    "description": "Flow F: Full consultation lifecycle — registers fresh customer & expert, onboards expert with profile+subscription, creates consultation, expert accepts, ends call, customer pays and submits review, verifies final state.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -596,6 +596,298 @@
             "billing",
             "subscriptions"
           ]
+        }
+      }
+    },
+    {
+      "name": "Get Verification Doc Upload URL (Consult Flow)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Doc upload URL 201\", function () { pm.response.to.have.status(201); });",
+              "var res = pm.response.json();",
+              "if (res.data && res.data.uploadUrl) {",
+              "  pm.collectionVariables.set(\"doc_upload_url\", res.data.uploadUrl);",
+              "  pm.collectionVariables.set(\"doc_media_id\", res.data.id);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/media/uploads",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "media",
+            "uploads"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"purpose\":\"verification_doc\",\"mimeType\":\"image/jpeg\",\"sizeBytes\":50000}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Upload Verification Doc to S3 (Consult Flow)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"S3 upload ok\", function () { pm.expect(pm.response.code).to.be.below(400); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "image/jpeg"
+          }
+        ],
+        "url": {
+          "raw": "{{doc_upload_url}}",
+          "host": [
+            "{{doc_upload_url}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "FAKEPAYLOAD"
+        }
+      }
+    },
+    {
+      "name": "Confirm Verification Doc Upload (Consult Flow)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Confirm 200\", function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/media/{{doc_media_id}}/confirm",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "media",
+            "{{doc_media_id}}",
+            "confirm"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Expert Submits Verification Document (Consult Flow)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Verification submitted 200\", function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/experts/me/verification/documents",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "me",
+            "verification",
+            "documents"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"documentType\":\"government_id\",\"primaryId\":\"{{doc_media_id}}\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Admin Approves Expert Verification (Consult Flow)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// 1. Login as admin",
+              "pm.sendRequest({",
+              "  url: pm.collectionVariables.get(\"base_url\") + \"/api/v1/admin/auth/login\",",
+              "  method: \"POST\",",
+              "  header: [{ key: \"Content-Type\", value: \"application/json\" }],",
+              "  body: { mode: \"raw\", raw: JSON.stringify({ email: \"admin@xpertlink.com\", password: \"Admin@123\" }) }",
+              "}, function (err, loginRes) {",
+              "  var loginJson = loginRes.json();",
+              "  var adminToken = (loginJson.data && loginJson.data.accessToken) ? loginJson.data.accessToken : \"\";",
+              "  pm.collectionVariables.set(\"admin_token\", adminToken);",
+              "  // 2. Fetch pending verifications",
+              "  pm.sendRequest({",
+              "    url: pm.collectionVariables.get(\"base_url\") + \"/api/v1/admin/verifications?status=pending\",",
+              "    method: \"GET\",",
+              "    header: [{ key: \"Authorization\", value: \"Bearer \" + adminToken }]",
+              "  }, function (err2, listRes) {",
+              "    var list = listRes.json();",
+              "    var expertId = pm.collectionVariables.get(\"expert_id\");",
+              "    // list item shape: { id, expert: { id, ... }, status, ... }",
+              "    var items = (list.data && list.data.items) ? list.data.items : [];",
+              "    var verif = items.find(function(v) { return v.expert && v.expert.id === expertId; });",
+              "    if (verif) {",
+              "      pm.collectionVariables.set(\"verif_id\", verif.id);",
+              "    }",
+              "  });",
+              "});"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Expert approved 200\", function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/admin/verifications/{{verif_id}}/approve",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "verifications",
+            "{{verif_id}}",
+            "approve"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Expert Sets Availability Online (Consult Flow)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"Settings updated 200\", function () { pm.response.to.have.status(200); });"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/experts/me/settings",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "me",
+            "settings"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\"availabilityStatus\":\"online\"}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
