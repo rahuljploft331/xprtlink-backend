@@ -541,7 +541,10 @@ export async function checkAvailability(query) {
     result.emailAvailable = !row;
   }
   if (query.mobile || query.phone) {
-    const phone = query.mobile || query.phone;
+    let phone = query.mobile || query.phone;
+    // Normalize: URL query strings decode '+' as space — restore the leading '+'
+    phone = phone.trim().replace(/^\s/, "+");
+    if (!phone.startsWith("+")) phone = `+${phone}`;
     const row = await db.user.findFirst({
       where: { phone, ...claimedAvailabilityFilter },
     });
