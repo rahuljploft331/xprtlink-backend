@@ -12,9 +12,9 @@
  *   3. Runs 6 verified Postman flow collections sequentially via Newman:
  *      A. Expert Onboarding Flow (phone OTP)
  *      B. Email Expert Onboarding Flow
- *      C. Customer Onboarding & Quote Flow
  *      D. Expert Subscription Lifecycle Flow (13 steps)
  *      E. Expert Verification Approval Flow
+ *      C. Customer Onboarding & Quote Flow (needs verified experts)
  *      F. Consultation Lifecycle Flow (12 steps)
  *      (Messaging is WebSocket/Socket.IO — tested separately, not via Newman)
  *   5. Prints a final pass/fail summary table
@@ -59,12 +59,6 @@ const FLOWS = [
     collection: "XpertLink Automated Email Expert Onboarding Flow (Verified)",
   },
   {
-    id: "C",
-    label: "Customer Onboarding & Quote Flow",
-    file: path.join(FLOWS_DIR, "customer-onboarding.flow.json"),
-    collection: "XpertLink Automated Customer Onboarding & Flow (Verified)",
-  },
-  {
     id: "D",
     label: "Expert Subscription Lifecycle (13 steps)",
     file: path.join(FLOWS_DIR, "expert-subscription-lifecycle.flow.json"),
@@ -75,6 +69,12 @@ const FLOWS = [
     label: "Expert Verification Approval",
     file: path.join(FLOWS_DIR, "expert-verification-approval.flow.json"),
     collection: "XpertLink Expert Verification Approval Flow (Verified)",
+  },
+  {
+    id: "C",
+    label: "Customer Onboarding & Quote Flow",
+    file: path.join(FLOWS_DIR, "customer-onboarding.flow.json"),
+    collection: "XpertLink Automated Customer Onboarding & Flow (Verified)",
   },
   {
     id: "F",

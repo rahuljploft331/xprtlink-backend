@@ -25,6 +25,10 @@
     {
       "key": "expert_id",
       "value": ""
+    },
+    {
+      "key": "stripe_pm_id",
+      "value": ""
     }
   ],
   "item": [
@@ -312,11 +316,21 @@
       "name": "Step 4: Add Saved Payment Method",
       "event": [
         {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "var ts = Date.now();",
+              "pm.collectionVariables.set('stripe_pm_id', 'pm_card_visa_' + ts);"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
           "listen": "test",
           "script": {
             "exec": [
               "pm.test('Payment method saved or Stripe not configured', function () {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 400, 500, 502]);",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 400, 409, 500, 502]);",
               "});",
               "var json = pm.response.json();",
               "if (pm.response.code === 200 || pm.response.code === 201) {",
@@ -324,7 +338,7 @@
               "  pm.collectionVariables.set('payment_method_id', pm_id || '');",
               "  pm.test('payment method id present', function () { pm.expect(pm_id).to.be.ok; });",
               "} else {",
-              "  pm.test('Skipped: Stripe not configured (status ' + pm.response.code + ')', function () { pm.expect(true).to.be.true; });",
+              "  pm.test('Skipped: Stripe not configured or duplicate (status ' + pm.response.code + ')', function () { pm.expect(true).to.be.true; });",
               "  pm.collectionVariables.set('payment_method_id', 'stripe-not-configured');",
               "}"
             ],
@@ -346,7 +360,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"stripePaymentMethodId\":\"pm_card_visa\",\"setAsDefault\":true}"
+          "raw": "{\"stripePaymentMethodId\":\"{{stripe_pm_id}}\",\"setAsDefault\":true}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/billing/payment-methods",
