@@ -187,7 +187,10 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"phone\": \"{{runPhone}}\",\n  \"password\": \"{{runPassword}}\",\n  \"confirmPassword\": \"{{runPassword}}\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"customer\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}"
+              "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"phone\": \"{{runPhone}}\",\n  \"password\": \"{{runPassword}}\",\n  \"confirmPassword\": \"{{runPassword}}\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"customer\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/register",
@@ -401,8 +404,14 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('otp resent', () => pm.expect(pm.response.json().data.sent).to.eql(true));"
+                  "// The preceding Send OTP used the same email+purpose, so a 60s resend",
+                  "// cooldown (400 OTP_RESEND_COOLDOWN) is the expected happy-path outcome here.",
+                  "pm.test('status is 200 or 400 (cooldown)', () => pm.expect([200, 400]).to.include(pm.response.code));",
+                  "const j = pm.response.json();",
+                  "pm.test('resent or cooling down', () => {",
+                  "  if (pm.response.code === 200) pm.expect(j.data.sent).to.eql(true);",
+                  "  else pm.expect(j.code).to.eql('OTP_RESEND_COOLDOWN');",
+                  "});"
                 ]
               }
             }
@@ -750,6 +759,30 @@
           "name": "Refresh Token",
           "event": [
             {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// The refreshToken captured earlier is invalidated by the intervening",
+                  "// Change Password / Change Mobile steps (both revoke sessions). Re-login",
+                  "// here with the current password to obtain a fresh, valid refresh token.",
+                  "const base = pm.collectionVariables.get('base_url') || pm.variables.get('base_url');",
+                  "pm.sendRequest({",
+                  "  url: base + '/api/v1/auth/login',",
+                  "  method: 'POST',",
+                  "  header: { 'Content-Type': 'application/json' },",
+                  "  body: { mode: 'raw', raw: JSON.stringify({ email: pm.collectionVariables.get('runEmail'), password: pm.collectionVariables.get('runPassword'), role: 'customer' }) }",
+                  "}, function (err, res) {",
+                  "  if (!err && res && res.code === 200) {",
+                  "    const d = res.json().data || {};",
+                  "    if (d.accessToken) pm.collectionVariables.set('accessToken', d.accessToken);",
+                  "    if (d.refreshToken) pm.collectionVariables.set('refreshToken', d.refreshToken);",
+                  "  }",
+                  "});"
+                ]
+              }
+            },
+            {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
@@ -969,7 +1002,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "// expertId is a placeholder; accept success or a not-found/validation response.",
+                  "// expertId is a well-formed but non-existent UUID; accept success or a clean not-found/validation response (never 500).",
+                  "pm.test('no server error (not 500)', () => pm.expect(pm.response.code).to.not.eql(500));",
                   "pm.test('status is 200/201/400/404', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code));"
                 ]
               }
@@ -988,10 +1022,10 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "customers", "me", "recently-viewed", ":expertId"],
               "variable": [
-                { "key": "expertId", "value": "expert-uuid-here" }
+                { "key": "expertId", "value": "00000000-0000-4000-8000-000000000000" }
               ]
             },
-            "description": "Record that an expert profile was viewed.\n\n_Uses a placeholder expertId; replace with a real expert UUID to record a view._"
+            "description": "Record that an expert profile was viewed.\n\n`:expertId` must be a UUID. A malformed id returns 400 VALIDATION_ERROR; an unknown (but well-formed) UUID may return 400/404 depending on FK. Replace with a real expert UUID to record a view.\n\n_Uses a placeholder well-formed UUID that does not exist, so it must not 500._"
           }
         },
         {
@@ -1002,6 +1036,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test('no server error (not 500)', () => pm.expect(pm.response.code).to.not.eql(500));",
                   "pm.test('status is 200/201/400/404', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code));"
                 ]
               }
@@ -1020,10 +1055,10 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "customers", "me", "saved-experts", ":expertId"],
               "variable": [
-                { "key": "expertId", "value": "expert-uuid-here" }
+                { "key": "expertId", "value": "00000000-0000-4000-8000-000000000000" }
               ]
             },
-            "description": "Save/bookmark an expert profile.\n\n_Uses a placeholder expertId; replace with a real expert UUID to save._"
+            "description": "Save/bookmark an expert profile.\n\n`:expertId` must be a UUID. A malformed id returns 400 VALIDATION_ERROR. Replace with a real expert UUID to save.\n\n_Uses a placeholder well-formed UUID that does not exist, so it must not 500._"
           }
         },
         {
@@ -1034,6 +1069,7 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
+                  "pm.test('no server error (not 500)', () => pm.expect(pm.response.code).to.not.eql(500));",
                   "pm.test('status is 200/204/400/404', () => pm.expect([200, 204, 400, 404]).to.include(pm.response.code));"
                 ]
               }
@@ -1052,10 +1088,10 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "customers", "me", "saved-experts", ":expertId"],
               "variable": [
-                { "key": "expertId", "value": "expert-uuid-here" }
+                { "key": "expertId", "value": "00000000-0000-4000-8000-000000000000" }
               ]
             },
-            "description": "Remove an expert from the saved list.\n\n_Uses a placeholder expertId; replace with a real expert UUID to unsave._"
+            "description": "Remove an expert from the saved list.\n\n`:expertId` must be a UUID. A malformed id returns 400 VALIDATION_ERROR. Replace with a real expert UUID to unsave.\n\n_Uses a placeholder well-formed UUID that does not exist, so it must not 500._"
           }
         },
         {

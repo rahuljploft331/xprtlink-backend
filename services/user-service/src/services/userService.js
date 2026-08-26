@@ -977,7 +977,19 @@ export async function getRecentlyViewed(auth, query) {
   return paginatedResult(items, { page, limit, total });
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Guard route path params before they reach Prisma. A malformed id would
+// otherwise surface as an unhandled Prisma P2023 (invalid UUID) → 500.
+function assertUuid(value, field = "expertId") {
+  if (!value || !UUID_RE.test(value)) {
+    throw badRequest("Invalid expert id", "VALIDATION_ERROR", field);
+  }
+}
+
 export async function recordRecentlyViewed(auth, expertId) {
+  assertUuid(expertId);
   const db = getDb();
   await db.customerRecentlyViewed.upsert({
     where: {
@@ -1023,6 +1035,7 @@ export async function getSavedExperts(auth, query) {
 }
 
 export async function saveExpert(auth, expertId) {
+  assertUuid(expertId);
   await getDb().customerSavedExpert.upsert({
     where: {
       customerProfileId_expertProfileId: {
@@ -1037,6 +1050,7 @@ export async function saveExpert(auth, expertId) {
 }
 
 export async function unsaveExpert(auth, expertId) {
+  assertUuid(expertId);
   await getDb().customerSavedExpert.deleteMany({
     where: { customerProfileId: auth.customerProfileId, expertProfileId: expertId },
   });
