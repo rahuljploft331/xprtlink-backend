@@ -57,6 +57,12 @@ export const registerRequestSchema = z
     otpChannel: z.enum(["email", "phone"]).optional(),
     /** Category selection for expert registration (Figma sign-up screen). Optional for customers. */
     categoryId: z.string().uuid().optional(),
+    /**
+     * Optional profile photo chosen during sign-up. Must be a media asset the
+     * registering user already uploaded (purpose "avatar", status "ready").
+     * Attached to the profile when it is created during OTP verification.
+     */
+    avatarMediaId: z.string().uuid().optional(),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match",

@@ -74,11 +74,22 @@ async function assertIdentifierAvailable({ email, phone, excludeUserId }) {
   }
 }
 
-async function createProfileForRole(tx, userId, role, firstName, lastName, { categoryId } = {}) {
+async function createProfileForRole(
+  tx,
+  userId,
+  role,
+  firstName,
+  lastName,
+  { categoryId, avatarMediaId } = {}
+) {
   if (role === "customer") {
     return tx.user.update({
       where: { id: userId },
-      data: { customerProfile: { create: { firstName, lastName } } },
+      data: {
+        customerProfile: {
+          create: { firstName, lastName, ...(avatarMediaId ? { avatarMediaId } : {}) },
+        },
+      },
       include: profileInclude(),
     });
   }
@@ -109,6 +120,7 @@ async function createProfileForRole(tx, userId, role, firstName, lastName, { cat
           lastName,
           categoryId: resolvedCategoryId,
           consultationRateCents: 0,
+          ...(avatarMediaId ? { avatarMediaId } : {}),
           settings: { create: { preferences: {} } },
         },
       },
@@ -147,6 +159,7 @@ export async function register(body) {
     lastName,
     otpChannel = "phone",
     categoryId,
+    avatarMediaId,
   } = body;
 
   // Pre-flight availability check (fast-fails common case; real enforcement is inside the transaction)
@@ -248,7 +261,7 @@ export async function register(body) {
     purpose: "register",
     channel: otpChannel,
     userId,
-    registrationData: { role, firstName, lastName, otpChannel, categoryId },
+    registrationData: { role, firstName, lastName, otpChannel, categoryId, avatarMediaId },
   });
 }
 
@@ -404,7 +417,26 @@ export async function verifyOtp(body) {
       );
     }
 
-    const { role, firstName, lastName, otpChannel, categoryId } = challenge.registrationData;
+    const { role, firstName, lastName, otpChannel, categoryId, avatarMediaId } =
+      challenge.registrationData;
+
+    // Validate the optional sign-up avatar: it must be a "ready" avatar asset
+    // owned by the user completing registration. Invalid/foreign/unready ids are
+    // ignored (profile is created without an avatar) rather than failing signup.
+    let resolvedAvatarMediaId = null;
+    if (avatarMediaId) {
+      const media = await db.mediaAsset.findFirst({
+        where: {
+          id: avatarMediaId,
+          ownerUserId: challenge.userId,
+          purpose: "avatar",
+          status: "ready",
+        },
+        select: { id: true },
+      });
+      if (media) resolvedAvatarMediaId = media.id;
+    }
+
     // C1: Only stamp the channel that was actually verified.
     // The other channel remains null until it is separately verified.
     const verifiedViaPhone = otpChannel === "phone" || (!otpChannel && challenge.phone);
@@ -447,7 +479,10 @@ export async function verifyOtp(body) {
         },
       });
 
-      return createProfileForRole(tx, challenge.userId, role, firstName, lastName, { categoryId });
+      return createProfileForRole(tx, challenge.userId, role, firstName, lastName, {
+        categoryId,
+        avatarMediaId: resolvedAvatarMediaId,
+      });
     });
 
     const tokens = await issueTokens(user, role);

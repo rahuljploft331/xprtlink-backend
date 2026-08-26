@@ -2,15 +2,255 @@
   "info": {
     "_postman_id": "ea16c2da-ed0f-4b72-9796-12cac4fafa35",
     "name": "User Service",
-    "description": "REST APIs for registration (3-step OTP flow with phone pre-verification), login, OTP validation, password management, social auth, and customer profile/discoveries.\n\n**Registration (3 steps — phone must be pre-verified):**\n1. POST /auth/otp/send { phone, purpose: 'verify_phone' } — send OTP to phone\n2. POST /auth/otp/verify { phone, code, purpose: 'verify_phone' } — verify phone ownership\n3. POST /auth/register — requires email + phone (E.164), confirmPassword, termsAccepted, MFS password rules; phone must have been verified within 30 min\n4. POST /auth/otp/verify { purpose: 'register' } → auth tokens\n\n**Social signup (when phone missing):**\n1. POST /auth/social → may return completionToken\n2. POST /auth/social/complete → OTP to phone\n3. POST /auth/otp/verify { purpose: verify_phone } → auth tokens",
+    "description": "REST APIs for registration (3-step OTP flow with phone pre-verification), login, OTP validation, password management, social auth, and customer profile/discoveries.\n\n**Registration (3 steps — phone must be pre-verified):**\n1. POST /auth/otp/send { phone, purpose: 'verify_phone' } — send OTP to phone\n2. POST /auth/otp/verify { phone, code, purpose: 'verify_phone' } — verify phone ownership\n3. POST /auth/register — requires email + phone (E.164), confirmPassword, termsAccepted, MFS password rules; phone must have been verified within 30 min\n4. POST /auth/otp/verify { purpose: 'register' } → auth tokens\n\n**Social signup (when phone missing):**\n1. POST /auth/social → may return completionToken\n2. POST /auth/social/complete → OTP to phone\n3. POST /auth/otp/verify { purpose: verify_phone } → auth tokens\n\n---\n\n**Self-validating run.** The Auth & Session folder runs as an ordered end-to-end chain. A collection-level pre-request seeds a unique per-run email/phone, and test scripts capture `accessToken`/`refreshToken` into collection variables so the authenticated requests (session, change password, change mobile number, customer profile) exercise their real happy paths. Every request carries a `pm.test` status-code assertion. Requires the backend running with `OTP_ENABLE_HARDCODE=true` and `OTP_HARDCODE_CODE=123456` (dev default).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Seed a unique identity for this run once, so the ordered Auth chain is repeatable.",
+          "if (!pm.collectionVariables.get('runSeeded')) {",
+          "  const ts = Date.now().toString();",
+          "  const tail = ts.slice(-7);",
+          "  pm.collectionVariables.set('runEmail', 'pm_' + ts + '@example.com');",
+          "  pm.collectionVariables.set('runPhone', '+1414' + tail);",
+          "  pm.collectionVariables.set('newPhone', '+1415' + tail);",
+          "  pm.collectionVariables.set('expertEmail', 'pm_exp_' + ts + '@example.com');",
+          "  pm.collectionVariables.set('expertPhone', '+1416' + tail);",
+          "  pm.collectionVariables.set('runPassword', 'Password123!');",
+          "  pm.collectionVariables.set('otpCode', '123456');",
+          "  pm.collectionVariables.set('runSeeded', '1');",
+          "}"
+        ]
+      }
+    }
+  ],
   "item": [
     {
       "name": "Auth & Session",
       "item": [
         {
+          "name": "Check Availability (email)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('emailAvailable is boolean', () => pm.expect(pm.response.json().data.emailAvailable).to.be.a('boolean'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/check-availability?email={{runEmail}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "check-availability"],
+              "query": [
+                {
+                  "key": "email",
+                  "value": "{{runEmail}}"
+                }
+              ]
+            },
+            "description": "Check if an email is available during onboarding.\n\npending_verification users are treated as available (they can re-register to get a fresh OTP).\n\nReturns: `{ emailAvailable: boolean }`"
+          }
+        },
+        {
+          "name": "Check Availability (phone)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('phoneAvailable is boolean', () => pm.expect(pm.response.json().data.phoneAvailable).to.be.a('boolean'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/check-availability?mobile={{runPhone}}",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "check-availability"],
+              "query": [
+                {
+                  "key": "mobile",
+                  "value": "{{runPhone}}",
+                  "description": "E.164 phone number (URL-encode the leading '+' as %2B, or omit it — server normalizes automatically)"
+                }
+              ]
+            },
+            "description": "Check if a mobile number is available during onboarding.\n\nAccepts query param `mobile` or `phone` in E.164 format. The server normalizes the value: trims whitespace, restores a leading '+' if it was decoded as a space or omitted.\n\npending_verification users are treated as available.\n\nReturns: `{ phoneAvailable: boolean }`"
+          }
+        },
+        {
+          "name": "Pre-verify Phone (before register)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('otp sent', () => pm.expect(pm.response.json().data.sent).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{runPhone}}\",\n  \"purpose\": \"verify_phone\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/otp/send",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "send"]
+            },
+            "description": "**Pre-registration phone verification (Step 1 of 4).**\n\nBefore calling POST /auth/register, the phone number MUST be verified via OTP. This sends a verify_phone OTP to the given phone number.\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'verify_phone' } to consume the challenge. Registration must happen within 30 minutes of verification."
+          }
+        },
+        {
+          "name": "Verify Phone OTP (before register)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('phone verified', () => pm.expect(pm.response.json().data.verified).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{runPhone}}\",\n  \"code\": \"{{otpCode}}\",\n  \"purpose\": \"verify_phone\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/otp/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "verify"]
+            },
+            "description": "**Pre-registration phone verification (Step 2 of 4).**\n\nVerifies the phone OTP sent in the previous step. Consumes the verify_phone challenge so POST /auth/register will succeed.\n\nThe phone must be verified within 30 minutes before calling /auth/register.\n\n**Next step:** Call POST /auth/register with the verified phone number."
+          }
+        },
+        {
+          "name": "Register — Customer (send OTP)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('otp sent', () => pm.expect(pm.response.json().data.sent).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"phone\": \"{{runPhone}}\",\n  \"password\": \"{{runPassword}}\",\n  \"confirmPassword\": \"{{runPassword}}\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"customer\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register"]
+            },
+            "description": "**Registration Step 3 of 4 (CUSTOMER).**\n\n**PREREQUISITE:** The phone number MUST be pre-verified via POST /auth/otp/send + POST /auth/otp/verify (purpose: verify_phone) within the last 30 minutes. Without this, registration will fail with PHONE_NOT_VERIFIED.\n\nCreates a pending_verification User with both email and phone. Sends a 6-digit registration OTP (default: phone).\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'customer'.\nOptional: otpChannel ('email' | 'phone', default phone), avatarMediaId (UUID — a profile photo the user already uploaded to media-service with purpose 'avatar' and status 'ready'; attached to the profile at OTP verification. Ignored if the asset is missing, not owned by this user, or not ready).\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens."
+          }
+        },
+        {
+          "name": "Register — Verify OTP (get tokens)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('tokens returned', () => {",
+                  "  pm.expect(d.accessToken, 'accessToken').to.be.a('string').and.not.empty;",
+                  "  pm.expect(d.refreshToken, 'refreshToken').to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('accessToken', d.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', d.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{runPhone}}\",\n  \"code\": \"{{otpCode}}\",\n  \"purpose\": \"register\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/otp/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "otp", "verify"]
+            },
+            "description": "**Registration Step 4 of 4 (final).**\n\nVerify registration OTP sent to email or phone (match otpChannel from register step). Stamps emailVerifiedAt and/or phoneVerifiedAt based on the verified channel. If the phone was pre-verified (via a prior verify_phone OTP in the signup screen flow), phoneVerifiedAt is also stamped even when the registration OTP was sent to email. Creates profile, issues tokens.\n\n_Test script captures `accessToken` + `refreshToken` into collection variables for the rest of the run._"
+          }
+        },
+        {
           "name": "Get Session",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('session has role', () => pm.expect(pm.response.json().data).to.have.property('role'));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -28,7 +268,43 @@
           }
         },
         {
-          "name": "Pre-verify Phone (before register)",
+          "name": "Register — Expert (send OTP)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Pre-verify the expert phone so registration passes the PHONE_NOT_VERIFIED gate.",
+                  "const base = pm.collectionVariables.get('base_url') || pm.variables.get('base_url');",
+                  "const phone = pm.collectionVariables.get('expertPhone');",
+                  "pm.sendRequest({",
+                  "  url: base + '/api/v1/auth/otp/send',",
+                  "  method: 'POST',",
+                  "  header: { 'Content-Type': 'application/json' },",
+                  "  body: { mode: 'raw', raw: JSON.stringify({ phone, purpose: 'verify_phone' }) }",
+                  "}, function () {",
+                  "  pm.sendRequest({",
+                  "    url: base + '/api/v1/auth/otp/verify',",
+                  "    method: 'POST',",
+                  "    header: { 'Content-Type': 'application/json' },",
+                  "    body: { mode: 'raw', raw: JSON.stringify({ phone, code: pm.collectionVariables.get('otpCode'), purpose: 'verify_phone' }) }",
+                  "  }, function () {});",
+                  "});"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('otp sent', () => pm.expect(pm.response.json().data.sent).to.eql(true));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -39,18 +315,64 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone\": \"+14155552671\",\n  \"purpose\": \"verify_phone\"\n}"
+              "raw": "{\n  \"email\": \"{{expertEmail}}\",\n  \"phone\": \"{{expertPhone}}\",\n  \"password\": \"{{runPassword}}\",\n  \"confirmPassword\": \"{{runPassword}}\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Expert\",\n  \"role\": \"expert\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/register",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "register"]
+            },
+            "description": "**Registration Step 3 of 4 (EXPERT).**\n\n**PREREQUISITE:** The phone number MUST be pre-verified via POST /auth/otp/send + POST /auth/otp/verify (purpose: verify_phone) within the last 30 minutes. Without this, registration will fail with PHONE_NOT_VERIFIED. _(The pre-request script above performs this pre-verification automatically.)_\n\nSame endpoint as customer but with role='expert' and optional categoryId.\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'expert'.\nOptional: otpChannel ('email' | 'phone', default phone), categoryId (UUID — selects expert's category; falls back to first active category if omitted or invalid), avatarMediaId (UUID — a profile photo the user already uploaded to media-service with purpose 'avatar' and status 'ready'; attached to the profile at OTP verification. Ignored if the asset is missing, not owned by this user, or not ready). Both omitted here so the request stays self-contained.\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens."
+          }
+        },
+        {
+          "name": "Send OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('otp sent', () => pm.expect(pm.response.json().data.sent).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"purpose\": \"verify_email\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/otp/send",
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "otp", "send"]
             },
-            "description": "**Pre-registration phone verification (Step 1 of 4).**\n\nBefore calling POST /auth/register, the phone number MUST be verified via OTP. This sends a verify_phone OTP to the given phone number.\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'verify_phone' } to consume the challenge. Registration must happen within 30 minutes of verification."
+            "description": "Send an OTP code via Email or Mobile.\n\nPurpose: 'verify_email' | 'verify_phone' | 'reset_password'\n\nNote: purpose='register' is NOT supported here — use POST /auth/register instead."
           }
         },
         {
-          "name": "Verify Phone OTP (before register)",
+          "name": "Verify OTP (negative — unknown code)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 (unknown/expired OTP)', () => pm.response.to.have.status(400));",
+                  "pm.test('error code is OTP_EXPIRED or INVALID_OTP', () => pm.expect(['OTP_EXPIRED','INVALID_OTP']).to.include(pm.response.json().code));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -61,18 +383,30 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone\": \"+14155552671\",\n  \"code\": \"123456\",\n  \"purpose\": \"verify_phone\"\n}"
+              "raw": "{\n  \"phone\": \"+11234567890\",\n  \"code\": \"000000\",\n  \"purpose\": \"login\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/otp/verify",
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "otp", "verify"]
             },
-            "description": "**Pre-registration phone verification (Step 2 of 4).**\n\nVerifies the phone OTP sent in the previous step. Consumes the verify_phone challenge so POST /auth/register will succeed.\n\nThe phone must be verified within 30 minutes before calling /auth/register.\n\n**Next step:** Call POST /auth/register with the verified phone number."
+            "description": "Verify an OTP code.\n\nField is 'code', NOT 'otp'.\n\nBehaviour by purpose:\n- 'register'       → returns auth tokens (see 'Register — Verify OTP')\n- 'login'          → returns auth tokens (used after phone login)\n- 'verify_email'   → stamps emailVerifiedAt, returns { verified: true }\n- 'verify_phone'   → stamps phoneVerifiedAt, returns { verified: true }\n- 'reset_password' → validates code only, returns { verified: true }\n\n_This example is a negative test: an unknown phone/code returns 400 OTP_EXPIRED._"
           }
         },
         {
-          "name": "Register — Customer (send OTP)",
+          "name": "Resend OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('otp resent', () => pm.expect(pm.response.json().data.sent).to.eql(true));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -83,18 +417,29 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"phone\": \"+14155552671\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"customer\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}"
+              "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"purpose\": \"verify_email\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/auth/register",
+              "raw": "{{base_url}}/api/v1/auth/otp/resend",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "register"]
+              "path": ["api", "v1", "auth", "otp", "resend"]
             },
-            "description": "**Registration Step 3 of 4 (CUSTOMER).**\n\n**PREREQUISITE:** The phone number MUST be pre-verified via POST /auth/otp/send + POST /auth/otp/verify (purpose: verify_phone) within the last 30 minutes. Without this, registration will fail with PHONE_NOT_VERIFIED.\n\nCreates a pending_verification User with both email and phone. Sends a 6-digit registration OTP (default: phone).\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'customer'.\nOptional: otpChannel ('email' | 'phone', default phone).\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens."
+            "description": "Resend an OTP code. Same rules as Send OTP — purpose='register' is not supported here (re-call /auth/register instead)."
           }
         },
         {
-          "name": "Register — Expert (send OTP)",
+          "name": "Forgot Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -105,18 +450,31 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"expert@example.com\",\n  \"phone\": \"+14155552672\",\n  \"password\": \"Password123!\",\n  \"confirmPassword\": \"Password123!\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Expert\",\n  \"role\": \"expert\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\",\n  \"categoryId\": \"category-uuid-here\"\n}"
+              "raw": "{\n  \"email\": \"{{runEmail}}\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/auth/register",
+              "raw": "{{base_url}}/api/v1/auth/password/forgot",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "register"]
+              "path": ["api", "v1", "auth", "password", "forgot"]
             },
-            "description": "**Registration Step 3 of 4 (EXPERT).**\n\n**PREREQUISITE:** The phone number MUST be pre-verified via POST /auth/otp/send + POST /auth/otp/verify (purpose: verify_phone) within the last 30 minutes. Without this, registration will fail with PHONE_NOT_VERIFIED.\n\nSame endpoint as customer but with role='expert' and optional categoryId.\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'expert'.\nOptional: otpChannel ('email' | 'phone', default phone), categoryId (UUID — selects expert's category; falls back to first active category if omitted or invalid).\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens."
+            "description": "Initiate password reset. Sends a reset code to email/phone."
           }
         },
         {
-          "name": "Register — Verify OTP (get tokens)",
+          "name": "Reset Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "// Keep the working password in sync for the Login request that follows.",
+                  "pm.collectionVariables.set('runPassword', 'NewPassword123!');"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -127,18 +485,36 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"phone\": \"+14155552671\",\n  \"code\": \"123456\",\n  \"purpose\": \"register\"\n}"
+              "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"code\": \"{{otpCode}}\",\n  \"newPassword\": \"NewPassword123!\",\n  \"confirmPassword\": \"NewPassword123!\"\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/auth/otp/verify",
+              "raw": "{{base_url}}/api/v1/auth/password/reset",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "otp", "verify"]
+              "path": ["api", "v1", "auth", "password", "reset"]
             },
-            "description": "**Registration Step 4 of 4 (final).**\n\nVerify registration OTP sent to email or phone (match otpChannel from register step). Stamps emailVerifiedAt and/or phoneVerifiedAt based on the verified channel. If the phone was pre-verified (via a prior verify_phone OTP in the signup screen flow), phoneVerifiedAt is also stamped even when the registration OTP was sent to email. Creates profile, issues tokens."
+            "description": "Set a new password using a reset OTP code.\n\nField is 'code', NOT 'otp'.\n\n_Uses the reset code from the previous Forgot Password step (hardcode OTP in dev). Updates `runPassword` so the following Login uses the new password._"
           }
         },
         {
           "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('tokens returned', () => {",
+                  "  pm.expect(d.accessToken, 'accessToken').to.be.a('string').and.not.empty;",
+                  "  pm.expect(d.refreshToken, 'refreshToken').to.be.a('string').and.not.empty;",
+                  "});",
+                  "pm.collectionVariables.set('accessToken', d.accessToken);",
+                  "pm.collectionVariables.set('refreshToken', d.refreshToken);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -149,18 +525,277 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\",\n  \"role\": \"customer\"\n}"
+              "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{runPassword}}\",\n  \"role\": \"customer\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/login",
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "login"]
             },
-            "description": "Log in and obtain access & refresh tokens.\n\nIf using `email`, `password` is required and tokens are returned instantly.\nIf using `phone`, `password` is optional. The API will generate an OTP and return `{ needsOtp: true, ... }` instead of tokens. The mobile app must then call `/auth/otp/verify` with `purpose: login`.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead)."
+            "description": "Log in and obtain access & refresh tokens.\n\nIf using `email`, `password` is required and tokens are returned instantly.\nIf using `phone`, `password` is optional. The API will generate an OTP and return `{ needsOtp: true, ... }` instead of tokens. The mobile app must then call `/auth/otp/verify` with `purpose: login`.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead).\n\n_Re-captures a fresh `accessToken` + `refreshToken` (using the password set by Reset Password) for the authenticated requests that follow._"
+          }
+        },
+        {
+          "name": "Change Password",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('runPassword', 'ChangedPassword123!');"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"{{runPassword}}\",\n  \"newPassword\": \"ChangedPassword123!\",\n  \"confirmPassword\": \"ChangedPassword123!\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/password/change",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "password", "change"]
+            },
+            "description": "Change password for an authenticated session.\n\nField is 'currentPassword', NOT 'oldPassword'.\n\n_Uses the current run password (set by Reset Password) and rotates it to a new value._"
+          }
+        },
+        {
+          "name": "Change Mobile Number - Request OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('otp sent to new number', () => pm.expect(pm.response.json().data.sent).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{newPhone}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/phone/change/request",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "phone", "change", "request"]
+            },
+            "description": "**Change mobile number (Step 1 of 2).** Authenticated — works for both customer and expert (phone lives on the shared User).\n\nValidates the new number is E.164, not already used by another account, and different from the current one, then sends a verify_phone OTP to the NEW number.\n\nErrors: 400 PHONE_UNCHANGED (same as current), 409 PHONE_TAKEN (in use by another account), 401 if session invalid.\n\n**Next step:** POST /auth/phone/change/verify with { phone, code }."
+          }
+        },
+        {
+          "name": "Change Mobile Number - Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('phone changed', () => {",
+                  "  pm.expect(d.changed).to.eql(true);",
+                  "  pm.expect(d.phone).to.eql(pm.collectionVariables.get('newPhone'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{newPhone}}\",\n  \"code\": \"{{otpCode}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/phone/change/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "phone", "change", "verify"]
+            },
+            "description": "**Change mobile number (Step 2 of 2).** Authenticated.\n\nVerifies the OTP sent to the new number, then updates user.phone, stamps phoneVerifiedAt, and revokes ALL other sessions (existing access/refresh tokens on other devices are invalidated).\n\nReturns { changed: true, phone }.\n\nErrors: 400 INVALID_OTP / OTP_EXPIRED, 409 PHONE_TAKEN, 401 if session invalid."
+          }
+        },
+        {
+          "name": "Login (by phone)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('needsOtp is true (OTP challenge issued)', () => pm.expect(pm.response.json().data.needsOtp).to.eql(true));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"{{newPhone}}\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "login"]
+            },
+            "description": "Log in with mobile number (E.164). Password is not required. This triggers an OTP SMS and returns `{ needsOtp: true, ... }`.\n\n_Uses the new phone number set by the Change Mobile Number flow._"
+          }
+        },
+        {
+          "name": "Social Login (negative — not configured)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 or 200', () => pm.expect([200, 400]).to.include(pm.response.code));",
+                  "pm.test('NOT_IMPLEMENTED when Firebase not configured', () => {",
+                  "  if (pm.response.code === 400) pm.expect(pm.response.json().code).to.eql('NOT_IMPLEMENTED');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"google\",\n  \"idToken\": \"firebase-id-token-from-mobile-sdk\",\n  \"role\": \"customer\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/social",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "social"]
+            },
+            "description": "Google or Apple sign-in via Firebase ID token.\n\nReturns auth tokens on success, or `{ needsProfileCompletion: true, missing: ['phone'], completionToken }` when phone is required.\n\n_In dev without Firebase configured this returns 400 NOT_IMPLEMENTED (negative test)._"
+          }
+        },
+        {
+          "name": "Social Complete (negative — invalid token)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 400 (invalid/empty completionToken)', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"completionToken\": \"not-a-real-token\",\n  \"phone\": \"{{runPhone}}\",\n  \"termsAccepted\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/social/complete",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "social", "complete"]
+            },
+            "description": "Complete social signup by providing phone. Sends OTP; verify with POST /auth/otp/verify { purpose: verify_phone }.\n\n_This example is a negative test: an invalid completionToken returns 400._"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('new accessToken returned', () => pm.expect(d.accessToken).to.be.a('string').and.not.empty);",
+                  "if (d.accessToken) pm.collectionVariables.set('accessToken', d.accessToken);",
+                  "if (d.refreshToken) pm.collectionVariables.set('refreshToken', d.refreshToken);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\",\n  \"role\": \"customer\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/refresh",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "refresh"]
+            },
+            "description": "Issue a new access token using a valid refresh token.\n\n_Uses the `refreshToken` captured at Login. Runs before Logout (which revokes it)._"
           }
         },
         {
           "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -182,321 +817,29 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "logout"]
             },
-            "description": "Revoke the refresh token and sign out."
-          }
-        },
-        {
-          "name": "Refresh Token",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\",\n  \"role\": \"customer\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/refresh",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "refresh"]
-            },
-            "description": "Issue a new access token using a valid refresh token."
-          }
-        },
-        {
-          "name": "Send OTP",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"purpose\": \"verify_email\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/otp/send",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "otp", "send"]
-            },
-            "description": "Send an OTP code via Email or Mobile.\n\nPurpose: 'verify_email' | 'verify_phone' | 'reset_password'\n\nNote: purpose='register' is NOT supported here — use POST /auth/register instead."
-          }
-        },
-        {
-          "name": "Verify OTP",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"phone\": \"+11234567890\",\n  \"code\": \"123456\",\n  \"purpose\": \"login\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/otp/verify",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "otp", "verify"]
-            },
-            "description": "Verify an OTP code.\n\nField is 'code', NOT 'otp'.\n\nBehaviour by purpose:\n- 'register'       → returns auth tokens (see 'Register — Step 2')\n- 'login'          → returns auth tokens (used after phone login)\n- 'verify_email'   → stamps emailVerifiedAt, returns { verified: true }\n- 'verify_phone'   → stamps phoneVerifiedAt, returns { verified: true }\n- 'reset_password' → validates code only, returns { verified: true }"
-          }
-        },
-        {
-          "name": "Resend OTP",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"purpose\": \"verify_email\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/otp/resend",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "otp", "resend"]
-            },
-            "description": "Resend an OTP code. Same rules as Send OTP — purpose='register' is not supported here (re-call /auth/register instead)."
-          }
-        },
-        {
-          "name": "Forgot Password",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/password/forgot",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "password", "forgot"]
-            },
-            "description": "Initiate password reset. Sends a reset code to email/phone."
-          }
-        },
-        {
-          "name": "Reset Password",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"email\": \"user@example.com\",\n  \"code\": \"123456\",\n  \"newPassword\": \"NewPassword123!\",\n  \"confirmPassword\": \"NewPassword123!\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/password/reset",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "password", "reset"]
-            },
-            "description": "Set a new password using a reset OTP code.\n\nField is 'code', NOT 'otp'."
-          }
-        },
-        {
-          "name": "Change Password",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"currentPassword\": \"Password123!\",\n  \"newPassword\": \"NewPassword123!\",\n  \"confirmPassword\": \"NewPassword123!\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/password/change",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "password", "change"]
-            },
-            "description": "Change password for an authenticated session.\n\nField is 'currentPassword', NOT 'oldPassword'."
-          }
-        },
-        {
-          "name": "Change Mobile Number - Request OTP",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"phone\": \"+14155559999\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/phone/change/request",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "phone", "change", "request"]
-            },
-            "description": "**Change mobile number (Step 1 of 2).** Authenticated — works for both customer and expert (phone lives on the shared User).\n\nValidates the new number is E.164, not already used by another account, and different from the current one, then sends a verify_phone OTP to the NEW number.\n\nErrors: 400 PHONE_UNCHANGED (same as current), 409 PHONE_TAKEN (in use by another account), 401 if session invalid.\n\n**Next step:** POST /auth/phone/change/verify with { phone, code }."
-          }
-        },
-        {
-          "name": "Change Mobile Number - Verify OTP",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"phone\": \"+14155559999\",\n  \"code\": \"123456\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/phone/change/verify",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "phone", "change", "verify"]
-            },
-            "description": "**Change mobile number (Step 2 of 2).** Authenticated.\n\nVerifies the OTP sent to the new number, then updates user.phone, stamps phoneVerifiedAt, and revokes ALL other sessions (existing access/refresh tokens on other devices are invalidated).\n\nReturns { changed: true, phone }.\n\nErrors: 400 INVALID_OTP / OTP_EXPIRED, 409 PHONE_TAKEN, 401 if session invalid."
-          }
-        },
-        {
-          "name": "Check Availability (email)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/check-availability?email=user@example.com",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "check-availability"],
-              "query": [
-                {
-                  "key": "email",
-                  "value": "user@example.com"
-                }
-              ]
-            },
-            "description": "Check if an email is available during onboarding.\n\npending_verification users are treated as available (they can re-register to get a fresh OTP).\n\nReturns: `{ emailAvailable: boolean }`"
-          }
-        },
-        {
-          "name": "Check Availability (phone)",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/check-availability?mobile=%2B14155552671",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "check-availability"],
-              "query": [
-                {
-                  "key": "mobile",
-                  "value": "%2B14155552671",
-                  "description": "E.164 phone number (URL-encode the leading '+' as %2B, or omit it — server normalizes automatically)"
-                }
-              ]
-            },
-            "description": "Check if a mobile number is available during onboarding.\n\nAccepts query param `mobile` or `phone` in E.164 format. The server normalizes the value: trims whitespace, restores a leading '+' if it was decoded as a space or omitted.\n\npending_verification users are treated as available.\n\nReturns: `{ phoneAvailable: boolean }`"
-          }
-        },
-        {
-          "name": "Login (by phone)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"phone\": \"+14155552671\",\n  \"role\": \"customer\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/login",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "login"]
-            },
-            "description": "Log in with mobile number (E.164). Password is not required. This triggers an OTP SMS and returns `{ needsOtp: true, ... }`."
-          }
-        },
-        {
-          "name": "Social Login",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"provider\": \"google\",\n  \"idToken\": \"firebase-id-token-from-mobile-sdk\",\n  \"role\": \"customer\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/social",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "social"]
-            },
-            "description": "Google or Apple sign-in via Firebase ID token.\n\nReturns auth tokens on success, or `{ needsProfileCompletion: true, missing: ['phone'], completionToken }` when phone is required."
-          }
-        },
-        {
-          "name": "Social Complete (collect phone)",
-          "request": {
-            "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"completionToken\": \"{{completionToken}}\",\n  \"phone\": \"+14155552671\",\n  \"termsAccepted\": true\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/auth/social/complete",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "auth", "social", "complete"]
-            },
-            "description": "Complete social signup by providing phone. Sends OTP; verify with POST /auth/otp/verify { purpose: verify_phone }."
+            "description": "Revoke the refresh token and sign out.\n\n_Runs last in the Auth chain since it revokes the refresh token._"
           }
         }
       ]
     },
     {
       "name": "Customer Profile",
+      "description": "Authenticated customer profile + discovery endpoints. These run after the Auth & Session chain, reusing the captured `accessToken`.",
       "item": [
         {
           "name": "Get Profile Me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('profile has id', () => pm.expect(pm.response.json().data).to.have.property('id'));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -515,6 +858,17 @@
         },
         {
           "name": "Update Profile Me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PATCH",
             "header": [
@@ -540,25 +894,19 @@
           }
         },
         {
-          "name": "Delete Account",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/customers/me/delete",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "customers", "me", "delete"]
-            },
-            "description": "Soft-delete the authenticated customer account (sets status=deleted)."
-          }
-        },
-        {
           "name": "Get Recently Viewed Experts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('paginated list', () => pm.expect(pm.response.json().data).to.have.property('items'));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -580,28 +928,19 @@
           }
         },
         {
-          "name": "Record Recently Viewed Expert",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/customers/me/recently-viewed/:expertId",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "customers", "me", "recently-viewed", ":expertId"],
-              "variable": [
-                { "key": "expertId", "value": "expert-uuid-here" }
-              ]
-            },
-            "description": "Record that an expert profile was viewed."
-          }
-        },
-        {
           "name": "Get Saved Experts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('paginated list', () => pm.expect(pm.response.json().data).to.have.property('items'));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -623,7 +962,51 @@
           }
         },
         {
+          "name": "Record Recently Viewed Expert",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// expertId is a placeholder; accept success or a not-found/validation response.",
+                  "pm.test('status is 200/201/400/404', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customers/me/recently-viewed/:expertId",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "customers", "me", "recently-viewed", ":expertId"],
+              "variable": [
+                { "key": "expertId", "value": "expert-uuid-here" }
+              ]
+            },
+            "description": "Record that an expert profile was viewed.\n\n_Uses a placeholder expertId; replace with a real expert UUID to record a view._"
+          }
+        },
+        {
           "name": "Save Expert",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200/201/400/404', () => pm.expect([200, 201, 400, 404]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -640,11 +1023,22 @@
                 { "key": "expertId", "value": "expert-uuid-here" }
               ]
             },
-            "description": "Save/bookmark an expert profile."
+            "description": "Save/bookmark an expert profile.\n\n_Uses a placeholder expertId; replace with a real expert UUID to save._"
           }
         },
         {
           "name": "Unsave Expert",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200/204/400/404', () => pm.expect([200, 204, 400, 404]).to.include(pm.response.code));"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "DELETE",
             "header": [
@@ -661,10 +1055,51 @@
                 { "key": "expertId", "value": "expert-uuid-here" }
               ]
             },
-            "description": "Remove an expert from the saved list."
+            "description": "Remove an expert from the saved list.\n\n_Uses a placeholder expertId; replace with a real expert UUID to unsave._"
+          }
+        },
+        {
+          "name": "Delete Account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customers/me/delete",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "customers", "me", "delete"]
+            },
+            "description": "Soft-delete the authenticated customer account (sets status=deleted).\n\n_Runs last in the Customer Profile folder since it deactivates the account created by this run._"
           }
         }
       ]
     }
+  ],
+  "variable": [
+    { "key": "runSeeded", "value": "" },
+    { "key": "runEmail", "value": "" },
+    { "key": "runPhone", "value": "" },
+    { "key": "newPhone", "value": "" },
+    { "key": "expertEmail", "value": "" },
+    { "key": "expertPhone", "value": "" },
+    { "key": "runPassword", "value": "Password123!" },
+    { "key": "otpCode", "value": "123456" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" }
   ]
 }
