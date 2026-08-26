@@ -580,6 +580,91 @@ export async function changePassword(userId, body) {
   return { changed: true };
 }
 
+// ─── Change mobile number ─────────────────────────────────────────────────────
+//
+// Two-step, OTP-verified flow. Phone lives on the shared User row, so this works
+// for both customers and experts (any authenticated user).
+//
+// Step 1 → POST /auth/phone/change/request  { phone }
+//   Validates the new number is E.164, not already in use, and different from the
+//   current one, then delivers an OTP to the NEW number (purpose=change_phone).
+//
+// Step 2 → POST /auth/phone/change/verify   { phone, code }
+//   Verifies the OTP, updates user.phone, stamps phoneVerifiedAt, and revokes all
+//   other sessions as a security measure (mirrors password reset/change).
+
+export async function requestPhoneChange(userId, body) {
+  const { phone } = body;
+  const db = getDb();
+
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user) throw notFound("User not found");
+  if (user.status !== "active") throw unauthorized("Session invalid");
+
+  if (user.phone && user.phone === phone) {
+    throw badRequest("This is already your current mobile number.", "PHONE_UNCHANGED", "phone");
+  }
+
+  // Uniqueness — reject if another account already claims this number
+  await assertIdentifierAvailable({ phone, excludeUserId: userId });
+
+  // Reuse the verify_phone OTP purpose (the shared OtpPurpose enum). The challenge
+  // is stamped with this userId so verifyPhoneChange can bind it to this account.
+  return createAndDeliverOtp({
+    phone,
+    purpose: "verify_phone",
+    channel: "phone",
+    userId,
+  });
+}
+
+export async function verifyPhoneChange(userId, body) {
+  const { phone, code } = body;
+  const db = getDb();
+
+  const user = await db.user.findUnique({ where: { id: userId } });
+  if (!user) throw notFound("User not found");
+  if (user.status !== "active") throw unauthorized("Session invalid");
+
+  // Re-check availability at confirm time (guards against a race between step 1 and 2)
+  await assertIdentifierAvailable({ phone, excludeUserId: userId });
+
+  const challenge = await findValidOtpChallenge({ phone, purpose: "verify_phone" });
+
+  // Bind the challenge to this user — a change-phone challenge is always stamped
+  // with the requesting userId (registration pre-verify challenges have userId=null).
+  if (challenge.userId !== userId) {
+    throw badRequest("OTP expired or not found", "OTP_EXPIRED", "phone");
+  }
+
+  await verifyOtpCode(challenge, code);
+
+  try {
+    await db.$transaction([
+      db.otpChallenge.update({
+        where: { id: challenge.id },
+        data: { consumedAt: new Date() },
+      }),
+      db.user.update({
+        where: { id: userId },
+        data: { phone, phoneVerifiedAt: new Date() },
+      }),
+      // Security: invalidate all other sessions on a mobile number change
+      db.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
+  } catch (err) {
+    if (err?.code === "P2002") {
+      throw conflict("This mobile number is already in use.", "PHONE_TAKEN");
+    }
+    throw err;
+  }
+
+  return { changed: true, phone };
+}
+
 // ─── Availability check ───────────────────────────────────────────────────────
 
 export async function checkAvailability(query) {

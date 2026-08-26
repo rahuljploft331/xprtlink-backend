@@ -41,6 +41,8 @@
   "resetCodeSent": "Reset code sent",
   "passwordReset": "Password reset",
   "passwordChanged": "Password changed",
+  "phoneChangeCodeSent": "Verification code sent to your new mobile number",
+  "phoneChanged": "Mobile number updated",
   "availabilityChecked": "Availability checked",
   "verificationCodeSent": "Verification code sent",
   "profileLoaded": "Profile loaded",

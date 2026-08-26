@@ -12,6 +12,8 @@ import {
   socialLoginRequestSchema,
   socialCompleteRequestSchema,
   refreshRequestSchema,
+  phoneChangeRequestSchema,
+  phoneChangeVerifySchema,
 } from "@xprtlink/shared/contracts";
 import * as svc from "../services/userService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
@@ -61,6 +63,26 @@ router.post(
     const body = refreshRequestSchema.parse(req.body);
     const data = await svc.refresh(body.refreshToken, body.role);
     return ResponseFormatter.success(res, { message: getMessage("tokenRefreshed"), data });
+  })
+);
+
+router.post(
+  "/phone/change/request",
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const body = phoneChangeRequestSchema.parse(req.body);
+    const data = await svc.requestPhoneChange(req.auth.userId, body);
+    return ResponseFormatter.success(res, { message: getMessage("phoneChangeCodeSent"), data });
+  })
+);
+
+router.post(
+  "/phone/change/verify",
+  authenticate,
+  asyncHandler(async (req, res) => {
+    const body = phoneChangeVerifySchema.parse(req.body);
+    const data = await svc.verifyPhoneChange(req.auth.userId, body);
+    return ResponseFormatter.success(res, { message: getMessage("phoneChanged"), data });
   })
 );
 

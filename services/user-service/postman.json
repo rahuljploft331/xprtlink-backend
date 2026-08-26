@@ -344,6 +344,58 @@
           }
         },
         {
+          "name": "Change Mobile Number - Request OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+14155559999\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/phone/change/request",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "phone", "change", "request"]
+            },
+            "description": "**Change mobile number (Step 1 of 2).** Authenticated — works for both customer and expert (phone lives on the shared User).\n\nValidates the new number is E.164, not already used by another account, and different from the current one, then sends a verify_phone OTP to the NEW number.\n\nErrors: 400 PHONE_UNCHANGED (same as current), 409 PHONE_TAKEN (in use by another account), 401 if session invalid.\n\n**Next step:** POST /auth/phone/change/verify with { phone, code }."
+          }
+        },
+        {
+          "name": "Change Mobile Number - Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"phone\": \"+14155559999\",\n  \"code\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/phone/change/verify",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "auth", "phone", "change", "verify"]
+            },
+            "description": "**Change mobile number (Step 2 of 2).** Authenticated.\n\nVerifies the OTP sent to the new number, then updates user.phone, stamps phoneVerifiedAt, and revokes ALL other sessions (existing access/refresh tokens on other devices are invalidated).\n\nReturns { changed: true, phone }.\n\nErrors: 400 INVALID_OTP / OTP_EXPIRED, 409 PHONE_TAKEN, 401 if session invalid."
+          }
+        },
+        {
           "name": "Check Availability (email)",
           "request": {
             "method": "GET",

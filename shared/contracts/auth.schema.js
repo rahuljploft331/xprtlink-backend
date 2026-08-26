@@ -172,3 +172,25 @@ export const refreshRequestSchema = z.object({
   refreshToken: z.string().min(1, "Refresh token is required"),
   role: sessionRoleSchema.optional(),
 });
+
+/** Step 1 — authenticated user requests to change their mobile number. */
+export const phoneChangeRequestSchema = z.object({
+  phone: e164PhoneSchema,
+});
+
+/** Step 2 — authenticated user confirms the change with the OTP sent to the new number. */
+export const phoneChangeVerifySchema = z.object({
+  phone: e164PhoneSchema,
+  code: z.string().regex(/^\d{6}$/, "OTP must be exactly 6 digits"),
+});
+
+export const phoneChangeRequestedDtoSchema = z.object({
+  sent: z.literal(true),
+  expiresInSeconds: z.number().int().positive(),
+  channel: z.enum(["email", "phone"]).optional(),
+});
+
+export const phoneChangedDtoSchema = z.object({
+  changed: z.literal(true),
+  phone: z.string(),
+});
