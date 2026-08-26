@@ -323,7 +323,7 @@
                 "verification"
               ]
             },
-            "description": "Load ID / professional verification status details."
+            "description": "Load ID / professional verification status details. status: unverified | pending | in_progress | approved | rejected | resubmit_required ('in_progress' = documents uploaded and awaiting admin review)."
           }
         },
         {
@@ -358,7 +358,7 @@
                 "documents"
               ]
             },
-            "description": "Submit verification documents. Uses primaryId (required UUID) and secondaryId (optional UUID) for document media references. docType: government_id | credential | other."
+            "description": "Submit verification documents. Uses primaryId (required UUID) and secondaryId (optional UUID) for document media references. docType: government_id | credential | other. On success the verification and the expert's verificationStatus move to 'in_progress' (documents uploaded and in review). Response: { submitted, documentCount, primaryId, secondaryId }."
           }
         },
         {
@@ -491,7 +491,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"holidayMode\": false,\n  \"vacationStart\": null,\n  \"vacationEnd\": null\n}"
+              "raw": "{\n  \"preferences\": {\n    \"holidayMode\": false,\n    \"vacationStart\": null,\n    \"vacationEnd\": null\n  }\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/experts/me/settings",
@@ -506,7 +506,7 @@
                 "settings"
               ]
             },
-            "description": "Modify configurations/settings for the expert."
+            "description": "Modify configurations/settings for the expert. Body must wrap settings in a `preferences` object (record of arbitrary keys, max 10KB), e.g. { \"preferences\": { \"holidayMode\": false, \"vacationStart\": null, \"vacationEnd\": null } }."
           }
         }
       ]

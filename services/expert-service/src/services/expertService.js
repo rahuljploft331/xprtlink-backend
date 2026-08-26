@@ -374,7 +374,12 @@ export async function submitVerificationDocuments(auth, body) {
     });
     if (!verification) {
       verification = await tx.expertVerification.create({
-        data: { expertProfileId: expert.id, status: "pending" },
+        data: { expertProfileId: expert.id, status: "in_progress" },
+      });
+    } else {
+      await tx.expertVerification.update({
+        where: { id: verification.id },
+        data: { status: "in_progress", submittedAt: new Date() },
       });
     }
 
@@ -388,9 +393,10 @@ export async function submitVerificationDocuments(auth, body) {
       });
     }
 
+    // Documents uploaded successfully — verification is now in review.
     await tx.expertProfile.update({
       where: { id: expert.id },
-      data: { verificationStatus: "pending" },
+      data: { verificationStatus: "in_progress" },
     });
   });
 

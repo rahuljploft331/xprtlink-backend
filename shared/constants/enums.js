@@ -19,6 +19,7 @@ export const AVAILABILITY_STATUS = {
 export const VERIFICATION_STATUS = {
   UNVERIFIED: "unverified",
   PENDING: "pending",
+  IN_PROGRESS: "in_progress",
   APPROVED: "approved",
   REJECTED: "rejected",
   RESUBMIT_REQUIRED: "resubmit_required",

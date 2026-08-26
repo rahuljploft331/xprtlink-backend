@@ -32,6 +32,7 @@ export const expertPublicDtoSchema = z.object({
   verificationStatus: z.enum([
     "unverified",
     "pending",
+    "in_progress",
     "approved",
     "rejected",
     "resubmit_required",
@@ -101,6 +102,7 @@ export const expertVerificationDtoSchema = z.object({
   status: z.enum([
     "unverified",
     "pending",
+    "in_progress",
     "approved",
     "rejected",
     "resubmit_required",

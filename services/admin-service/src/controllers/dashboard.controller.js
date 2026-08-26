@@ -29,7 +29,7 @@ export async function getStats(_req, res, next) {
     ] = await Promise.all([
       db.customerProfile.count(),
       db.expertProfile.count(),
-      db.expertVerification.count({ where: { status: "pending" } }),
+      db.expertVerification.count({ where: { status: { in: ["pending", "in_progress"] } } }),
       db.expertSubscription.count({ where: { status: "active" } }),
       db.consultation.count({
         where: { createdAt: { gte: thirtyDaysAgo }, status: "completed" },

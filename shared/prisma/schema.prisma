@@ -33,6 +33,7 @@ enum AvailabilityStatus {
 enum VerificationStatus {
   unverified
   pending
+  in_progress
   approved
   rejected
   resubmit_required
