@@ -55,7 +55,8 @@ router.post(
   authenticate,
   requireRole("expert"),
   asyncHandler(async (req, res) => {
-    const data = await svc.submitOnboarding(req.auth);
+    const body = expertOnboardingRequestSchema.parse(req.body);
+    const data = await svc.submitOnboarding(req.auth, body);
     return ResponseFormatter.success(res, { message: getMessage("onboardingSubmitted"), data });
   })
 );
