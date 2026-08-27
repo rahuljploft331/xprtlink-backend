@@ -6,6 +6,7 @@ import {
 } from "@xprtlink/shared/mappers/notification.mapper.js";
 import { notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
+import { DEFAULT_NOTIFICATION_PREFERENCES } from "@xprtlink/shared/constants/index.js";
 
 export async function registerDeviceToken(auth, body) {
   const db = getDb();
@@ -81,25 +82,26 @@ export async function markAllRead(auth) {
   return { marked: result.count };
 }
 
-async function getOrCreatePreferences(userId) {
+async function getOrCreatePreferences(userId, role) {
   const db = getDb();
   let pref = await db.notificationPreference.findUnique({ where: { userId } });
   if (!pref) {
+    const defaults = DEFAULT_NOTIFICATION_PREFERENCES[role] ?? {};
     pref = await db.notificationPreference.create({
-      data: { userId, preferences: {} },
+      data: { userId, preferences: defaults },
     });
   }
   return pref;
 }
 
 export async function getPreferences(auth) {
-  const pref = await getOrCreatePreferences(auth.userId);
+  const pref = await getOrCreatePreferences(auth.userId, auth.role);
   return toNotificationPreferencesDto(pref);
 }
 
 export async function updatePreferences(auth, body) {
   const db = getDb();
-  const existing = await getOrCreatePreferences(auth.userId);
+  const existing = await getOrCreatePreferences(auth.userId, auth.role);
   const merged = { ...(existing.preferences ?? {}), ...body.preferences };
 
   const pref = await db.notificationPreference.update({
