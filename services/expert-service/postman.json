@@ -281,8 +281,16 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
               }
             ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"headline\": \"Expert Cloud Architect\",\n  \"bio\": \"Experienced professional ready for consultations.\",\n  \"title\": \"Senior Consultant\",\n  \"businessName\": \"My Consulting LLC\",\n  \"languages\": [\"English\"],\n  \"serviceAreas\": [{\"name\": \"Austin, TX\", \"lat\": 30.2672, \"lng\": -97.7431}],\n  \"consultationRate\": 100,\n  \"experienceYears\": 5,\n  \"categoryId\": \"category-uuid-here\"\n}"
+            },
             "url": {
               "raw": "{{base_url}}/api/v1/experts/me/onboarding/submit",
               "host": [
@@ -297,7 +305,7 @@
                 "submit"
               ]
             },
-            "description": "Submit onboarding application for admin review."
+            "description": "Submit onboarding application for admin review. Accepts the same body as Save Onboarding Draft (all fields optional): headline, bio, title, businessName, languages (string[]), serviceAreas (array of {name, lat, lng}), consultationRate, experienceYears, categoryId, avatarMediaId."
           }
         },
         {
