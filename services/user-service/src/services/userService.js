@@ -1007,21 +1007,8 @@ function assertUuid(value, field = "expertId") {
   }
 }
 
-export async function recordRecentlyViewed(auth, expertId) {
-  assertUuid(expertId);
-  const db = getDb();
-  await db.customerRecentlyViewed.upsert({
-    where: {
-      customerProfileId_expertProfileId: {
-        customerProfileId: auth.customerProfileId,
-        expertProfileId: expertId,
-      },
-    },
-    create: { customerProfileId: auth.customerProfileId, expertProfileId: expertId },
-    update: { viewedAt: new Date() },
-  });
-  return { recorded: true };
-}
+// recordRecentlyViewed removed — recording now happens automatically
+// in expert-service's getExpertById (fire-and-forget side effect)
 
 export async function getSavedExperts(auth, query) {
   const { page, limit, skip } = parsePagination(query);

@@ -166,6 +166,18 @@ export async function getExpertById(id, auth) {
       where: { customerProfileId: auth.customerProfileId, expertProfileId: id },
     });
     isSaved = Boolean(saved);
+
+    // Record recently viewed (fire-and-forget — don't block the response)
+    getDb().customerRecentlyViewed.upsert({
+      where: {
+        customerProfileId_expertProfileId: {
+          customerProfileId: auth.customerProfileId,
+          expertProfileId: id,
+        },
+      },
+      create: { customerProfileId: auth.customerProfileId, expertProfileId: id },
+      update: { viewedAt: new Date() },
+    }).catch(() => {}); // silently ignore failures
   }
   return toExpertPublicDto(expert, { category: expert.category, isSaved });
 }
