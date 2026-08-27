@@ -240,40 +240,6 @@
           }
         },
         {
-          "name": "Save Onboarding Draft",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"headline\": \"Expert Cloud Architect\",\n  \"bio\": \"Onboarding draft biography.\",\n  \"title\": \"Senior Consultant\",\n  \"businessName\": \"My Consulting LLC\",\n  \"languages\": [\"English\"],\n  \"serviceAreas\": [{\"name\": \"Austin, TX\", \"lat\": 30.2672, \"lng\": -97.7431}],\n  \"consultationRate\": 100,\n  \"experienceYears\": 5,\n  \"categoryId\": \"category-uuid-here\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/experts/me/onboarding",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "experts",
-                "me",
-                "onboarding"
-              ]
-            },
-            "description": "Draft/save professional profile onboarding information. Accepts: headline, bio, title, businessName, languages (string[]), serviceAreas (array of {name, lat, lng} objects), consultationRate, experienceYears, categoryId, avatarMediaId."
-          }
-        },
-        {
           "name": "Submit Onboarding Profile",
           "request": {
             "method": "POST",

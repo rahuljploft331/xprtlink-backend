@@ -40,17 +40,6 @@ router.patch(
 );
 
 router.post(
-  "/me/onboarding",
-  authenticate,
-  requireRole("expert"),
-  asyncHandler(async (req, res) => {
-    const body = expertOnboardingRequestSchema.parse(req.body);
-    const data = await svc.saveOnboarding(req.auth, body);
-    return ResponseFormatter.success(res, { message: getMessage("onboardingSaved"), data });
-  })
-);
-
-router.post(
   "/me/onboarding/submit",
   authenticate,
   requireRole("expert"),

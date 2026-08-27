@@ -259,38 +259,6 @@ export async function updateExpertMe(auth, body) {
   });
 }
 
-export async function saveOnboarding(auth, body) {
-  const expert = await getDb().expertProfile.findFirst({ where: { userId: auth.userId } });
-  if (!expert) throw notFound("Expert profile not found");
-  
-  if (body.avatarMediaId) {
-    const media = await getDb().mediaAsset.findFirst({
-      where: { id: body.avatarMediaId, ownerUserId: auth.userId, status: "ready" }
-    });
-    if (!media) throw badRequest("Invalid or unready avatar media asset");
-  }
-
-  await getDb().expertProfile.update({
-    where: { id: expert.id },
-    data: {
-      ...(body.headline !== undefined ? { headline: body.headline } : {}),
-      ...(body.bio !== undefined ? { bio: body.bio } : {}),
-      ...(body.title !== undefined ? { title: body.title } : {}),
-      ...(body.businessName !== undefined ? { businessName: body.businessName } : {}),
-      ...(body.languages !== undefined ? { languages: body.languages } : {}),
-      ...(body.serviceAreas !== undefined ? { serviceAreas: body.serviceAreas } : {}),
-      ...(body.consultationRate !== undefined
-        ? { consultationRateCents: amountToCents(body.consultationRate) }
-        : {}),
-      ...(body.experienceYears !== undefined ? { experienceYears: body.experienceYears } : {}),
-      ...(body.categoryId ? { categoryId: body.categoryId } : {}),
-      ...(body.avatarMediaId !== undefined ? { avatarMediaId: body.avatarMediaId } : {}),
-      onboardingStep: { increment: 1 },
-    },
-  });
-  return { saved: true };
-}
-
 export async function submitOnboarding(auth, body) {
   const db = getDb();
   const expert = await db.expertProfile.findFirst({ where: { userId: auth.userId } });
