@@ -35,7 +35,9 @@ export const expertQuoteBlockDtoSchema = z.object({
 
 export const quoteSummaryDtoSchema = z.object({
   id: z.string().uuid(),
+  referenceNumber: z.string().nullable(),
   title: z.string(),
+  category: z.string().nullable(),
   status: quoteStatusSchema,
   expertId: z.string().uuid(),
   expertName: z.string(),
@@ -49,8 +51,11 @@ export const quoteSummaryDtoSchema = z.object({
 
 export const quoteDetailDtoSchema = z.object({
   id: z.string().uuid(),
+  referenceNumber: z.string().nullable(),
   title: z.string(),
   description: z.string(),
+  category: z.string().nullable(),
+  preferredLocation: z.string().nullable(),
   status: quoteStatusSchema,
   budget: z.number().nullable(),
   currency: z.string().length(3),
@@ -76,12 +81,16 @@ export const createQuoteRequestSchema = z.object({
   expertId: z.string().uuid().optional(),
   title: z.string().min(1).max(200),
   description: z.string().min(1),
+  category: z.string().min(1).max(120).optional(),
+  preferredLocation: z.string().min(1).max(200).optional(),
   budget: z.number().positive().optional(),
 });
 
 export const updateQuoteRequestSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().min(1).optional(),
+  category: z.string().min(1).max(120).optional(),
+  preferredLocation: z.string().min(1).max(200).optional(),
   budget: z.number().positive().optional(),
   mediaIds: z.array(z.string().uuid()).optional(),
   notes: z.string().optional(),

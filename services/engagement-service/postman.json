@@ -25,7 +25,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"expertId\": \"expert-uuid-here\",\n  \"title\": \"Need consultation on database architecture\",\n  \"description\": \"Require help sizing tables and setting up indexes.\",\n  \"mediaIds\": []\n}"
+              "raw": "{\n  \"expertId\": \"expert-uuid-here\",\n  \"title\": \"Need consultation on database architecture\",\n  \"description\": \"Require help sizing tables and setting up indexes.\",\n  \"category\": \"Database Design\",\n  \"preferredLocation\": \"Remote / Video call\",\n  \"budget\": 200.00\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/engagement/quotes",
@@ -39,7 +39,7 @@
                 "quotes"
               ]
             },
-            "description": "Customer submits a new quote request to an expert."
+            "description": "Customer submits a new quote request to an expert. Accepts expertId (optional), title, description, category (optional), preferredLocation (optional), and budget (optional). The response includes a generated referenceNumber."
           }
         },
         {
@@ -58,7 +58,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"description\": \"Updated description with more details.\",\n  \"mediaIds\": [\"media-uuid-1\"]\n}"
+              "raw": "{\n  \"title\": \"Need consultation on database architecture\",\n  \"description\": \"Updated description with more details.\",\n  \"category\": \"Database Design\",\n  \"preferredLocation\": \"Remote / Video call\",\n  \"budget\": 250.00,\n  \"mediaIds\": [\"media-uuid-1\"],\n  \"notes\": \"Added indexing requirements.\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/engagement/quotes/:id",
@@ -79,7 +79,7 @@
                 }
               ]
             },
-            "description": "Attach file media IDs or add additional notes to the quote."
+            "description": "Update a quote request. Accepts title, description, category, preferredLocation, budget, mediaIds, and notes (all optional)."
           }
         },
         {
@@ -106,7 +106,18 @@
               "query": [
                 {
                   "key": "role",
-                  "value": "customer"
+                  "value": "expert"
+                },
+                {
+                  "key": "inbox",
+                  "value": "true",
+                  "description": "Experts only: when true, returns only requests awaiting a quotation (status = pending_expert_review)."
+                },
+                {
+                  "key": "status",
+                  "value": "pending_expert_review",
+                  "description": "Optional status filter: submitted, pending_expert_review, quoted, accepted, rejected, canceled, expired.",
+                  "disabled": true
                 },
                 {
                   "key": "page",
@@ -118,7 +129,7 @@
                 }
               ]
             },
-            "description": "Get lists of quote requests (inbound for experts, outbound for customers)."
+            "description": "Get lists of quote requests (inbound for experts, outbound for customers). Pass role=expert to view the expert inbox; add inbox=true to show only requests awaiting a quotation, or status=<value> to filter. Each item includes referenceNumber, title, category, status, customerName, and timestamps."
           }
         },
         {
@@ -169,7 +180,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"price\": 150.00,\n  \"estimatedHours\": 2,\n  \"notes\": \"I can finish this in one sessions.\"\n}"
+              "raw": "{\n  \"amount\": 150.00,\n  \"notes\": \"I can finish this in one session.\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/engagement/quotes/:id/quotation",
