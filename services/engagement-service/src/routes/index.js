@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { validateUUID } from "@xprtlink/shared/middleware/validateUUID.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import quotesRoutes from "./quotes.routes.js";
@@ -11,17 +10,10 @@ import { expireStaleQuotes } from "../crons/expireQuotes.js";
 
 const router = Router();
 
-// Validate UUID route params across all engagement routes
-router.param("id", (req, _res, next, value) => {
-  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-7][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-  if (!UUID_RE.test(value)) {
-    const err = new Error(`Invalid UUID for parameter "id": ${value}`);
-    err.statusCode = 400;
-    err.code = "INVALID_UUID";
-    return next(err);
-  }
-  next();
-});
+// Note: UUID validation for :id params is applied inside each child router
+// (quotes.routes.js, consultations.routes.js) via validateUUID, because a
+// router.param callback on this parent router does not fire for params that
+// are matched by mounted child routers.
 
 router.use("/v1/engagement/quotes", quotesRoutes);
 router.use("/v1/engagement/consultations", consultationsRoutes);
