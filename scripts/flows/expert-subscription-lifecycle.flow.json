@@ -246,7 +246,7 @@
           "script": {
             "exec": [
               "pm.sendRequest({",
-              "  url: pm.collectionVariables.get('base_url') + '/api/v1/catalog/categories',",
+              "  url: pm.variables.get('base_url') + '/api/v1/catalog/categories',",
               "  method: 'GET'",
               "}, function (err, res) {",
               "  var json = res.json();",
@@ -283,44 +283,8 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"categories\":[\"{{category_id}}\"],\"bio\":\"Subscription lifecycle flow test expert. Created by init:flows.\",\"headline\":\"Flow Test Consultant\",\"hourlyRate\":100,\"experienceYears\":5,\"languages\":[\"English\"],\"location\":\"Chicago, IL\"}"
+          "raw": "{\"categoryId\":\"{{category_id}}\",\"bio\":\"Subscription lifecycle flow test expert. Created by init:flows.\",\"headline\":\"Flow Test Consultant\",\"title\":\"Senior Consultant\",\"businessName\":\"Flow Test Consulting\",\"consultationRate\":100,\"experienceYears\":5,\"languages\":[\"English\"],\"serviceAreas\":[{\"name\":\"Chicago, IL\",\"lat\":41.8781,\"lng\":-87.6298}]}"
         },
-        "url": {
-          "raw": "{{base_url}}/api/v1/experts/me/onboarding",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "experts",
-            "me",
-            "onboarding"
-          ]
-        }
-      }
-    },
-    {
-      "name": "Step 4: Submit Onboarding",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "pm.test('Status is 200 or 201', function () { pm.expect(pm.response.code).to.be.oneOf([200, 201]); });"
-            ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Authorization",
-            "value": "Bearer {{expert_token}}"
-          }
-        ],
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me/onboarding/submit",
           "host": [
@@ -333,6 +297,45 @@
             "me",
             "onboarding",
             "submit"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Step 4: Verify Onboarding Persisted",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status is 200', function () { pm.response.to.have.status(200); });",
+              "var me = pm.response.json().data;",
+              "pm.test('bio persisted', function () { pm.expect(me.bio).to.eql('Subscription lifecycle flow test expert. Created by init:flows.'); });",
+              "pm.test('consultationRate persisted', function () { pm.expect(me.consultationRate).to.eql(100); });",
+              "pm.test('onboardingComplete true', function () { pm.expect(me.onboardingComplete).to.be.true; });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{expert_token}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/experts/me",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "experts",
+            "me"
           ]
         }
       }

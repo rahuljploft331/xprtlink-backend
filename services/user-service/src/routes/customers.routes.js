@@ -47,13 +47,8 @@ router.get(
   })
 );
 
-router.post(
-  "/me/recently-viewed/:expertId",
-  asyncHandler(async (req, res) => {
-    const data = await svc.recordRecentlyViewed(req.auth, req.params.expertId);
-    return ResponseFormatter.success(res, { message: getMessage("viewRecorded"), data });
-  })
-);
+// POST /me/recently-viewed/:expertId removed — recording now happens
+// automatically as a side effect of GET /api/v1/experts/:id (expert-service)
 
 router.get(
   "/me/saved-experts",

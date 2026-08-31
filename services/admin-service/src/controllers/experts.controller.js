@@ -3,6 +3,8 @@ import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { logAdminAction } from "#utils/audit.js";
+import { adminSetFeaturedSchema } from "@xprtlink/shared/contracts/expert.schema.js";
 
 
 /** GET /api/v1/admin/experts */
@@ -64,6 +66,9 @@ export async function list(req, res, next) {
       ratingAvg: e.ratingAvg,
       ratingCount: e.ratingCount,
       activeSubscription: e.subscriptions[0] ?? null,
+      isFeatured: e.isFeatured,
+      featuredRank: e.featuredRank,
+      featuredUntil: e.featuredUntil,
       createdAt: e.createdAt,
     }));
 
@@ -96,6 +101,47 @@ export async function getById(req, res, next) {
       expert.avatarUrl = resolveMediaUrl(expert.avatarMedia?.storageKey);
     }
     return ResponseFormatter.success(res, { data: expert });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** PATCH /api/v1/admin/experts/:id/featured */
+export async function setFeatured(req, res, next) {
+  try {
+    const db = getDb();
+    const { isFeatured, featuredRank, featuredUntil } = adminSetFeaturedSchema.parse(req.body);
+
+    const existing = await db.expertProfile.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: getMessage("expertNotFound"), code: "NOT_FOUND" });
+    }
+
+    const expert = await db.expertProfile.update({
+      where: { id: req.params.id },
+      data: {
+        isFeatured,
+        // Clear ordering/expiry when un-featuring so stale values can't leak back in.
+        featuredRank: isFeatured ? (featuredRank ?? null) : null,
+        featuredUntil: isFeatured ? (featuredUntil ? new Date(featuredUntil) : null) : null,
+      },
+    });
+
+    await logAdminAction(req, "expert.setFeatured", "ExpertProfile", expert.id, {
+      isFeatured,
+      featuredRank: expert.featuredRank,
+      featuredUntil: expert.featuredUntil,
+    });
+
+    return ResponseFormatter.success(res, {
+      message: getMessage("expertFeaturedUpdated"),
+      data: {
+        id: expert.id,
+        isFeatured: expert.isFeatured,
+        featuredRank: expert.featuredRank,
+        featuredUntil: expert.featuredUntil,
+      },
+    });
   } catch (err) {
     next(err);
   }

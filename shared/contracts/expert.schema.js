@@ -40,7 +40,14 @@ export const expertPublicDtoSchema = z.object({
   rating: z.number().nullable(),
   reviewCount: z.number().int().nonnegative(),
   foundingMember: z.boolean(),
+  isFeatured: z.boolean().optional(),
   isSaved: z.boolean().optional(),
+});
+
+export const adminSetFeaturedSchema = z.object({
+  isFeatured: z.boolean(),
+  featuredRank: z.number().int().positive().nullable().optional(),
+  featuredUntil: z.string().datetime().nullable().optional(),
 });
 
 export const expertMeDtoSchema = expertPublicDtoSchema.extend({

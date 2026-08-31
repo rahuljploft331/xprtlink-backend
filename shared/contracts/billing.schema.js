@@ -22,9 +22,12 @@ export const subscriptionPlanDtoSchema = z.object({
   id: z.string().uuid(),
   code: z.string(),
   name: z.string(),
+  tagline: z.string().nullable(),
   priceMonthly: z.number(),
   currency: z.string().length(3),
   visibilityBoost: z.enum(["listing", "top_25", "top_5"]),
+  isMostPopular: z.boolean(),
+  keyFeatures: z.array(z.string()),
 });
 
 export const expertSubscriptionDtoSchema = z.object({

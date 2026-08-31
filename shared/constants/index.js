@@ -53,6 +53,26 @@ export const ADMIN_MODULES = [
 
 export * from "./enums.js";
 
+/**
+ * Default notification preferences per role.
+ * These are created when a user first accesses preferences (lazy) or on verification.
+ */
+export const DEFAULT_NOTIFICATION_PREFERENCES = {
+  expert: {
+    consultationAlerts: true,
+    quoteRequestUpdates: true,
+    pushNotifications: true,
+    subscriptionNotifications: true,
+    marketingCommunications: false,
+  },
+  customer: {
+    pushNotifications: true,
+    consultationReminders: true,
+    emailNotifications: true,
+    marketingNotifications: false,
+  },
+};
+
 export const SERVICE_NAMES = [
   "api-gateway",
   "user-service",

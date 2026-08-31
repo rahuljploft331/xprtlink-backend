@@ -13,6 +13,7 @@ import { toAuthSessionDto } from "@xprtlink/shared/mappers/auth.mapper.js";
 import { toCustomerMeDto } from "@xprtlink/shared/mappers/customer.mapper.js";
 import { badRequest, conflict, notFound, unauthorized, forbidden } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
+import { DEFAULT_NOTIFICATION_PREFERENCES } from "@xprtlink/shared/constants/index.js";
 
 // ─── Session ──────────────────────────────────────────────────────────────────
 
@@ -485,6 +486,12 @@ export async function verifyOtp(body) {
       });
     });
 
+    // Create default notification preferences for the newly verified user
+    const defaults = DEFAULT_NOTIFICATION_PREFERENCES[role] ?? {};
+    await db.notificationPreference.create({
+      data: { userId: challenge.userId, preferences: defaults },
+    }).catch(() => { /* ignore if already exists */ });
+
     const tokens = await issueTokens(user, role);
     if (!tokens) throw badRequest("Failed to create session");
     return tokens;
@@ -509,6 +516,12 @@ export async function verifyOtp(body) {
 
       return createProfileForRole(tx, challenge.userId, role, firstName, lastName);
     });
+
+    // Create default notification preferences for the newly verified user
+    const socialDefaults = DEFAULT_NOTIFICATION_PREFERENCES[role] ?? {};
+    await db.notificationPreference.create({
+      data: { userId: challenge.userId, preferences: socialDefaults },
+    }).catch(() => { /* ignore if already exists */ });
 
     const tokens = await issueTokens(user, role);
     if (!tokens) throw badRequest("Failed to create session");
@@ -807,6 +820,12 @@ export async function socialLogin(body) {
       data: { status: "active" },
       include,
     });
+
+    // Create default notification preferences for the newly verified user
+    const defaults = DEFAULT_NOTIFICATION_PREFERENCES[role] ?? {};
+    await db.notificationPreference.create({
+      data: { userId: user.id, preferences: defaults },
+    }).catch(() => { /* ignore if already exists */ });
   }
 
   const tokens = await issueTokens(user, role);
@@ -988,21 +1007,8 @@ function assertUuid(value, field = "expertId") {
   }
 }
 
-export async function recordRecentlyViewed(auth, expertId) {
-  assertUuid(expertId);
-  const db = getDb();
-  await db.customerRecentlyViewed.upsert({
-    where: {
-      customerProfileId_expertProfileId: {
-        customerProfileId: auth.customerProfileId,
-        expertProfileId: expertId,
-      },
-    },
-    create: { customerProfileId: auth.customerProfileId, expertProfileId: expertId },
-    update: { viewedAt: new Date() },
-  });
-  return { recorded: true };
-}
+// recordRecentlyViewed removed — recording now happens automatically
+// in expert-service's getExpertById (fire-and-forget side effect)
 
 export async function getSavedExperts(auth, query) {
   const { page, limit, skip } = parsePagination(query);

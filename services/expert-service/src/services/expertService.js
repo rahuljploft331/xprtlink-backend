@@ -13,14 +13,89 @@ import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/paginat
 
 const PUBLIC_WHERE = { searchEligible: true, verificationStatus: "approved" };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Expert ids are UUIDs. Guard lookups so malformed ids (from bots/scanners)
+// return a clean 404 instead of surfacing a Prisma P2023 stack trace.
+function assertExpertId(id) {
+  if (typeof id !== "string" || !UUID_RE.test(id)) {
+    throw notFound("Expert not found");
+  }
+}
+
+// Rank of each subscription visibility boost for featured ordering (higher = better).
+// Mirrors SubscriptionPlan.visibilityBoost (listing | top_25 | top_5) → Core / Professional / Elite.
+const VISIBILITY_BOOST_RANK = { top_5: 3, top_25: 2, listing: 1 };
+
+function activeBoostRank(expert) {
+  const boost = expert.subscriptions?.[0]?.plan?.visibilityBoost;
+  return VISIBILITY_BOOST_RANK[boost] ?? 0;
+}
+
+/**
+ * Featured experts (MFS §9.7.3, CUS-HOME-003).
+ *
+ * Selection is configurable rather than hardcoded:
+ *  1. Admin/manually promoted experts (`isFeatured`, not expired) ordered by `featuredRank`.
+ *  2. Backfilled by active subscription tier (Elite > Professional > Core) when fewer
+ *     than `limit` experts are explicitly featured.
+ * Rating / founding-member are only tiebreakers. All candidates must still satisfy
+ * marketplace eligibility (approved + search-eligible) and also appear in normal search.
+ */
 export async function getFeatured(limit = 10) {
-  const experts = await getDb().expertProfile.findMany({
-    where: PUBLIC_WHERE,
+  const db = getDb();
+  const now = new Date();
+  const include = {
+    category: true,
+    avatarMedia: true,
+    subscriptions: {
+      where: { status: "active" },
+      take: 1,
+      include: { plan: { select: { visibilityBoost: true } } },
+    },
+  };
+
+  // 1. Admin-pinned featured experts (respecting optional expiry), ordered by rank.
+  const pinned = await db.expertProfile.findMany({
+    where: {
+      ...PUBLIC_WHERE,
+      isFeatured: true,
+      OR: [{ featuredUntil: null }, { featuredUntil: { gt: now } }],
+    },
     take: limit,
-    orderBy: [{ ratingAvg: "desc" }, { foundingMember: "desc" }],
-    include: { category: true, avatarMedia: true },
+    orderBy: [
+      { featuredRank: "asc" },
+      { ratingAvg: "desc" },
+      { foundingMember: "desc" },
+    ],
+    include,
   });
-  return experts.map((e) => toExpertPublicDto(e, { category: e.category }));
+
+  let selected = pinned;
+
+  // 2. Backfill by subscription tier when there aren't enough pinned experts.
+  if (pinned.length < limit) {
+    const backfill = await db.expertProfile.findMany({
+      where: {
+        ...PUBLIC_WHERE,
+        id: { notIn: pinned.map((e) => e.id) },
+      },
+      // Over-fetch, then sort by tier (boost) in memory since visibilityBoost lives on the plan.
+      take: (limit - pinned.length) * 5,
+      orderBy: [{ ratingAvg: "desc" }, { foundingMember: "desc" }],
+      include,
+    });
+
+    backfill.sort((a, b) => {
+      const boostDiff = activeBoostRank(b) - activeBoostRank(a);
+      if (boostDiff !== 0) return boostDiff;
+      return Number(b.ratingAvg) - Number(a.ratingAvg);
+    });
+
+    selected = [...pinned, ...backfill.slice(0, limit - pinned.length)];
+  }
+
+  return selected.map((e) => toExpertPublicDto(e, { category: e.category }));
 }
 
 export async function searchExperts(query, auth) {
@@ -154,6 +229,7 @@ function buildSort(sort) {
 }
 
 export async function getExpertById(id, auth) {
+  assertExpertId(id);
   const expert = await getDb().expertProfile.findUnique({
     where: { id },
     include: { category: true, avatarMedia: true },
@@ -166,11 +242,24 @@ export async function getExpertById(id, auth) {
       where: { customerProfileId: auth.customerProfileId, expertProfileId: id },
     });
     isSaved = Boolean(saved);
+
+    // Record recently viewed (fire-and-forget — don't block the response)
+    getDb().customerRecentlyViewed.upsert({
+      where: {
+        customerProfileId_expertProfileId: {
+          customerProfileId: auth.customerProfileId,
+          expertProfileId: id,
+        },
+      },
+      create: { customerProfileId: auth.customerProfileId, expertProfileId: id },
+      update: { viewedAt: new Date() },
+    }).catch(() => {}); // silently ignore failures
   }
   return toExpertPublicDto(expert, { category: expert.category, isSaved });
 }
 
 export async function getExpertReviews(id, query) {
+  assertExpertId(id);
   const { page, limit, skip } = parsePagination(query);
   const db = getDb();
   const [reviews, total] = await Promise.all([
@@ -190,6 +279,7 @@ export async function getExpertReviews(id, query) {
 }
 
 export async function getExpertAvailability(id) {
+  assertExpertId(id);
   const expert = await getDb().expertProfile.findUnique({ where: { id } });
   if (!expert) throw notFound("Expert not found");
   return {

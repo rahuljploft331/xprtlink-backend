@@ -29,6 +29,7 @@ export function toExpertPublicDto(expert, { category, isSaved } = {}) {
     rating: expert.ratingCount > 0 ? Number(expert.ratingAvg) : null,
     reviewCount: expert.ratingCount,
     foundingMember: expert.foundingMember,
+    isFeatured: expert.isFeatured ?? false,
     ...(isSaved !== undefined ? { isSaved } : {}),
   };
 }

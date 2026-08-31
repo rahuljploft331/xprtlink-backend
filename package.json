@@ -27,6 +27,7 @@
     "seed:platform": "node scripts/seed-platform.js",
     "init:flows": "node scripts/init-flows.js",
     "init:flows:fresh": "node scripts/init-flows.js --fresh",
+    "flow:chat": "node scripts/flows/messaging-chat.socket.mjs",
     "db:generate": "npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared run db:generate",
     "db:push": "npx dotenv-cli -e .env -- npx prisma db push --schema=shared/prisma/schema.prisma",
     "db:migrate": "npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared run db:migrate",

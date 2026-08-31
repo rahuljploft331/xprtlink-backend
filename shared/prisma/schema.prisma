@@ -457,8 +457,11 @@ model SubscriptionPlan {
   id                String          @id @default(uuid()) @db.Uuid
   code              String          @unique @db.VarChar(32)
   name              String          @db.VarChar(120)
+  tagline           String?         @db.VarChar(120)
   priceMonthlyCents Int             @map("price_monthly_cents")
   visibilityBoost   VisibilityBoost @map("visibility_boost")
+  keyFeatures       String[]        @default([]) @map("key_features")
+  isMostPopular     Boolean         @default(false) @map("is_most_popular")
   isActive          Boolean         @default(true) @map("is_active")
   stripeProductId   String?         @map("stripe_product_id") @db.VarChar(128)
   stripePriceId     String?         @map("stripe_price_id") @db.VarChar(128)
@@ -515,6 +518,9 @@ model ExpertProfile {
   ratingAvg             Decimal            @default(0) @map("rating_avg") @db.Decimal(3, 2)
   ratingCount           Int                @default(0) @map("rating_count")
   searchEligible        Boolean            @default(false) @map("search_eligible")
+  isFeatured            Boolean            @default(false) @map("is_featured")
+  featuredRank          Int?               @map("featured_rank")
+  featuredUntil         DateTime?          @map("featured_until") @db.Timestamptz(6)
   stripeAccountId       String?            @map("stripe_account_id") @db.VarChar(128)
   createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -541,6 +547,7 @@ model ExpertProfile {
   @@index([verificationStatus])
   @@index([availabilityStatus])
   @@index([searchEligible])
+  @@index([isFeatured])
   @@map("expert_profiles")
 }
 
