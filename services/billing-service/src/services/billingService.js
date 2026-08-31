@@ -710,6 +710,21 @@ export async function subscribe(auth, body) {
       },
     });
 
+    // Marketplace eligibility: an expert becomes discoverable in search only
+    // when they are BOTH approved AND hold an active subscription. Approval
+    // sets searchEligible based on the subscription state at approval time
+    // (see admin verifications controller). When an already-approved expert
+    // subscribes afterwards, flip the flag on here so they surface in search
+    // without needing to be re-approved.
+    await tx.expertProfile.updateMany({
+      where: {
+        id: auth.expertProfileId,
+        verificationStatus: "approved",
+        searchEligible: false,
+      },
+      data: { searchEligible: true },
+    });
+
     return created;
   });
 
@@ -788,6 +803,17 @@ export async function expireSubscriptions() {
   const db = getDb();
   const now = new Date();
 
+  // Capture which experts are losing their subscription before we flip status,
+  // so we can revoke search eligibility for any left without an active plan.
+  const expiring = await db.expertSubscription.findMany({
+    where: {
+      status: "active",
+      cancelAtPeriodEnd: true,
+      currentPeriodEnd: { lte: now },
+    },
+    select: { expertProfileId: true },
+  });
+
   const result = await db.expertSubscription.updateMany({
     where: {
       status: "active",
@@ -799,6 +825,23 @@ export async function expireSubscriptions() {
       canceledAt: now,
     },
   });
+
+  // Revoke search eligibility for experts who no longer hold any active
+  // subscription. Discoverability requires an active plan (mirrors the
+  // approval-time rule and the activation path in subscribeToPlan).
+  const affectedExpertIds = [...new Set(expiring.map((s) => s.expertProfileId))];
+  for (const expertProfileId of affectedExpertIds) {
+    const stillActive = await db.expertSubscription.findFirst({
+      where: { expertProfileId, status: "active" },
+      select: { id: true },
+    });
+    if (!stillActive) {
+      await db.expertProfile.updateMany({
+        where: { id: expertProfileId, searchEligible: true },
+        data: { searchEligible: false },
+      });
+    }
+  }
 
   console.log(`[billing] expireSubscriptions: expired ${result.count} subscription(s) at ${now.toISOString()}`);
   return { expired: result.count };
