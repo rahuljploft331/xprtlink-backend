@@ -1,7 +1,11 @@
 import { centsToAmount, customerDisplayName, resolveMediaUrl, toIso } from "./common.js";
 import { expertDisplayName } from "./expert.mapper.js";
 
-export function toQuoteSummaryDto(quote, { customerUser, expertProfile, currency = "USD" }) {
+export function toQuoteSummaryDto(quote, { customerUser, expertProfile, attachments, currency = "USD" }) {
+  const attachmentCount = Array.isArray(attachments)
+    ? attachments.length
+    : quote.attachments?.length ?? 0;
+
   return {
     id: quote.id,
     referenceNumber: quote.referenceNumber ?? null,
@@ -10,16 +14,21 @@ export function toQuoteSummaryDto(quote, { customerUser, expertProfile, currency
     status: quote.status,
     expertId: quote.expertId,
     expertName: expertDisplayName(expertProfile),
+    expertAvatarUrl: resolveMediaUrl(expertProfile?.avatarMedia?.storageKey),
     customerId: quote.customerId,
     customerName: customerDisplayName(customerUser),
     budget: centsToAmount(quote.budgetCents),
     currency,
+    attachmentCount,
     createdAt: toIso(quote.createdAt),
     updatedAt: toIso(quote.updatedAt),
   };
 }
 
-export function toQuoteDetailDto(quote, { customerUser, expertProfile, attachments = [], currency = "USD" }) {
+export function toQuoteDetailDto(
+  quote,
+  { customerUser, customerProfile, expertProfile, attachments = [], currency = "USD" }
+) {
   const expertQuote =
     quote.status === "quoted" || quote.expertQuoteAmountCents != null
       ? {
@@ -30,11 +39,14 @@ export function toQuoteDetailDto(quote, { customerUser, expertProfile, attachmen
         }
       : null;
 
+  const contactName = customerDisplayName(customerUser);
+
   return {
     id: quote.id,
     referenceNumber: quote.referenceNumber ?? null,
     title: quote.title,
     description: quote.description,
+    notes: quote.notes ?? null,
     category: quote.category ?? null,
     preferredLocation: quote.preferredLocation ?? null,
     status: quote.status,
@@ -42,8 +54,14 @@ export function toQuoteDetailDto(quote, { customerUser, expertProfile, attachmen
     currency,
     expertId: quote.expertId,
     expertName: expertDisplayName(expertProfile),
+    expertTitle: expertProfile?.title ?? null,
+    expertHeadline: expertProfile?.headline ?? null,
+    expertAvatarUrl: resolveMediaUrl(expertProfile?.avatarMedia?.storageKey),
     customerId: quote.customerId,
-    customerName: customerDisplayName(customerUser),
+    customerName: contactName,
+    contactName,
+    contactPhone: customerUser?.phone ?? null,
+    customerAvatarUrl: resolveMediaUrl(customerProfile?.avatarMedia?.storageKey),
     attachments: attachments.map((a) => ({
       id: a.id,
       mediaId: a.mediaId,

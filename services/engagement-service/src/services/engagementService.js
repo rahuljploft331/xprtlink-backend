@@ -20,8 +20,8 @@ import { badRequest, conflict, forbidden, notFound } from "@xprtlink/shared/util
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 
 const QUOTE_INCLUDE = {
-  customer: { include: { user: true } },
-  expert: true,
+  customer: { include: { user: true, avatarMedia: true } },
+  expert: { include: { avatarMedia: true } },
   attachments: { include: { media: true } },
 };
 
@@ -103,6 +103,7 @@ function assertConsultationParticipant(auth, consultation) {
 function quoteContext(quote) {
   return {
     customerUser: quote.customer.user,
+    customerProfile: quote.customer,
     expertProfile: quote.expert,
     attachments: quote.attachments ?? [],
     currency: quote.expert.currency,
@@ -183,11 +184,19 @@ export async function createQuote(auth, body) {
         category: body.category ?? null,
         preferredLocation: body.preferredLocation ?? null,
         budgetCents: amountToCents(body.budget),
+        notes: body.notes ?? null,
         status: "submitted",
         submittedAt: now,
       },
       include: QUOTE_INCLUDE,
     });
+
+    if (body.mediaIds?.length) {
+      await tx.quoteAttachment.createMany({
+        data: body.mediaIds.map((mediaId) => ({ quoteId: created.id, mediaId })),
+        skipDuplicates: true,
+      });
+    }
 
     await tx.quoteStatusEvent.create({
       data: {
@@ -231,6 +240,7 @@ export async function updateQuote(auth, quoteId, body) {
         ? { preferredLocation: body.preferredLocation }
         : {}),
       ...(body.budget !== undefined ? { budgetCents: amountToCents(body.budget) } : {}),
+      ...(body.notes !== undefined ? { notes: body.notes } : {}),
     };
 
     if (body.mediaIds?.length) {
