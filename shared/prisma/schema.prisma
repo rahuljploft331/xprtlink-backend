@@ -60,6 +60,7 @@ enum QuoteStatus {
   draft
   submitted
   pending_expert_review
+  expert_reviewed
   quoted
   accepted
   rejected
@@ -624,6 +625,8 @@ model QuoteRequest {
   status                 QuoteStatus @default(draft)
   expertQuoteAmountCents Int?        @map("expert_quote_amount_cents")
   expertQuoteNotes       String?     @map("expert_quote_notes")
+  expertQuoteTimeline    String?     @map("expert_quote_timeline") @db.VarChar(120)
+  reviewedAt             DateTime?   @map("reviewed_at") @db.Timestamptz(6)
   expiresAt              DateTime?   @map("expires_at") @db.Timestamptz(6)
   submittedAt            DateTime?   @map("submitted_at") @db.Timestamptz(6)
   quotedAt               DateTime?   @map("quoted_at") @db.Timestamptz(6)

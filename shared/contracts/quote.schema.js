@@ -4,6 +4,7 @@ export const quoteStatusSchema = z.enum([
   "draft",
   "submitted",
   "pending_expert_review",
+  "expert_reviewed",
   "quoted",
   "accepted",
   "rejected",
@@ -30,6 +31,7 @@ export const expertQuoteBlockDtoSchema = z.object({
   amount: z.number(),
   currency: z.string().length(3),
   notes: z.string().nullable(),
+  timeline: z.string().nullable(),
   quotedAt: z.string().datetime(),
 });
 
@@ -76,6 +78,7 @@ export const quoteDetailDtoSchema = z.object({
   expertQuote: expertQuoteBlockDtoSchema.nullable(),
   expiresAt: z.string().datetime().nullable(),
   submittedAt: z.string().datetime().nullable(),
+  reviewedAt: z.string().datetime().nullable(),
   resolvedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
@@ -109,5 +112,6 @@ export const updateQuoteRequestSchema = z.object({
 
 export const submitQuotationRequestSchema = z.object({
   amount: z.number().positive(),
+  timeline: z.string().min(1).max(120).optional(),
   notes: z.string().optional(),
 });

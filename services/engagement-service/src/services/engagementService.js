@@ -31,8 +31,12 @@ const CONSULTATION_INCLUDE = {
   review: true,
 };
 
-const EDITABLE_QUOTE_STATUSES = new Set(["draft", "submitted", "pending_expert_review"]);
-const CANCELLABLE_QUOTE_STATUSES = new Set(["draft", "submitted", "pending_expert_review"]);
+const EDITABLE_QUOTE_STATUSES = new Set(["draft", "submitted", "pending_expert_review", "expert_reviewed"]);
+const CANCELLABLE_QUOTE_STATUSES = new Set(["draft", "submitted", "pending_expert_review", "expert_reviewed"]);
+// Statuses from which an expert may submit a quotation.
+const QUOTABLE_QUOTE_STATUSES = new Set(["pending_expert_review", "expert_reviewed"]);
+// Statuses that make up the expert "inbox" (awaiting action from the expert).
+const INBOX_QUOTE_STATUSES = ["pending_expert_review", "expert_reviewed"];
 const ACTIVE_CONSULTATION_STATUSES = new Set(["requested", "ringing", "accepted", "in_progress"]);
 
 // Crockford base32 alphabet — excludes ambiguous chars (0/O, 1/I/L, U).
@@ -272,7 +276,7 @@ export async function listQuotes(auth, query) {
     if (!auth.expertProfileId) throw forbidden("Expert access required");
     where.expertId = auth.expertProfileId;
     if (query.inbox === "true" || query.inbox === true) {
-      where.status = "pending_expert_review";
+      where.status = { in: INBOX_QUOTE_STATUSES };
     }
   } else {
     throw badRequest("Invalid role filter");
@@ -299,6 +303,30 @@ export async function listQuotes(auth, query) {
 export async function getQuote(auth, quoteId) {
   const quote = await loadQuote(quoteId);
   assertQuoteParticipant(auth, quote);
+
+  // First time the assigned expert opens a pending request, record that they
+  // reviewed it — this drives the "Expert Reviewed" step in the audit trail.
+  if (
+    auth.role === "expert" &&
+    auth.expertProfileId === quote.expertId &&
+    quote.status === "pending_expert_review"
+  ) {
+    const reviewed = await getDb().$transaction(async (tx) => {
+      const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
+      // Re-check inside the transaction to avoid racing a concurrent open.
+      if (!current || current.status !== "pending_expert_review") return null;
+      return recordQuoteTransition(tx, {
+        quoteId,
+        fromStatus: current.status,
+        toStatus: "expert_reviewed",
+        actorUserId: auth.userId,
+        note: "Expert reviewed the request",
+        data: { reviewedAt: new Date() },
+      });
+    });
+    if (reviewed) return toQuoteDetailDto(reviewed, quoteContext(reviewed));
+  }
+
   return toQuoteDetailDto(quote, quoteContext(quote));
 }
 
@@ -312,7 +340,7 @@ export async function submitQuotation(auth, quoteId, body) {
   const updated = await getDb().$transaction(async (tx) => {
     // Re-read inside transaction with optimistic status guard
     const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
-    if (!current || current.status !== "pending_expert_review") {
+    if (!current || !QUOTABLE_QUOTE_STATUSES.has(current.status)) {
       throw badRequest("Quote is not awaiting a quotation", "INVALID_STATUS");
     }
     return recordQuoteTransition(tx, {
@@ -324,6 +352,7 @@ export async function submitQuotation(auth, quoteId, body) {
       data: {
         expertQuoteAmountCents: amountToCents(body.amount),
         expertQuoteNotes: body.notes ?? null,
+        expertQuoteTimeline: body.timeline ?? null,
         quotedAt: now,
       },
     });
