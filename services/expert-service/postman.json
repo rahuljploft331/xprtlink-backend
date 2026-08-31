@@ -5,12 +5,33 @@
     "description": "REST APIs for expert profile management, search/featured, ratings/reviews, and onboarding verification.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
+  "variable": [
+    {
+      "key": "expertProfileId",
+      "value": "883b9c01-8985-4594-9785-0de4d75aca4c",
+      "type": "string",
+      "description": "A real, existing expert profile UUID used by the public profile/reviews/availability requests. Override in the active environment to point at a different expert."
+    }
+  ],
   "item": [
     {
       "name": "Marketplace & Discovery",
       "item": [
         {
           "name": "Get Featured Experts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-featured",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -26,11 +47,24 @@
                 "featured"
               ]
             },
-            "description": "Get active, verified, paid experts for the dashboard featured list."
+            "description": "Get featured experts for the customer home dashboard (MFS §9.7.3 / CUS-HOME-003). Selection is configurable, not hardcoded: (1) admin-pinned experts (isFeatured, respecting optional featuredUntil expiry) ordered by featuredRank, then (2) backfilled by active subscription tier (Elite > Professional > Core) with rating as the final tiebreaker. All candidates must satisfy marketplace eligibility (approved + search-eligible) and also appear in standard search. Each expert DTO now includes an `isFeatured` boolean."
           }
         },
         {
           "name": "Search Experts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-search",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
@@ -88,11 +122,24 @@
         },
         {
           "name": "Get Expert Profile by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-profile-by-id",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/experts/:id",
+              "raw": "{{base_url}}/api/v1/experts/{{expertProfileId}}",
               "host": [
                 "{{base_url}}"
               ],
@@ -100,25 +147,32 @@
                 "api",
                 "v1",
                 "experts",
-                ":id"
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "expert-uuid-here"
-                }
+                "{{expertProfileId}}"
               ]
             },
-            "description": "Get detailed public profile of an expert."
+            "description": "Get detailed public profile of an expert. Uses the `expertProfileId` collection/environment variable."
           }
         },
         {
           "name": "Get Expert Reviews",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-reviews",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/experts/:id/reviews?page=1&limit=20",
+              "raw": "{{base_url}}/api/v1/experts/{{expertProfileId}}/reviews?page=1&limit=20",
               "host": [
                 "{{base_url}}"
               ],
@@ -126,7 +180,7 @@
                 "api",
                 "v1",
                 "experts",
-                ":id",
+                "{{expertProfileId}}",
                 "reviews"
               ],
               "query": [
@@ -138,24 +192,31 @@
                   "key": "limit",
                   "value": "20"
                 }
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "expert-uuid-here"
-                }
               ]
             },
-            "description": "List reviews and ratings of an expert."
+            "description": "List reviews and ratings of an expert. Uses the `expertProfileId` collection/environment variable."
           }
         },
         {
           "name": "Get Expert Availability Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-availability",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/experts/:id/availability",
+              "raw": "{{base_url}}/api/v1/experts/{{expertProfileId}}/availability",
               "host": [
                 "{{base_url}}"
               ],
@@ -163,17 +224,11 @@
                 "api",
                 "v1",
                 "experts",
-                ":id",
+                "{{expertProfileId}}",
                 "availability"
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "expert-uuid-here"
-                }
               ]
             },
-            "description": "Check real-time availability/callability status on the expert profile."
+            "description": "Check real-time availability/callability status on the expert profile. Uses the `expertProfileId` collection/environment variable."
           }
         }
       ]
@@ -183,6 +238,19 @@
       "item": [
         {
           "name": "Get Profile Me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-me",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -208,6 +276,19 @@
         },
         {
           "name": "Update Profile Me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-update-me",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PATCH",
             "header": [
@@ -241,6 +322,26 @@
         },
         {
           "name": "Submit Onboarding Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-onboarding",
+                "type": "text/javascript",
+                "exec": [
+                  "// The sample body uses a non-UUID placeholder `categoryId`, so the API is expected",
+                  "// to reject it with a 400 VALIDATION_ERROR. Provide a real category UUID (or omit",
+                  "// categoryId) in the body to exercise the success path (200).",
+                  "pm.test('rejects non-UUID categoryId with 400 VALIDATION_ERROR', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql('VALIDATION_ERROR');",
+                  "  pm.expect(body.field).to.eql('categoryId');",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -271,11 +372,24 @@
                 "submit"
               ]
             },
-            "description": "Submit onboarding application for admin review. Accepts the same body as Save Onboarding Draft (all fields optional): headline, bio, title, businessName, languages (string[]), serviceAreas (array of {name, lat, lng}), consultationRate, experienceYears, categoryId, avatarMediaId."
+            "description": "Submit onboarding application for admin review. Accepts the same body as Save Onboarding Draft (all fields optional): headline, bio, title, businessName, languages (string[]), serviceAreas (array of {name, lat, lng}), consultationRate, experienceYears, categoryId (UUID), avatarMediaId.\n\nNOTE: the sample body uses a placeholder (non-UUID) `categoryId` and therefore expects a 400 VALIDATION_ERROR. Provide a real category UUID (or omit categoryId) to exercise the success path (200)."
           }
         },
         {
           "name": "Get Verification Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-verif-status",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -302,6 +416,26 @@
         },
         {
           "name": "Submit Verification Documents",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-verif-docs",
+                "type": "text/javascript",
+                "exec": [
+                  "// The sample body uses non-UUID placeholder media IDs, so the API is expected to reject",
+                  "// with a 400 VALIDATION_ERROR. Provide real media UUIDs (from a Media Service upload)",
+                  "// to exercise the success path.",
+                  "pm.test('rejects non-UUID media ids with 400 VALIDATION_ERROR', function () {",
+                  "  pm.response.to.have.status(400);",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.code).to.eql('VALIDATION_ERROR');",
+                  "  pm.expect(body.field).to.eql('primaryId');",
+                  "});"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -332,11 +466,24 @@
                 "documents"
               ]
             },
-            "description": "Submit verification documents. Uses primaryId (required UUID) and secondaryId (optional UUID) for document media references. docType: government_id | credential | other. On success the verification and the expert's verificationStatus move to 'in_progress' (documents uploaded and in review). Response: { submitted, documentCount, primaryId, secondaryId }."
+            "description": "Submit verification documents. Uses primaryId (required UUID) and secondaryId (optional UUID) for document media references. docType: government_id | credential | other. On success the verification and the expert's verificationStatus move to 'in_progress' (documents uploaded and in review). Response: { submitted, documentCount, primaryId, secondaryId }.\n\nNOTE: the sample body uses placeholder (non-UUID) media IDs and therefore expects a 400 VALIDATION_ERROR. Provide real media UUIDs (from a Media Service upload) to exercise the success path."
           }
         },
         {
           "name": "Get Expert Dashboard Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-dashboard",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -363,6 +510,19 @@
         },
         {
           "name": "Get Rating Summary",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-rating",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -389,6 +549,19 @@
         },
         {
           "name": "Get My Reviews (Paginated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-my-reviews",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -425,6 +598,19 @@
         },
         {
           "name": "Get Settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-settings",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "GET",
             "header": [
@@ -451,6 +637,19 @@
         },
         {
           "name": "Update Settings",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-update-settings",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "PATCH",
             "header": [

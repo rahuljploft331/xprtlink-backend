@@ -267,6 +267,52 @@
           }
         },
         {
+          "name": "Set Expert Featured",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isFeatured\": true,\n  \"featuredRank\": 1,\n  \"featuredUntil\": null\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/experts/:id/featured",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "experts",
+                ":id",
+                "featured"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "expert-uuid-here"
+                }
+              ]
+            },
+            "description": "Feature or unfeature an expert on the customer home dashboard (MFS §9.7.3). Requires the `experts` module at `edit` permission level. Body: `isFeatured` (bool, required); `featuredRank` (int > 0, optional — lower = higher placement); `featuredUntil` (ISO 8601 datetime, optional — auto-expires the pin). When `isFeatured` is false, `featuredRank` and `featuredUntil` are cleared. Featured experts must still satisfy marketplace eligibility (approved + search-eligible) to actually appear."
+          }
+        },
+        {
           "name": "List Verification Requests",
           "request": {
             "method": "GET",
