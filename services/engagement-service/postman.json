@@ -25,7 +25,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"expertId\": \"expert-uuid-here\",\n  \"title\": \"Need consultation on database architecture\",\n  \"description\": \"Require help sizing tables and setting up indexes.\",\n  \"category\": \"Database Design\",\n  \"preferredLocation\": \"Remote / Video call\",\n  \"budget\": 200.00\n}"
+              "raw": "{\n  \"expertId\": \"expert-uuid-here\",\n  \"title\": \"Need consultation on database architecture\",\n  \"description\": \"Require help sizing tables and setting up indexes.\",\n  \"category\": \"Database Design\",\n  \"preferredLocation\": \"Remote / Video call\",\n  \"budget\": 200.00,\n  \"notes\": \"Priority on the private consultation rooms.\",\n  \"mediaIds\": [\"media-uuid-1\"]\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/engagement/quotes",
@@ -39,7 +39,7 @@
                 "quotes"
               ]
             },
-            "description": "Customer submits a new quote request to an expert. Accepts expertId (optional), title, description, category (optional), preferredLocation (optional), and budget (optional). The response includes a generated referenceNumber."
+            "description": "Customer submits a new quote request to an expert. Accepts expertId (optional), title, description, category (optional), preferredLocation (optional), budget (optional), notes (optional customer note), and mediaIds (optional array of uploaded media UUIDs to attach). The response is a quote detail object including a generated referenceNumber, notes, expert card fields (expertName, expertTitle, expertHeadline, expertAvatarUrl), contact fields (contactName, contactPhone, customerAvatarUrl), and attachments (id, mediaId, url, mimeType)."
           }
         },
         {
@@ -129,7 +129,7 @@
                 }
               ]
             },
-            "description": "Get lists of quote requests (inbound for experts, outbound for customers). Pass role=expert to view the expert inbox; add inbox=true to show only requests awaiting a quotation, or status=<value> to filter. Each item includes referenceNumber, title, category, status, customerName, and timestamps."
+            "description": "Get lists of quote requests (inbound for experts, outbound for customers). Pass role=expert to view the expert inbox; add inbox=true to show only requests awaiting a quotation, or status=<value> to filter. Paginated response: data.{items,page,limit,total}. Each item includes referenceNumber, title, category, status, expertName, expertAvatarUrl, customerName, budget, currency, attachmentCount (for the file-count chip), and timestamps."
           }
         },
         {
@@ -161,7 +161,7 @@
                 }
               ]
             },
-            "description": "Fetch detailed information of a quote request."
+            "description": "Fetch detailed information of a quote request. Response fields: id, referenceNumber, title, description, notes (customer note), category, preferredLocation, status, budget, currency, expert card (expertId, expertName, expertTitle, expertHeadline, expertAvatarUrl), contact info (customerId, customerName, contactName, contactPhone, customerAvatarUrl), attachments[{id, mediaId, url, mimeType}], expertQuote{amount, currency, notes, quotedAt} (non-null once status is 'quoted'), and timestamps (expiresAt, submittedAt, resolvedAt, createdAt, updatedAt)."
           }
         },
         {
