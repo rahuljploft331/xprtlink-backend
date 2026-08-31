@@ -70,6 +70,13 @@ enum QuoteStatus {
   @@map("quote_status")
 }
 
+enum QuoteAttachmentRole {
+  customer
+  expert
+
+  @@map("quote_attachment_role")
+}
+
 enum ConsultationStatus {
   requested
   ringing
@@ -662,10 +669,11 @@ model QuoteStatusEvent {
 }
 
 model QuoteAttachment {
-  id        String   @id @default(uuid()) @db.Uuid
-  quoteId   String   @map("quote_id") @db.Uuid
-  mediaId   String   @map("media_id") @db.Uuid
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id             String              @id @default(uuid()) @db.Uuid
+  quoteId        String              @map("quote_id") @db.Uuid
+  mediaId        String              @map("media_id") @db.Uuid
+  uploadedByRole QuoteAttachmentRole @default(customer) @map("uploaded_by_role")
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
 
   quote QuoteRequest @relation(fields: [quoteId], references: [id], onDelete: Cascade)
   media MediaAsset   @relation(fields: [mediaId], references: [id], onDelete: Restrict)

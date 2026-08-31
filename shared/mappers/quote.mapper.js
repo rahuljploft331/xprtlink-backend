@@ -68,6 +68,7 @@ export function toQuoteDetailDto(
       mediaId: a.mediaId,
       url: resolveMediaUrl(a.media?.storageKey),
       mimeType: a.media?.mimeType ?? null,
+      uploadedByRole: a.uploadedByRole ?? "customer",
     })),
     expertQuote,
     expiresAt: toIso(quote.expiresAt),

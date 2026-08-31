@@ -180,7 +180,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"amount\": 150.00,\n  \"timeline\": \"5 Business Days\",\n  \"notes\": \"I can finish this in one session.\"\n}"
+              "raw": "{\n  \"amount\": 150.00,\n  \"timeline\": \"5 Business Days\",\n  \"notes\": \"I can finish this in one session.\",\n  \"mediaIds\": [\"media-uuid-1\"]\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/engagement/quotes/:id/quotation",
@@ -202,7 +202,7 @@
                 }
               ]
             },
-            "description": "Expert submits a quotation back to the customer. Body: amount (required, positive), timeline (optional, e.g. \"5 Business Days\"), notes (optional). Valid when the quote status is pending_expert_review or expert_reviewed; moves the quote to `quoted`. The response's expertQuote block includes amount, currency, notes, timeline, and quotedAt."
+            "description": "Expert submits a quotation back to the customer. Body: amount (required, positive), timeline (optional, e.g. \"5 Business Days\"), notes (optional), and mediaIds (optional array of uploaded media UUIDs the expert attaches to the quotation). Valid when the quote status is pending_expert_review or expert_reviewed; moves the quote to `quoted`. The response's expertQuote block includes amount, currency, notes, timeline, and quotedAt. Attachments returned in the quote detail carry an uploadedByRole field (`customer` or `expert`) so clients can separate the customer's request files from the expert's quotation files."
           }
         },
         {
