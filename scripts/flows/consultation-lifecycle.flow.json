@@ -659,10 +659,10 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"categories\":[\"{{category_id}}\"],\"bio\":\"Consultation lifecycle test expert.\",\"headline\":\"Video Consultation Specialist\",\"hourlyRate\":150,\"experienceYears\":5,\"languages\":[\"English\"],\"location\":\"San Francisco, CA\",\"avatarMediaId\":\"{{avatar_media_id}}\"}"
+          "raw": "{\"categoryId\":\"{{category_id}}\",\"bio\":\"Consultation lifecycle test expert.\",\"headline\":\"Video Consultation Specialist\",\"title\":\"Senior Consultant\",\"businessName\":\"Consult Flow LLC\",\"consultationRate\":150,\"experienceYears\":5,\"languages\":[\"English\"],\"serviceAreas\":[{\"name\":\"San Francisco, CA\",\"lat\":37.7749,\"lng\":-122.4194}],\"avatarMediaId\":\"{{avatar_media_id}}\"}"
         },
         "url": {
-          "raw": "{{base_url}}/api/v1/experts/me/onboarding",
+          "raw": "{{base_url}}/api/v1/experts/me/onboarding/submit",
           "host": [
             "{{base_url}}"
           ],
@@ -671,7 +671,8 @@
             "v1",
             "experts",
             "me",
-            "onboarding"
+            "onboarding",
+            "submit"
           ]
         }
       }
@@ -959,7 +960,7 @@
               "  pm.collectionVariables.set(\"admin_token\", adminToken);",
               "  // 2. Fetch pending verifications",
               "  pm.sendRequest({",
-              "    url: pm.collectionVariables.get(\"base_url\") + \"/api/v1/admin/verifications?status=pending\",",
+              "    url: pm.collectionVariables.get(\"base_url\") + \"/api/v1/admin/verifications?status=in_progress&limit=100\",",
               "    method: \"GET\",",
               "    header: [{ key: \"Authorization\", value: \"Bearer \" + adminToken }]",
               "  }, function (err2, listRes) {",
