@@ -35,6 +35,35 @@ const EDITABLE_QUOTE_STATUSES = new Set(["draft", "submitted", "pending_expert_r
 const CANCELLABLE_QUOTE_STATUSES = new Set(["draft", "submitted", "pending_expert_review"]);
 const ACTIVE_CONSULTATION_STATUSES = new Set(["requested", "ringing", "accepted", "in_progress"]);
 
+// Crockford base32 alphabet — excludes ambiguous chars (0/O, 1/I/L, U).
+const REFERENCE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+
+/** Generates a human-friendly quote reference, e.g. "QR-8F3KD2". */
+function generateQuoteReference(length = 6) {
+  let code = "";
+  for (let i = 0; i < length; i += 1) {
+    code += REFERENCE_ALPHABET[Math.floor(Math.random() * REFERENCE_ALPHABET.length)];
+  }
+  return `QR-${code}`;
+}
+
+/**
+ * Returns a reference number guaranteed unique against existing quotes.
+ * Retries on the rare collision (unique index also guards at the DB level).
+ */
+async function uniqueQuoteReference(tx, attempts = 5) {
+  for (let i = 0; i < attempts; i += 1) {
+    const candidate = generateQuoteReference();
+    const existing = await tx.quoteRequest.findUnique({
+      where: { referenceNumber: candidate },
+      select: { id: true },
+    });
+    if (!existing) return candidate;
+  }
+  // Fall back to a longer code to virtually eliminate collision risk.
+  return generateQuoteReference(10);
+}
+
 function assertCustomer(auth) {
   if (auth.role !== "customer" || !auth.customerProfileId) {
     throw forbidden("Customer access required");
@@ -143,12 +172,16 @@ export async function createQuote(auth, body) {
 
   const now = new Date();
   const quote = await db.$transaction(async (tx) => {
+    const referenceNumber = await uniqueQuoteReference(tx);
     const created = await tx.quoteRequest.create({
       data: {
+        referenceNumber,
         customerId: auth.customerProfileId,
         expertId: expert.id,
         title: body.title,
         description: body.description,
+        category: body.category ?? null,
+        preferredLocation: body.preferredLocation ?? null,
         budgetCents: amountToCents(body.budget),
         status: "submitted",
         submittedAt: now,
@@ -193,6 +226,10 @@ export async function updateQuote(auth, quoteId, body) {
     const data = {
       ...(body.title ? { title: body.title } : {}),
       ...(body.description ? { description: body.description } : {}),
+      ...(body.category !== undefined ? { category: body.category } : {}),
+      ...(body.preferredLocation !== undefined
+        ? { preferredLocation: body.preferredLocation }
+        : {}),
       ...(body.budget !== undefined ? { budgetCents: amountToCents(body.budget) } : {}),
     };
 

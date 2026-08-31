@@ -4,7 +4,9 @@ import { expertDisplayName } from "./expert.mapper.js";
 export function toQuoteSummaryDto(quote, { customerUser, expertProfile, currency = "USD" }) {
   return {
     id: quote.id,
+    referenceNumber: quote.referenceNumber ?? null,
     title: quote.title,
+    category: quote.category ?? null,
     status: quote.status,
     expertId: quote.expertId,
     expertName: expertDisplayName(expertProfile),
@@ -30,8 +32,11 @@ export function toQuoteDetailDto(quote, { customerUser, expertProfile, attachmen
 
   return {
     id: quote.id,
+    referenceNumber: quote.referenceNumber ?? null,
     title: quote.title,
     description: quote.description,
+    category: quote.category ?? null,
+    preferredLocation: quote.preferredLocation ?? null,
     status: quote.status,
     budget: centsToAmount(quote.budgetCents),
     currency,
