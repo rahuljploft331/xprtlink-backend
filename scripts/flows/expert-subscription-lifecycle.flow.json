@@ -246,7 +246,7 @@
           "script": {
             "exec": [
               "pm.sendRequest({",
-              "  url: pm.collectionVariables.get('base_url') + '/api/v1/catalog/categories',",
+              "  url: pm.variables.get('base_url') + '/api/v1/catalog/categories',",
               "  method: 'GET'",
               "}, function (err, res) {",
               "  var json = res.json();",

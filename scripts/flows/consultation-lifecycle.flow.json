@@ -629,7 +629,7 @@
           "listen": "prerequest",
           "script": {
             "exec": [
-              "pm.sendRequest({ url: pm.collectionVariables.get('base_url') + '/api/v1/catalog/categories', method: 'GET' }, function (err, res) { var json = res.json(); if (json.data && json.data.length > 0) { pm.collectionVariables.set('category_id', json.data[0].id); } });"
+              "pm.sendRequest({ url: pm.variables.get('base_url') + '/api/v1/catalog/categories', method: 'GET' }, function (err, res) { var json = res.json(); if (json.data && json.data.length > 0) { pm.collectionVariables.set('category_id', json.data[0].id); } });"
             ],
             "type": "text/javascript"
           }
@@ -722,7 +722,7 @@
           "listen": "prerequest",
           "script": {
             "exec": [
-              "pm.sendRequest({ url: pm.collectionVariables.get('base_url') + '/api/v1/billing/subscriptions/plans', method: 'GET', header: [{ key: 'Authorization', value: 'Bearer ' + pm.collectionVariables.get('expert_token') }] }, function (err, res) { var json = res.json(); if (json.data && json.data.length > 0) { var plan = json.data.find(function(p) { return p.code === 'professional'; }) || json.data[0]; pm.collectionVariables.set('plan_code', plan.code); } });"
+              "pm.sendRequest({ url: pm.variables.get('base_url') + '/api/v1/billing/subscriptions/plans', method: 'GET', header: [{ key: 'Authorization', value: 'Bearer ' + pm.collectionVariables.get('expert_token') }] }, function (err, res) { var json = res.json(); if (json.data && json.data.length > 0) { var plan = json.data.find(function(p) { return p.code === 'professional'; }) || json.data[0]; pm.collectionVariables.set('plan_code', plan.code); } });"
             ],
             "type": "text/javascript"
           }
