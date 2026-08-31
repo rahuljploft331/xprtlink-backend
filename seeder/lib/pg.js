@@ -175,8 +175,11 @@ export async function seedPostgres(payload) {
       data: {
         code: plan.code,
         name: plan.name,
+        tagline: plan.tagline ?? null,
         priceMonthlyCents: Math.round(plan.priceMonthly * 100),
         visibilityBoost: plan.visibilityBoost,
+        keyFeatures: plan.keyFeatures ?? [],
+        isMostPopular: plan.isMostPopular ?? false,
         stripeProductId: stripeInfo.stripeProductId ?? null,
         stripePriceId: stripeInfo.stripePriceId ?? null,
       },

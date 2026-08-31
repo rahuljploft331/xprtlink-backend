@@ -27,9 +27,12 @@ export function toSubscriptionPlanDto(plan, currency = "USD") {
     id: plan.id,
     code: plan.code,
     name: plan.name,
+    tagline: plan.tagline ?? null,
     priceMonthly: centsToAmount(plan.priceMonthlyCents),
     currency,
     visibilityBoost: plan.visibilityBoost,
+    isMostPopular: plan.isMostPopular ?? false,
+    keyFeatures: plan.keyFeatures ?? [],
   };
 }
 

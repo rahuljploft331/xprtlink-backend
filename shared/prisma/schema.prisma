@@ -457,8 +457,11 @@ model SubscriptionPlan {
   id                String          @id @default(uuid()) @db.Uuid
   code              String          @unique @db.VarChar(32)
   name              String          @db.VarChar(120)
+  tagline           String?         @db.VarChar(120)
   priceMonthlyCents Int             @map("price_monthly_cents")
   visibilityBoost   VisibilityBoost @map("visibility_boost")
+  keyFeatures       String[]        @default([]) @map("key_features")
+  isMostPopular     Boolean         @default(false) @map("is_most_popular")
   isActive          Boolean         @default(true) @map("is_active")
   stripeProductId   String?         @map("stripe_product_id") @db.VarChar(128)
   stripePriceId     String?         @map("stripe_price_id") @db.VarChar(128)

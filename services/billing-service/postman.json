@@ -295,7 +295,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "billing", "subscriptions", "plans"]
             },
-            "description": "List subscription plans available for experts."
+            "description": "List subscription plans available for experts. Response includes id, code, name, tagline, priceMonthly, currency, visibilityBoost, isMostPopular, and keyFeatures array."
           }
         },
         {
