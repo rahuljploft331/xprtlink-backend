@@ -197,7 +197,11 @@ export async function createQuote(auth, body) {
 
     if (body.mediaIds?.length) {
       await tx.quoteAttachment.createMany({
-        data: body.mediaIds.map((mediaId) => ({ quoteId: created.id, mediaId })),
+        data: body.mediaIds.map((mediaId) => ({
+          quoteId: created.id,
+          mediaId,
+          uploadedByRole: "customer",
+        })),
         skipDuplicates: true,
       });
     }
@@ -249,7 +253,11 @@ export async function updateQuote(auth, quoteId, body) {
 
     if (body.mediaIds?.length) {
       await tx.quoteAttachment.createMany({
-        data: body.mediaIds.map((mediaId) => ({ quoteId, mediaId })),
+        data: body.mediaIds.map((mediaId) => ({
+          quoteId,
+          mediaId,
+          uploadedByRole: "customer",
+        })),
         skipDuplicates: true,
       });
     }
@@ -343,6 +351,20 @@ export async function submitQuotation(auth, quoteId, body) {
     if (!current || !QUOTABLE_QUOTE_STATUSES.has(current.status)) {
       throw badRequest("Quote is not awaiting a quotation", "INVALID_STATUS");
     }
+
+    // Persist any media the expert attached to their quotation, tagged with
+    // the expert role so the client can separate them from the customer's files.
+    if (body.mediaIds?.length) {
+      await tx.quoteAttachment.createMany({
+        data: body.mediaIds.map((mediaId) => ({
+          quoteId,
+          mediaId,
+          uploadedByRole: "expert",
+        })),
+        skipDuplicates: true,
+      });
+    }
+
     return recordQuoteTransition(tx, {
       quoteId,
       fromStatus: current.status,

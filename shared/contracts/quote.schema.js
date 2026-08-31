@@ -12,11 +12,14 @@ export const quoteStatusSchema = z.enum([
   "canceled",
 ]);
 
+export const quoteAttachmentRoleSchema = z.enum(["customer", "expert"]);
+
 export const quoteAttachmentDtoSchema = z.object({
   id: z.string().uuid(),
   mediaId: z.string().uuid(),
   url: z.string().url().nullable(),
   mimeType: z.string().nullable(),
+  uploadedByRole: quoteAttachmentRoleSchema,
 });
 
 export const quoteStatusEventDtoSchema = z.object({
@@ -114,4 +117,6 @@ export const submitQuotationRequestSchema = z.object({
   amount: z.number().positive(),
   timeline: z.string().min(1).max(120).optional(),
   notes: z.string().optional(),
+  // Media the expert attaches alongside their quotation (optional).
+  mediaIds: z.array(z.string().uuid()).optional(),
 });
