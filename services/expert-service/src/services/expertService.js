@@ -13,6 +13,16 @@ import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/paginat
 
 const PUBLIC_WHERE = { searchEligible: true, verificationStatus: "approved" };
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Expert ids are UUIDs. Guard lookups so malformed ids (from bots/scanners)
+// return a clean 404 instead of surfacing a Prisma P2023 stack trace.
+function assertExpertId(id) {
+  if (typeof id !== "string" || !UUID_RE.test(id)) {
+    throw notFound("Expert not found");
+  }
+}
+
 export async function getFeatured(limit = 10) {
   const experts = await getDb().expertProfile.findMany({
     where: PUBLIC_WHERE,
@@ -154,6 +164,7 @@ function buildSort(sort) {
 }
 
 export async function getExpertById(id, auth) {
+  assertExpertId(id);
   const expert = await getDb().expertProfile.findUnique({
     where: { id },
     include: { category: true, avatarMedia: true },
@@ -183,6 +194,7 @@ export async function getExpertById(id, auth) {
 }
 
 export async function getExpertReviews(id, query) {
+  assertExpertId(id);
   const { page, limit, skip } = parsePagination(query);
   const db = getDb();
   const [reviews, total] = await Promise.all([
@@ -202,6 +214,7 @@ export async function getExpertReviews(id, query) {
 }
 
 export async function getExpertAvailability(id) {
+  assertExpertId(id);
   const expert = await getDb().expertProfile.findUnique({ where: { id } });
   if (!expert) throw notFound("Expert not found");
   return {
