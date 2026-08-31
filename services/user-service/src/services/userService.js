@@ -81,7 +81,7 @@ async function createProfileForRole(
   role,
   firstName,
   lastName,
-  { categoryId, avatarMediaId } = {}
+  { categoryIds, avatarMediaId } = {}
 ) {
   if (role === "customer") {
     return tx.user.update({
@@ -95,21 +95,25 @@ async function createProfileForRole(
     });
   }
 
-  // Use the provided categoryId if valid, otherwise fall back to the first active category
-  let resolvedCategoryId = categoryId;
-  if (resolvedCategoryId) {
-    const cat = await tx.category.findFirst({
-      where: { id: resolvedCategoryId, isActive: true },
+  // Resolve the expert's categories (many-to-many). Keep only the provided IDs
+  // that map to active categories; if none are valid, fall back to the first
+  // active category so every expert always has at least one.
+  let resolvedCategoryIds = [];
+  const requested = Array.isArray(categoryIds) ? [...new Set(categoryIds)] : [];
+  if (requested.length > 0) {
+    const active = await tx.category.findMany({
+      where: { id: { in: requested }, isActive: true },
+      select: { id: true },
     });
-    if (!cat) resolvedCategoryId = null; // invalid/inactive — fall back
+    resolvedCategoryIds = active.map((c) => c.id);
   }
-  if (!resolvedCategoryId) {
+  if (resolvedCategoryIds.length === 0) {
     const category = await tx.category.findFirst({
       where: { isActive: true },
       orderBy: { sortOrder: "asc" },
     });
     if (!category) throw badRequest("No categories configured");
-    resolvedCategoryId = category.id;
+    resolvedCategoryIds = [category.id];
   }
 
   return tx.user.update({
@@ -119,7 +123,7 @@ async function createProfileForRole(
         create: {
           firstName,
           lastName,
-          categoryId: resolvedCategoryId,
+          categories: { connect: resolvedCategoryIds.map((id) => ({ id })) },
           consultationRateCents: 0,
           ...(avatarMediaId ? { avatarMediaId } : {}),
           settings: { create: { preferences: {} } },
@@ -159,7 +163,7 @@ export async function register(body) {
     firstName,
     lastName,
     otpChannel = "phone",
-    categoryId,
+    categoryIds,
     avatarMediaId,
   } = body;
 
@@ -262,7 +266,7 @@ export async function register(body) {
     purpose: "register",
     channel: otpChannel,
     userId,
-    registrationData: { role, firstName, lastName, otpChannel, categoryId, avatarMediaId },
+    registrationData: { role, firstName, lastName, otpChannel, categoryIds, avatarMediaId },
   });
 }
 
@@ -418,7 +422,7 @@ export async function verifyOtp(body) {
       );
     }
 
-    const { role, firstName, lastName, otpChannel, categoryId, avatarMediaId } =
+    const { role, firstName, lastName, otpChannel, categoryIds, avatarMediaId } =
       challenge.registrationData;
 
     // Validate the optional sign-up avatar: it must be a "ready" avatar asset
@@ -481,7 +485,7 @@ export async function verifyOtp(body) {
       });
 
       return createProfileForRole(tx, challenge.userId, role, firstName, lastName, {
-        categoryId,
+        categoryIds,
         avatarMediaId: resolvedAvatarMediaId,
       });
     });
@@ -974,7 +978,7 @@ export async function getRecentlyViewed(auth, query) {
       orderBy: { viewedAt: "desc" },
       skip,
       take: limit,
-      include: { expert: { include: { category: true } } },
+      include: { expert: { include: { categories: true } } },
     }),
     db.customerRecentlyViewed.count({ where: { customerProfileId: auth.customerProfileId } }),
   ]);
@@ -983,8 +987,7 @@ export async function getRecentlyViewed(auth, query) {
     firstName: r.expert.firstName,
     lastName: r.expert.lastName,
     headline: r.expert.headline,
-    categorySlug: r.expert.category.slug,
-    categoryName: r.expert.category.name,
+    categories: (r.expert.categories ?? []).map((c) => ({ id: c.id, slug: c.slug, name: c.name })),
     consultationRate: r.expert.consultationRateCents / 100,
     currency: r.expert.currency,
     availabilityStatus: r.expert.availabilityStatus,
@@ -1019,7 +1022,7 @@ export async function getSavedExperts(auth, query) {
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
-      include: { expert: { include: { category: true } } },
+      include: { expert: { include: { categories: true } } },
     }),
     db.customerSavedExpert.count({ where: { customerProfileId: auth.customerProfileId } }),
   ]);
@@ -1028,8 +1031,7 @@ export async function getSavedExperts(auth, query) {
     firstName: r.expert.firstName,
     lastName: r.expert.lastName,
     headline: r.expert.headline,
-    categorySlug: r.expert.category.slug,
-    categoryName: r.expert.category.name,
+    categories: (r.expert.categories ?? []).map((c) => ({ id: c.id, slug: c.slug, name: c.name })),
     consultationRate: r.expert.consultationRateCents / 100,
     currency: r.expert.currency,
     availabilityStatus: r.expert.availabilityStatus,

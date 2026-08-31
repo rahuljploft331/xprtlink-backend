@@ -24,8 +24,9 @@ export const savedExpertSummaryDtoSchema = z.object({
   firstName: z.string(),
   lastName: z.string(),
   headline: z.string().nullable(),
-  categorySlug: z.string(),
-  categoryName: z.string(),
+  categories: z.array(
+    z.object({ id: z.string().uuid(), slug: z.string(), name: z.string() })
+  ),
   consultationRate: z.number(),
   currency: z.string().length(3),
   availabilityStatus: z.enum(["online", "offline", "busy"]),

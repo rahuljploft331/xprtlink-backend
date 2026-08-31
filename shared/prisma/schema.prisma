@@ -419,7 +419,7 @@ model Category {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  experts ExpertProfile[]
+  experts ExpertProfile[] @relation("ExpertCategories")
 
   @@index([isActive, sortOrder])
   @@map("categories")
@@ -505,7 +505,6 @@ model SupportTicket {
 model ExpertProfile {
   id                    String             @id @default(uuid()) @db.Uuid
   userId                String             @unique @map("user_id") @db.Uuid
-  categoryId            String             @map("category_id") @db.Uuid
   firstName             String             @map("first_name") @db.VarChar(100)
   lastName              String             @map("last_name") @db.VarChar(100)
   avatarMediaId         String?            @map("avatar_media_id") @db.Uuid
@@ -534,7 +533,7 @@ model ExpertProfile {
   updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  category         Category                 @relation(fields: [categoryId], references: [id])
+  categories       Category[]               @relation("ExpertCategories")
   avatarMedia      MediaAsset?              @relation("ExpertAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
   settings         ExpertSettings?
   verifications    ExpertVerification[]
@@ -550,7 +549,6 @@ model ExpertProfile {
   payouts          ExpertPayout[]
   earningsLedger   ExpertEarningsLedger[]
 
-  @@index([categoryId])
   @@index([avatarMediaId])
   @@index([verificationStatus])
   @@index([availabilityStatus])

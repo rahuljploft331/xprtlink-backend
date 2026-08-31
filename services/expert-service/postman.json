@@ -317,7 +317,7 @@
                 "me"
               ]
             },
-            "description": "Update professional information, rates, and availability. Accepts: firstName, lastName, headline, bio, title, businessName, languages (string[]), serviceAreas (array of {name, lat, lng} objects), consultationRate, experienceYears, availabilityStatus, categoryId, avatarMediaId."
+            "description": "Update professional information, rates, and availability. Accepts: firstName, lastName, headline, bio, title, businessName, languages (string[]), serviceAreas (array of {name, lat, lng} objects), consultationRate, experienceYears, availabilityStatus, categoryIds (array of category UUIDs, min 1 when provided), avatarMediaId."
           }
         },
         {
@@ -329,14 +329,14 @@
                 "id": "t-onboarding",
                 "type": "text/javascript",
                 "exec": [
-                  "// The sample body uses a non-UUID placeholder `categoryId`, so the API is expected",
-                  "// to reject it with a 400 VALIDATION_ERROR. Provide a real category UUID (or omit",
-                  "// categoryId) in the body to exercise the success path (200).",
-                  "pm.test('rejects non-UUID categoryId with 400 VALIDATION_ERROR', function () {",
+                  "// The sample body uses a non-UUID placeholder in `categoryIds`, so the API is expected",
+                  "// to reject it with a 400 VALIDATION_ERROR. Provide real category UUIDs (or omit",
+                  "// categoryIds) in the body to exercise the success path (200).",
+                  "pm.test('rejects non-UUID categoryIds with 400 VALIDATION_ERROR', function () {",
                   "  pm.response.to.have.status(400);",
                   "  const body = pm.response.json();",
                   "  pm.expect(body.code).to.eql('VALIDATION_ERROR');",
-                  "  pm.expect(body.field).to.eql('categoryId');",
+                  "  pm.expect(body.field).to.match(/^categoryIds(\\.\\d+)?$/);",
                   "});"
                 ]
               }
@@ -356,7 +356,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"headline\": \"Expert Cloud Architect\",\n  \"bio\": \"Experienced professional ready for consultations.\",\n  \"title\": \"Senior Consultant\",\n  \"businessName\": \"My Consulting LLC\",\n  \"languages\": [\"English\"],\n  \"serviceAreas\": [{\"name\": \"Austin, TX\", \"lat\": 30.2672, \"lng\": -97.7431}],\n  \"consultationRate\": 100,\n  \"experienceYears\": 5,\n  \"categoryId\": \"category-uuid-here\"\n}"
+              "raw": "{\n  \"headline\": \"Expert Cloud Architect\",\n  \"bio\": \"Experienced professional ready for consultations.\",\n  \"title\": \"Senior Consultant\",\n  \"businessName\": \"My Consulting LLC\",\n  \"languages\": [\"English\"],\n  \"serviceAreas\": [{\"name\": \"Austin, TX\", \"lat\": 30.2672, \"lng\": -97.7431}],\n  \"consultationRate\": 100,\n  \"experienceYears\": 5,\n  \"categoryIds\": [\"category-uuid-here\"]\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/experts/me/onboarding/submit",
@@ -372,7 +372,7 @@
                 "submit"
               ]
             },
-            "description": "Submit onboarding application for admin review. Accepts the same body as Save Onboarding Draft (all fields optional): headline, bio, title, businessName, languages (string[]), serviceAreas (array of {name, lat, lng}), consultationRate, experienceYears, categoryId (UUID), avatarMediaId.\n\nNOTE: the sample body uses a placeholder (non-UUID) `categoryId` and therefore expects a 400 VALIDATION_ERROR. Provide a real category UUID (or omit categoryId) to exercise the success path (200)."
+            "description": "Submit onboarding application for admin review. Accepts the same body as Save Onboarding Draft (all fields optional): headline, bio, title, businessName, languages (string[]), serviceAreas (array of {name, lat, lng}), consultationRate, experienceYears, categoryIds (array of category UUIDs, min 1 when provided), avatarMediaId.\n\nNOTE: the sample body uses a placeholder (non-UUID) in `categoryIds` and therefore expects a 400 VALIDATION_ERROR. Provide real category UUIDs (or omit categoryIds) to exercise the success path (200)."
           }
         },
         {

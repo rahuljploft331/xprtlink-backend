@@ -189,7 +189,7 @@ async function main() {
   }
 
   const onboard = await api("POST", "/api/v1/experts/me/onboarding", {
-    categories: [categoryId],
+    categoryIds: [categoryId],
     bio: persona.bio,
     hourlyRate: persona.hourlyRate,
     yearsExperience: persona.yearsExperience,
