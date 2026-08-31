@@ -326,6 +326,8 @@ export async function updateExpertMe(auth, body) {
   const updated = await getDb().expertProfile.update({
     where: { id: expert.id },
     data: {
+      ...(body.firstName !== undefined ? { firstName: body.firstName } : {}),
+      ...(body.lastName !== undefined ? { lastName: body.lastName } : {}),
       ...(body.headline !== undefined ? { headline: body.headline } : {}),
       ...(body.bio !== undefined ? { bio: body.bio } : {}),
       ...(body.title !== undefined ? { title: body.title } : {}),
