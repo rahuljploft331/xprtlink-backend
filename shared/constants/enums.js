@@ -40,6 +40,7 @@ export const QUOTE_STATUS = {
   DRAFT: "draft",
   SUBMITTED: "submitted",
   PENDING_EXPERT_REVIEW: "pending_expert_review",
+  EXPERT_REVIEWED: "expert_reviewed",
   QUOTED: "quoted",
   ACCEPTED: "accepted",
   REJECTED: "rejected",

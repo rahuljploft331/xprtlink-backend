@@ -161,7 +161,7 @@
                 }
               ]
             },
-            "description": "Fetch detailed information of a quote request. Response fields: id, referenceNumber, title, description, notes (customer note), category, preferredLocation, status, budget, currency, expert card (expertId, expertName, expertTitle, expertHeadline, expertAvatarUrl), contact info (customerId, customerName, contactName, contactPhone, customerAvatarUrl), attachments[{id, mediaId, url, mimeType}], expertQuote{amount, currency, notes, quotedAt} (non-null once status is 'quoted'), and timestamps (expiresAt, submittedAt, resolvedAt, createdAt, updatedAt)."
+            "description": "Fetch detailed information of a quote request. When the assigned expert opens a quote that is in 'pending_expert_review', the request is auto-transitioned to 'expert_reviewed' (recording reviewedAt and a quote status event). Response fields: id, referenceNumber, title, description, notes (customer note), category, preferredLocation, status, budget, currency, expert card (expertId, expertName, expertTitle, expertHeadline, expertAvatarUrl), contact info (customerId, customerName, contactName, contactPhone, customerAvatarUrl), attachments[{id, mediaId, url, mimeType}], expertQuote{amount, currency, notes, timeline, quotedAt} (non-null once status is 'quoted'), and timestamps (expiresAt, submittedAt, reviewedAt, resolvedAt, createdAt, updatedAt)."
           }
         },
         {
