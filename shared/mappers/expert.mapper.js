@@ -79,7 +79,13 @@ export function toExpertDashboardDto({
   activeConsultationCount,
   unreadNotificationCount,
   earningsThisWeekCents,
+  earningsTodayCents = 0,
+  earningsThisMonthCents = 0,
   subscriptionActive,
+  subscription = null,
+  latestQuote = null,
+  latestMessage = null,
+  lastCompleted = null,
 }) {
   return {
     availabilityStatus: expert.availabilityStatus,
@@ -89,6 +95,59 @@ export function toExpertDashboardDto({
     activeConsultationCount,
     unreadNotificationCount,
     earningsThisWeekCents,
+    earningsTodayCents,
+    earningsThisMonthCents,
+    subscription: toDashboardSubscriptionDto(subscription),
+    recentActivity: {
+      newRequest: toNewRequestActivityDto(latestQuote),
+      latestMessage: toLatestMessageActivityDto(latestMessage),
+      lastCompleted: toLastCompletedActivityDto(lastCompleted),
+    },
+  };
+}
+
+function toDashboardSubscriptionDto(subscription) {
+  if (!subscription) return null;
+  return {
+    planName: subscription.plan?.name ?? null,
+    status: subscription.status,
+    cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
+    currentPeriodEnd: toIso(subscription.currentPeriodEnd),
+  };
+}
+
+function toNewRequestActivityDto(quote) {
+  if (!quote) return null;
+  return {
+    type: "quote",
+    id: quote.id,
+    title: quote.title,
+    description: quote.description,
+    customerName: fullName(quote.customer?.firstName, quote.customer?.lastName) || "Customer",
+    status: quote.status,
+    createdAt: toIso(quote.createdAt),
+  };
+}
+
+function toLatestMessageActivityDto(message) {
+  if (!message) return null;
+  const customer = message.conversation?.customer;
+  return {
+    conversationId: message.conversationId,
+    peerName: fullName(customer?.firstName, customer?.lastName) || "Customer",
+    preview: message.body ?? null,
+    createdAt: toIso(message.createdAt),
+  };
+}
+
+function toLastCompletedActivityDto(consultation) {
+  if (!consultation) return null;
+  return {
+    consultationId: consultation.id,
+    customerName: fullName(consultation.customer?.firstName, consultation.customer?.lastName) || "Customer",
+    endedAt: toIso(consultation.endedAt),
+    rating: consultation.review?.rating ?? null,
+    comment: consultation.review?.comment ?? null,
   };
 }
 

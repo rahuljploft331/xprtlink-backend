@@ -479,7 +479,20 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status is 200', () => pm.response.to.have.status(200));",
-                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                  "pm.test('response is JSON', () => pm.response.to.be.json);",
+                  "pm.test('has earnings breakdown fields', function () {",
+                  "  const d = pm.response.json().data || {};",
+                  "  pm.expect(d).to.have.property('earningsTodayCents');",
+                  "  pm.expect(d).to.have.property('earningsThisWeekCents');",
+                  "  pm.expect(d).to.have.property('earningsThisMonthCents');",
+                  "});",
+                  "pm.test('has recentActivity object', function () {",
+                  "  const d = pm.response.json().data || {};",
+                  "  pm.expect(d).to.have.property('recentActivity');",
+                  "  pm.expect(d.recentActivity).to.have.property('newRequest');",
+                  "  pm.expect(d.recentActivity).to.have.property('latestMessage');",
+                  "  pm.expect(d.recentActivity).to.have.property('lastCompleted');",
+                  "});"
                 ]
               }
             }
@@ -505,7 +518,7 @@
                 "dashboard"
               ]
             },
-            "description": "Load active practice numbers and subscription restrictions."
+            "description": "Load the expert dashboard: active practice numbers, earnings, subscription card, and recent activity feed.\n\nResponse shape (data):\n- availabilityStatus, verificationStatus, subscriptionActive\n- pendingQuoteCount, activeConsultationCount, unreadNotificationCount\n- earningsTodayCents, earningsThisWeekCents, earningsThisMonthCents (integer cents, aggregated from the expert earnings ledger for the current day / rolling 7 days / current calendar month)\n- subscription: null | { planName, status, cancelAtPeriodEnd, currentPeriodEnd } (the active subscription, if any)\n- recentActivity: {\n    newRequest: null | { type: 'quote', id, title, description, customerName, status, createdAt } — latest quote pending expert review,\n    latestMessage: null | { conversationId, peerName, preview, createdAt } — latest inbound message from a customer,\n    lastCompleted: null | { consultationId, customerName, endedAt, rating, comment } — most recently completed consultation (rating/comment from its review if present)\n  }"
           }
         },
         {

@@ -97,6 +97,38 @@ export const expertRatingSummaryDtoSchema = z.object({
   }),
 });
 
+export const dashboardSubscriptionDtoSchema = z.object({
+  planName: z.string().nullable(),
+  status: z.string(),
+  cancelAtPeriodEnd: z.boolean(),
+  currentPeriodEnd: z.string().datetime().nullable(),
+});
+
+export const dashboardNewRequestActivityDtoSchema = z.object({
+  type: z.literal("quote"),
+  id: z.string().uuid(),
+  title: z.string(),
+  description: z.string(),
+  customerName: z.string(),
+  status: z.string(),
+  createdAt: z.string().datetime().nullable(),
+});
+
+export const dashboardLatestMessageActivityDtoSchema = z.object({
+  conversationId: z.string().uuid(),
+  peerName: z.string(),
+  preview: z.string().nullable(),
+  createdAt: z.string().datetime().nullable(),
+});
+
+export const dashboardLastCompletedActivityDtoSchema = z.object({
+  consultationId: z.string().uuid(),
+  customerName: z.string(),
+  endedAt: z.string().datetime().nullable(),
+  rating: z.number().int().min(1).max(5).nullable(),
+  comment: z.string().nullable(),
+});
+
 export const expertDashboardDtoSchema = z.object({
   availabilityStatus: z.enum(["online", "offline", "busy"]),
   verificationStatus: z.string(),
@@ -105,6 +137,14 @@ export const expertDashboardDtoSchema = z.object({
   activeConsultationCount: z.number().int().nonnegative(),
   unreadNotificationCount: z.number().int().nonnegative(),
   earningsThisWeekCents: z.number().int().nonnegative(),
+  earningsTodayCents: z.number().int().nonnegative(),
+  earningsThisMonthCents: z.number().int().nonnegative(),
+  subscription: dashboardSubscriptionDtoSchema.nullable(),
+  recentActivity: z.object({
+    newRequest: dashboardNewRequestActivityDtoSchema.nullable(),
+    latestMessage: dashboardLatestMessageActivityDtoSchema.nullable(),
+    lastCompleted: dashboardLastCompletedActivityDtoSchema.nullable(),
+  }),
 });
 
 export const expertVerificationDtoSchema = z.object({
