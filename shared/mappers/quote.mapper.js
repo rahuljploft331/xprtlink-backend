@@ -35,6 +35,7 @@ export function toQuoteDetailDto(
           amount: centsToAmount(quote.expertQuoteAmountCents),
           currency,
           notes: quote.expertQuoteNotes,
+          timeline: quote.expertQuoteTimeline ?? null,
           quotedAt: toIso(quote.quotedAt),
         }
       : null;
@@ -71,6 +72,7 @@ export function toQuoteDetailDto(
     expertQuote,
     expiresAt: toIso(quote.expiresAt),
     submittedAt: toIso(quote.submittedAt),
+    reviewedAt: toIso(quote.reviewedAt),
     resolvedAt: toIso(quote.resolvedAt),
     createdAt: toIso(quote.createdAt),
     updatedAt: toIso(quote.updatedAt),

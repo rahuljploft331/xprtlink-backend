@@ -111,12 +111,12 @@
                 {
                   "key": "inbox",
                   "value": "true",
-                  "description": "Experts only: when true, returns only requests awaiting a quotation (status = pending_expert_review)."
+                  "description": "Experts only: when true, returns only requests awaiting the expert's action (status pending_expert_review or expert_reviewed)."
                 },
                 {
                   "key": "status",
                   "value": "pending_expert_review",
-                  "description": "Optional status filter: submitted, pending_expert_review, quoted, accepted, rejected, canceled, expired.",
+                  "description": "Optional status filter: submitted, pending_expert_review, expert_reviewed, quoted, accepted, rejected, canceled, expired.",
                   "disabled": true
                 },
                 {
@@ -180,7 +180,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"amount\": 150.00,\n  \"notes\": \"I can finish this in one session.\"\n}"
+              "raw": "{\n  \"amount\": 150.00,\n  \"timeline\": \"5 Business Days\",\n  \"notes\": \"I can finish this in one session.\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/engagement/quotes/:id/quotation",
@@ -202,7 +202,7 @@
                 }
               ]
             },
-            "description": "Expert submits pricing quote estimation back to customer."
+            "description": "Expert submits a quotation back to the customer. Body: amount (required, positive), timeline (optional, e.g. \"5 Business Days\"), notes (optional). Valid when the quote status is pending_expert_review or expert_reviewed; moves the quote to `quoted`. The response's expertQuote block includes amount, currency, notes, timeline, and quotedAt."
           }
         },
         {
