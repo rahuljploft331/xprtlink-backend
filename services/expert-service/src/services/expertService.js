@@ -493,30 +493,90 @@ export async function submitVerificationDocuments(auth, body) {
 export async function getDashboard(auth) {
   const { expert, subscriptionActive } = await getExpertProfileOrThrow(auth);
   const db = getDb();
-  const [pendingQuoteCount, activeConsultationCount, unreadNotificationCount, earnings] =
-    await Promise.all([
-      db.quoteRequest.count({
-        where: { expertId: expert.id, status: { in: ["pending_expert_review", "submitted"] } },
-      }),
-      db.consultation.count({
-        where: { expertId: expert.id, status: { in: ["requested", "ringing", "accepted", "in_progress"] } },
-      }),
-      db.notification.count({ where: { userId: auth.userId, readAt: null } }),
-      db.expertEarningsLedger.aggregate({
-        where: {
-          expertProfileId: expert.id,
-          createdAt: { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
-        },
-        _sum: { netCents: true },
-      }),
-    ]);
+
+  const now = new Date();
+  const startOfWeek = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const [
+    pendingQuoteCount,
+    activeConsultationCount,
+    unreadNotificationCount,
+    earningsWeek,
+    earningsToday,
+    earningsMonth,
+    subscription,
+    latestQuote,
+    latestMessage,
+    lastCompleted,
+  ] = await Promise.all([
+    db.quoteRequest.count({
+      where: { expertId: expert.id, status: { in: ["pending_expert_review", "submitted"] } },
+    }),
+    db.consultation.count({
+      where: { expertId: expert.id, status: { in: ["requested", "ringing", "accepted", "in_progress"] } },
+    }),
+    db.notification.count({ where: { userId: auth.userId, readAt: null } }),
+    db.expertEarningsLedger.aggregate({
+      where: { expertProfileId: expert.id, createdAt: { gte: startOfWeek } },
+      _sum: { netCents: true },
+    }),
+    db.expertEarningsLedger.aggregate({
+      where: { expertProfileId: expert.id, createdAt: { gte: startOfDay } },
+      _sum: { netCents: true },
+    }),
+    db.expertEarningsLedger.aggregate({
+      where: { expertProfileId: expert.id, createdAt: { gte: startOfMonth } },
+      _sum: { netCents: true },
+    }),
+    // Active subscription (with plan) for the subscription card
+    db.expertSubscription.findFirst({
+      where: { expertProfileId: expert.id, status: "active" },
+      orderBy: { createdAt: "desc" },
+      include: { plan: { select: { name: true } } },
+    }),
+    // Recent Activity → NEW REQUEST: latest quote received but not yet reviewed/accepted
+    db.quoteRequest.findFirst({
+      where: { expertId: expert.id, status: { in: ["pending_expert_review", "submitted"] } },
+      orderBy: { createdAt: "desc" },
+      include: { customer: { select: { firstName: true, lastName: true } } },
+    }),
+    // Recent Activity → LATEST MESSAGE: latest inbound message across this expert's conversations
+    db.message.findFirst({
+      where: {
+        senderUserId: { not: auth.userId },
+        conversation: { expertId: expert.id },
+      },
+      orderBy: { createdAt: "desc" },
+      include: {
+        conversation: { include: { customer: { select: { firstName: true, lastName: true } } } },
+      },
+    }),
+    // Recent Activity → COMPLETED: last finished call (with review if present)
+    db.consultation.findFirst({
+      where: { expertId: expert.id, status: "completed" },
+      orderBy: { endedAt: "desc" },
+      include: {
+        customer: { select: { firstName: true, lastName: true } },
+        review: { select: { rating: true, comment: true } },
+      },
+    }),
+  ]);
+
   return toExpertDashboardDto({
     expert,
     pendingQuoteCount,
     activeConsultationCount,
     unreadNotificationCount,
-    earningsThisWeekCents: earnings._sum.netCents ?? 0,
+    earningsThisWeekCents: earningsWeek._sum.netCents ?? 0,
+    earningsTodayCents: earningsToday._sum.netCents ?? 0,
+    earningsThisMonthCents: earningsMonth._sum.netCents ?? 0,
     subscriptionActive,
+    subscription,
+    latestQuote,
+    latestMessage,
+    lastCompleted,
   });
 }
 
