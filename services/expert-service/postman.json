@@ -303,7 +303,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"bio\": \"Senior Cloud Architect with 10+ years experience.\",\n  \"title\": \"Cloud Solutions Architect\",\n  \"businessName\": \"CloudPro Consulting\",\n  \"languages\": [\"English\", \"Spanish\"],\n  \"serviceAreas\": [{\"name\": \"New York, NY\", \"lat\": 40.7128, \"lng\": -74.006}, {\"name\": \"San Francisco, CA\", \"lat\": 37.7749, \"lng\": -122.4194}],\n  \"consultationRate\": 120,\n  \"experienceYears\": 10,\n  \"availabilityStatus\": \"online\"\n}"
+              "raw": "{\n  \"firstName\": \"Rahul\",\n  \"lastName\": \"Sharma\",\n  \"bio\": \"Senior Cloud Architect with 10+ years experience.\",\n  \"title\": \"Cloud Solutions Architect\",\n  \"businessName\": \"CloudPro Consulting\",\n  \"languages\": [\"English\", \"Spanish\"],\n  \"serviceAreas\": [{\"name\": \"New York, NY\", \"lat\": 40.7128, \"lng\": -74.006}, {\"name\": \"San Francisco, CA\", \"lat\": 37.7749, \"lng\": -122.4194}],\n  \"consultationRate\": 120,\n  \"experienceYears\": 10,\n  \"availabilityStatus\": \"online\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/experts/me",
@@ -317,7 +317,7 @@
                 "me"
               ]
             },
-            "description": "Update professional information, rates, and availability. Accepts: headline, bio, title, businessName, languages (string[]), serviceAreas (array of {name, lat, lng} objects), consultationRate, experienceYears, availabilityStatus, categoryId, avatarMediaId."
+            "description": "Update professional information, rates, and availability. Accepts: firstName, lastName, headline, bio, title, businessName, languages (string[]), serviceAreas (array of {name, lat, lng} objects), consultationRate, experienceYears, availabilityStatus, categoryId, avatarMediaId."
           }
         },
         {

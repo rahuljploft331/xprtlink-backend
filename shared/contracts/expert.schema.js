@@ -61,6 +61,8 @@ export const expertMeDtoSchema = expertPublicDtoSchema.extend({
 });
 
 export const expertMeUpdateRequestSchema = z.object({
+  firstName: z.string().min(1).max(100).optional(),
+  lastName: z.string().min(1).max(100).optional(),
   headline: z.string().max(200).optional(),
   bio: z.string().optional(),
   title: z.string().max(200).optional(),
