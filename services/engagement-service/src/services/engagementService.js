@@ -225,6 +225,21 @@ export async function createQuote(auth, body) {
     });
   });
 
+  // Notify assigned expert about the new quote request (non-fatal)
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const customerName = `${quote.customer.firstName ?? ""} ${quote.customer.lastName ?? ""}`.trim() || "A customer";
+    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+      userIds: [quote.expert.userId],
+      type: "quote_received",
+      title: "New Quote Request",
+      body: `${customerName} sent you a new quote request: "${quote.title}"`,
+      data: { quoteId: quote.id, referenceNumber: quote.referenceNumber },
+    });
+  } catch (err) {
+    console.error(`[createQuote] Notification dispatch failed: ${err.message}`);
+  }
+
   return toQuoteDetailDto(quote, quoteContext(quote));
 }
 
@@ -380,6 +395,21 @@ export async function submitQuotation(auth, quoteId, body) {
     });
   });
 
+  // Notify customer that the expert has submitted a quotation (non-fatal)
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const expertName = `${updated.expert.firstName ?? ""} ${updated.expert.lastName ?? ""}`.trim() || "Your expert";
+    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+      userIds: [updated.customer.user.id],
+      type: "quote_submitted",
+      title: "Quote Ready",
+      body: `${expertName} has sent you a quote for "${updated.title}"`,
+      data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
+    });
+  } catch (err) {
+    console.error(`[submitQuotation] Notification dispatch failed: ${err.message}`);
+  }
+
   return toQuoteDetailDto(updated, quoteContext(updated));
 }
 
@@ -404,6 +434,21 @@ export async function acceptQuote(auth, quoteId) {
     });
   });
 
+  // Notify expert that the customer accepted their quotation (non-fatal)
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const customerName = `${updated.customer.firstName ?? ""} ${updated.customer.lastName ?? ""}`.trim() || "A customer";
+    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+      userIds: [updated.expert.userId],
+      type: "quote_accepted",
+      title: "Quote Accepted",
+      body: `${customerName} accepted your quote for "${updated.title}"`,
+      data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
+    });
+  } catch (err) {
+    console.error(`[acceptQuote] Notification dispatch failed: ${err.message}`);
+  }
+
   return toQuoteDetailDto(updated, quoteContext(updated));
 }
 
@@ -427,6 +472,21 @@ export async function rejectQuote(auth, quoteId) {
     });
   });
 
+  // Notify expert that the customer rejected their quotation (non-fatal)
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const customerName = `${updated.customer.firstName ?? ""} ${updated.customer.lastName ?? ""}`.trim() || "A customer";
+    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+      userIds: [updated.expert.userId],
+      type: "quote_rejected",
+      title: "Quote Rejected",
+      body: `${customerName} rejected your quote for "${updated.title}"`,
+      data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
+    });
+  } catch (err) {
+    console.error(`[rejectQuote] Notification dispatch failed: ${err.message}`);
+  }
+
   return toQuoteDetailDto(updated, quoteContext(updated));
 }
 
@@ -449,6 +509,21 @@ export async function cancelQuote(auth, quoteId) {
       data: { resolvedAt: new Date() },
     });
   });
+
+  // Notify expert that the customer cancelled the quote request (non-fatal)
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const customerName = `${updated.customer.firstName ?? ""} ${updated.customer.lastName ?? ""}`.trim() || "A customer";
+    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+      userIds: [updated.expert.userId],
+      type: "quote_cancelled",
+      title: "Quote Request Cancelled",
+      body: `${customerName} cancelled their quote request: "${updated.title}"`,
+      data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
+    });
+  } catch (err) {
+    console.error(`[cancelQuote] Notification dispatch failed: ${err.message}`);
+  }
 
   return toQuoteDetailDto(updated, quoteContext(updated));
 }
@@ -491,6 +566,21 @@ export async function createConsultation(auth, body) {
     },
     include: CONSULTATION_INCLUDE,
   });
+
+  // Notify expert of the incoming consultation request (non-fatal)
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const customerName = `${consultation.customer.firstName ?? ""} ${consultation.customer.lastName ?? ""}`.trim() || "A customer";
+    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+      userIds: [consultation.expert.userId],
+      type: "consultation_requested",
+      title: "Incoming Consultation Request",
+      body: `${customerName} is requesting a consultation with you`,
+      data: { consultationId: consultation.id },
+    });
+  } catch (err) {
+    console.error(`[createConsultation] Notification dispatch failed: ${err.message}`);
+  }
 
   return toConsultationDetailDto(consultation, consultationContext(consultation));
 }
@@ -556,6 +646,21 @@ export async function acceptConsultation(auth, consultationId) {
     });
   });
 
+  // Notify customer that the expert accepted their consultation (non-fatal)
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const expertName = `${updated.expert.firstName ?? ""} ${updated.expert.lastName ?? ""}`.trim() || "Your expert";
+    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+      userIds: [updated.customer.user.id],
+      type: "consultation_accepted",
+      title: "Consultation Accepted",
+      body: `${expertName} accepted your consultation request`,
+      data: { consultationId: updated.id },
+    });
+  } catch (err) {
+    console.error(`[acceptConsultation] Notification dispatch failed: ${err.message}`);
+  }
+
   return toConsultationDetailDto(updated, consultationContext(updated));
 }
 
@@ -578,6 +683,21 @@ export async function declineConsultation(auth, consultationId) {
       include: CONSULTATION_INCLUDE,
     });
   });
+
+  // Notify customer that the expert declined their consultation (non-fatal)
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const expertName = `${updated.expert.firstName ?? ""} ${updated.expert.lastName ?? ""}`.trim() || "Your expert";
+    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+      userIds: [updated.customer.user.id],
+      type: "consultation_declined",
+      title: "Consultation Declined",
+      body: `${expertName} is currently unavailable and declined your request`,
+      data: { consultationId: updated.id },
+    });
+  } catch (err) {
+    console.error(`[declineConsultation] Notification dispatch failed: ${err.message}`);
+  }
 
   return toConsultationDetailDto(updated, consultationContext(updated));
 }
@@ -627,6 +747,33 @@ export async function endConsultation(auth, consultationId) {
       // Non-fatal — consultation is already marked completed; billing can be retried
       console.error(`[endConsultation] Billing capture failed: ${err.message}`);
     }
+  }
+
+  // Notify both parties that the consultation ended via API (non-fatal)
+  // Note: the ZegoCloud room_close webhook handles this for calls ended via Zego.
+  // This covers the manual end-via-API path only.
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const minutes = Math.floor(durationSeconds / 60);
+    const seconds = durationSeconds % 60;
+    const durationLabel = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+    const userIds = [
+      updated.customer?.user?.id,
+      updated.expert?.userId,
+    ].filter(Boolean);
+    if (userIds.length > 0) {
+      await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+        userIds,
+        type: "call_ended",
+        title: "Consultation Ended",
+        body: wasConnected
+          ? `Your consultation has ended. Duration: ${durationLabel}.`
+          : "Your consultation has ended.",
+        data: { consultationId: updated.id },
+      });
+    }
+  } catch (err) {
+    console.error(`[endConsultation] Notification dispatch failed: ${err.message}`);
   }
 
   return toConsultationDetailDto(updated, consultationContext(updated));
@@ -710,6 +857,27 @@ export async function submitReview(auth, consultationId, body) {
 
     return created;
   });
+
+  // Notify the reviewed expert (non-fatal)
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const expertProfile = await getDb().expertProfile.findUnique({
+      where: { id: consultation.expertId },
+      select: { userId: true },
+    });
+    if (expertProfile?.userId) {
+      const stars = "★".repeat(body.rating) + "☆".repeat(5 - body.rating);
+      await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+        userIds: [expertProfile.userId],
+        type: "review_received",
+        title: "New Review Received",
+        body: `You received a ${body.rating}-star review ${stars}`,
+        data: { consultationId, reviewId: review.id, rating: body.rating },
+      });
+    }
+  } catch (err) {
+    console.error(`[submitReview] Notification dispatch failed: ${err.message}`);
+  }
 
   return toReviewDto(review);
 

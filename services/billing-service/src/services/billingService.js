@@ -10,6 +10,7 @@ import {
 import { badRequest, conflict, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 import * as stripeSvc from "./stripeService.js";
+import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 
 const COMMISSION_RATE = 0.15;
 
@@ -385,6 +386,28 @@ export async function captureConsultation(consultationId, durationSeconds) {
         where: { id: consultationId },
         data: { billingStatus: "failed" },
       });
+
+      // Notify customer that payment failed — non-fatal
+      try {
+        const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+        const db2 = getDb();
+        const custForNotif = await db2.consultation.findUnique({
+          where: { id: consultationId },
+          include: { customer: { include: { user: true } } },
+        });
+        if (custForNotif?.customer?.user?.id) {
+          await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+            userIds: [custForNotif.customer.user.id],
+            type: "payment_failed",
+            title: "Payment Failed",
+            body: "We were unable to process your consultation payment. Please check your payment method and try again.",
+            data: { consultationId },
+          });
+        }
+      } catch (notifErr) {
+        console.error(`[captureConsultation] Failure notification failed: ${notifErr.message}`);
+      }
+
       return { skipped: false, captured: false, reason: "stripe_capture_failed", error: err.message };
     }
   } else {
@@ -438,6 +461,36 @@ export async function captureConsultation(consultationId, durationSeconds) {
   });
 
   console.log(`[billing] captureConsultation: ${consultationId} → charged $${(amountCents / 100).toFixed(2)}`);
+
+  // Notify customer (charge confirmation) and expert (earnings credit) — non-fatal
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const db2 = getDb();
+    const consultationForNotif = await db2.consultation.findUnique({
+      where: { id: consultationId },
+      include: {
+        customer: { include: { user: true } },
+        expert: { select: { userId: true } },
+      },
+    });
+    const notifUserIds = [
+      consultationForNotif?.customer?.user?.id,
+      consultationForNotif?.expert?.userId,
+    ].filter(Boolean);
+    if (notifUserIds.length > 0) {
+      const amountFormatted = `$${(amountCents / 100).toFixed(2)}`;
+      await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+        userIds: notifUserIds,
+        type: "payment_succeeded",
+        title: "Payment Successful",
+        body: `Consultation payment of ${amountFormatted} was processed successfully.`,
+        data: { consultationId, amountCents, transactionId: result.id },
+      });
+    }
+  } catch (err) {
+    console.error(`[captureConsultation] Payment notification failed: ${err.message}`);
+  }
+
   return { captured: true, transactionId: result.id, amountCents, commissionCents, expertShareCents };
 }
 
@@ -742,6 +795,23 @@ export async function subscribe(auth, body) {
     return created;
   });
 
+  // Notify expert that their subscription is now active (non-fatal)
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const periodEnd = subscription.currentPeriodEnd
+      ? new Date(subscription.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+      : "next month";
+    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+      userIds: [auth.userId],
+      type: "subscription_activated",
+      title: "Subscription Activated",
+      body: `Your ${subscription.plan.name} plan is now active. You're discoverable to customers until ${periodEnd}.`,
+      data: { subscriptionId: subscription.id, planId: subscription.planId },
+    });
+  } catch (err) {
+    console.error(`[subscribe] Notification dispatch failed: ${err.message}`);
+  }
+
   return toExpertSubscriptionDto(subscription, subscription.plan);
 }
 
@@ -805,6 +875,23 @@ export async function cancelSubscription(auth) {
     include: { plan: true },
   });
 
+  // Notify expert of the cancellation schedule — non-fatal
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const periodEnd = updated.currentPeriodEnd
+      ? new Date(updated.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+      : "the end of your billing period";
+    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+      userIds: [auth.userId],
+      type: "subscription_cancelled",
+      title: "Subscription Cancellation Scheduled",
+      body: `Your ${updated.plan.name} subscription will be cancelled on ${periodEnd}. You retain access until then.`,
+      data: { subscriptionId: updated.id, planId: updated.planId },
+    });
+  } catch (err) {
+    console.error(`[cancelSubscription] Notification dispatch failed: ${err.message}`);
+  }
+
   return toExpertSubscriptionDto(updated, updated.plan);
 }
 
@@ -858,5 +945,30 @@ export async function expireSubscriptions() {
   }
 
   console.log(`[billing] expireSubscriptions: expired ${result.count} subscription(s) at ${now.toISOString()}`);
+
+  // Notify each affected expert that their subscription has expired — non-fatal
+  if (affectedExpertIds.length > 0) {
+    try {
+      const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+      const db2 = getDb();
+      const expertRows = await db2.expertProfile.findMany({
+        where: { id: { in: affectedExpertIds } },
+        select: { userId: true },
+      });
+      const userIds = expertRows.map((e) => e.userId).filter(Boolean);
+      if (userIds.length > 0) {
+        await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+          userIds,
+          type: "subscription_expired",
+          title: "Subscription Expired",
+          body: "Your expert subscription has expired. Renew now to stay discoverable on XpertLink.",
+          data: {},
+        });
+      }
+    } catch (err) {
+      console.error(`[expireSubscriptions] Notification dispatch failed: ${err.message}`);
+    }
+  }
+
   return { expired: result.count };
 }

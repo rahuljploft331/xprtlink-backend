@@ -4,6 +4,7 @@ import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { logAdminAction } from "#utils/audit.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 
 
 /** GET /api/v1/admin/verifications */
@@ -117,6 +118,27 @@ export async function approve(req, res, next) {
     await logAdminAction(req, "verification.approve", "ExpertVerification", result.id, {
       notes: req.body?.notes ?? null,
     });
+
+    // Notify the expert that their profile was approved (non-fatal)
+    try {
+      const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+      const expertProfile = await db.expertProfile.findUnique({
+        where: { id: result.expertProfileId },
+        select: { userId: true, firstName: true },
+      });
+      if (expertProfile?.userId) {
+        await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+          userIds: [expertProfile.userId],
+          type: "verification_approved",
+          title: "Profile Approved ✓",
+          body: `Congratulations${expertProfile.firstName ? `, ${expertProfile.firstName}` : ""}! Your expert profile has been approved. You can now receive consultation requests.`,
+          data: { verificationId: result.id },
+        });
+      }
+    } catch (err) {
+      console.error(`[verifications.approve] Notification dispatch failed: ${err.message}`);
+    }
+
     return ResponseFormatter.success(res, { message: getMessage("verificationApproved"), data: result });
   } catch (err) {
     next(err);
@@ -142,6 +164,27 @@ export async function reject(req, res, next) {
     await logAdminAction(req, "verification.reject", "ExpertVerification", v.id, {
       notes: req.body?.notes ?? null,
     });
+
+    // Notify the expert that their profile was rejected (non-fatal)
+    try {
+      const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+      const expertProfile = await db.expertProfile.findUnique({
+        where: { id: v.expertProfileId },
+        select: { userId: true, firstName: true },
+      });
+      if (expertProfile?.userId) {
+        await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+          userIds: [expertProfile.userId],
+          type: "verification_rejected",
+          title: "Verification Update",
+          body: `Your expert profile verification was not approved. Please review the admin notes and resubmit your documents.`,
+          data: { verificationId: v.id, notes: req.body?.notes ?? null },
+        });
+      }
+    } catch (err) {
+      console.error(`[verifications.reject] Notification dispatch failed: ${err.message}`);
+    }
+
     return ResponseFormatter.success(res, { message: getMessage("verificationRejected"), data: v });
   } catch (err) {
     next(err);
