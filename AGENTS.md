@@ -54,6 +54,32 @@ Constants: `ADMIN_ROLES`, `ADMIN_MODULES`, `ADMIN_PERMISSION_LEVELS` in `shared/
 4. Return DTOs via mappers; do not expose Prisma objects directly
 5. Public gateway paths: `/api/v1/<domain>/*`
 
+## Expert discovery: `/featured` and `/trending` (both required — do not merge or delete)
+
+`GET /api/v1/experts/featured` and `GET /api/v1/experts/trending` are **both required
+endpoints**. `getTrending()` currently delegates straight to `getFeatured()`
+(`services/expert-service/src/services/expertService.js`).
+
+**This is deliberate, not a bug or leftover stub.** The trending business logic has **not been
+cleared by the client yet**, so trending intentionally mocks the featured response to unblock
+the Flutter team's integration — they can wire the real endpoint and URL now, and the payload
+shape will not change when the algorithm lands.
+
+Rules for agents:
+- **Do not** delete `/trending`, collapse it into `/featured`, or "fix" the delegation as
+  duplicated code. Both endpoints stay, and the delegation stays until the client signs off.
+- **Do not** invent a trending algorithm. When the client clears it, only the body of
+  `getTrending()` changes; the route, contract, and response shape stay as they are.
+- Keep both routes declared **before** `/:id` in `experts.routes.js` or the UUID param route
+  will shadow them.
+- Both routes should clamp `limit` with `parsePagination` (`shared/utils/pagination.js`) —
+  a raw `parseInt` lets `?limit=abc` reach Prisma as `NaN` and `?limit=500000` trigger a
+  multi-million-row over-fetch on a public, unauthenticated endpoint.
+
+Related open item: "Trending" does not appear in the MFS; §9.6.3 specifies a **Top Rated
+Experts** rail that has no endpoint. Confirm with the client whether trending and top-rated
+are the same rail before building either algorithm. See `docs/MFS-implementation-audit.md`.
+
 ## Do not
 
 - Commit secrets (`.env`)
