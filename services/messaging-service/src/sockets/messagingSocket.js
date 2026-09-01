@@ -188,20 +188,21 @@ export function registerMessagingSockets(io) {
 
           // Also create a persistent in-app notification record so the peer
           // sees a badge even if they were offline when the message arrived.
-          // This is non-fatal — the real-time socket emit above already covers
-          // the connected case; the notification is for offline/backgrounded users.
           try {
-            const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
-            const preview = message.body
-              ? message.body.slice(0, 80) + (message.body.length > 80 ? "..." : "")
-              : "Sent an attachment";
-            await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
-              userIds: [peerUserId],
-              type: "new_message",
-              title: "New Message",
-              body: preview,
-              data: { conversationId, messageId: message.id, senderUserId: auth.userId },
-            });
+            const peerSockets = await io.in(`user:${peerUserId}`).fetchSockets();
+            if (peerSockets.length === 0) {
+              const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+              const preview = message.body
+                ? message.body.slice(0, 80) + (message.body.length > 80 ? "..." : "")
+                : "Sent an attachment";
+              await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+                userIds: [peerUserId],
+                type: "new_message",
+                title: "New Message",
+                body: preview,
+                data: { conversationId, messageId: message.id, senderUserId: auth.userId },
+              });
+            }
           } catch (err) {
             console.error(`[messaging:message:send] Notification dispatch failed: ${err.message}`);
           }
