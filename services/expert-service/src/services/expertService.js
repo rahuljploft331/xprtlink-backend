@@ -555,7 +555,9 @@ export async function getDashboard(auth) {
     db.consultation.count({
       where: { expertId: expert.id, status: { in: ["requested", "ringing", "accepted", "in_progress"] } },
     }),
-    db.notification.count({ where: { userId: auth.userId, readAt: null } }),
+    // clearedAt must be excluded here too — notifications are soft-deleted, and a
+    // cleared item must not keep the dashboard badge lit (see notification-service).
+    db.notification.count({ where: { userId: auth.userId, readAt: null, clearedAt: null } }),
     db.expertEarningsLedger.aggregate({
       where: { expertProfileId: expert.id, createdAt: { gte: startOfWeek } },
       _sum: { netCents: true },
