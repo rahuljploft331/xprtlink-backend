@@ -1,6 +1,6 @@
 import { getDb } from "@xprtlink/shared/db";
 import { moveS3Object } from "@xprtlink/shared/utils/s3.js";
-import { customerDisplayName } from "@xprtlink/shared/mappers/common.js";
+import { customerDisplayName, resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
 import {
   toConversationSummaryDto,
@@ -64,14 +64,12 @@ function peerInfo(conversation, auth) {
     const avatarMedia = conversation.expert?.avatarMedia;
     return {
       peerName: expertDisplayName(conversation.expert),
-      peerAvatarUrl: avatarMedia?.storageKey
-        ? `${process.env.MEDIA_PUBLIC_BASE_URL ?? ""}/${avatarMedia.storageKey}`
-        : null,
+      peerAvatarUrl: resolveMediaUrl(avatarMedia?.storageKey),
     };
   }
   return {
-    peerName: customerDisplayName(conversation.customer.user, conversation.customer),
-    peerAvatarUrl: null, // customer avatars not yet stored in conversations include
+    peerName: customerDisplayName(conversation.customer?.user, conversation.customer),
+    peerAvatarUrl: resolveMediaUrl(conversation.customer?.avatarMedia?.storageKey),
   };
 }
 
@@ -86,7 +84,7 @@ export async function listConversations(auth, query) {
       skip,
       take: limit,
       include: {
-        customer: { include: { user: true } },
+        customer: { include: { user: true, avatarMedia: true } },
         expert: { include: { avatarMedia: true } },
         messages: { orderBy: { createdAt: "desc" }, take: 1 },
         readStates: {
@@ -173,7 +171,7 @@ export async function createConversation(auth, body) {
     create: { customerId, expertId },
     update: {},
     include: {
-      customer: { include: { user: true } },
+      customer: { include: { user: true, avatarMedia: true } },
       expert: { include: { avatarMedia: true } },
       messages: { orderBy: { createdAt: "desc" }, take: 1 },
     },
