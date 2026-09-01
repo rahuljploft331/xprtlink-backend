@@ -5,6 +5,7 @@ import { authenticate, optionalAuthenticate, requireRole } from "@xprtlink/share
 import { expertMeUpdateRequestSchema, expertOnboardingRequestSchema, expertSettingsUpdateRequestSchema, expertVerificationDocumentsRequestSchema } from "@xprtlink/shared/contracts";
 import * as svc from "../services/expertService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 
 
 const router = Router();
@@ -12,8 +13,9 @@ const router = Router();
 router.get(
   "/featured",
   optionalAuthenticate,
-  asyncHandler(async (_req, res) => {
-    const data = await svc.getFeatured();
+  asyncHandler(async (req, res) => {
+    const { limit } = parsePagination(req.query, { defaultLimit: 10, maxLimit: 50 });
+    const data = await svc.getFeatured(limit);
     return ResponseFormatter.success(res, { message: getMessage("featuredExperts"), data });
   })
 );
@@ -22,9 +24,9 @@ router.get(
   "/trending",
   optionalAuthenticate,
   asyncHandler(async (req, res) => {
-    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;
+    const { limit } = parsePagination(req.query, { defaultLimit: 10, maxLimit: 50 });
     const data = await svc.getTrending(limit);
-    return ResponseFormatter.success(res, { message: getMessage("featuredExperts"), data });
+    return ResponseFormatter.success(res, { message: getMessage("trendingExperts"), data });
   })
 );
 

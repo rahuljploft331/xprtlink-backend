@@ -36,7 +36,7 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{base_url}}/api/v1/experts/featured",
+              "raw": "{{base_url}}/api/v1/experts/featured?limit=10",
               "host": [
                 "{{base_url}}"
               ],
@@ -45,9 +45,15 @@
                 "v1",
                 "experts",
                 "featured"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
               ]
             },
-            "description": "Get featured experts for the customer home dashboard (MFS §9.7.3 / CUS-HOME-003). Selection is configurable, not hardcoded: (1) admin-pinned experts (isFeatured, respecting optional featuredUntil expiry) ordered by featuredRank, then (2) backfilled by active subscription tier (Elite > Professional > Core) with rating as the final tiebreaker. All candidates must satisfy marketplace eligibility (approved + search-eligible) and also appear in standard search. Each expert DTO now includes an `isFeatured` boolean."
+            "description": "Get featured experts for the customer home dashboard (MFS §9.7.3 / CUS-HOME-003). Selection is configurable, not hardcoded: (1) admin-pinned experts (isFeatured, respecting optional featuredUntil expiry) ordered by featuredRank, then (2) backfilled by active subscription tier (Elite > Professional > Core) with rating as the final tiebreaker. All candidates must satisfy marketplace eligibility (approved + search-eligible) and also appear in standard search. Each expert DTO now includes an `isFeatured` boolean. Optional `limit` query param: defaults to 10, minimum 1, maximum 50 (values above the max are clamped; non-numeric or zero values fall back to the default)."
           }
         },
         {
@@ -86,7 +92,7 @@
                 }
               ]
             },
-            "description": "Get trending experts for the customer search dashboard. Currently returns the same selection as featured experts. Will be updated later with actual trending calculation (e.g. by activity/popularity)."
+            "description": "Get trending experts for the customer search dashboard. Currently returns the same selection as featured experts. Will be updated later with actual trending calculation (e.g. by activity/popularity). Optional `limit` query param: defaults to 10, minimum 1, maximum 50 (values above the max are clamped; non-numeric or zero values fall back to the default)."
           }
         },
         {
