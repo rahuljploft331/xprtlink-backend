@@ -125,7 +125,11 @@ export async function searchExperts(query, auth) {
   if (query.experienceMax) {
     where.experienceYears = { ...(where.experienceYears || {}), lte: Number(query.experienceMax) };
   }
-  if (query.online === "true") where.availabilityStatus = "online";
+  if (query.online === "true") {
+    where.availabilityStatus = "online";
+  } else if (query.online === "false") {
+    where.availabilityStatus = { not: "online" };
+  }
   if (query.verified === "true") where.verificationStatus = "approved";
 
   if (query.q) {
