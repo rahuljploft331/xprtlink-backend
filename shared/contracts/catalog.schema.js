@@ -13,3 +13,12 @@ export const updateCategoryRequestSchema = z.object({
   sortOrder: z.number().int().nonnegative().optional(),
   isActive: z.boolean().optional(),
 });
+
+export const reorderCategoriesRequestSchema = z.object({
+  items: z.array(
+    z.object({
+      id: z.string().uuid(),
+      sortOrder: z.number().int().nonnegative(),
+    })
+  ).min(1),
+});

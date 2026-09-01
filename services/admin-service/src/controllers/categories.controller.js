@@ -5,6 +5,7 @@ import { logAdminAction } from "#utils/audit.js";
 import {
   createCategoryRequestSchema,
   updateCategoryRequestSchema,
+  reorderCategoriesRequestSchema,
 } from "@xprtlink/shared/contracts/catalog.schema.js";
 
 
@@ -66,5 +67,19 @@ export async function remove(req, res, next) {
     await db.category.delete({ where: { id: req.params.id } });
     await logAdminAction(req, "category.delete", "Category", req.params.id, {});
     return ResponseFormatter.success(res, { message: getMessage("categoryDeleted") });
+  } catch (err) { next(err); }
+}
+
+export async function reorder(req, res, next) {
+  try {
+    const { items } = reorderCategoriesRequestSchema.parse(req.body);
+    const db = getDb();
+    await db.$transaction(
+      items.map(({ id, sortOrder }) =>
+        db.category.update({ where: { id }, data: { sortOrder } })
+      )
+    );
+    await logAdminAction(req, "category.reorder", "Category", "batch", { count: items.length });
+    return ResponseFormatter.success(res, { message: "Category order saved." });
   } catch (err) { next(err); }
 }
