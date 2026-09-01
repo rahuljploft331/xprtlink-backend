@@ -25,7 +25,9 @@ function internalServiceGuard(req, res, next) {
 /**
  * POST /api/v1/notifications/dispatch
  * Internal-only — creates in-app notification records for one or more users.
- * Body: { userIds: string[], title: string, body: string, data?: object }
+ * Body: { userIds: string[], type: string, title: string, body: string, data?: object }
+ * `type` is required by the Notification model; if omitted it falls back to
+ * `data.type` and then to "system". `data` is stored in the `payload` column.
  */
 router.post(
   "/dispatch",

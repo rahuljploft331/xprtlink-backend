@@ -199,11 +199,12 @@ async function handleRoomClose(payload) {
     if (userIds.length > 0) {
       await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
         userIds,
+        type: "call_ended",
         title: "Call Ended",
         body: wasConnected
           ? `Your consultation has ended. Duration: ${durationLabel}.`
           : "Your consultation has ended.",
-        data: { consultationId: consultation.id, type: "call_ended" },
+        data: { consultationId: consultation.id },
       });
     }
   } catch (err) {

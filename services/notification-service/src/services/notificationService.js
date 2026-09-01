@@ -156,19 +156,27 @@ export async function updatePreferences(auth, body) {
  *
  * @param {{ userIds: string[], title: string, body: string, data?: object }} payload
  */
-export async function dispatchNotification({ userIds, title, body: bodyText, data = {} }) {
+export async function dispatchNotification({ userIds, type, title, body: bodyText, data = {} }) {
   if (!Array.isArray(userIds) || userIds.length === 0) return { dispatched: 0 };
 
+  // `type` is required by the model and has no default. Callers may send it at the
+  // top level, or nested in `data` (the original zego caller does); fall back to a
+  // generic type rather than throwing, so a mislabelled notification still lands.
+  const resolvedType = String(type ?? data?.type ?? "system").slice(0, 64);
+
   const db = getDb();
-  await db.notification.createMany({
+  const created = await db.notification.createMany({
+    // NOTE: the column is `payload`, not `data`. The wire contract keeps the name
+    // `data` for callers; it is mapped here.
     data: userIds.map((userId) => ({
       userId,
+      type: resolvedType,
       title: title ?? "Notification",
       body: bodyText ?? "",
-      data: data ?? {},
+      payload: data ?? {},
     })),
     skipDuplicates: true,
   });
 
-  return { dispatched: userIds.length };
+  return { dispatched: created.count };
 }
