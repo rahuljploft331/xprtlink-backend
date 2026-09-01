@@ -70,7 +70,7 @@ function peerInfo(conversation, auth) {
     };
   }
   return {
-    peerName: customerDisplayName(conversation.customer.user),
+    peerName: customerDisplayName(conversation.customer.user, conversation.customer),
     peerAvatarUrl: null, // customer avatars not yet stored in conversations include
   };
 }
