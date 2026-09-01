@@ -43,5 +43,5 @@ export function customerDisplayName(customerUser, customerProfile) {
 export function resolveMediaUrl(storageKey) {
   if (!storageKey) return null;
   const base = process.env.MEDIA_PUBLIC_BASE_URL || "";
-  return base ? `${base.replace(/\/$/, "")}/${storageKey}` : null;
+  return base ? `${base.replace(/\/$/, "")}/${storageKey}` : `/${storageKey}`;
 }
