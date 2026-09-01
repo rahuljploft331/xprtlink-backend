@@ -1350,6 +1350,104 @@
           }
         }
       ]
+    },
+    {
+      "name": "Platform Settings",
+      "description": "MFS §12.12 platform settings plus the admin's own password change.\n\nValues are stored as one row per key in `platform_settings` (a shared key/value store). catalog-service's public `/app-config` folds every row into the mobile payload, so key names (`commissionPercent`, `maintenanceMode`, `supportEmail`, `payoutSchedule`) are a contract — add keys, never rename them.",
+      "item": [
+        {
+          "name": "Get Platform Settings",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "settings"
+              ]
+            },
+            "description": "Current platform settings as a flat object.\n\n**Auth**: `requireAdmin` + `requirePermission(\"settings\", \"view\")` — an admin without at least `view` on the `settings` module gets 403.\n\nA key that has never been written falls back to its default (15 / false / support@xpertlink.com / weekly), so a freshly migrated database still returns all four.\n\n**Response**\n```json\n{\n  \"success\": true,\n  \"message\": \"Platform settings loaded\",\n  \"data\": {\n    \"commissionPercent\": 15,\n    \"maintenanceMode\": false,\n    \"supportEmail\": \"support@xpertlink.com\",\n    \"payoutSchedule\": \"weekly\"\n  }\n}\n```"
+          }
+        },
+        {
+          "name": "Update Platform Settings",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"commissionPercent\": 15,\n  \"maintenanceMode\": false,\n  \"supportEmail\": \"support@xpertlink.com\",\n  \"payoutSchedule\": \"weekly\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/settings",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "settings"
+              ]
+            },
+            "description": "Partial update — every field is optional and only the keys present in the body are written, so untouched settings keep their existing rows. At least one key is required (an empty body returns 400).\n\n**Auth**: `requireAdmin` + `requirePermission(\"settings\", \"edit\")` — a sub-admin with only `view` gets 403.\n\n**Validation** (`shared/contracts/settings.schema.js`, all failures are 400 `VALIDATION_ERROR`)\n| Field | Rule |\n| --- | --- |\n| `commissionPercent` | number, 0–100 |\n| `maintenanceMode` | boolean |\n| `supportEmail` | valid email |\n| `payoutSchedule` | `daily` \\| `weekly` \\| `monthly` |\n\nWrites an audit entry `settings.update` on `PlatformSetting` carrying only the changed keys.\n\n**Response** — the full settings object after the write:\n```json\n{\n  \"success\": true,\n  \"message\": \"Platform settings updated\",\n  \"data\": {\n    \"commissionPercent\": 15,\n    \"maintenanceMode\": false,\n    \"supportEmail\": \"support@xpertlink.com\",\n    \"payoutSchedule\": \"weekly\"\n  }\n}\n```"
+          }
+        },
+        {
+          "name": "Change Own Admin Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"Admin@123\",\n  \"newPassword\": \"NewAdmin@456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/settings/password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "settings",
+                "password"
+              ]
+            },
+            "description": "The logged-in admin changing their OWN password. Distinct from `PUT /admin/admins/:id/reset-password`, which is a super admin resetting somebody else's account.\n\n**Auth**: `requireAdmin` only — no module permission, because it can only ever touch the caller's own row.\n\n- `currentPassword` is verified with the same bcrypt helper the admin login uses; a mismatch returns **401** `Current password is incorrect`.\n- `newPassword` must be at least 8 characters, otherwise **400**.\n- The audit entry `settings.password_change` records the actor's email only — never password values — and no response ever contains a password hash.\n- Existing sessions are left intact; the new password applies to the next login.\n\n**Response**\n```json\n{\n  \"success\": true,\n  \"message\": \"Password changed\",\n  \"data\": null\n}\n```"
+          }
+        }
+      ]
     }
   ]
 }

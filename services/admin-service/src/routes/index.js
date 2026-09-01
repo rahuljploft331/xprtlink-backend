@@ -18,6 +18,7 @@ import auditLogRoutes from "./auditLog.routes.js";
 import notificationsRoutes from "./notifications.routes.js";
 import reportsRoutes from "./reports.routes.js";
 import eventsRoutes from "./events.routes.js";
+import settingsRoutes from "./settings.routes.js";
 
 const router = Router();
 
@@ -43,5 +44,6 @@ router.use("/audit-log", auditLogRoutes);
 router.use("/notifications", notificationsRoutes);
 router.use("/reports", reportsRoutes);
 router.use("/events", eventsRoutes);
+router.use("/settings", settingsRoutes);
 
 export default router;
