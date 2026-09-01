@@ -12,13 +12,26 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
 const router = Router();
 
 // ── Internal dispatch endpoint (no JWT) — guarded by SERVICE_SECRET ──────────
+import crypto from "crypto";
+
 function internalServiceGuard(req, res, next) {
   const secret = process.env.SERVICE_SECRET;
+  if (!secret) {
+    return res.status(500).json({ success: false, message: "Internal Server Error: Missing SERVICE_SECRET" });
+  }
+  
   const header = req.headers["x-internal-service"];
-  if (!header) return res.status(403).json({ success: false, message: "Forbidden" });
-  if (secret && process.env.NODE_ENV === "production" && header !== secret) {
+  if (!header || typeof header !== "string") {
     return res.status(403).json({ success: false, message: "Forbidden" });
   }
+
+  const secretBuffer = Buffer.from(secret);
+  const headerBuffer = Buffer.from(header);
+
+  if (secretBuffer.length !== headerBuffer.length || !crypto.timingSafeEqual(secretBuffer, headerBuffer)) {
+    return res.status(403).json({ success: false, message: "Forbidden" });
+  }
+
   next();
 }
 
@@ -33,6 +46,9 @@ router.post(
   "/dispatch",
   internalServiceGuard,
   asyncHandler(async (req, res) => {
+    if (Array.isArray(req.body.userIds) && req.body.userIds.length > 500) {
+      return res.status(400).json({ success: false, message: "Too many userIds (max 500)" });
+    }
     const data = await svc.dispatchNotification(req.body);
     return ResponseFormatter.success(res, { message: "Notifications dispatched", data });
   })
