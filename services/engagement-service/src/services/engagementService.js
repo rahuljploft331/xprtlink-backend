@@ -261,13 +261,23 @@ export async function updateQuote(auth, quoteId, body) {
       ...(body.notes !== undefined ? { notes: body.notes } : {}),
     };
 
-    const result = await tx.quoteRequest.updateMany({
-      where: { id: quoteId, status: { in: Array.from(EDITABLE_QUOTE_STATUSES) } },
-      data,
-    });
+    if (Object.keys(data).length === 0) {
+      const current = await tx.quoteRequest.findUnique({
+        where: { id: quoteId },
+        select: { status: true },
+      });
+      if (!current || !EDITABLE_QUOTE_STATUSES.has(current.status)) {
+        throw badRequest("Quote cannot be edited in its current status", "INVALID_STATUS");
+      }
+    } else {
+      const result = await tx.quoteRequest.updateMany({
+        where: { id: quoteId, status: { in: Array.from(EDITABLE_QUOTE_STATUSES) } },
+        data,
+      });
 
-    if (result.count === 0) {
-      throw badRequest("Quote cannot be edited in its current status", "INVALID_STATUS");
+      if (result.count === 0) {
+        throw badRequest("Quote cannot be edited in its current status", "INVALID_STATUS");
+      }
     }
 
     if (body.mediaIds?.length) {
