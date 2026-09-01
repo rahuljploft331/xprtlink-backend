@@ -122,6 +122,9 @@ export async function searchExperts(query, auth) {
   }
   if (query.rating) where.ratingAvg = { gte: Number(query.rating) };
   if (query.experience) where.experienceYears = { gte: Number(query.experience) };
+  if (query.experienceMax) {
+    where.experienceYears = { ...(where.experienceYears || {}), lte: Number(query.experienceMax) };
+  }
   if (query.online === "true") where.availabilityStatus = "online";
   if (query.verified === "true") where.verificationStatus = "approved";
 
