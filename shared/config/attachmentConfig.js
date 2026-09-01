@@ -41,19 +41,29 @@ export function getChatAttachmentConfig() {
     process.env.CHAT_ATTACHMENT_VIDEO_MAX_SIZE_MB || "50"
   );
 
+  // Client decision (31 Aug 2026 call, §3.3): standard customer<->expert chat does
+  // NOT support image or video. Media belongs to the Quote Request workflow, which
+  // uploads under the separate `quote_attachment` purpose and is unaffected by this
+  // config. Kept as a flag rather than deleted so the decision is reversible without
+  // a code change; documents are untouched either way.
+  const allowMedia = process.env.CHAT_ATTACHMENT_ALLOW_MEDIA === "true";
+
   return {
     image: {
-      mimes: imageMimes,
+      enabled: allowMedia,
+      mimes: allowMedia ? imageMimes : [],
       maxSizeMb: imageMaxSizeMb,
       maxSizeBytes: Math.round(imageMaxSizeMb * 1024 * 1024),
     },
     document: {
+      enabled: true,
       mimes: docMimes,
       maxSizeMb: docMaxSizeMb,
       maxSizeBytes: Math.round(docMaxSizeMb * 1024 * 1024),
     },
     video: {
-      mimes: videoMimes,
+      enabled: allowMedia,
+      mimes: allowMedia ? videoMimes : [],
       maxSizeMb: videoMaxSizeMb,
       maxSizeBytes: Math.round(videoMaxSizeMb * 1024 * 1024),
     },
@@ -85,6 +95,15 @@ export function validateChatAttachment(mimeType, sizeBytes) {
 
   const catConfig = config[category];
 
+  // Media is disabled for standard chat (§3.3). Fail with a message that points at
+  // the right workflow rather than the generic "allowed formats: <empty>" below.
+  if (catConfig.enabled === false) {
+    throw badRequest(
+      `${category === "video" ? "Video" : "Image"} attachments are not supported in chat. Share photos or videos through a Quote Request instead.`,
+      "CHAT_MEDIA_NOT_ALLOWED"
+    );
+  }
+
   // Check allowed format
   if (!catConfig.mimes.includes(normalizedMime)) {
     throw badRequest(
@@ -102,4 +121,12 @@ export function validateChatAttachment(mimeType, sizeBytes) {
   }
 
   return { valid: true, category, config: catConfig };
+}
+
+/**
+ * Whether standard chat currently accepts image/video attachments.
+ * False by default per the 31 Aug 2026 client decision (§3.3).
+ */
+export function isChatMediaAllowed() {
+  return process.env.CHAT_ATTACHMENT_ALLOW_MEDIA === "true";
 }

@@ -6,6 +6,7 @@ import {
   toConversationSummaryDto,
   toMessageDto,
 } from "@xprtlink/shared/mappers/messaging.mapper.js";
+import { isChatMediaAllowed } from "@xprtlink/shared/config/attachmentConfig.js";
 import { badRequest, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 
@@ -250,6 +251,24 @@ export async function sendMessage(auth, conversationId, body) {
 
     if (assets.length !== body.mediaIds.length) {
       throw badRequest("One or more media assets are invalid", "INVALID_MEDIA");
+    }
+
+    // Client decision (31 Aug 2026 call, §3.3): no image/video in standard chat.
+    // Enforced again here, not just at upload — an asset uploaded under the
+    // `quote_attachment` purpose bypasses the chat upload gate, so its id must not
+    // be smuggled in as a chat attachment. Quote Requests remain the media workflow.
+    if (!isChatMediaAllowed()) {
+      const blocked = assets.find(
+        (a) =>
+          a.mimeType?.toLowerCase().startsWith("image/") ||
+          a.mimeType?.toLowerCase().startsWith("video/")
+      );
+      if (blocked) {
+        throw badRequest(
+          "Images and videos cannot be sent in chat. Share them through a Quote Request instead.",
+          "CHAT_MEDIA_NOT_ALLOWED"
+        );
+      }
     }
 
     // Move any temporary staged media assets to permanent user/category/ path in S3
