@@ -980,6 +980,44 @@
             },
             "description": "Update markdown content of a CMS static page."
           }
+        },
+        {
+          "name": "Broadcast Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Welcome\",\n  \"body\": \"Welcome to XprtLink!\",\n  \"audience\": \"customers\",\n  \"type\": \"marketing\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "notifications"
+              ]
+            },
+            "description": "Broadcast a notification to users."
+          }
         }
       ]
     },
@@ -1261,14 +1299,30 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{adminToken}}" },
-              { "key": "Accept", "value": "text/event-stream" },
-              { "key": "Cache-Control", "value": "no-cache" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Accept",
+                "value": "text/event-stream"
+              },
+              {
+                "key": "Cache-Control",
+                "value": "no-cache"
+              }
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/admin/events",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "admin", "events"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "events"
+              ]
             },
             "description": "Opens a persistent Server-Sent Events (SSE) connection. The server streams events as they occur in the platform.\n\n**Authentication**: Valid admin JWT required.\n\n**Client usage (React admin portal)**:\n```js\nconst es = new EventSource(`${API_BASE}/api/v1/admin/events`, {\n  headers: { Authorization: `Bearer ${adminToken}` }\n});\n\nes.addEventListener('ticket:created', e => {\n  const ticket = JSON.parse(e.data);\n  // show toast / update badge count\n});\n\nes.addEventListener('verification:submitted', e => { ... });\nes.addEventListener('report:filed', e => { ... });\nes.addEventListener('consultation:completed', e => { ... });\nes.addEventListener('user:registered', e => { ... });\nes.addEventListener('review:flagged', e => { ... });\n\nes.onerror = () => es.close();\n```\n\n**Polling interval**: DB is polled every 5 seconds. Maximum latency before an event appears = 5 s.\n\n**Heartbeat**: Server sends a `: ping` SSE comment every 25 s to keep the connection alive through proxies."
           }
@@ -1279,12 +1333,23 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{adminToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/admin/events/status",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "admin", "events", "status"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "events",
+                "status"
+              ]
             },
             "description": "Returns the number of admin SSE clients currently connected. Useful for monitoring / debugging.\n\n**Response**: `{ success: true, data: { connectedClients: 3 } }`"
           }
@@ -1295,7 +1360,18 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/api/v1/admin/events", "host": ["{{base_url}}"], "path": ["api", "v1", "admin", "events"] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/events",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "events"
+              ]
+            },
             "description": "Fired when a user (customer or expert) submits a new support ticket.\n\n**SSE format**:\n```\nevent: ticket:created\ndata: {\"id\":\"uuid\",\"subject\":\"Cannot access history\",\"category\":\"consultation\",\"userId\":\"uuid\",\"createdAt\":\"2026-08-19T...\"}\n```\n\n**Admin action**: Navigate to Support Tickets module to view and respond."
           }
         },
@@ -1305,7 +1381,18 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/api/v1/admin/events", "host": ["{{base_url}}"], "path": ["api", "v1", "admin", "events"] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/events",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "events"
+              ]
+            },
             "description": "Fired when an expert submits identity/credential verification documents.\n\n**SSE format**:\n```\nevent: verification:submitted\ndata: {\"id\":\"uuid\",\"expertId\":\"uuid\",\"expertName\":\"John Doe\",\"submittedAt\":\"2026-08-19T...\"}\n```\n\n**Admin action**: Navigate to Verifications module → approve or reject."
           }
         },
@@ -1315,7 +1402,18 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/api/v1/admin/events", "host": ["{{base_url}}"], "path": ["api", "v1", "admin", "events"] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/events",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "events"
+              ]
+            },
             "description": "Fired when a customer files a complaint against an expert.\n\n**SSE format**:\n```\nevent: report:filed\ndata: {\"id\":\"uuid\",\"expertId\":\"uuid\",\"customerId\":\"uuid\",\"reason\":\"Inappropriate behaviour\",\"createdAt\":\"2026-08-19T...\"}\n```"
           }
         },
@@ -1325,7 +1423,18 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/api/v1/admin/events", "host": ["{{base_url}}"], "path": ["api", "v1", "admin", "events"] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/events",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "events"
+              ]
+            },
             "description": "Fired when a consultation session ends and billing is settled.\n\n**SSE format**:\n```\nevent: consultation:completed\ndata: {\"id\":\"uuid\",\"expertId\":\"uuid\",\"customerId\":\"uuid\",\"durationSeconds\":1800,\"billingStatus\":\"charged\",\"endedAt\":\"2026-08-19T...\"}\n```"
           }
         },
@@ -1335,7 +1444,18 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/api/v1/admin/events", "host": ["{{base_url}}"], "path": ["api", "v1", "admin", "events"] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/events",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "events"
+              ]
+            },
             "description": "Fired when a new user (customer or expert) registers on the platform.\n\n**SSE format**:\n```\nevent: user:registered\ndata: {\"id\":\"uuid\",\"role\":\"customer\",\"email\":\"jane@example.com\",\"createdAt\":\"2026-08-19T...\"}\n```"
           }
         },
@@ -1345,7 +1465,18 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": { "raw": "{{base_url}}/api/v1/admin/events", "host": ["{{base_url}}"], "path": ["api", "v1", "admin", "events"] },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/events",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "events"
+              ]
+            },
             "description": "Fired when a review is flagged (by automated rules or admin action).\n\n**SSE format**:\n```\nevent: review:flagged\ndata: {\"id\":\"uuid\",\"expertId\":\"uuid\",\"customerId\":\"uuid\",\"rating\":1,\"flaggedAt\":\"2026-08-19T...\"}\n```"
           }
         }
