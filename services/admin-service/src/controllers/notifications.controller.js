@@ -22,6 +22,9 @@ export async function getById(req, res) {
 import { broadcastNotificationRequestSchema } from "@xprtlink/shared/contracts/admin.schema.js";
 import { DEFAULT_NOTIFICATION_PREFERENCES } from "@xprtlink/shared/constants/index.js";
 
+import { logAdminAction } from "#utils/audit.js";
+import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
+
 export async function send(req, res) {
   let validated;
   try {
@@ -72,15 +75,29 @@ export async function send(req, res) {
     return ResponseFormatter.success(res, { message: "No matching users found for audience.", data: { dispatched: 0 } });
   }
 
-  const data = targetUserIds.map((userId) => ({
-    userId,
-    title,
-    body,
-    type,
-  }));
+  const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+  const CHUNK_SIZE = 500;
 
-  await db.notification.createMany({
-    data,
+  for (let i = 0; i < targetUserIds.length; i += CHUNK_SIZE) {
+    const chunk = targetUserIds.slice(i, i + CHUNK_SIZE);
+    try {
+      await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+        userIds: chunk,
+        type: type,
+        title: title,
+        body: body,
+        data: {}, // no extra payload needed for simple broadcast
+      });
+    } catch (err) {
+      console.error(`[admin-service] Failed to dispatch broadcast chunk: ${err.message}`);
+    }
+  }
+
+  await logAdminAction(req, "notification.broadcast", "Notification", null, {
+    audience,
+    type,
+    userCount: targetUserIds.length,
+    title,
   });
 
   return ResponseFormatter.success(res, { 
