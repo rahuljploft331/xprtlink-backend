@@ -51,6 +51,45 @@
           }
         },
         {
+          "name": "Get Trending Experts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "id": "t-trending",
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('response is JSON', () => pm.response.to.be.json);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/experts/trending?limit=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "experts",
+                "trending"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            },
+            "description": "Get trending experts for the customer search dashboard. Currently returns the same selection as featured experts. Will be updated later with actual trending calculation (e.g. by activity/popularity)."
+          }
+        },
+        {
           "name": "Search Experts",
           "event": [
             {

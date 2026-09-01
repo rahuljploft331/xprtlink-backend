@@ -98,6 +98,16 @@ export async function getFeatured(limit = 10) {
   return selected.map((e) => toExpertPublicDto(e, { categories: e.categories }));
 }
 
+/**
+ * Trending experts (Placeholder logic).
+ * Currently reuses getFeatured() logic as requested by the client,
+ * to be updated later with actual trending calculation (e.g. by activity/popularity).
+ */
+export async function getTrending(limit = 10) {
+  return getFeatured(limit);
+}
+
+
 export async function searchExperts(query, auth) {
   const { page, limit, skip } = parsePagination(query);
   const where = { ...PUBLIC_WHERE };

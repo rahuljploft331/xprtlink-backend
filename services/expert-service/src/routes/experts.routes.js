@@ -19,6 +19,16 @@ router.get(
 );
 
 router.get(
+  "/trending",
+  optionalAuthenticate,
+  asyncHandler(async (req, res) => {
+    const limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;
+    const data = await svc.getTrending(limit);
+    return ResponseFormatter.success(res, { message: getMessage("featuredExperts"), data });
+  })
+);
+
+router.get(
   "/me",
   authenticate,
   requireRole("expert"),
