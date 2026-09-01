@@ -68,7 +68,7 @@ The following user journeys from the Figma UI designs are **not yet covered** by
 
 | Flow | Figma Screen / MFS Section | Priority |
 |------|---------------------------|----------|
-| **G. Messaging / Chat** | Customer ↔ Expert real-time messaging with attachments | Medium |
+| **G. Messaging / Chat** | Customer ↔ Expert real-time **text** chat (no image/video — Aug 31). Socket driver exists: `pnpm flow:chat`. | Medium |
 | **H. Expert Payout Cycle** | Consultation earnings → weekly payout → Stripe Connect transfer | Medium |
 | **I. Customer Quote Acceptance** | Expert responds to quote → customer accepts → consultation scheduled | Medium |
 | **J. Admin Moderation** | Admin reviews flagged content, suspends users, manages CMS | Low |
