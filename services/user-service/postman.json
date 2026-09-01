@@ -459,14 +459,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"email\": \"{{runEmail}}\"\n}"
+              "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"role\": \"customer\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/auth/password/forgot",
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "password", "forgot"]
             },
-            "description": "Initiate password reset. Sends a reset code to email/phone."
+            "description": "Initiate password reset. Sends a reset code to email/phone. The role field (customer/expert) is optional but recommended."
           }
         },
         {

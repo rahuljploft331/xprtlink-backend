@@ -14,6 +14,7 @@ import {
   refreshRequestSchema,
   phoneChangeRequestSchema,
   phoneChangeVerifySchema,
+  forgotPasswordRequestSchema,
 } from "@xprtlink/shared/contracts";
 import * as svc from "../services/userService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
@@ -116,8 +117,8 @@ router.post(
 router.post(
   "/password/forgot",
   asyncHandler(async (req, res) => {
-    const body = otpSendRequestSchema.parse({ ...req.body, purpose: "reset_password" });
-    const data = await svc.forgotPassword(body);
+    const body = forgotPasswordRequestSchema.parse(req.body);
+    const data = await svc.forgotPassword({ ...body, purpose: "reset_password" });
     return ResponseFormatter.success(res, { message: getMessage("resetCodeSent"), data });
   })
 );

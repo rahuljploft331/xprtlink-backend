@@ -111,6 +111,17 @@ export const otpVerifyRequestSchema = z
     path: ["email"],
   });
 
+export const forgotPasswordRequestSchema = z
+  .object({
+    email: z.string().email().optional(),
+    phone: e164PhoneSchema.optional(),
+    role: sessionRoleSchema.optional(),
+  })
+  .refine((data) => data.email || data.phone, {
+    message: "Email or phone is required",
+    path: ["email"],
+  });
+
 export const passwordResetRequestSchema = z
   .object({
     email: z.string().email().optional(),
