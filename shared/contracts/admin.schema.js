@@ -22,3 +22,10 @@ export const updateAdminSchema = z.object({
 export const setPermissionsSchema = z.object({
   permissions: z.record(z.enum(ADMIN_MODULES), z.enum(PERMISSION_LEVEL_VALUES)),
 });
+
+export const broadcastNotificationRequestSchema = z.object({
+  audience: z.enum(["all", "customers", "experts"]),
+  title: z.string().min(1).max(200),
+  body: z.string().min(1),
+  type: z.string().default("system"),
+});

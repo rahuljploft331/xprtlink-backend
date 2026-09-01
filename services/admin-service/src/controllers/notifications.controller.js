@@ -19,37 +19,49 @@ export async function getById(req, res) {
   return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
 }
 
+import { broadcastNotificationRequestSchema } from "@xprtlink/shared/contracts/admin.schema.js";
+import { DEFAULT_NOTIFICATION_PREFERENCES } from "@xprtlink/shared/constants/index.js";
+
 export async function send(req, res) {
-  const { title, body, audience, type = "system" } = req.body;
-  if (!title || !body) {
-    return res.status(400).json({ success: false, message: "Title and body are required." });
+  let validated;
+  try {
+    validated = broadcastNotificationRequestSchema.parse(req.body);
+  } catch (err) {
+    return res.status(400).json({ success: false, message: err.errors?.[0]?.message || "Invalid payload" });
   }
 
-  // Determine user query filter based on audience
+  const { title, body, audience, type } = validated;
+
   let roleFilter = {};
-  if (audience === "customers") roleFilter = { role: "CUSTOMER" };
-  else if (audience === "experts") roleFilter = { role: "EXPERT" };
+  if (audience === "customers") roleFilter = { customerProfile: { isNot: null } };
+  else if (audience === "experts") roleFilter = { expertProfile: { isNot: null } };
 
   const db = getDb();
   
-  // Get users matching audience
   const users = await db.user.findMany({
     where: roleFilter,
     select: {
       id: true,
-      notificationPref: {
-        select: { preferences: true }
-      }
+      expertProfile: { select: { id: true } },
+      customerProfile: { select: { id: true } },
+      notificationPref: { select: { preferences: true } }
     }
   });
 
-  // Filter based on type and preferences
   let targetUserIds = [];
   for (const u of users) {
     if (type === "marketing") {
       const prefs = u.notificationPref?.preferences || {};
-      // Respect user preferences (if marketing is explicitly false, skip)
-      if (prefs.marketing === false) {
+      const isExpert = Boolean(u.expertProfile);
+      
+      let isOptedIn = false;
+      if (isExpert) {
+        isOptedIn = prefs.marketingCommunications ?? DEFAULT_NOTIFICATION_PREFERENCES.expert.marketingCommunications;
+      } else {
+        isOptedIn = prefs.marketingNotifications ?? DEFAULT_NOTIFICATION_PREFERENCES.customer.marketingNotifications;
+      }
+
+      if (!isOptedIn) {
         continue;
       }
     }
@@ -60,7 +72,6 @@ export async function send(req, res) {
     return ResponseFormatter.success(res, { message: "No matching users found for audience.", data: { dispatched: 0 } });
   }
 
-  // Insert notifications
   const data = targetUserIds.map((userId) => ({
     userId,
     title,
