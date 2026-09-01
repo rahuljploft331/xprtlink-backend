@@ -1160,6 +1160,63 @@
       ]
     },
     {
+      "name": "Audit Log",
+      "description": "Read-only view of the immutable admin action trail (`admin_audit_logs`). Super admin only — sub-admins receive 403.",
+      "item": [
+        {
+          "name": "List Audit Log",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/audit-log?page=1&limit=25&action=&module=&adminId=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "audit-log"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "25",
+                  "description": "1-100, default 20"
+                },
+                {
+                  "key": "action",
+                  "value": "",
+                  "description": "Case-insensitive `contains` match on the stored action, so `approve` matches `verification.approve`. Empty = no filter."
+                },
+                {
+                  "key": "module",
+                  "value": "",
+                  "description": "Portal module name (`experts`, `verifications`, `categories`, `admins`, `cms`, ...) resolved to the matching `entityType` values, or a raw `entityType` substring. Empty = no filter."
+                },
+                {
+                  "key": "adminId",
+                  "value": "",
+                  "description": "Actor admin UUID. A malformed UUID returns 400. Empty = no filter."
+                }
+              ]
+            },
+            "description": "Paginated admin audit trail, newest first.\n\n**Auth**: `requireAdmin` + `requireSuperAdmin` — sub-admins get 403.\n\n**Response**\n```json\n{\n  \"success\": true,\n  \"message\": \"Audit log loaded\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"uuid\",\n        \"createdAt\": \"2026-08-31T07:21:50.911Z\",\n        \"adminId\": \"uuid\",\n        \"adminName\": \"Ops Admin\",\n        \"action\": \"verification.approve\",\n        \"module\": \"ExpertVerification\",\n        \"targetId\": \"uuid\",\n        \"targetName\": null,\n        \"details\": \"notes: Auto-approved\",\n        \"ipAddress\": \"127.0.0.1\"\n      }\n    ],\n    \"page\": 1,\n    \"limit\": 25,\n    \"total\": 17\n  }\n}\n```\n\nThe trail is append-only — there is no create/update/delete route for audit rows."
+          }
+        }
+      ]
+    },
+    {
       "name": "Global Admin Search",
       "item": [
         {
