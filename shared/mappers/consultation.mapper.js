@@ -3,7 +3,7 @@ import { expertDisplayName } from "./expert.mapper.js";
 
 export function toConsultationSummaryDto(
   consultation,
-  { customerUser, expertProfile, currency = "USD" }
+  { customerUser, customerProfile, expertProfile, currency = "USD" }
 ) {
   return {
     id: consultation.id,
@@ -11,7 +11,7 @@ export function toConsultationSummaryDto(
     expertId: consultation.expertId,
     expertName: expertDisplayName(expertProfile),
     customerId: consultation.customerId,
-    customerName: customerDisplayName(customerUser),
+    customerName: customerDisplayName(customerUser, customerProfile),
     ratePerMinute: centsToAmount(consultation.ratePerMinuteCents),
     currency,
     durationSeconds: consultation.durationSeconds,

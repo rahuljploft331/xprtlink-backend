@@ -1,7 +1,7 @@
 import { centsToAmount, customerDisplayName, resolveMediaUrl, toIso } from "./common.js";
 import { expertDisplayName } from "./expert.mapper.js";
 
-export function toQuoteSummaryDto(quote, { customerUser, expertProfile, attachments, currency = "USD" }) {
+export function toQuoteSummaryDto(quote, { customerUser, customerProfile, expertProfile, attachments, currency = "USD" }) {
   const attachmentCount = Array.isArray(attachments)
     ? attachments.length
     : quote.attachments?.length ?? 0;
@@ -16,7 +16,7 @@ export function toQuoteSummaryDto(quote, { customerUser, expertProfile, attachme
     expertName: expertDisplayName(expertProfile),
     expertAvatarUrl: resolveMediaUrl(expertProfile?.avatarMedia?.storageKey),
     customerId: quote.customerId,
-    customerName: customerDisplayName(customerUser),
+    customerName: customerDisplayName(customerUser, customerProfile),
     budget: centsToAmount(quote.budgetCents),
     currency,
     attachmentCount,
@@ -40,7 +40,7 @@ export function toQuoteDetailDto(
         }
       : null;
 
-  const contactName = customerDisplayName(customerUser);
+  const contactName = customerDisplayName(customerUser, customerProfile);
 
   return {
     id: quote.id,

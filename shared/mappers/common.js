@@ -21,16 +21,22 @@ export function fullName(firstName, lastName) {
   return [firstName, lastName].filter(Boolean).join(" ").trim();
 }
 
-/** Customer display name from user + profile. */
-export function customerDisplayName(customerUser) {
-  if (!customerUser) return "Customer";
-  if (customerUser.customerProfile) {
-    return fullName(
-      customerUser.customerProfile.firstName,
-      customerUser.customerProfile.lastName
-    );
+/**
+ * Customer display name.
+ * @param {object} customerUser - The User row.
+ * @param {object|null} [customerProfile] - The CustomerProfile row (if available separately).
+ *   When present, first_name/last_name from the profile are used (most accurate).
+ *   Falls back to email prefix only as a last resort.
+ */
+export function customerDisplayName(customerUser, customerProfile) {
+  if (!customerUser && !customerProfile) return "Customer";
+  // Prefer the explicit customerProfile argument (passed by quote/consultation mappers).
+  const profile = customerProfile ?? customerUser?.customerProfile ?? null;
+  if (profile) {
+    const name = fullName(profile.firstName, profile.lastName);
+    if (name) return name;
   }
-  return customerUser.email?.split("@")[0] ?? "Customer";
+  return customerUser?.email?.split("@")[0] ?? "Customer";
 }
 
 /** Resolve media URL from storage key (placeholder until S3 wiring). */

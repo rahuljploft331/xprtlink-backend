@@ -117,6 +117,7 @@ function quoteContext(quote) {
 function consultationContext(consultation) {
   return {
     customerUser: consultation.customer.user,
+    customerProfile: consultation.customer,
     expertProfile: consultation.expert,
     currency: consultation.expert.currency,
     hasReview: Boolean(consultation.review),
