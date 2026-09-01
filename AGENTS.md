@@ -18,7 +18,7 @@
 | engagement-service | Quotes + consultations |
 | messaging-service | Chat realtime (Socket.IO only; no REST messages) |
 | billing-service | Stripe payments + IAP subscriptions + payouts |
-| notification-service | Push / in-app. `dispatchNotification` must set `type` + `payload` or writes fail (B10) |
+| notification-service | Push / in-app. Write path fixed (`type` + `payload`). In-app dispatch triggers wired (T-018); FCM push + admin broadcast still open |
 | media-service | Uploads |
 | admin-service | Super admin + **subadmin RBAC** + reports. Audit **writes** only (no read API — G7) |
 | api-gateway | Ingress (no database connection) |
