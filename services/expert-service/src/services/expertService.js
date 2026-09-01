@@ -266,7 +266,9 @@ export async function getExpertById(id, auth) {
       },
       create: { customerProfileId: auth.customerProfileId, expertProfileId: id },
       update: { viewedAt: new Date() },
-    }).catch(() => {}); // silently ignore failures
+    }).catch((err) => {
+      console.error(`[getExpertById] Failed to record recently viewed for expert ${id}:`, err.message);
+    });
   }
   return toExpertPublicDto(expert, { categories: expert.categories, isSaved });
 }

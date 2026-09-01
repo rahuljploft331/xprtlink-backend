@@ -44,7 +44,7 @@ export const authTokensDtoSchema = z.object({
 export const registerRequestSchema = z
   .object({
     role: sessionRoleSchema,
-    email: z.string().email(),
+    email: z.string().email().transform((e) => e.trim().toLowerCase()),
     phone: e164PhoneSchema,
     password: passwordSchema,
     confirmPassword: z.string(),
@@ -72,7 +72,7 @@ export const registerRequestSchema = z
 export const loginRequestSchema = z
   .object({
     role: sessionRoleSchema,
-    email: z.string().email().optional(),
+    email: z.string().email().transform((e) => e.trim().toLowerCase()).optional(),
     phone: e164PhoneSchema.optional(),
     password: z.string().optional(),
   })
@@ -90,7 +90,7 @@ export const loginRequestSchema = z
 
 export const otpSendRequestSchema = z
   .object({
-    email: z.string().email().optional(),
+    email: z.string().email().transform((e) => e.trim().toLowerCase()).optional(),
     phone: e164PhoneSchema.optional(),
     purpose: z.enum(["register", "login", "reset_password", "verify_email", "verify_phone"]),
   })
@@ -101,7 +101,7 @@ export const otpSendRequestSchema = z
 
 export const otpVerifyRequestSchema = z
   .object({
-    email: z.string().email().optional(),
+    email: z.string().email().transform((e) => e.trim().toLowerCase()).optional(),
     phone: e164PhoneSchema.optional(),
     code: z.string().regex(/^\d{6}$/, "OTP must be exactly 6 digits"),
     purpose: z.enum(["register", "login", "reset_password", "verify_email", "verify_phone"]),
@@ -113,7 +113,7 @@ export const otpVerifyRequestSchema = z
 
 export const forgotPasswordRequestSchema = z
   .object({
-    email: z.string().email().optional(),
+    email: z.string().email().transform((e) => e.trim().toLowerCase()).optional(),
     phone: e164PhoneSchema.optional(),
     role: sessionRoleSchema.optional(),
   })
@@ -124,7 +124,7 @@ export const forgotPasswordRequestSchema = z
 
 export const passwordResetRequestSchema = z
   .object({
-    email: z.string().email().optional(),
+    email: z.string().email().transform((e) => e.trim().toLowerCase()).optional(),
     phone: e164PhoneSchema.optional(),
     code: z.string().regex(/^\d{6}$/, "OTP must be exactly 6 digits"),
     newPassword: passwordSchema,

@@ -250,12 +250,6 @@ export async function updateQuote(auth, quoteId, body) {
 
   const db = getDb();
   const updated = await db.$transaction(async (tx) => {
-    // Re-check status inside transaction to prevent TOCTOU race
-    const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
-    if (!current || !EDITABLE_QUOTE_STATUSES.has(current.status)) {
-      throw badRequest("Quote cannot be edited in its current status", "INVALID_STATUS");
-    }
-
     const data = {
       ...(body.title ? { title: body.title } : {}),
       ...(body.description ? { description: body.description } : {}),
@@ -266,6 +260,15 @@ export async function updateQuote(auth, quoteId, body) {
       ...(body.budget !== undefined ? { budgetCents: amountToCents(body.budget) } : {}),
       ...(body.notes !== undefined ? { notes: body.notes } : {}),
     };
+
+    const result = await tx.quoteRequest.updateMany({
+      where: { id: quoteId, status: { in: Array.from(EDITABLE_QUOTE_STATUSES) } },
+      data,
+    });
+
+    if (result.count === 0) {
+      throw badRequest("Quote cannot be edited in its current status", "INVALID_STATUS");
+    }
 
     if (body.mediaIds?.length) {
       await tx.quoteAttachment.createMany({
@@ -278,9 +281,8 @@ export async function updateQuote(auth, quoteId, body) {
       });
     }
 
-    return tx.quoteRequest.update({
+    return tx.quoteRequest.findUnique({
       where: { id: quoteId },
-      data,
       include: QUOTE_INCLUDE,
     });
   });

@@ -215,15 +215,14 @@ export async function register(body) {
       // Look for a pending user that matches BOTH identifiers (not just one).
       // This prevents cross-contamination where a pending user with matching email
       // but different phone gets its phone overwritten.
-      const pendingWhere = { status: "pending_verification" };
-      if (email && phone) {
-        pendingWhere.email = email;
-        pendingWhere.phone = phone;
-      } else if (email) {
-        pendingWhere.email = email;
-      } else if (phone) {
-        pendingWhere.phone = phone;
-      }
+      const pendingWhere = {
+        status: "pending_verification",
+        ...(email && phone
+          ? { OR: [{ email }, { phone }] }
+          : email
+            ? { email }
+            : { phone }),
+      };
 
       const pending = await tx.user.findFirst({ where: pendingWhere });
 
@@ -300,6 +299,10 @@ export async function login(body) {
     );
   }
 
+  if (user.status === "suspended") {
+    throw forbidden("Account suspended", "ACCOUNT_SUSPENDED");
+  }
+
   if (user.status !== "active") throw unauthorized("Invalid credentials");
 
   if (phone) {
@@ -350,10 +353,10 @@ export async function sendOtp(body) {
   const { email, phone, purpose } = body;
   if (!email && !phone) throw badRequest("Email or phone required");
 
-  if (purpose === "register") {
+  if (purpose === "register" || purpose === "reset_password") {
     throw badRequest(
-      "Use POST /auth/register to start the registration flow.",
-      "USE_REGISTER_ENDPOINT"
+      "Use the dedicated endpoints for registration and password resets.",
+      "INVALID_PURPOSE"
     );
   }
 
@@ -762,7 +765,7 @@ export async function socialLogin(body) {
 
   let user = await db.user.findUnique({ where: { firebaseUid }, include });
 
-  if (!user && email) {
+  if (!user && email && decoded.email_verified) {
     user = await db.user.findFirst({ where: { email, deletedAt: null }, include });
     if (user) {
       user = await db.user.update({
