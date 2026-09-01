@@ -218,7 +218,7 @@ export async function register(body) {
       const pendingWhere = {
         status: "pending_verification",
         ...(email && phone
-          ? { OR: [{ email }, { phone }] }
+          ? { email, phone }
           : email
             ? { email }
             : { phone }),
@@ -291,6 +291,13 @@ export async function login(body) {
     throw unauthorized("Invalid credentials");
   }
 
+  if (phone) {
+    // Phone auth relies on OTP; we don't verify password here
+  } else {
+    const valid = await verifyPassword(password, user.passwordHash);
+    if (!valid) throw unauthorized("Invalid credentials");
+  }
+
   // Give a clear, actionable error instead of a generic 401
   if (user.status === "pending_verification") {
     throw forbidden(
@@ -315,9 +322,6 @@ export async function login(body) {
     });
     return { needsOtp: true, ...otpResult };
   }
-
-  const valid = await verifyPassword(password, user.passwordHash);
-  if (!valid) throw unauthorized("Invalid credentials");
 
   const tokens = await issueTokens(user, role);
   if (!tokens) throw badRequest(`No ${role} profile on this account`, "PROFILE_MISSING");
