@@ -418,7 +418,7 @@
               "  pm.test('experienceYears persisted', function () { pm.expect(me.experienceYears).to.eql(10); });",
               "  pm.test('languages persisted', function () { pm.expect(me.languages).to.include('English'); });",
               "  pm.test('serviceAreas persisted', function () { pm.expect(me.serviceAreas.length).to.be.above(0); });",
-              "  pm.test('category persisted', function () { pm.expect(me.category && me.category.id).to.eql(pm.collectionVariables.get('category_id')); });",
+              "  pm.test('category persisted', function () { pm.expect((me.categories || []).map(function (c) { return c.id; })).to.include(pm.collectionVariables.get('category_id')); });",
               "});"
             ],
             "type": "text/javascript"
@@ -439,7 +439,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"categoryId\":\"{{category_id}}\",\"bio\":\"Seasoned professional with extensive industry experience. Email-onboarded init flow account.\",\"headline\":\"Industry Expert\",\"title\":\"Senior Consultant\",\"businessName\":\"XpertLink Consulting LLC\",\"consultationRate\":150,\"experienceYears\":10,\"languages\":[\"English\",\"Spanish\"],\"serviceAreas\":[{\"name\":\"San Francisco, CA\",\"lat\":37.7749,\"lng\":-122.4194}],\"avatarMediaId\":\"{{avatar_media_id}}\"}"
+          "raw": "{\"categoryIds\":[\"{{category_id}}\"],\"bio\":\"Seasoned professional with extensive industry experience. Email-onboarded init flow account.\",\"headline\":\"Industry Expert\",\"title\":\"Senior Consultant\",\"businessName\":\"XpertLink Consulting LLC\",\"consultationRate\":150,\"experienceYears\":10,\"languages\":[\"English\",\"Spanish\"],\"serviceAreas\":[{\"name\":\"San Francisco, CA\",\"lat\":37.7749,\"lng\":-122.4194}],\"avatarMediaId\":\"{{avatar_media_id}}\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me/onboarding/submit",

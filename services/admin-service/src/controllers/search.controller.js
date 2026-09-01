@@ -57,7 +57,7 @@ export async function globalSearch(req, res, next) {
           ],
         },
         take: MAX_PER_GROUP,
-        include: { category: { select: { name: true } } },
+        include: { categories: { select: { name: true } } },
       }),
 
       // Categories
@@ -131,7 +131,7 @@ export async function globalSearch(req, res, next) {
         items: experts.map((e) => ({
           id: e.id,
           title: `${e.firstName} ${e.lastName}`,
-          subtitle: e.category?.name ?? "Expert",
+          subtitle: e.categories?.map((c) => c.name).join(", ") || "Expert",
           href: `/experts/${e.id}`,
         })),
       });

@@ -55,8 +55,8 @@ export const registerRequestSchema = z
     }),
     /** OTP delivery channel for step 2. Defaults to phone on the server. */
     otpChannel: z.enum(["email", "phone"]).optional(),
-    /** Category selection for expert registration (Figma sign-up screen). Optional for customers. */
-    categoryId: z.string().uuid().optional(),
+    /** Category selections for expert registration (Figma sign-up screen). Optional for customers; experts require at least one. */
+    categoryIds: z.array(z.string().uuid()).min(1).max(20).optional(),
     /**
      * Optional profile photo chosen during sign-up. Must be a media asset the
      * registering user already uploaded (purpose "avatar", status "ready").

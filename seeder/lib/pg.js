@@ -290,7 +290,7 @@ export async function seedPostgres(payload) {
         emailVerifiedAt: new Date(),
         expertProfile: {
           create: {
-            categoryId: category.id,
+            categories: { connect: [{ id: category.id }] },
             firstName: expert.firstName,
             lastName: expert.lastName,
             headline: `${expert.firstName} ${expert.lastName}`,

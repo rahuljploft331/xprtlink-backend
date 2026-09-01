@@ -18,7 +18,7 @@ export const expertPublicDtoSchema = z.object({
   id: z.string().uuid(),
   firstName: z.string(),
   lastName: z.string(),
-  category: categoryRefDtoSchema,
+  categories: z.array(categoryRefDtoSchema),
   headline: z.string().nullable(),
   bio: z.string().nullable(),
   title: z.string().nullable(),
@@ -72,7 +72,7 @@ export const expertMeUpdateRequestSchema = z.object({
   consultationRate: z.number().positive().optional(),
   experienceYears: z.number().int().nonnegative().optional(),
   availabilityStatus: z.enum(["online", "offline", "busy"]).optional(),
-  categoryId: z.string().uuid().optional(),
+  categoryIds: z.array(z.string().uuid()).min(1).max(20).optional(),
   avatarMediaId: z.string().uuid().optional(),
 });
 
@@ -184,7 +184,7 @@ export const expertOnboardingRequestSchema = z.object({
   serviceAreas: z.array(serviceAreaLocationSchema).max(20).optional(),
   consultationRate: z.number().positive().optional(),
   experienceYears: z.number().int().nonnegative().optional(),
-  categoryId: z.string().uuid().optional(),
+  categoryIds: z.array(z.string().uuid()).min(1).max(20).optional(),
   avatarMediaId: z.string().uuid().nullable().optional(),
 });
 

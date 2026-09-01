@@ -45,7 +45,7 @@ export async function list(req, res, next) {
         orderBy,
         include: {
           avatarMedia: true,
-          category: { select: { id: true, name: true } },
+          categories: { select: { id: true, name: true, slug: true } },
           subscriptions: {
             where: { status: "active" },
             take: 1,
@@ -60,7 +60,7 @@ export async function list(req, res, next) {
       firstName: e.firstName,
       lastName: e.lastName,
       avatarUrl: resolveMediaUrl(e.avatarMedia?.storageKey),
-      category: e.category,
+      categories: e.categories,
       verificationStatus: e.verificationStatus,
       availabilityStatus: e.availabilityStatus,
       ratingAvg: e.ratingAvg,
@@ -86,7 +86,7 @@ export async function getById(req, res, next) {
       where: { id: req.params.id },
       include: {
         avatarMedia: true,
-        category: true,
+        categories: true,
         verifications: { include: { documents: true }, orderBy: { createdAt: "desc" }, take: 5 },
         subscriptions: { include: { plan: true }, orderBy: { createdAt: "desc" }, take: 1 },
         reviews: { take: 10, orderBy: { createdAt: "desc" } },

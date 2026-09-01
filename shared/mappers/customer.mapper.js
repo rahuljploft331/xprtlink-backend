@@ -16,14 +16,14 @@ export function toCustomerMeDto({ profile, user, avatarUrl = null }) {
   };
 }
 
-export function toSavedExpertSummaryDto(expert, { savedAt, category }) {
+export function toSavedExpertSummaryDto(expert, { savedAt, categories }) {
+  const cats = categories ?? expert.categories ?? [];
   return {
     id: expert.id,
     firstName: expert.firstName,
     lastName: expert.lastName,
     headline: expert.headline,
-    categorySlug: category.slug,
-    categoryName: category.name,
+    categories: cats.map((c) => ({ id: c.id, slug: c.slug, name: c.name })),
     consultationRate: expert.consultationRateCents / 100,
     currency: expert.currency,
     availabilityStatus: expert.availabilityStatus,
@@ -33,9 +33,9 @@ export function toSavedExpertSummaryDto(expert, { savedAt, category }) {
   };
 }
 
-export function toRecentlyViewedExpertDto(expert, { viewedAt, category }) {
+export function toRecentlyViewedExpertDto(expert, { viewedAt, categories }) {
   return {
-    ...toSavedExpertSummaryDto(expert, { savedAt: viewedAt, category }),
+    ...toSavedExpertSummaryDto(expert, { savedAt: viewedAt, categories }),
     viewedAt: toIso(viewedAt),
   };
 }

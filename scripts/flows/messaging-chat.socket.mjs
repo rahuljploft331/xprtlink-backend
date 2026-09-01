@@ -93,7 +93,7 @@ async function main() {
   const cats = await http("/api/v1/catalog/categories", "GET");
   const catId = cats.json.data?.[0]?.id;
   await http("/api/v1/experts/me/onboarding/submit", "POST",
-    { bio: "Messaging flow expert.", headline: "Chat Specialist", consultationRate: 80, experienceYears: 3, categoryId: catId },
+    { bio: "Messaging flow expert.", headline: "Chat Specialist", consultationRate: 80, experienceYears: 3, categoryIds: [catId] },
     expToken);
   const me = await http("/api/v1/experts/me", "GET", null, expToken);
   const expertId = me.json.data?.id;

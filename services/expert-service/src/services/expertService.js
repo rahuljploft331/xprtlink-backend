@@ -46,7 +46,7 @@ export async function getFeatured(limit = 10) {
   const db = getDb();
   const now = new Date();
   const include = {
-    category: true,
+    categories: true,
     avatarMedia: true,
     subscriptions: {
       where: { status: "active" },
@@ -95,7 +95,7 @@ export async function getFeatured(limit = 10) {
     selected = [...pinned, ...backfill.slice(0, limit - pinned.length)];
   }
 
-  return selected.map((e) => toExpertPublicDto(e, { category: e.category }));
+  return selected.map((e) => toExpertPublicDto(e, { categories: e.categories }));
 }
 
 export async function searchExperts(query, auth) {
@@ -103,8 +103,8 @@ export async function searchExperts(query, auth) {
   const where = { ...PUBLIC_WHERE };
 
   if (query.category) {
-    const cat = await getDb().category.findFirst({ where: { slug: query.category } });
-    if (cat) where.categoryId = cat.id;
+    // Match experts linked to the given category slug (many-to-many).
+    where.categories = { some: { slug: query.category } };
   }
   if (query.priceMin) where.consultationRateCents = { gte: amountToCents(Number(query.priceMin)) };
   if (query.priceMax) {
@@ -140,7 +140,7 @@ export async function searchExperts(query, auth) {
     const allExperts = await db.expertProfile.findMany({
       where,
       orderBy,
-      include: { category: true, avatarMedia: true },
+      include: { categories: true, avatarMedia: true },
     });
 
     // Filter experts who have at least one serviceArea within the radius
@@ -171,7 +171,7 @@ export async function searchExperts(query, auth) {
     }
 
     const items = paged.map((e) => ({
-      ...toExpertPublicDto(e, { category: e.category, isSaved: savedIds.has(e.id) }),
+      ...toExpertPublicDto(e, { categories: e.categories, isSaved: savedIds.has(e.id) }),
       distance: Math.round(nearestDistance(customerLat, customerLng, e.serviceAreas) * 10) / 10,
     }));
     return paginatedResult(items, { page, limit, total });
@@ -179,7 +179,7 @@ export async function searchExperts(query, auth) {
 
   // Standard non-geo search with DB-level pagination
   const [experts, total] = await Promise.all([
-    db.expertProfile.findMany({ where, skip, take: limit, orderBy, include: { category: true, avatarMedia: true } }),
+    db.expertProfile.findMany({ where, skip, take: limit, orderBy, include: { categories: true, avatarMedia: true } }),
     db.expertProfile.count({ where }),
   ]);
 
@@ -192,7 +192,7 @@ export async function searchExperts(query, auth) {
   }
 
   const items = experts.map((e) =>
-    toExpertPublicDto(e, { category: e.category, isSaved: savedIds.has(e.id) })
+    toExpertPublicDto(e, { categories: e.categories, isSaved: savedIds.has(e.id) })
   );
   return paginatedResult(items, { page, limit, total });
 }
@@ -232,7 +232,7 @@ export async function getExpertById(id, auth) {
   assertExpertId(id);
   const expert = await getDb().expertProfile.findUnique({
     where: { id },
-    include: { category: true, avatarMedia: true },
+    include: { categories: true, avatarMedia: true },
   });
   if (!expert) throw notFound("Expert not found");
 
@@ -255,7 +255,7 @@ export async function getExpertById(id, auth) {
       update: { viewedAt: new Date() },
     }).catch(() => {}); // silently ignore failures
   }
-  return toExpertPublicDto(expert, { category: expert.category, isSaved });
+  return toExpertPublicDto(expert, { categories: expert.categories, isSaved });
 }
 
 export async function getExpertReviews(id, query) {
@@ -293,7 +293,7 @@ async function getExpertProfileOrThrow(auth) {
   const expert = await getDb().expertProfile.findFirst({
     where: { userId: auth.userId },
     include: {
-      category: true,
+      categories: true,
       avatarMedia: true,
       subscriptions: { where: { status: "active" }, take: 1 },
       settings: true,
@@ -310,7 +310,7 @@ async function getExpertProfileOrThrow(auth) {
 
 export async function getExpertMe(auth) {
   const { expert, user, subscriptionActive } = await getExpertProfileOrThrow(auth);
-  return toExpertMeDto(expert, { user, category: expert.category, subscriptionActive });
+  return toExpertMeDto(expert, { user, categories: expert.categories, subscriptionActive });
 }
 
 export async function updateExpertMe(auth, body) {
@@ -322,6 +322,9 @@ export async function updateExpertMe(auth, body) {
     });
     if (!media) throw badRequest("Invalid or unready avatar media asset");
   }
+
+  // Resolve categories when provided: must be a non-empty set of active categories.
+  const categoryConnect = await resolveCategoryConnect(body.categoryIds);
 
   const updated = await getDb().expertProfile.update({
     where: { id: expert.id },
@@ -339,16 +342,38 @@ export async function updateExpertMe(auth, body) {
         : {}),
       ...(body.experienceYears !== undefined ? { experienceYears: body.experienceYears } : {}),
       ...(body.availabilityStatus ? { availabilityStatus: body.availabilityStatus } : {}),
-      ...(body.categoryId ? { categoryId: body.categoryId } : {}),
+      ...(categoryConnect ? { categories: { set: categoryConnect } } : {}),
       ...(body.avatarMediaId !== undefined ? { avatarMediaId: body.avatarMediaId } : {}),
     },
-    include: { category: true, avatarMedia: true, subscriptions: { where: { status: "active" }, take: 1 } },
+    include: { categories: true, avatarMedia: true, subscriptions: { where: { status: "active" }, take: 1 } },
   });
   return toExpertMeDto(updated, {
     user,
-    category: updated.category,
+    categories: updated.categories,
     subscriptionActive,
   });
+}
+
+/**
+ * Validate a categoryIds array and return a Prisma connect/set list ([{ id }]).
+ * Returns null when categoryIds is not provided (caller leaves the relation
+ * untouched). Throws when the array is empty or references missing/inactive
+ * categories — experts must always have at least one valid category.
+ */
+export async function resolveCategoryConnect(categoryIds) {
+  if (categoryIds === undefined) return null;
+  if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
+    throw badRequest("At least one category is required", "VALIDATION_ERROR", "categoryIds");
+  }
+  const unique = [...new Set(categoryIds)];
+  const found = await getDb().category.findMany({
+    where: { id: { in: unique }, isActive: true },
+    select: { id: true },
+  });
+  if (found.length !== unique.length) {
+    throw badRequest("One or more categories are invalid or inactive", "VALIDATION_ERROR", "categoryIds");
+  }
+  return unique.map((id) => ({ id }));
 }
 
 export async function submitOnboarding(auth, body) {
@@ -363,6 +388,9 @@ export async function submitOnboarding(auth, body) {
     });
     if (!media) throw badRequest("Invalid or unready avatar media asset");
   }
+
+  // Resolve categories when provided (must be a non-empty set of active categories).
+  const categoryConnect = await resolveCategoryConnect(body.categoryIds);
 
   await db.$transaction(async (tx) => {
     // Save profile data + mark onboarding complete in one shot
@@ -379,7 +407,7 @@ export async function submitOnboarding(auth, body) {
           ? { consultationRateCents: amountToCents(body.consultationRate) }
           : {}),
         ...(body.experienceYears !== undefined ? { experienceYears: body.experienceYears } : {}),
-        ...(body.categoryId ? { categoryId: body.categoryId } : {}),
+        ...(categoryConnect ? { categories: { set: categoryConnect } } : {}),
         ...(body.avatarMediaId !== undefined ? { avatarMediaId: body.avatarMediaId } : {}),
         onboardingCompletedAt: new Date(),
         verificationStatus: "pending",

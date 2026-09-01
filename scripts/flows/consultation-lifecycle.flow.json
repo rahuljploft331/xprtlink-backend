@@ -659,7 +659,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"categoryId\":\"{{category_id}}\",\"bio\":\"Consultation lifecycle test expert.\",\"headline\":\"Video Consultation Specialist\",\"title\":\"Senior Consultant\",\"businessName\":\"Consult Flow LLC\",\"consultationRate\":150,\"experienceYears\":5,\"languages\":[\"English\"],\"serviceAreas\":[{\"name\":\"San Francisco, CA\",\"lat\":37.7749,\"lng\":-122.4194}],\"avatarMediaId\":\"{{avatar_media_id}}\"}"
+          "raw": "{\"categoryIds\":[\"{{category_id}}\"],\"bio\":\"Consultation lifecycle test expert.\",\"headline\":\"Video Consultation Specialist\",\"title\":\"Senior Consultant\",\"businessName\":\"Consult Flow LLC\",\"consultationRate\":150,\"experienceYears\":5,\"languages\":[\"English\"],\"serviceAreas\":[{\"name\":\"San Francisco, CA\",\"lat\":37.7749,\"lng\":-122.4194}],\"avatarMediaId\":\"{{avatar_media_id}}\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me/onboarding/submit",

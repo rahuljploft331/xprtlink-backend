@@ -283,7 +283,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"categoryId\":\"{{category_id}}\",\"bio\":\"Subscription lifecycle flow test expert. Created by init:flows.\",\"headline\":\"Flow Test Consultant\",\"title\":\"Senior Consultant\",\"businessName\":\"Flow Test Consulting\",\"consultationRate\":100,\"experienceYears\":5,\"languages\":[\"English\"],\"serviceAreas\":[{\"name\":\"Chicago, IL\",\"lat\":41.8781,\"lng\":-87.6298}]}"
+          "raw": "{\"categoryIds\":[\"{{category_id}}\"],\"bio\":\"Subscription lifecycle flow test expert. Created by init:flows.\",\"headline\":\"Flow Test Consultant\",\"title\":\"Senior Consultant\",\"businessName\":\"Flow Test Consulting\",\"consultationRate\":100,\"experienceYears\":5,\"languages\":[\"English\"],\"serviceAreas\":[{\"name\":\"Chicago, IL\",\"lat\":41.8781,\"lng\":-87.6298}]}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me/onboarding/submit",

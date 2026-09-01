@@ -8,13 +8,14 @@ export function toCategoryRefDto(category) {
   };
 }
 
-export function toExpertPublicDto(expert, { category, isSaved } = {}) {
+export function toExpertPublicDto(expert, { categories, isSaved } = {}) {
+  const cats = categories ?? expert.categories ?? [];
   return {
     id: expert.id,
     firstName: expert.firstName,
     lastName: expert.lastName,
     avatarUrl: resolveMediaUrl(expert.avatarMedia?.storageKey),
-    category: toCategoryRefDto(category),
+    categories: cats.map(toCategoryRefDto),
     headline: expert.headline,
     bio: expert.bio,
     title: expert.title ?? null,
@@ -34,9 +35,9 @@ export function toExpertPublicDto(expert, { category, isSaved } = {}) {
   };
 }
 
-export function toExpertMeDto(expert, { user, category, subscriptionActive = false }) {
+export function toExpertMeDto(expert, { user, categories, subscriptionActive = false }) {
   return {
-    ...toExpertPublicDto(expert, { category }),
+    ...toExpertPublicDto(expert, { categories }),
     userId: user.id,
     email: user.email,
     phone: user.phone,
