@@ -212,6 +212,61 @@
         },
         "description": "Modify user notification configurations."
       }
+    },
+    {
+      "name": "Clear One Notification (Soft Delete)",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/notifications/:id",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications",
+            ":id"
+          ],
+          "variable": [
+            {
+              "key": "id",
+              "value": "notification-uuid-here"
+            }
+          ]
+        },
+        "description": "Soft-delete a single notification for the authenticated user. The row is never removed - a cleared_at timestamp is stamped and every read path (list, list count, unread count) filters it out. Scoped by userId: clearing another user's notification returns 404. Idempotent - calling it again on an already-cleared notification returns 200, not 404. Available to both the customer and expert apps. Returns { cleared: true }."
+      }
+    },
+    {
+      "name": "Clear All Notifications (Soft Delete)",
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/v1/notifications",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "notifications"
+          ]
+        },
+        "description": "Soft-delete every notification for the authenticated user. Non-destructive - rows are retained with cleared_at set, so notification history and payload deep-link data survive. Available to both the customer and expert apps. Returns { cleared: <count> }."
+      }
     }
   ]
 }

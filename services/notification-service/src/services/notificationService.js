@@ -36,12 +36,12 @@ export async function listNotifications(auth, query) {
 
   const [rows, total] = await Promise.all([
     db.notification.findMany({
-      where: { userId: auth.userId },
+      where: { userId: auth.userId, clearedAt: null },
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
     }),
-    db.notification.count({ where: { userId: auth.userId } }),
+    db.notification.count({ where: { userId: auth.userId, clearedAt: null } }),
   ]);
 
   const items = rows.map(toNotificationDto);
@@ -50,7 +50,7 @@ export async function listNotifications(auth, query) {
 
 export async function getUnreadCount(auth) {
   const count = await getDb().notification.count({
-    where: { userId: auth.userId, readAt: null },
+    where: { userId: auth.userId, readAt: null, clearedAt: null },
   });
   return toUnreadCountDto(count);
 }
@@ -58,7 +58,7 @@ export async function getUnreadCount(auth) {
 export async function markNotificationRead(auth, notificationId) {
   const db = getDb();
   const notification = await db.notification.findFirst({
-    where: { id: notificationId, userId: auth.userId },
+    where: { id: notificationId, userId: auth.userId, clearedAt: null },
   });
   if (!notification) throw notFound("Notification not found");
 
@@ -76,10 +76,47 @@ export async function markNotificationRead(auth, notificationId) {
 
 export async function markAllRead(auth) {
   const result = await getDb().notification.updateMany({
-    where: { userId: auth.userId, readAt: null },
+    where: { userId: auth.userId, readAt: null, clearedAt: null },
     data: { readAt: new Date() },
   });
   return { marked: result.count };
+}
+
+/**
+ * Soft-delete a single notification for the current user.
+ * Rows are never removed — `clearedAt` is stamped so every read path filters it out.
+ * Scoped by userId, so a user cannot clear someone else's notification (404 instead).
+ * Idempotent: an already-cleared notification returns success without re-writing.
+ */
+export async function clearNotification(auth, notificationId) {
+  const db = getDb();
+  const notification = await db.notification.findFirst({
+    where: { id: notificationId, userId: auth.userId },
+  });
+  if (!notification) throw notFound("Notification not found");
+
+  if (notification.clearedAt) {
+    return { cleared: true };
+  }
+
+  await db.notification.update({
+    where: { id: notification.id },
+    data: { clearedAt: new Date() },
+  });
+
+  return { cleared: true };
+}
+
+/**
+ * Soft-delete every notification for the current user.
+ * Non-destructive — history is retained, rows are just hidden from all read paths.
+ */
+export async function clearAllNotifications(auth) {
+  const result = await getDb().notification.updateMany({
+    where: { userId: auth.userId, clearedAt: null },
+    data: { clearedAt: new Date() },
+  });
+  return { cleared: result.count };
 }
 
 async function getOrCreatePreferences(userId, role) {

@@ -97,4 +97,32 @@ router.post(
   })
 );
 
+/**
+ * DELETE /api/v1/notifications
+ * Clear all notifications for the current user (soft delete — rows are retained).
+ * Role-agnostic: used by both the customer and the expert app, scoped by userId.
+ * Declared before "/:id" for readability; Express matches on method + path, so the
+ * two DELETE routes cannot shadow each other.
+ */
+router.delete(
+  "/",
+  asyncHandler(async (req, res) => {
+    const data = await svc.clearAllNotifications(req.auth);
+    return ResponseFormatter.success(res, { message: getMessage("allNotificationsCleared"), data });
+  })
+);
+
+/**
+ * DELETE /api/v1/notifications/:id
+ * Clear a single notification (soft delete). Scoped by userId — clearing another
+ * user's notification returns 404. Idempotent: repeating the call succeeds.
+ */
+router.delete(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    const data = await svc.clearNotification(req.auth, req.params.id);
+    return ResponseFormatter.success(res, { message: getMessage("notificationCleared"), data });
+  })
+);
+
 export default router;

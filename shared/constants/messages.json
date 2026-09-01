@@ -16,6 +16,8 @@
   "preferencesUpdated": "Preferences updated",
   "notifications": "Notifications",
   "notificationMarkedRead": "Notification marked read",
+  "notificationCleared": "Notification cleared",
+  "allNotificationsCleared": "All notifications cleared",
   "notFound": "Not found",
   "payoutMarkedAsPaid": "Payout marked as paid",
   "verificationNotFound": "Verification not found",
@@ -110,5 +112,7 @@
   "settingsUpdated": "Settings updated",
   "expertReviews": "Expert reviews",
   "availability": "Availability",
-  "auditLogLoaded": "Audit log loaded"
+  "auditLogLoaded": "Audit log loaded",
+  "platformSettingsLoaded": "Platform settings loaded",
+  "platformSettingsUpdated": "Platform settings updated"
 }

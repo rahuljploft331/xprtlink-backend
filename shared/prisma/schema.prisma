@@ -964,6 +964,7 @@ model Notification {
   body      String
   payload   Json      @default("{}")
   readAt    DateTime? @map("read_at") @db.Timestamptz(6)
+  clearedAt DateTime? @map("cleared_at") @db.Timestamptz(6)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
