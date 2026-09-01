@@ -14,10 +14,24 @@ import * as stripeSvc from "./stripeService.js";
 const COMMISSION_RATE = 0.15;
 
 
-function computeConsultationChargeCents(consultation) {
-  const durationSeconds = consultation.durationSeconds ?? 0;
-  const minutes = durationSeconds / 60;
-  return Math.ceil(minutes * consultation.ratePerMinuteCents);
+/**
+ * Billable charge for a consultation, in cents.
+ *
+ * Client decision (31 Aug 2026 call, §7.2): a partial minute is rounded UP to the
+ * next full minute — 10m20s bills as 11 minutes. Round the MINUTES, not the cents.
+ * The previous form, `Math.ceil((seconds / 60) * rate)`, prorated by the second and
+ * under-charged every partial minute (10m20s at $1/min charged $10.34, not $11.00).
+ *
+ * Single source of truth: the customer charge, expert earnings, platform commission
+ * and consultation history must all derive from this one number.
+ *
+ * @param consultation            must carry `ratePerMinuteCents` (and usually `durationSeconds`)
+ * @param durationSecondsOverride actual duration when the caller knows better than the row
+ */
+export function computeConsultationChargeCents(consultation, durationSecondsOverride) {
+  const durationSeconds = durationSecondsOverride ?? consultation.durationSeconds ?? 0;
+  const billableMinutes = Math.ceil(durationSeconds / 60);
+  return billableMinutes * consultation.ratePerMinuteCents;
 }
 
 export async function listPaymentMethods(auth) {
@@ -343,8 +357,8 @@ export async function captureConsultation(consultationId, durationSeconds) {
     return { skipped: true, reason: "already_charged" };
   }
 
-  const actualDuration = durationSeconds ?? consultation.durationSeconds ?? 0;
-  const amountCents = Math.ceil((actualDuration / 60) * consultation.ratePerMinuteCents);
+  // Same helper as payConsultation — the two paths must never round differently.
+  const amountCents = computeConsultationChargeCents(consultation, durationSeconds);
 
   if (amountCents <= 0) {
     console.log(`[billing] captureConsultation: ${consultationId} — zero amount, skipping charge`);
