@@ -18,7 +18,7 @@ import {
 } from "@xprtlink/shared/contracts";
 import * as svc from "../services/userService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
-import { authRateLimiter, otpRateLimiter, passwordRateLimiter } from "@xprtlink/shared/middleware/rateLimiter.js";
+// Rate limiting is handled by api-gateway. Service-level limiters were creating a global bucket.
 
 const router = Router();
 
@@ -33,7 +33,6 @@ router.get(
 
 router.post(
   "/register",
-  authRateLimiter,
   asyncHandler(async (req, res) => {
     const body = registerRequestSchema.parse(req.body);
     const data = await svc.register(body);
@@ -43,7 +42,6 @@ router.post(
 
 router.post(
   "/login",
-  authRateLimiter,
   asyncHandler(async (req, res) => {
     const body = loginRequestSchema.parse(req.body);
     const data = await svc.login(body);
@@ -91,7 +89,6 @@ router.post(
 
 router.post(
   "/otp/send",
-  otpRateLimiter,
   asyncHandler(async (req, res) => {
     const body = otpSendRequestSchema.parse(req.body);
     const data = await svc.sendOtp(body);
@@ -101,7 +98,6 @@ router.post(
 
 router.post(
   "/otp/verify",
-  otpRateLimiter,
   asyncHandler(async (req, res) => {
     const body = otpVerifyRequestSchema.parse(req.body);
     const data = await svc.verifyOtp(body);
@@ -111,7 +107,6 @@ router.post(
 
 router.post(
   "/otp/resend",
-  otpRateLimiter,
   asyncHandler(async (req, res) => {
     const body = otpSendRequestSchema.parse(req.body);
     const data = await svc.resendOtp(body);
@@ -121,7 +116,6 @@ router.post(
 
 router.post(
   "/password/forgot",
-  passwordRateLimiter,
   asyncHandler(async (req, res) => {
     const body = forgotPasswordRequestSchema.parse(req.body);
     const data = await svc.forgotPassword({ ...body, purpose: "reset_password" });
@@ -131,7 +125,6 @@ router.post(
 
 router.post(
   "/password/reset",
-  passwordRateLimiter,
   asyncHandler(async (req, res) => {
     const body = passwordResetRequestSchema.parse(req.body);
     const data = await svc.resetPassword(body);
@@ -159,7 +152,6 @@ router.get(
 
 router.post(
   "/social",
-  authRateLimiter,
   asyncHandler(async (req, res) => {
     const body = socialLoginRequestSchema.parse(req.body);
     const data = await svc.socialLogin(body);
@@ -172,7 +164,6 @@ router.post(
 
 router.post(
   "/social/complete",
-  authRateLimiter,
   asyncHandler(async (req, res) => {
     const body = socialCompleteRequestSchema.parse(req.body);
     const data = await svc.socialComplete(body);
