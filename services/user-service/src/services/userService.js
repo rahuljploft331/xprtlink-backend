@@ -581,7 +581,12 @@ export async function forgotPassword(body) {
     return { sent: true, expiresInSeconds: ttlMs / 1000, channel: email ? "email" : "phone" };
   }
 
-  return sendOtp({ ...body, purpose: "reset_password" });
+  return createAndDeliverOtp({
+    email,
+    phone,
+    purpose: "reset_password",
+    channel: email ? "email" : "phone",
+  });
 }
 
 export async function resetPassword(body) {
