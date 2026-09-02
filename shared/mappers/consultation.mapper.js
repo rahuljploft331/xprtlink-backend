@@ -1,4 +1,4 @@
-import { centsToAmount, customerDisplayName, toIso } from "./common.js";
+import { centsToAmount, customerDisplayName, toIso, resolveMediaUrl } from "./common.js";
 import { expertDisplayName } from "./expert.mapper.js";
 
 export function toConsultationSummaryDto(
@@ -10,8 +10,11 @@ export function toConsultationSummaryDto(
     status: consultation.status,
     expertId: consultation.expertId,
     expertName: expertDisplayName(expertProfile),
+    expertAvatar: resolveMediaUrl(expertProfile?.avatarMedia?.storageKey),
+    expertRating: expertProfile?.ratingCount > 0 ? Number(expertProfile.ratingAvg) : null,
     customerId: consultation.customerId,
     customerName: customerDisplayName(customerUser, customerProfile),
+    customerAvatar: resolveMediaUrl(customerProfile?.avatarMedia?.storageKey),
     ratePerMinute: centsToAmount(consultation.ratePerMinuteCents),
     currency,
     durationSeconds: consultation.durationSeconds,

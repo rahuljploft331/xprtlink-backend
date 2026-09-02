@@ -26,8 +26,8 @@ const QUOTE_INCLUDE = {
 };
 
 const CONSULTATION_INCLUDE = {
-  customer: { include: { user: true } },
-  expert: true,
+  customer: { include: { user: true, avatarMedia: true } },
+  expert: { include: { avatarMedia: true } },
   review: true,
 };
 
