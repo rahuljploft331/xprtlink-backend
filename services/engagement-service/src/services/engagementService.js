@@ -1011,9 +1011,15 @@ export async function getCallStatus(consultationId) {
   const customerId = consultation.customer?.user?.id;
   const expertId = consultation.expert?.userId;
 
-  const customerJoined = customerId ? consultation.joinedParticipantIds.includes(customerId) : false;
-  const expertJoined = expertId ? consultation.joinedParticipantIds.includes(expertId) : false;
-  const wasSuccessfullyConnected = Boolean(consultation.startedAt);
+  const matchId = (targetId, idList) => {
+    if (!targetId) return false;
+    const strippedTarget = targetId.replace(/-/g, '');
+    return idList.some(id => id.replace(/-/g, '') === strippedTarget);
+  };
+
+  const customerJoined = matchId(customerId, consultation.joinedParticipantIds);
+  const expertJoined = matchId(expertId, consultation.joinedParticipantIds);
+  const wasSuccessfullyConnected = customerJoined === true && expertJoined === true;
 
   return {
     consultationId: consultation.id,

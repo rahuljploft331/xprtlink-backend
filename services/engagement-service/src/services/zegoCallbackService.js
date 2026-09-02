@@ -99,8 +99,8 @@ async function handleUserLogin(payload) {
   const customerId = consultation.customer?.user?.id;
   const expertId = consultation.expert?.userId;
 
-  const hasCustomerJoined = customerId && consultation.joinedParticipantIds.includes(customerId);
-  const hasExpertJoined = expertId && consultation.joinedParticipantIds.includes(expertId);
+  const hasCustomerJoined = customerId && consultation.joinedParticipantIds.some(id => id.replace(/-/g, '') === customerId.replace(/-/g, ''));
+  const hasExpertJoined = expertId && consultation.joinedParticipantIds.some(id => id.replace(/-/g, '') === expertId.replace(/-/g, ''));
 
   if (!hasCustomerJoined || !hasExpertJoined) {
     console.log(`[zego-callback] Consultation ${consultation.id} — waiting for both participants to join (hasCustomer=${hasCustomerJoined}, hasExpert=${hasExpertJoined})`);
@@ -128,7 +128,7 @@ async function handleUserLogin(payload) {
  */
 async function handleUserLogout(payload) {
   const roomId = payload.room_id;
-  const userId = payload.id_name;
+  const userId = payload.user_account || payload.id_name;
   console.log(`[zego-callback] User left: userId=${userId} room=${roomId}`);
   
   const timeoutMins = Number(process.env.MISSING_PARTICIPANT_TIMEOUT_MINS) || 0;
