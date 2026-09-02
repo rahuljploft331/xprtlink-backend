@@ -638,6 +638,14 @@ export async function acceptConsultation(auth, consultationId) {
   const consultation = await loadConsultation(consultationId);
   assertConsultationParticipant(auth, consultation);
 
+  // Enforce payment hold: Expert cannot accept if customer hasn't secured funds
+  if (!consultation.stripePaymentIntentId) {
+    throw badRequest(
+      "A payment hold has not been secured for this consultation.",
+      "PAYMENT_HOLD_REQUIRED"
+    );
+  }
+
   const now = new Date();
   const db = getDb();
   const updated = await db.$transaction(async (tx) => {
