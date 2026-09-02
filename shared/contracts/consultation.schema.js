@@ -20,6 +20,8 @@ export const consultationBillingStatusSchema = z.enum([
 
 export const consultationSummaryDtoSchema = z.object({
   id: z.string().uuid(),
+  title: z.string().nullable(),
+  note: z.string().nullable(),
   status: consultationStatusSchema,
   expertId: z.string().uuid(),
   expertName: z.string(),
@@ -58,6 +60,8 @@ export const videoTokenDtoSchema = z.object({
 
 export const createConsultationRequestSchema = z.object({
   expertId: z.string().uuid(),
+  title: z.string().min(1).max(200),
+  note: z.string().max(1000).optional(),
 });
 
 export const submitReviewRequestSchema = z.object({
@@ -87,4 +91,13 @@ export const expertReportDtoSchema = z.object({
   details: z.string().nullable(),
   status: z.enum(["open", "reviewing", "resolved", "dismissed"]),
   createdAt: z.string().datetime(),
+});
+
+export const callStatusDtoSchema = z.object({
+  consultationId: z.string().uuid(),
+  customerJoined: z.boolean(),
+  expertJoined: z.boolean(),
+  wasSuccessfullyConnected: z.boolean(),
+  status: consultationStatusSchema,
+  connectedDurationSeconds: z.number().int().nonnegative().nullable(),
 });

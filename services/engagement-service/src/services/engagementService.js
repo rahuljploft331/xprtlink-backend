@@ -573,6 +573,8 @@ export async function createConsultation(auth, body) {
     data: {
       customerId: auth.customerProfileId,
       expertId: body.expertId,
+      title: body.title,
+      note: body.note,
       status: "requested",
       ratePerMinuteCents: expert.consultationRateCents,
       zegoRoomId: `room-${crypto.randomUUID()}`,
@@ -993,4 +995,32 @@ export async function createReport(auth, body) {
   });
 
   return toExpertReportDto(report);
+}
+
+export async function getCallStatus(consultationId) {
+  const db = getDb();
+  const consultation = await db.consultation.findUnique({
+    where: { id: consultationId },
+    include: { customer: { include: { user: true } }, expert: true },
+  });
+
+  if (!consultation) {
+    throw notFound("Consultation not found");
+  }
+
+  const customerId = consultation.customer?.user?.id;
+  const expertId = consultation.expert?.userId;
+
+  const customerJoined = customerId ? consultation.joinedParticipantIds.includes(customerId) : false;
+  const expertJoined = expertId ? consultation.joinedParticipantIds.includes(expertId) : false;
+  const wasSuccessfullyConnected = Boolean(consultation.startedAt);
+
+  return {
+    consultationId: consultation.id,
+    customerJoined,
+    expertJoined,
+    wasSuccessfullyConnected,
+    status: consultation.status,
+    connectedDurationSeconds: consultation.durationSeconds,
+  };
 }

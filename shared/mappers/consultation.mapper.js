@@ -7,6 +7,8 @@ export function toConsultationSummaryDto(
 ) {
   return {
     id: consultation.id,
+    title: consultation.title,
+    note: consultation.note,
     status: consultation.status,
     expertId: consultation.expertId,
     expertName: expertDisplayName(expertProfile),

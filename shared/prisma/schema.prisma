@@ -685,6 +685,8 @@ model Consultation {
   id                    String                    @id @default(uuid()) @db.Uuid
   customerId            String                    @map("customer_id") @db.Uuid
   expertId              String                    @map("expert_id") @db.Uuid
+  title                 String?                   @db.VarChar(200)
+  note                  String?                   @db.VarChar(1000)
   status                ConsultationStatus        @default(requested)
   ratePerMinuteCents    Int                       @map("rate_per_minute_cents")
   requestedAt           DateTime                  @default(now()) @map("requested_at") @db.Timestamptz(6)
