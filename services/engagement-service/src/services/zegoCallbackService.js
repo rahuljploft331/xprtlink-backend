@@ -14,6 +14,10 @@ import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
  *   { appid, event, nonce, timestamp, signature, room_id, id_name (userId), ... }
  */
 
+// In-memory map to store timeout timers for missing participants.
+// Safe here because ecosystem.config.cjs specifies a single instance.
+const disconnectTimers = new Map();
+
 const handlers = {
   room_create: handleRoomCreate,
   room_login: handleUserLogin,
@@ -57,6 +61,13 @@ async function handleUserLogin(payload) {
   const roomId = payload.room_id;
   const userId = payload.user_account || payload.id_name;
   console.log(`[zego-callback] User joined: userId=${userId} room=${roomId}`);
+
+  // Clear any existing missing participant timer since someone rejoined
+  if (disconnectTimers.has(roomId)) {
+    console.log(`[zego-callback] Clearing disconnect timer for room ${roomId}`);
+    clearTimeout(disconnectTimers.get(roomId));
+    disconnectTimers.delete(roomId);
+  }
 
   const db = getDb();
   let consultation = await db.consultation.findFirst({
@@ -119,8 +130,33 @@ async function handleUserLogout(payload) {
   const roomId = payload.room_id;
   const userId = payload.id_name;
   console.log(`[zego-callback] User left: userId=${userId} room=${roomId}`);
-  // Don't end consultation on user_logout — wait for room_close
-  // This handles reconnection scenarios gracefully
+  
+  const timeoutMins = Number(process.env.MISSING_PARTICIPANT_TIMEOUT_MINS) || 0;
+  if (timeoutMins > 0) {
+    const db = getDb();
+    const consultation = await db.consultation.findFirst({
+      where: { zegoRoomId: roomId },
+    });
+
+    if (consultation && consultation.status === "in_progress") {
+      console.log(`[zego-callback] Starting ${timeoutMins}m missing participant timer for room ${roomId}`);
+      if (disconnectTimers.has(roomId)) {
+        clearTimeout(disconnectTimers.get(roomId));
+      }
+      
+      const timer = setTimeout(async () => {
+        console.log(`[zego-callback] Timeout reached for missing participant in room ${roomId}. Force closing.`);
+        disconnectTimers.delete(roomId);
+        // Simulate a room_close to complete the consultation properly
+        await handleRoomClose({
+          room_id: roomId,
+          timestamp: Math.floor(Date.now() / 1000)
+        });
+      }, timeoutMins * 60 * 1000);
+      
+      disconnectTimers.set(roomId, timer);
+    }
+  }
 }
 
 /**
@@ -139,6 +175,11 @@ async function handleRoomClose(payload) {
     : new Date();
 
   console.log(`[zego-callback] Room closed: ${roomId}`);
+
+  if (disconnectTimers.has(roomId)) {
+    clearTimeout(disconnectTimers.get(roomId));
+    disconnectTimers.delete(roomId);
+  }
 
   const db = getDb();
   const consultation = await db.consultation.findFirst({
