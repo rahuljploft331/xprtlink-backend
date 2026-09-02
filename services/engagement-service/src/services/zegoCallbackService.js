@@ -75,9 +75,13 @@ async function handleUserLogin(payload) {
   }
 
   // Check if this is the second participant joining
-  // ZegoCloud's room_user_count or we track via the user_login events
-  // For simplicity: if consultation is in accepted state, the second join starts the call
-  // If in requested/ringing, expert hasn't accepted yet via our API — mark as accepted + in_progress
+  // ZegoCloud includes 'room_user_count' in the payload
+  const userCount = payload.room_user_count || 1;
+  if (userCount < 2) {
+    console.log(`[zego-callback] Consultation ${consultation.id} — only ${userCount} user(s) in room, waiting for second join to start billing`);
+    return;
+  }
+
   const now = new Date();
   await db.consultation.update({
     where: { id: consultation.id },
@@ -88,7 +92,7 @@ async function handleUserLogin(payload) {
     },
   });
 
-  console.log(`[zego-callback] Consultation ${consultation.id} → in_progress (call started via ZegoCloud)`);
+  console.log(`[zego-callback] Consultation ${consultation.id} → in_progress (both participants joined)`);
 }
 
 /**
