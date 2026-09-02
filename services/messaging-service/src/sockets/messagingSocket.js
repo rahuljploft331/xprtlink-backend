@@ -56,6 +56,8 @@ export function registerMessagingSockets(io) {
     const auth = socket.data.auth;
     const userRoom = `user:${auth.userId}`;
     socket.join(userRoom);
+    if (auth.customerProfileId) socket.join(`customer:${auth.customerProfileId}`);
+    if (auth.expertProfileId) socket.join(`expert:${auth.expertProfileId}`);
 
     console.log(
       `[messaging-service] User connected: ${auth.userId} (${auth.role}) -> socket ${socket.id}`
@@ -256,11 +258,16 @@ export function registerMessagingSockets(io) {
       try {
         const { targetUserId, type, data } = payload;
         if (targetUserId) {
-          io.to(`user:${targetUserId}`).emit("signal", {
-            type,
-            data,
-            senderUserId: auth.userId,
-          });
+          // targetUserId could be a userId, customerProfileId, or expertProfileId.
+          // Broadcast to all three potential room names to guarantee delivery.
+          io.to(`user:${targetUserId}`)
+            .to(`customer:${targetUserId}`)
+            .to(`expert:${targetUserId}`)
+            .emit("signal", {
+              type,
+              data,
+              senderUserId: auth.userId,
+            });
         }
         if (typeof callback === "function") {
           callback({ success: true });
