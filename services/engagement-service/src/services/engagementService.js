@@ -695,9 +695,8 @@ export async function acceptConsultation(auth, consultationId) {
     const result = await tx.consultation.updateMany({
       where: { id: consultationId, status: { in: ["requested", "ringing"] } },
       data: {
-        status: "in_progress",
+        status: "accepted",
         acceptedAt: now,
-        startedAt: now,
       },
     });
     if (result.count === 0) {

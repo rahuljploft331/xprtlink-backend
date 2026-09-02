@@ -55,11 +55,11 @@ async function handleRoomCreate(payload) {
  */
 async function handleUserLogin(payload) {
   const roomId = payload.room_id;
-  const userId = payload.id_name;
+  const userId = payload.user_account || payload.id_name;
   console.log(`[zego-callback] User joined: userId=${userId} room=${roomId}`);
 
   const db = getDb();
-  const consultation = await db.consultation.findFirst({
+  let consultation = await db.consultation.findFirst({
     where: { zegoRoomId: roomId },
     include: { customer: { include: { user: true } }, expert: true },
   });
@@ -69,17 +69,30 @@ async function handleUserLogin(payload) {
     return;
   }
 
+  // Update joinedParticipantIds atomically using Prisma push
+  if (userId && !consultation.joinedParticipantIds.includes(userId)) {
+    consultation = await db.consultation.update({
+      where: { id: consultation.id },
+      data: { joinedParticipantIds: { push: userId } },
+      include: { customer: { include: { user: true } }, expert: true },
+    });
+  }
+
   // Only transition to in_progress if currently in accepted/ringing/requested
   if (!["requested", "ringing", "accepted"].includes(consultation.status)) {
     console.log(`[zego-callback] Consultation ${consultation.id} already ${consultation.status}, skipping`);
     return;
   }
 
-  // Check if this is the second participant joining
-  // ZegoCloud includes 'room_user_count' in the payload
-  const userCount = payload.room_user_count || 1;
-  if (userCount < 2) {
-    console.log(`[zego-callback] Consultation ${consultation.id} — only ${userCount} user(s) in room, waiting for second join to start billing`);
+  // Check if both the customer and the expert have joined
+  const customerId = consultation.customer?.user?.id;
+  const expertId = consultation.expert?.userId;
+
+  const hasCustomerJoined = customerId && consultation.joinedParticipantIds.includes(customerId);
+  const hasExpertJoined = expertId && consultation.joinedParticipantIds.includes(expertId);
+
+  if (!hasCustomerJoined || !hasExpertJoined) {
+    console.log(`[zego-callback] Consultation ${consultation.id} — waiting for both participants to join (hasCustomer=${hasCustomerJoined}, hasExpert=${hasExpertJoined})`);
     return;
   }
 
