@@ -1,4 +1,4 @@
-import { centsToAmount, toIso } from "./common.js";
+import { centsToAmount, toIso, fullName, resolveMediaUrl } from "./common.js";
 
 export function toPaymentMethodDto(method) {
   return {
@@ -12,7 +12,7 @@ export function toPaymentMethodDto(method) {
 }
 
 export function toTransactionDto(tx) {
-  return {
+  const dto = {
     id: tx.id,
     type: tx.type,
     amount: centsToAmount(tx.amountCents),
@@ -20,6 +20,21 @@ export function toTransactionDto(tx) {
     status: tx.status,
     createdAt: toIso(tx.createdAt),
   };
+
+  if (tx.consultationCharge?.consultation) {
+    const consultation = tx.consultationCharge.consultation;
+    if (consultation.expert) {
+      dto.expertName = fullName(consultation.expert.firstName, consultation.expert.lastName);
+      const media = consultation.expert.avatarMedia;
+      dto.expertImage = media?.storageKey ? resolveMediaUrl(media.storageKey) : null;
+    }
+    
+    dto.subject = consultation.category || consultation.title || "Consultation";
+    dto.isOnline = true; // Placeholder for online status, though not stored per transaction
+    dto.consultationId = consultation.id;
+  }
+
+  return dto;
 }
 
 export function toSubscriptionPlanDto(plan, currency = "USD") {

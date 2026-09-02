@@ -674,7 +674,10 @@ export async function listTransactions(auth, query) {
         consultationCharge: {
           include: {
             consultation: {
-              include: { customer: true, expert: true },
+              include: { 
+                customer: { include: { avatarMedia: true } }, 
+                expert: { include: { avatarMedia: true } }
+              },
             },
           },
         },
