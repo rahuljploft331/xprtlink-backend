@@ -25,6 +25,7 @@ const handlers = {
  * Main dispatcher — called from the webhook route.
  */
 export async function handleZegoCallback(payload) {
+  console.log(`[zego-callback] Received event '${payload.event}' with payload:`, JSON.stringify(payload));
   const handler = handlers[payload.event];
   if (!handler) {
     console.log(`[zego-callback] Unhandled event: ${payload.event}`);
