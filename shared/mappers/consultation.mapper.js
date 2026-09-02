@@ -18,6 +18,7 @@ export function toConsultationSummaryDto(
     billingStatus: consultation.billingStatus,
     requestedAt: toIso(consultation.requestedAt),
     endedAt: toIso(consultation.endedAt),
+    hasReview: Boolean(consultation.review),
   };
 }
 
@@ -28,6 +29,7 @@ export function toConsultationDetailDto(consultation, ctx) {
     startedAt: toIso(consultation.startedAt),
     zegoRoomId: consultation.zegoRoomId,
     hasReview: Boolean(ctx.hasReview),
+    review: consultation.review ? toReviewDto(consultation.review) : null,
   };
 }
 
