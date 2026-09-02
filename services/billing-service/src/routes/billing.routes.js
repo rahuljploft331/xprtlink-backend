@@ -149,6 +149,15 @@ router.post(
 );
 
 router.get(
+  "/transactions",
+  requireRole("customer"),
+  asyncHandler(async (req, res) => {
+    const data = await svc.listTransactions(req.auth, req.query);
+    return ResponseFormatter.paginated(res, { message: getMessage("transactions"), ...data });
+  })
+);
+
+router.get(
   "/transactions/:id",
   asyncHandler(async (req, res) => {
     const data = await svc.getTransaction(req.auth, req.params.id);

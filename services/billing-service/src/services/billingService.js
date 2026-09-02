@@ -641,6 +641,52 @@ export async function handleStripeWebhook(payload, signature) {
 }
 
 
+export async function listTransactions(auth, query) {
+  if (!auth.customerProfileId) throw forbidden("Customer access required");
+  const { page, limit, skip } = parsePagination(query);
+  const db = getDb();
+
+  const where = {
+    OR: [
+      {
+        consultationCharge: {
+          consultation: {
+            customerId: auth.customerProfileId,
+          },
+        },
+      },
+      {
+        metadata: {
+          path: ["customerProfileId"],
+          equals: auth.customerProfileId,
+        },
+      },
+    ],
+  };
+
+  const [rows, total] = await Promise.all([
+    db.transaction.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+      include: {
+        consultationCharge: {
+          include: {
+            consultation: {
+              include: { customer: true, expert: true },
+            },
+          },
+        },
+      },
+    }),
+    db.transaction.count({ where }),
+  ]);
+
+  const items = rows.map((t) => toTransactionDto(t));
+  return paginatedResult(items, { page, limit, total });
+}
+
 export async function getTransaction(auth, transactionId) {
   const db = getDb();
   const tx = await db.transaction.findUnique({
