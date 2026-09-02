@@ -73,7 +73,7 @@ export const addPaymentMethodRequestSchema = z.object({
 });
 
 export const preAuthHoldRequestSchema = z.object({
-  paymentMethodId: z.string().uuid(),
+  paymentMethodId: z.string().uuid().optional(),
   estimatedCents: z.number().int().positive().optional(),
 });
 

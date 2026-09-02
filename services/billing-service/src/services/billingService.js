@@ -195,9 +195,17 @@ export async function holdConsultationFunds(auth, consultationId, body) {
     throw badRequest("No Stripe customer found. Add a payment method first.", "NO_STRIPE_CUSTOMER");
   }
 
-  const paymentMethod = await db.paymentMethod.findFirst({
-    where: { id: body.paymentMethodId, customerProfileId: auth.customerProfileId },
-  });
+  let paymentMethod;
+  if (body.paymentMethodId) {
+    paymentMethod = await db.paymentMethod.findFirst({
+      where: { id: body.paymentMethodId, customerProfileId: auth.customerProfileId },
+    });
+  } else {
+    paymentMethod = await db.paymentMethod.findFirst({
+      where: { customerProfileId: auth.customerProfileId },
+      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+    });
+  }
   if (!paymentMethod) throw notFound("Payment method not found");
 
   // Enforce server-calculated minimum: at least 30 minutes at the expert's rate or $30,
