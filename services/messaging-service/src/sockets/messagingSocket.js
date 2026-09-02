@@ -251,6 +251,28 @@ export function registerMessagingSockets(io) {
       }
     });
 
+    // 8. P2P Signaling (for incoming calls, etc.)
+    socket.on("signal", (payload = {}, callback) => {
+      try {
+        const { targetUserId, type, data } = payload;
+        if (targetUserId) {
+          io.to(`user:${targetUserId}`).emit("signal", {
+            type,
+            data,
+            senderUserId: auth.userId,
+          });
+        }
+        if (typeof callback === "function") {
+          callback({ success: true });
+        }
+      } catch (err) {
+        console.error("[messaging-service] signal error:", err.message);
+        if (typeof callback === "function") {
+          callback({ success: false, message: err.message });
+        }
+      }
+    });
+
     // 8. Typing indicators
     socket.on("typing:start", ({ conversationId } = {}) => {
       if (conversationId) {
