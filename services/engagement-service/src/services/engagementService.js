@@ -626,10 +626,43 @@ export async function listConsultations(auth, query) {
   return paginatedResult(items, { page, limit, total });
 }
 
+async function getCustomerSummary(customerId) {
+  if (!customerId) return null;
+  const db = getDb();
+  
+  const activeSessions = await db.consultation.count({
+    where: {
+      customerId,
+      status: { in: Array.from(ACTIVE_CONSULTATION_STATUSES) }
+    }
+  });
+
+  const spentAgg = await db.transaction.aggregate({
+    where: {
+      status: "succeeded",
+      type: "consultation_charge",
+      consultationCharge: {
+        consultation: { customerId }
+      }
+    },
+    _sum: { amountCents: true }
+  });
+
+  return {
+    totalSpentCents: spentAgg._sum.amountCents || 0,
+    activeSessions,
+  };
+}
+
 export async function getConsultation(auth, consultationId) {
   const consultation = await loadConsultation(consultationId);
   assertConsultationParticipant(auth, consultation);
-  return toConsultationDetailDto(consultation, consultationContext(consultation));
+  
+  const dto = toConsultationDetailDto(consultation, consultationContext(consultation));
+  if (auth.role === "customer" && auth.customerProfileId) {
+    dto.summary = await getCustomerSummary(auth.customerProfileId);
+  }
+  return dto;
 }
 
 export async function acceptConsultation(auth, consultationId) {
@@ -836,9 +869,13 @@ export async function getBillingSummary(auth, consultationId) {
     `/api/v1/billing/consultations/${consultationId}/charge`
   ).catch(() => null); // charge may not exist yet for legacy consultations
 
-  return toConsultationBillingSummaryDto(consultation, {
+  const dto = toConsultationBillingSummaryDto(consultation, {
     commissionCents: charge?.commissionCents ?? 0,
   });
+  if (auth.role === "customer" && auth.customerProfileId) {
+    dto.summary = await getCustomerSummary(auth.customerProfileId);
+  }
+  return dto;
 }
 
 // ─── Reviews ─────────────────────────────────────────────────────────────────
