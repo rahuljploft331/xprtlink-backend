@@ -204,7 +204,8 @@ async function handleRoomClose(payload) {
   // Calculate duration
   const startedAt = consultation.startedAt ?? consultation.acceptedAt ?? consultation.requestedAt;
   const endedAt = zegoTimestamp;
-  const durationSeconds = Math.max(0, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000));
+  const rawDurationSeconds = Math.max(0, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000));
+  const durationSeconds = Math.ceil(rawDurationSeconds / 60) * 60;
 
   // If the call was never actually connected (no startedAt), duration is 0 → no charge
   const wasConnected = Boolean(consultation.startedAt);

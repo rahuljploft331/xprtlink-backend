@@ -923,7 +923,8 @@ export async function endConsultation(auth, consultationId) {
 
   const now = new Date();
   const startedAt = consultation.startedAt ?? consultation.acceptedAt ?? consultation.requestedAt;
-  const durationSeconds = Math.max(0, Math.floor((now.getTime() - startedAt.getTime()) / 1000));
+  const rawDurationSeconds = Math.max(0, Math.floor((now.getTime() - startedAt.getTime()) / 1000));
+  const durationSeconds = Math.ceil(rawDurationSeconds / 60) * 60;
   const wasConnected = Boolean(consultation.startedAt);
 
   const db = getDb();
