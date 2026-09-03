@@ -103,4 +103,4 @@ Dev `.env` uses high limits so `init:flows` is not 429’d. Production must use 
 
 ## Consultations / billing (Aug 31)
 
-Manual accept before paid session. Per-minute billing; partial minutes **round up**. Same duration for customer charge, expert earnings, and commission.
+Manual accept before paid session. Listed expert rate is **per 30 minutes**. Convert duration to whole minutes (`ceil(seconds / 60)`), then `charge = minutes × rate / 30`. Same duration for customer charge, expert earnings, and commission.

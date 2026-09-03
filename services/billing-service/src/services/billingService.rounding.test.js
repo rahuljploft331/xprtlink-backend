@@ -2,42 +2,44 @@ import { describe, expect, it } from "vitest";
 import { computeConsultationChargeCents } from "./billingService.js";
 
 /**
- * Client decision, 31 Aug 2026 call §7.2:
- *   "A partial minute is rounded up to the next full minute."
- *   Worked example from the document: 10 minutes 20 seconds bills as 11 minutes.
- *
- * The rule rounds MINUTES, not cents. These tests exist to stop a regression to the
- * old prorated form, Math.ceil((seconds / 60) * rate), which under-charged every
- * partial minute.
+ * Listed rate is per 30 minutes. Duration is converted to whole minutes first
+ * (partial minutes round up). Charge = round(minutes × listedRate / 30).
  */
-describe("computeConsultationChargeCents — partial minutes round up", () => {
-  const rate = (ratePerMinuteCents) => ({ ratePerMinuteCents });
+describe("computeConsultationChargeCents — per 30 minutes, billed in minutes", () => {
+  const rate = (ratePer30MinutesCents) => ({ ratePerMinuteCents: ratePer30MinutesCents });
 
-  it("bills the document's worked example (10m20s @ $1/min) as 11 minutes", () => {
-    expect(computeConsultationChargeCents({ ...rate(100), durationSeconds: 620 })).toBe(1100);
+  it("bills 54s at $60 / 30 min as 1 minute ($2), not $60", () => {
+    expect(computeConsultationChargeCents({ ...rate(6000), durationSeconds: 54 })).toBe(200);
   });
 
-  it("does NOT prorate by the second (the old bug charged 1034¢ here)", () => {
-    expect(computeConsultationChargeCents({ ...rate(100), durationSeconds: 620 })).not.toBe(1034);
+  it("does NOT prorate by the second", () => {
+    // 10m20s at $30 / 30 min ($1/min equivalent) → 11 minutes → $11
+    expect(computeConsultationChargeCents({ ...rate(3000), durationSeconds: 620 })).toBe(1100);
+    expect(computeConsultationChargeCents({ ...rate(3000), durationSeconds: 620 })).not.toBe(
+      Math.ceil((620 / 60) * 3000)
+    );
   });
 
-  it("leaves exact minutes untouched", () => {
-    expect(computeConsultationChargeCents({ ...rate(100), durationSeconds: 600 })).toBe(1000);
-    expect(computeConsultationChargeCents({ ...rate(250), durationSeconds: 180 })).toBe(750);
+  it("charges one 30-minute block at exactly 30 minutes", () => {
+    expect(computeConsultationChargeCents({ ...rate(6000), durationSeconds: 1800 })).toBe(6000);
   });
 
-  it("rounds any partial minute up to a whole one", () => {
-    expect(computeConsultationChargeCents({ ...rate(100), durationSeconds: 1 })).toBe(100);
-    expect(computeConsultationChargeCents({ ...rate(100), durationSeconds: 59 })).toBe(100);
-    expect(computeConsultationChargeCents({ ...rate(100), durationSeconds: 61 })).toBe(200);
+  it("prorates 45 minutes of a $60 / 30 min rate as $90", () => {
+    expect(computeConsultationChargeCents({ ...rate(6000), durationSeconds: 2700 })).toBe(9000);
+  });
+
+  it("rounds any partial minute up to a whole one before applying the rate", () => {
+    expect(computeConsultationChargeCents({ ...rate(6000), durationSeconds: 1 })).toBe(200);
+    expect(computeConsultationChargeCents({ ...rate(6000), durationSeconds: 59 })).toBe(200);
+    expect(computeConsultationChargeCents({ ...rate(6000), durationSeconds: 61 })).toBe(400);
   });
 
   it("charges nothing for a zero or missing duration", () => {
-    expect(computeConsultationChargeCents({ ...rate(100), durationSeconds: 0 })).toBe(0);
-    expect(computeConsultationChargeCents(rate(100))).toBe(0);
+    expect(computeConsultationChargeCents({ ...rate(6000), durationSeconds: 0 })).toBe(0);
+    expect(computeConsultationChargeCents(rate(6000))).toBe(0);
   });
 
-  it("always yields whole cents, so commission never derives from a fraction", () => {
+  it("always yields whole cents", () => {
     for (const seconds of [1, 59, 61, 620, 3599]) {
       const cents = computeConsultationChargeCents({ ...rate(333), durationSeconds: seconds });
       expect(Number.isInteger(cents)).toBe(true);
@@ -45,9 +47,8 @@ describe("computeConsultationChargeCents — partial minutes round up", () => {
   });
 
   it("prefers an explicit duration override over the stored row", () => {
-    const consultation = { ...rate(100), durationSeconds: 600 };
+    const consultation = { ...rate(3000), durationSeconds: 600 };
     expect(computeConsultationChargeCents(consultation, 620)).toBe(1100);
-    // undefined override must fall back to the row, not to zero
     expect(computeConsultationChargeCents(consultation, undefined)).toBe(1000);
   });
 });

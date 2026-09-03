@@ -30,6 +30,7 @@ export const consultationSummaryDtoSchema = z.object({
   customerId: z.string().uuid(),
   customerName: z.string(),
   customerAvatar: z.string().nullable(),
+  ratePer30Minutes: z.number(),
   ratePerMinute: z.number(),
   currency: z.string().length(3),
   durationSeconds: z.number().int().nonnegative().nullable(),
@@ -48,6 +49,8 @@ export const consultationDetailDtoSchema = consultationSummaryDtoSchema.extend({
 export const consultationBillingSummaryDtoSchema = z.object({
   consultationId: z.string().uuid(),
   durationSeconds: z.number().int().nonnegative(),
+  billableMinutes: z.number().int().nonnegative(),
+  ratePer30Minutes: z.number(),
   ratePerMinute: z.number(),
   currency: z.string().length(3),
   subtotal: z.number(),

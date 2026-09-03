@@ -1,6 +1,8 @@
 import {
   computeConsultationChargeCents,
   computeConsultationCommissionCents,
+  consultationBillableMinutes,
+  perMinuteCentsFromListedRate,
 } from "../lib/consultationBilling.js";
 import { centsToAmount, customerDisplayName, toIso, resolveMediaUrl } from "./common.js";
 import { expertDisplayName } from "./expert.mapper.js";
@@ -37,7 +39,8 @@ export function toConsultationSummaryDto(
     customerId: consultation.customerId,
     customerName: customerDisplayName(customerUser, customerProfile),
     customerAvatar: resolveMediaUrl(customerProfile?.avatarMedia?.storageKey),
-    ratePerMinute: centsToAmount(consultation.ratePerMinuteCents),
+    ratePer30Minutes: centsToAmount(consultation.ratePerMinuteCents),
+    ratePerMinute: centsToAmount(perMinuteCentsFromListedRate(consultation.ratePerMinuteCents)),
     currency,
     durationSeconds: consultation.durationSeconds,
     billingStatus: consultation.billingStatus,
@@ -65,7 +68,11 @@ export function toConsultationBillingSummaryDto(
   { commissionCents = 0, expertShareCents } = {}
 ) {
   const durationSeconds = consultation.durationSeconds ?? 0;
-  const ratePerMinute = centsToAmount(consultation.ratePerMinuteCents);
+  const billableMinutes = consultationBillableMinutes(durationSeconds);
+  const ratePer30Minutes = centsToAmount(consultation.ratePerMinuteCents);
+  const ratePerMinute = centsToAmount(
+    perMinuteCentsFromListedRate(consultation.ratePerMinuteCents)
+  );
   const computedCents = computeConsultationChargeCents(consultation);
   const hasCapturedBreakdown =
     Number.isFinite(commissionCents) &&
@@ -82,6 +89,8 @@ export function toConsultationBillingSummaryDto(
   return {
     consultationId: consultation.id,
     durationSeconds,
+    billableMinutes,
+    ratePer30Minutes,
     ratePerMinute,
     currency: consultation.currency ?? "USD",
     subtotal,
