@@ -585,6 +585,104 @@ export async function getQuoteHistory(auth, quoteId) {
   return toQuoteHistoryDto(quoteId, events);
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-7][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function startOfUtcMonth(date = new Date()) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function parseQueryDate(value, label) {
+  if (value == null || value === "") return null;
+  const raw = String(value);
+  const parsed = new Date(raw);
+  if (Number.isNaN(parsed.getTime())) {
+    throw badRequest(`Invalid ${label} date`, "INVALID_DATE");
+  }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw) && label === "to") {
+    parsed.setUTCHours(23, 59, 59, 999);
+  }
+  return parsed;
+}
+
+function consultationOwnerWhere(auth) {
+  return auth.role === "expert"
+    ? { expertId: auth.expertProfileId }
+    : { customerId: auth.customerProfileId };
+}
+
+function buildConsultationListWhere(auth, query) {
+  const where = consultationOwnerWhere(auth);
+
+  if (query.status) where.status = query.status;
+
+  const from = parseQueryDate(query.from, "from");
+  const to = parseQueryDate(query.to, "to");
+  if (from || to) {
+    where.requestedAt = {};
+    if (from) where.requestedAt.gte = from;
+    if (to) where.requestedAt.lte = to;
+  }
+
+  const q = typeof query.q === "string" ? query.q.trim() : "";
+  if (q) {
+    const term = q.replace(/^#/, "");
+    const or = [];
+    if (UUID_RE.test(term)) or.push({ id: term });
+    const nameFilter = { contains: term, mode: "insensitive" };
+    if (auth.role === "expert") {
+      or.push(
+        { customer: { firstName: nameFilter } },
+        { customer: { lastName: nameFilter } }
+      );
+    } else {
+      or.push(
+        { expert: { firstName: nameFilter } },
+        { expert: { lastName: nameFilter } }
+      );
+    }
+    where.OR = or;
+  }
+
+  return where;
+}
+
+async function consultationHistoryStats(db, auth) {
+  const ownerWhere = consultationOwnerWhere(auth);
+  const completedWhere = { ...ownerWhere, status: "completed" };
+  const monthStart = startOfUtcMonth();
+  const [total, thisMonth] = await Promise.all([
+    db.consultation.count({ where: completedWhere }),
+    db.consultation.count({
+      where: { ...completedWhere, endedAt: { gte: monthStart } },
+    }),
+  ]);
+  return { total, thisMonth };
+}
+
+async function loadPaymentMethodForConsultation(consultation, charge) {
+  const db = getDb();
+  const transactionId = charge?.transactionId;
+  if (transactionId) {
+    const tx = await db.transaction.findUnique({
+      where: { id: transactionId },
+      select: { metadata: true },
+    });
+    const paymentMethodId = tx?.metadata?.paymentMethodId;
+    if (paymentMethodId) {
+      const method = await db.paymentMethod.findUnique({
+        where: { id: paymentMethodId },
+        select: { brand: true, last4: true },
+      });
+      if (method) return method;
+    }
+  }
+
+  return db.paymentMethod.findFirst({
+    where: { customerProfileId: consultation.customerId, isDefault: true },
+    select: { brand: true, last4: true },
+  });
+}
+
 // ─── Consultations ───────────────────────────────────────────────────────────
 
 export async function createConsultation(auth, body) {
@@ -634,17 +732,13 @@ export async function createConsultation(auth, body) {
 
 export async function listConsultations(auth, query) {
   const { page, limit, skip } = parsePagination(query);
-  const where =
-    auth.role === "expert"
-      ? { expertId: auth.expertProfileId }
-      : { customerId: auth.customerProfileId };
 
   if (auth.role === "expert" && !auth.expertProfileId) throw forbidden("Expert access required");
   if (auth.role === "customer" && !auth.customerProfileId) throw forbidden("Customer access required");
 
-  if (query.status) where.status = query.status;
-
+  const where = buildConsultationListWhere(auth, query);
   const db = getDb();
+  const stats = await consultationHistoryStats(db, auth);
 
   // Customer history is only real connected sessions (both parties joined).
   // Expert list stays unfiltered so incoming/missed requests remain visible.
@@ -658,7 +752,7 @@ export async function listConsultations(auth, query) {
     const items = connected
       .slice(skip, skip + limit)
       .map((c) => toConsultationSummaryDto(c, consultationContext(c)));
-    return paginatedResult(items, { page, limit, total: connected.length });
+    return { ...paginatedResult(items, { page, limit, total: connected.length }), stats };
   }
 
   const [rows, total] = await Promise.all([
@@ -673,7 +767,7 @@ export async function listConsultations(auth, query) {
   ]);
 
   const items = rows.map((c) => toConsultationSummaryDto(c, consultationContext(c)));
-  return paginatedResult(items, { page, limit, total });
+  return { ...paginatedResult(items, { page, limit, total }), stats };
 }
 
 async function getCustomerSummary(customerId) {
@@ -716,11 +810,17 @@ async function getCustomerSummary(customerId) {
 export async function getConsultation(auth, consultationId) {
   const consultation = await loadConsultation(consultationId);
   assertConsultationParticipant(auth, consultation);
-  
+
   const dto = toConsultationDetailDto(consultation, consultationContext(consultation));
   if (auth.role === "customer" && auth.customerProfileId) {
     dto.summary = await getCustomerSummary(auth.customerProfileId);
   }
+  dto.billing =
+    consultation.status === "completed"
+      ? await getBillingSummary(auth, consultationId, { includeCustomerSummary: false }).catch(
+          () => null
+        )
+      : null;
   return dto;
 }
 
@@ -912,7 +1012,7 @@ export async function getVideoToken(auth, consultationId) {
   });
 }
 
-export async function getBillingSummary(auth, consultationId) {
+export async function getBillingSummary(auth, consultationId, { includeCustomerSummary = true } = {}) {
   const consultation = await loadConsultation(consultationId);
   assertConsultationParticipant(auth, consultation);
   if (consultation.status !== "completed") {
@@ -927,11 +1027,17 @@ export async function getBillingSummary(auth, consultationId) {
     `/api/v1/billing/consultations/${consultationId}/charge`
   ).catch(() => null); // charge may not exist yet for legacy consultations
 
+  const paymentMethod = await loadPaymentMethodForConsultation(consultation, charge).catch(
+    () => null
+  );
+
   const dto = toConsultationBillingSummaryDto(consultation, {
     commissionCents: charge?.commissionCents ?? 0,
     expertShareCents: charge?.expertShareCents,
+    paymentBrand: paymentMethod?.brand ?? null,
+    paymentLast4: paymentMethod?.last4 ?? null,
   });
-  if (auth.role === "customer" && auth.customerProfileId) {
+  if (includeCustomerSummary && auth.role === "customer" && auth.customerProfileId) {
     dto.summary = await getCustomerSummary(auth.customerProfileId);
   }
   return dto;

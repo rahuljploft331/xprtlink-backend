@@ -13,14 +13,17 @@ export const ResponseFormatter = {
       page = 1,
       limit = 20,
       total = 0,
+      stats,
       code,
       status = 200,
     } = {}
   ) {
+    const data = { items, page, limit, total };
+    if (stats !== undefined) data.stats = stats;
     const body = {
       success: true,
       message,
-      data: { items, page, limit, total },
+      data,
     };
     if (code) body.code = code;
     return res.status(status).json(body);

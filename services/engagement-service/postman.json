@@ -404,10 +404,30 @@
                 {
                   "key": "limit",
                   "value": "20"
+                },
+                {
+                  "key": "status",
+                  "value": "completed",
+                  "description": "Expert Consultation History: pass completed. Omit to include incoming/missed requests."
+                },
+                {
+                  "key": "q",
+                  "value": "",
+                  "description": "Search customer/expert name or consultation UUID"
+                },
+                {
+                  "key": "from",
+                  "value": "",
+                  "description": "ISO date or datetime lower bound on requestedAt"
+                },
+                {
+                  "key": "to",
+                  "value": "",
+                  "description": "ISO date or datetime upper bound on requestedAt"
                 }
               ]
             },
-            "description": "List historical and active consultations."
+            "description": "List historical and active consultations. Expert Consultation History: status=completed, q, from, to. Response data includes stats.total and stats.thisMonth (completed counts, not affected by search/date filters)."
           }
         },
         {

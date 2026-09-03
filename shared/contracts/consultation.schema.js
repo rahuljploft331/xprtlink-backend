@@ -20,13 +20,18 @@ export const consultationBillingStatusSchema = z.enum([
 
 export const consultationSummaryDtoSchema = z.object({
   id: z.string().uuid(),
+  displayId: z.string(),
   title: z.string().nullable(),
   note: z.string().nullable(),
   status: consultationStatusSchema,
   expertId: z.string().uuid(),
   expertName: z.string(),
   expertAvatar: z.string().nullable(),
+  expertTitle: z.string().nullable(),
+  expertVerificationStatus: z.string().nullable(),
   expertRating: z.number().nullable(),
+  expertRatingAvg: z.number().nullable(),
+  expertReviewCount: z.number().int().nonnegative(),
   customerId: z.string().uuid(),
   customerName: z.string(),
   customerAvatar: z.string().nullable(),
@@ -34,16 +39,13 @@ export const consultationSummaryDtoSchema = z.object({
   ratePerMinute: z.number(),
   currency: z.string().length(3),
   durationSeconds: z.number().int().nonnegative().nullable(),
+  billableMinutes: z.number().int().nonnegative(),
+  total: z.number(),
   billingStatus: consultationBillingStatusSchema,
   requestedAt: z.string().datetime(),
+  startedAt: z.string().datetime().nullable(),
   endedAt: z.string().datetime().nullable(),
   hasReview: z.boolean(),
-});
-
-export const consultationDetailDtoSchema = consultationSummaryDtoSchema.extend({
-  acceptedAt: z.string().datetime().nullable(),
-  startedAt: z.string().datetime().nullable(),
-  zegoRoomId: z.string().nullable(),
 });
 
 export const consultationBillingSummaryDtoSchema = z.object({
@@ -55,7 +57,27 @@ export const consultationBillingSummaryDtoSchema = z.object({
   currency: z.string().length(3),
   subtotal: z.number(),
   commission: z.number(),
+  expertShare: z.number(),
   total: z.number(),
+  billingStatus: consultationBillingStatusSchema.nullable(),
+  paymentBrand: z.string().nullable(),
+  paymentLast4: z.string().nullable(),
+});
+
+export const reviewDtoSchema = z.object({
+  id: z.string().uuid(),
+  consultationId: z.string().uuid(),
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().nullable(),
+  status: z.enum(["published", "hidden", "flagged"]),
+  createdAt: z.string().datetime(),
+});
+
+export const consultationDetailDtoSchema = consultationSummaryDtoSchema.extend({
+  acceptedAt: z.string().datetime().nullable(),
+  zegoRoomId: z.string().nullable(),
+  review: reviewDtoSchema.nullable(),
+  billing: consultationBillingSummaryDtoSchema.nullable().optional(),
 });
 
 export const videoTokenDtoSchema = z.object({
@@ -73,15 +95,6 @@ export const createConsultationRequestSchema = z.object({
 export const submitReviewRequestSchema = z.object({
   rating: z.number().int().min(1).max(5),
   comment: z.string().max(2000).optional(),
-});
-
-export const reviewDtoSchema = z.object({
-  id: z.string().uuid(),
-  consultationId: z.string().uuid(),
-  rating: z.number().int().min(1).max(5),
-  comment: z.string().nullable(),
-  status: z.enum(["published", "hidden", "flagged"]),
-  createdAt: z.string().datetime(),
 });
 
 export const expertReportRequestSchema = z.object({

@@ -29,8 +29,10 @@ export async function getById(req, res, next) {
     const c = await db.consultation.findUnique({
       where: { id: req.params.id },
       include: {
-        customer: true, expert: true,
-        review: true, charge: { include: { transaction: true } },
+        customer: { include: { user: { select: { email: true, phone: true } } } },
+        expert: { include: { user: { select: { email: true } } } },
+        review: true,
+        charge: { include: { transaction: true } },
       },
     });
     if (!c) return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
