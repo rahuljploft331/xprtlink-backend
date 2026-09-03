@@ -1,10 +1,26 @@
 import { centsToAmount, customerDisplayName, toIso, resolveMediaUrl } from "./common.js";
 import { expertDisplayName } from "./expert.mapper.js";
 
+/**
+ * Review this consultation's customer submitted for this session.
+ * History/detail APIs are session-relative — do not use ExpertProfile.ratingAvg here.
+ */
+export function customerConsultationReview(consultation) {
+  const review = consultation?.review ?? null;
+  if (!review) return null;
+  if (review.customerId && consultation.customerId && review.customerId !== consultation.customerId) {
+    return null;
+  }
+  return review;
+}
+
 export function toConsultationSummaryDto(
   consultation,
   { customerUser, customerProfile, expertProfile, currency = "USD" }
 ) {
+  const review = customerConsultationReview(consultation);
+  const hasReview = review != null;
+
   return {
     id: consultation.id,
     title: consultation.title,
@@ -13,7 +29,7 @@ export function toConsultationSummaryDto(
     expertId: consultation.expertId,
     expertName: expertDisplayName(expertProfile),
     expertAvatar: resolveMediaUrl(expertProfile?.avatarMedia?.storageKey),
-    expertRating: expertProfile?.ratingCount > 0 ? Number(expertProfile.ratingAvg) : null,
+    expertRating: hasReview ? Number(review.rating) : null,
     customerId: consultation.customerId,
     customerName: customerDisplayName(customerUser, customerProfile),
     customerAvatar: resolveMediaUrl(customerProfile?.avatarMedia?.storageKey),
@@ -23,18 +39,20 @@ export function toConsultationSummaryDto(
     billingStatus: consultation.billingStatus,
     requestedAt: toIso(consultation.requestedAt),
     endedAt: toIso(consultation.endedAt),
-    hasReview: Boolean(consultation.review),
+    hasReview,
   };
 }
 
 export function toConsultationDetailDto(consultation, ctx) {
+  const summary = toConsultationSummaryDto(consultation, ctx);
+  const review = customerConsultationReview(consultation);
   return {
-    ...toConsultationSummaryDto(consultation, ctx),
+    ...summary,
     acceptedAt: toIso(consultation.acceptedAt),
     startedAt: toIso(consultation.startedAt),
     zegoRoomId: consultation.zegoRoomId,
-    hasReview: Boolean(ctx.hasReview),
-    review: consultation.review ? toReviewDto(consultation.review) : null,
+    hasReview: summary.hasReview,
+    review: review ? toReviewDto(review) : null,
   };
 }
 

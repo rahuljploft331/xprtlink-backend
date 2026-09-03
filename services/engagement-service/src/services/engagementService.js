@@ -120,7 +120,7 @@ function consultationContext(consultation) {
     customerProfile: consultation.customer,
     expertProfile: consultation.expert,
     currency: consultation.expert.currency,
-    hasReview: Boolean(consultation.review),
+    hasReview: consultation.review != null,
   };
 }
 
