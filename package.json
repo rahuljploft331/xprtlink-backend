@@ -24,6 +24,8 @@
     "db:seed": "node scripts/seed.js",
     "db:reset": "node scripts/reset.js",
     "db:backup": "bash scripts/backup.sh",
+    "sync-remote-db": "node scripts/sync-remote-db.js",
+    "db:sync-remote": "node scripts/sync-remote-db.js",
     "seed:platform": "node scripts/seed-platform.js",
     "init:flows": "node scripts/init-flows.js",
     "init:flows:fresh": "node scripts/init-flows.js --fresh",

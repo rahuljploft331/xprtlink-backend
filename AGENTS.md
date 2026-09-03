@@ -36,6 +36,7 @@ pnpm db:generate      # after schema edits
 pnpm db:migrate:dev   # new migration in dev
 pnpm db:migrate       # deploy migrations
 pnpm seed / pnpm reset
+pnpm sync-remote-db   # SSH dump of remote Postgres → overwrite local DATABASE_URL
 ```
 
 ## Admin / subadmin RBAC

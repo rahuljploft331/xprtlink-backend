@@ -50,6 +50,7 @@ pnpm db:generate         # Prisma client after schema changes
 pnpm db:migrate          # apply migrations (deploy)
 pnpm db:migrate:dev      # create + apply migration (development)
 pnpm db:studio           # Prisma Studio GUI
+pnpm sync-remote-db      # dump remote DB over SSH and overwrite local DATABASE_URL
 ```
 
 ### Reset anytime
