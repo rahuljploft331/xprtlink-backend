@@ -25,21 +25,24 @@ export const consultationSummaryDtoSchema = z.object({
   status: consultationStatusSchema,
   expertId: z.string().uuid(),
   expertName: z.string(),
+  expertAvatar: z.string().nullable(),
+  expertRating: z.number().nullable(),
   customerId: z.string().uuid(),
   customerName: z.string(),
+  customerAvatar: z.string().nullable(),
   ratePerMinute: z.number(),
   currency: z.string().length(3),
   durationSeconds: z.number().int().nonnegative().nullable(),
   billingStatus: consultationBillingStatusSchema,
   requestedAt: z.string().datetime(),
   endedAt: z.string().datetime().nullable(),
+  hasReview: z.boolean(),
 });
 
 export const consultationDetailDtoSchema = consultationSummaryDtoSchema.extend({
   acceptedAt: z.string().datetime().nullable(),
   startedAt: z.string().datetime().nullable(),
   zegoRoomId: z.string().nullable(),
-  hasReview: z.boolean(),
 });
 
 export const consultationBillingSummaryDtoSchema = z.object({
