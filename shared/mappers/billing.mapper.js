@@ -65,9 +65,19 @@ export function toExpertSubscriptionDto(subscription, plan, currency = "USD") {
 }
 
 export function toEarningsEntryDto(entry, currency = "USD") {
+  const consultation = entry.consultation;
+  const customerName = consultation?.customer
+    ? fullName(consultation.customer.firstName, consultation.customer.lastName)
+    : "Customer";
+  const customerInitials = consultation?.customer?.firstName?.charAt(0)?.toUpperCase() ?? "?";
+
   return {
     id: entry.id,
     consultationId: entry.consultationId,
+    customerName,
+    customerInitials,
+    durationMinutes: consultation?.durationSeconds ? Math.round(consultation.durationSeconds / 60) : 0,
+    status: consultation?.billingStatus === "charged" ? "PAID" : "PENDING",
     grossAmount: centsToAmount(entry.grossCents),
     commissionAmount: centsToAmount(entry.commissionCents),
     netAmount: centsToAmount(entry.netCents),

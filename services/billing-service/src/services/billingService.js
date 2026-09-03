@@ -885,6 +885,11 @@ export async function getEarnings(auth, query) {
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
+      include: {
+        consultation: {
+          include: { customer: true },
+        },
+      },
     }),
     db.expertEarningsLedger.count({ where: { expertProfileId: auth.expertProfileId } }),
   ]);

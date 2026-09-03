@@ -557,6 +557,9 @@ export async function getDashboard(auth) {
     latestQuote,
     latestMessage,
     lastCompleted,
+    lifetimeEarnings,
+    totalConsultationsCompleted,
+    recentEarningsLedger,
   ] = await Promise.all([
     db.quoteRequest.count({
       where: { expertId: expert.id, status: { in: ["pending_expert_review", "submitted"] } },
@@ -611,7 +614,36 @@ export async function getDashboard(auth) {
         review: { select: { rating: true, comment: true } },
       },
     }),
+    db.expertEarningsLedger.aggregate({
+      where: { expertProfileId: expert.id },
+      _sum: { netCents: true },
+    }),
+    db.consultation.count({
+      where: { expertId: expert.id, status: "completed" },
+    }),
+    db.expertEarningsLedger.findMany({
+      where: { expertProfileId: expert.id, createdAt: { gte: new Date(startOfDay.getTime() - 6 * 24 * 60 * 60 * 1000) } },
+      select: { netCents: true, createdAt: true },
+    }),
   ]);
+
+  const earningsTrend = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(startOfDay);
+    d.setDate(d.getDate() - i);
+    const endOfThatDay = new Date(d);
+    endOfThatDay.setDate(endOfThatDay.getDate() + 1);
+    
+    const sumCents = recentEarningsLedger
+      .filter((e) => e.createdAt >= d && e.createdAt < endOfThatDay)
+      .reduce((acc, curr) => acc + curr.netCents, 0);
+      
+    earningsTrend.push({
+      day: d.toLocaleDateString("en-US", { weekday: "short" }),
+      netIncomeCents: sumCents,
+    });
+  }
+
 
   return toExpertDashboardDto({
     expert,
@@ -621,6 +653,9 @@ export async function getDashboard(auth) {
     earningsThisWeekCents: earningsWeek._sum.netCents ?? 0,
     earningsTodayCents: earningsToday._sum.netCents ?? 0,
     earningsThisMonthCents: earningsMonth._sum.netCents ?? 0,
+    lifetimeEarningsCents: lifetimeEarnings._sum.netCents ?? 0,
+    totalConsultationsCompleted,
+    earningsTrend,
     subscriptionActive,
     subscription,
     latestQuote,
