@@ -47,6 +47,11 @@ describe("toConsultationSummaryDto — session-relative review", () => {
 
     expect(dto.hasReview).toBe(true);
     expect(dto.expertRating).toBe(5);
+    expect(dto.expertRatingAvg).toBe(3.75);
+    expect(dto.expertReviewCount).toBe(8);
+    expect(dto.displayId).toBe("CON-37535A");
+    expect(dto.billableMinutes).toBe(1);
+    expect(dto.total).toBe(1.17);
   });
 
   it("sets hasReview false and expertRating null when this customer has not reviewed", () => {
@@ -93,5 +98,6 @@ describe("toConsultationBillingSummaryDto — per 30 minutes, billed in minutes"
     expect(dto.subtotal).toBe(1.17);
     expect(dto.total).toBe(1.17);
     expect(dto.commission).toBe(0.18);
+    expect(dto.expertShare).toBe(0.99);
   });
 });

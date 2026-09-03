@@ -30,8 +30,15 @@ router.post(
 router.get(
   "/",
   asyncHandler(async (req, res) => {
-    const data = await svc.listConsultations(req.auth, req.query);
-    return ResponseFormatter.paginated(res, { message: getMessage("consultationsLoaded"), ...data });
+    const { items, pagination, stats } = await svc.listConsultations(req.auth, req.query);
+    return ResponseFormatter.paginated(res, {
+      message: getMessage("consultationsLoaded"),
+      items,
+      page: pagination.page,
+      limit: pagination.limit,
+      total: pagination.total,
+      stats,
+    });
   })
 );
 
