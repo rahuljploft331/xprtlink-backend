@@ -96,7 +96,7 @@ export const createQuoteRequestSchema = z.object({
   expertId: z.string().uuid().optional(),
   title: z.string().min(1).max(200),
   description: z.string().min(1),
-  category: z.string().min(1).max(120).optional(),
+  categoryId: z.string().uuid().optional(),
   preferredLocation: z.string().min(1).max(200).optional(),
   budget: z.number().positive().optional(),
   notes: z.string().optional(),
@@ -106,7 +106,7 @@ export const createQuoteRequestSchema = z.object({
 export const updateQuoteRequestSchema = z.object({
   title: z.string().min(1).max(200).optional(),
   description: z.string().min(1).optional(),
-  category: z.string().min(1).max(120).optional(),
+  categoryId: z.string().uuid().optional(),
   preferredLocation: z.string().min(1).max(200).optional(),
   budget: z.number().positive().optional(),
   mediaIds: z.array(z.string().uuid()).optional(),

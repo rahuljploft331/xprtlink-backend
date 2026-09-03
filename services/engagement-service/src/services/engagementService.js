@@ -208,6 +208,14 @@ export async function createQuote(auth, body) {
     if (!expert) throw notFound("No approved experts available to receive quotes");
   }
 
+  let categoryName = null;
+  if (body.categoryId) {
+    const category = await db.category.findUnique({ where: { id: body.categoryId } });
+    if (category) {
+      categoryName = category.name;
+    }
+  }
+
   const now = new Date();
   const quote = await db.$transaction(async (tx) => {
     const referenceNumber = await uniqueQuoteReference(tx);
@@ -218,7 +226,7 @@ export async function createQuote(auth, body) {
         expertId: expert.id,
         title: body.title,
         description: body.description,
-        category: body.category ?? null,
+        category: categoryName,
         preferredLocation: body.preferredLocation ?? null,
         budgetCents: amountToCents(body.budget),
         notes: body.notes ?? null,
@@ -282,10 +290,20 @@ export async function updateQuote(auth, quoteId, body) {
 
   const db = getDb();
   const updated = await db.$transaction(async (tx) => {
+    let categoryNameUpdate;
+    if (body.categoryId !== undefined) {
+      if (body.categoryId === null) {
+        categoryNameUpdate = null;
+      } else {
+        const category = await tx.category.findUnique({ where: { id: body.categoryId } });
+        if (category) categoryNameUpdate = category.name;
+      }
+    }
+
     const data = {
       ...(body.title ? { title: body.title } : {}),
       ...(body.description ? { description: body.description } : {}),
-      ...(body.category !== undefined ? { category: body.category } : {}),
+      ...(categoryNameUpdate !== undefined ? { category: categoryNameUpdate } : {}),
       ...(body.preferredLocation !== undefined
         ? { preferredLocation: body.preferredLocation }
         : {}),
