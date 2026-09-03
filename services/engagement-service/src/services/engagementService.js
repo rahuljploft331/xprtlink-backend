@@ -740,34 +740,26 @@ export async function listConsultations(auth, query) {
   const db = getDb();
   const stats = await consultationHistoryStats(db, auth);
 
-  // Customer history is only real connected sessions (both parties joined).
-  // Expert list stays unfiltered so incoming/missed requests remain visible.
-  if (auth.role === "customer") {
-    const rows = await db.consultation.findMany({
-      where,
-      orderBy: { requestedAt: "desc" },
-      include: CONSULTATION_INCLUDE,
-    });
-    const connected = rows.filter(wasSuccessfullyConnectedConsultation);
-    const items = connected
-      .slice(skip, skip + limit)
-      .map((c) => toConsultationSummaryDto(c, consultationContext(c)));
-    return { ...paginatedResult(items, { page, limit, total: connected.length }), stats };
-  }
+  // Fetch all matching records since we must filter JSON connections in-memory
+  const rows = await db.consultation.findMany({
+    where,
+    orderBy: { requestedAt: "desc" },
+    include: CONSULTATION_INCLUDE,
+  });
 
-  const [rows, total] = await Promise.all([
-    db.consultation.findMany({
-      where,
-      orderBy: { requestedAt: "desc" },
-      skip,
-      take: limit,
-      include: CONSULTATION_INCLUDE,
-    }),
-    db.consultation.count({ where }),
-  ]);
+  // Customer history historically only showed real connected sessions (both parties joined).
+  // Expert list stays unfiltered so incoming/missed requests remain visible,
+  // EXCEPT for 'completed' status which should only show if successfully connected.
+  const filtered = rows.filter((c) => {
+    if (auth.role === "customer") return wasSuccessfullyConnectedConsultation(c);
+    return c.status !== "completed" || wasSuccessfullyConnectedConsultation(c);
+  });
 
-  const items = rows.map((c) => toConsultationSummaryDto(c, consultationContext(c)));
-  return { ...paginatedResult(items, { page, limit, total }), stats };
+  const items = filtered
+    .slice(skip, skip + limit)
+    .map((c) => toConsultationSummaryDto(c, consultationContext(c)));
+
+  return { ...paginatedResult(items, { page, limit, total: filtered.length }), stats };
 }
 
 async function getCustomerSummary(customerId) {
