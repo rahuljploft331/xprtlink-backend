@@ -43,6 +43,10 @@ jobs:
             echo \"=== Generating Prisma Client ===\"
             pnpm db:generate
 
+            echo \"=== Recovering failed 20260903055403 if present ===\"
+            # Safe no-op once that migration has finished_at. Remove after one green deploy.
+            npx dotenv-cli -e .env -- pnpm --filter @xprtlink/shared exec -- prisma migrate resolve --rolled-back 20260903055403 --schema=./prisma/schema.prisma || true
+
             echo \"=== Applying Database Migrations ===\"
             pnpm db:migrate
 
