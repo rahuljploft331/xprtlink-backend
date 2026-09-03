@@ -650,12 +650,23 @@ async function consultationHistoryStats(db, auth) {
   const ownerWhere = consultationOwnerWhere(auth);
   const completedWhere = { ...ownerWhere, status: "completed" };
   const monthStart = startOfUtcMonth();
-  const [total, thisMonth] = await Promise.all([
-    db.consultation.count({ where: completedWhere }),
-    db.consultation.count({
-      where: { ...completedWhere, endedAt: { gte: monthStart } },
-    }),
-  ]);
+  
+  // Fetch all completed consultations for the user, including only fields needed for join check
+  const allCompleted = await db.consultation.findMany({
+    where: completedWhere,
+    select: {
+      endedAt: true,
+      joinedParticipantIds: true,
+      customer: { select: { user: { select: { id: true } } } },
+      expert: { select: { userId: true } },
+    }
+  });
+
+  const connectedCompleted = allCompleted.filter(wasSuccessfullyConnectedConsultation);
+  
+  const total = connectedCompleted.length;
+  const thisMonth = connectedCompleted.filter(c => c.endedAt && c.endedAt >= monthStart).length;
+  
   return { total, thisMonth };
 }
 
