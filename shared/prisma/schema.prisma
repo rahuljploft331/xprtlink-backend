@@ -1106,3 +1106,17 @@ model ProcessedWebhookEvent {
   @@index([processedAt])
   @@map("processed_webhook_events")
 }
+
+// ─── External Integrations ───────────────────────────────────────────────
+
+model ZegoCallbackLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  event     String   @db.VarChar(64)
+  roomId    String?  @map("room_id") @db.VarChar(128)
+  payload   Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([roomId])
+  @@index([event])
+  @@map("zego_callback_logs")
+}

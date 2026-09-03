@@ -30,6 +30,20 @@ const handlers = {
  */
 export async function handleZegoCallback(payload) {
   console.log(`[zego-callback] Received event '${payload.event}' with payload:`, JSON.stringify(payload));
+  
+  try {
+    const db = getDb();
+    await db.zegoCallbackLog.create({
+      data: {
+        event: payload.event || "unknown",
+        roomId: payload.room_id || null,
+        payload: payload,
+      },
+    });
+  } catch (err) {
+    console.error(`[zego-callback] Failed to log raw event to DB: ${err.message}`);
+  }
+
   const handler = handlers[payload.event];
   if (!handler) {
     console.log(`[zego-callback] Unhandled event: ${payload.event}`);
