@@ -514,7 +514,7 @@ model ExpertProfile {
   businessName          String?            @map("business_name") @db.VarChar(200)
   languages             String[]           @default([])
   serviceAreas          Json               @default("[]") @map("service_areas")
-  consultationRateCents Int                @map("consultation_rate_cents")
+  consultationRateCents Int                @map("consultation_rate_cents") // cents per 30 minutes
   currency              String             @default("USD") @db.Char(3)
   experienceYears       Int                @default(0) @map("experience_years")
   availabilityStatus    AvailabilityStatus @default(offline) @map("availability_status")
@@ -688,7 +688,7 @@ model Consultation {
   title                 String?                   @db.VarChar(200)
   note                  String?                   @db.VarChar(1000)
   status                ConsultationStatus        @default(requested)
-  ratePerMinuteCents    Int                       @map("rate_per_minute_cents")
+  ratePerMinuteCents    Int                       @map("rate_per_minute_cents") // snapshot: cents per 30 minutes
   requestedAt           DateTime                  @default(now()) @map("requested_at") @db.Timestamptz(6)
   acceptedAt            DateTime?                 @map("accepted_at") @db.Timestamptz(6)
   startedAt             DateTime?                 @map("started_at") @db.Timestamptz(6)

@@ -57,37 +57,41 @@ describe("toConsultationSummaryDto — session-relative review", () => {
   });
 });
 
-describe("toConsultationBillingSummaryDto — partial minutes round up", () => {
-  it("bills 4s at $35/min as 1 minute ($35), not the old $2.34 proration", () => {
+describe("toConsultationBillingSummaryDto — per 30 minutes, billed in minutes", () => {
+  it("bills 4s at $35 / 30 min as 1 minute, not $35", () => {
     const dto = toConsultationBillingSummaryDto(consultationFixture(null));
 
     expect(dto.durationSeconds).toBe(4);
-    expect(dto.ratePerMinute).toBe(35);
-    expect(dto.subtotal).toBe(35);
-    expect(dto.total).toBe(35);
-    expect(dto.commission).toBe(5.25);
+    expect(dto.billableMinutes).toBe(1);
+    expect(dto.ratePer30Minutes).toBe(35);
+    expect(dto.ratePerMinute).toBe(1.17);
+    expect(dto.subtotal).toBe(1.17);
+    expect(dto.total).toBe(1.17);
+  });
+
+  it("bills 54s at $60 / 30 min as $2", () => {
+    const dto = toConsultationBillingSummaryDto({
+      ...consultationFixture(null),
+      ratePerMinuteCents: 6000,
+      durationSeconds: 54,
+    });
+
+    expect(dto.billableMinutes).toBe(1);
+    expect(dto.ratePer30Minutes).toBe(60);
+    expect(dto.ratePerMinute).toBe(2);
+    expect(dto.subtotal).toBe(2);
+    expect(dto.total).toBe(2);
+    expect(dto.commission).toBe(0.3);
   });
 
   it("uses the captured charge breakdown when both shares are present", () => {
     const dto = toConsultationBillingSummaryDto(consultationFixture(null), {
-      commissionCents: 525,
-      expertShareCents: 2975,
+      commissionCents: 18,
+      expertShareCents: 99,
     });
 
-    expect(dto.subtotal).toBe(35);
-    expect(dto.total).toBe(35);
-    expect(dto.commission).toBe(5.25);
-  });
-
-  it("does not prorate 10m20s at $1/min", () => {
-    const dto = toConsultationBillingSummaryDto({
-      ...consultationFixture(null),
-      ratePerMinuteCents: 100,
-      durationSeconds: 620,
-    });
-
-    expect(dto.subtotal).toBe(11);
-    expect(dto.total).toBe(11);
-    expect(dto.commission).toBe(1.65);
+    expect(dto.subtotal).toBe(1.17);
+    expect(dto.total).toBe(1.17);
+    expect(dto.commission).toBe(0.18);
   });
 });

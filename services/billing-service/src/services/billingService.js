@@ -15,6 +15,7 @@ import {
   computeConsultationChargeCents,
   computeConsultationCommissionCents,
   CONSULTATION_COMMISSION_RATE,
+  consultationHoldMinimumCents,
 } from "@xprtlink/shared/lib/consultationBilling.js";
 
 export {
@@ -196,9 +197,8 @@ export async function holdConsultationFunds(auth, consultationId, body) {
   }
   if (!paymentMethod) throw notFound("Payment method not found");
 
-  // Enforce server-calculated minimum: at least 30 minutes at the expert's rate or $30,
-  // whichever is larger — prevents malicious clients from holding too little.
-  const serverMinimumCents = Math.max(30 * consultation.ratePerMinuteCents, 3000);
+  // Listed rate is per 30 minutes. Hold one block, or $30, whichever is larger.
+  const serverMinimumCents = consultationHoldMinimumCents(consultation.ratePerMinuteCents);
   const estimatedCents = Math.max(body.estimatedCents || 0, serverMinimumCents);
 
   try {
