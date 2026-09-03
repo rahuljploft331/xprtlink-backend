@@ -559,6 +559,8 @@ export async function getDashboard(auth) {
     lastCompleted,
     lifetimeEarnings,
     totalConsultationsCompleted,
+    consultationsThisMonth,
+    satisfactionReviews,
     recentEarningsLedger,
   ] = await Promise.all([
     db.quoteRequest.count({
@@ -621,6 +623,14 @@ export async function getDashboard(auth) {
     db.consultation.count({
       where: { expertId: expert.id, status: "completed" },
     }),
+    db.consultation.count({
+      where: { expertId: expert.id, status: "completed", endedAt: { gte: startOfMonth } },
+    }),
+    // Satisfaction: count total published reviews and those with rating >= 4
+    db.review.findMany({
+      where: { expertId: expert.id, status: "published" },
+      select: { rating: true },
+    }),
     db.expertEarningsLedger.findMany({
       where: { expertProfileId: expert.id, createdAt: { gte: new Date(startOfDay.getTime() - 6 * 24 * 60 * 60 * 1000) } },
       select: { netCents: true, createdAt: true },
@@ -633,17 +643,21 @@ export async function getDashboard(auth) {
     d.setDate(d.getDate() - i);
     const endOfThatDay = new Date(d);
     endOfThatDay.setDate(endOfThatDay.getDate() + 1);
-    
+
     const sumCents = recentEarningsLedger
       .filter((e) => e.createdAt >= d && e.createdAt < endOfThatDay)
       .reduce((acc, curr) => acc + curr.netCents, 0);
-      
+
     earningsTrend.push({
       day: d.toLocaleDateString("en-US", { weekday: "short" }),
       netIncomeCents: sumCents,
     });
   }
 
+  // Satisfaction rate: % of published reviews with rating >= 4
+  const totalReviews = satisfactionReviews.length;
+  const positiveReviews = satisfactionReviews.filter((r) => r.rating >= 4).length;
+  const satisfactionRate = totalReviews > 0 ? Math.round((positiveReviews / totalReviews) * 100) : null;
 
   return toExpertDashboardDto({
     expert,
@@ -655,6 +669,8 @@ export async function getDashboard(auth) {
     earningsThisMonthCents: earningsMonth._sum.netCents ?? 0,
     lifetimeEarningsCents: lifetimeEarnings._sum.netCents ?? 0,
     totalConsultationsCompleted,
+    consultationsThisMonth,
+    satisfactionRate,
     earningsTrend,
     subscriptionActive,
     subscription,

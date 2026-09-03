@@ -84,6 +84,8 @@ export function toExpertDashboardDto({
   earningsThisMonthCents = 0,
   lifetimeEarningsCents = 0,
   totalConsultationsCompleted = 0,
+  consultationsThisMonth = 0,
+  satisfactionRate = null,
   earningsTrend = [],
   subscriptionActive,
   subscription = null,
@@ -103,6 +105,8 @@ export function toExpertDashboardDto({
     earningsThisMonthCents,
     lifetimeEarningsCents,
     totalConsultationsCompleted,
+    consultationsThisMonth,
+    satisfactionRate,
     earningsTrend,
     subscription: toDashboardSubscriptionDto(subscription),
     recentActivity: {

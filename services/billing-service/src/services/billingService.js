@@ -887,7 +887,9 @@ export async function getEarnings(auth, query) {
       take: limit,
       include: {
         consultation: {
-          include: { customer: true },
+          include: {
+            customer: { include: { avatarMedia: true } },
+          },
         },
       },
     }),

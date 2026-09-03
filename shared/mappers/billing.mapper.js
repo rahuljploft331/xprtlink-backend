@@ -70,12 +70,14 @@ export function toEarningsEntryDto(entry, currency = "USD") {
     ? fullName(consultation.customer.firstName, consultation.customer.lastName)
     : "Customer";
   const customerInitials = consultation?.customer?.firstName?.charAt(0)?.toUpperCase() ?? "?";
+  const customerAvatarUrl = resolveMediaUrl(consultation?.customer?.avatarMedia?.storageKey) ?? null;
 
   return {
     id: entry.id,
     consultationId: entry.consultationId,
     customerName,
     customerInitials,
+    customerAvatarUrl,
     durationMinutes: consultation?.durationSeconds ? Math.round(consultation.durationSeconds / 60) : 0,
     status: consultation?.billingStatus === "charged" ? "PAID" : "PENDING",
     grossAmount: centsToAmount(entry.grossCents),
