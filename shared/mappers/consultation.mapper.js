@@ -1,3 +1,7 @@
+import {
+  computeConsultationChargeCents,
+  computeConsultationCommissionCents,
+} from "../lib/consultationBilling.js";
 import { centsToAmount, customerDisplayName, toIso, resolveMediaUrl } from "./common.js";
 import { expertDisplayName } from "./expert.mapper.js";
 
@@ -56,12 +60,23 @@ export function toConsultationDetailDto(consultation, ctx) {
   };
 }
 
-export function toConsultationBillingSummaryDto(consultation, { commissionCents = 0 }) {
+export function toConsultationBillingSummaryDto(
+  consultation,
+  { commissionCents = 0, expertShareCents } = {}
+) {
   const durationSeconds = consultation.durationSeconds ?? 0;
   const ratePerMinute = centsToAmount(consultation.ratePerMinuteCents);
-  const minutes = durationSeconds / 60;
-  const subtotalCents = Math.ceil(minutes * consultation.ratePerMinuteCents);
-  const commission = centsToAmount(commissionCents || Math.round(subtotalCents * 0.15));
+  const computedCents = computeConsultationChargeCents(consultation);
+  const hasCapturedBreakdown =
+    Number.isFinite(commissionCents) &&
+    Number.isFinite(expertShareCents) &&
+    commissionCents + expertShareCents > 0;
+  const subtotalCents = hasCapturedBreakdown
+    ? commissionCents + expertShareCents
+    : computedCents;
+  const commission = centsToAmount(
+    commissionCents || computeConsultationCommissionCents(subtotalCents)
+  );
   const subtotal = centsToAmount(subtotalCents);
 
   return {
