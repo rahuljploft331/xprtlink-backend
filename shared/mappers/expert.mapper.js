@@ -48,13 +48,27 @@ export function toExpertMeDto(expert, { user, categories, subscriptionActive = f
   };
 }
 
-export function toExpertReviewDto(review, { customerFirstName }) {
+export function toExpertReviewDto(review) {
+  const customer = review.customer;
+  const consultation = review.consultation;
+  const expert = review.expert;
+
   return {
     id: review.id,
     rating: review.rating,
     comment: review.comment,
-    customerFirstName,
-    customerLastInitial: customerFirstName?.charAt(0)?.toUpperCase() ?? "?",
+    customerName: customer ? fullName(customer.firstName, customer.lastName) : "Customer",
+    customerInitials: customer?.firstName?.charAt(0)?.toUpperCase() ?? "?",
+    customerAvatarUrl: resolveMediaUrl(customer?.avatarMedia?.storageKey) ?? null,
+    consultationTitle: consultation?.title || "Consultation",
+    serviceDate: consultation?.endedAt ? toIso(consultation.endedAt) : null,
+    // Generate a shorter recognizable ID for display purposes from the UUID
+    projectId: consultation?.id ? `#PRJ-${consultation.id.split('-')[0].toUpperCase()}` : null,
+    durationMinutes: consultation?.durationSeconds ? Math.round(consultation.durationSeconds / 60) : 0,
+    expertAssigned: expert ? fullName(expert.firstName, expert.lastName) : "Expert",
+    // Note: The database does not currently support expertise chips on reviews. 
+    // Sending static chips for the UI until the DB model is updated.
+    expertiseChips: ["Detail Oriented", "Professional", "Technical Proficiency"],
     createdAt: toIso(review.createdAt),
   };
 }

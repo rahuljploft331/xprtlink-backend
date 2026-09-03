@@ -287,13 +287,15 @@ export async function getExpertReviews(id, query) {
       skip,
       take: limit,
       orderBy: { createdAt: "desc" },
-      include: { customer: true },
+      include: {
+        customer: { include: { avatarMedia: true } },
+        consultation: true,
+        expert: true,
+      },
     }),
     db.review.count({ where: { expertId: id, status: "published" } }),
   ]);
-  const items = reviews.map((r) =>
-    toExpertReviewDto(r, { customerFirstName: r.customer.firstName })
-  );
+  const items = reviews.map((r) => toExpertReviewDto(r));
   return paginatedResult(items, { page, limit, total });
 }
 
