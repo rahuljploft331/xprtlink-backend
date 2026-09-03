@@ -929,6 +929,7 @@ export async function getBillingSummary(auth, consultationId) {
 
   const dto = toConsultationBillingSummaryDto(consultation, {
     commissionCents: charge?.commissionCents ?? 0,
+    expertShareCents: charge?.expertShareCents,
   });
   if (auth.role === "customer" && auth.customerProfileId) {
     dto.summary = await getCustomerSummary(auth.customerProfileId);

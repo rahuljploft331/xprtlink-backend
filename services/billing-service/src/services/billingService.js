@@ -11,29 +11,17 @@ import { badRequest, conflict, forbidden, notFound } from "@xprtlink/shared/util
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 import * as stripeSvc from "./stripeService.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
+import {
+  computeConsultationChargeCents,
+  computeConsultationCommissionCents,
+  CONSULTATION_COMMISSION_RATE,
+} from "@xprtlink/shared/lib/consultationBilling.js";
 
-const COMMISSION_RATE = 0.15;
-
-
-/**
- * Billable charge for a consultation, in cents.
- *
- * Client decision (31 Aug 2026 call, §7.2): a partial minute is rounded UP to the
- * next full minute — 10m20s bills as 11 minutes. Round the MINUTES, not the cents.
- * The previous form, `Math.ceil((seconds / 60) * rate)`, prorated by the second and
- * under-charged every partial minute (10m20s at $1/min charged $10.34, not $11.00).
- *
- * Single source of truth: the customer charge, expert earnings, platform commission
- * and consultation history must all derive from this one number.
- *
- * @param consultation            must carry `ratePerMinuteCents` (and usually `durationSeconds`)
- * @param durationSecondsOverride actual duration when the caller knows better than the row
- */
-export function computeConsultationChargeCents(consultation, durationSecondsOverride) {
-  const durationSeconds = durationSecondsOverride ?? consultation.durationSeconds ?? 0;
-  const billableMinutes = Math.ceil(durationSeconds / 60);
-  return billableMinutes * consultation.ratePerMinuteCents;
-}
+export {
+  computeConsultationChargeCents,
+  computeConsultationCommissionCents,
+  CONSULTATION_COMMISSION_RATE,
+};
 
 export async function listPaymentMethods(auth) {
   const rows = await getDb().paymentMethod.findMany({
@@ -293,7 +281,7 @@ export async function payConsultation(auth, consultationId, body) {
   }
 
   // Record transaction
-  const commissionCents = Math.round(amountCents * COMMISSION_RATE);
+  const commissionCents = computeConsultationCommissionCents(amountCents);
   const expertShareCents = amountCents - commissionCents;
 
   const result = await db.$transaction(async (tx) => {
@@ -374,7 +362,7 @@ export async function captureConsultation(consultationId, durationSeconds) {
     return { skipped: true, reason: "zero_amount" };
   }
 
-  const commissionCents = Math.round(amountCents * COMMISSION_RATE);
+  const commissionCents = computeConsultationCommissionCents(amountCents);
   const expertShareCents = amountCents - commissionCents;
   const currency = consultation.expert?.currency || "USD";
 

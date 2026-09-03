@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toConsultationSummaryDto } from "./consultation.mapper.js";
+import { toConsultationSummaryDto, toConsultationBillingSummaryDto } from "./consultation.mapper.js";
 
 const customerId = "fb7524f5-756b-4fbc-ba64-7999fe104eaa";
 const expertId = "619d5c7b-0310-43bf-813a-4cf43e3826e9";
@@ -54,5 +54,40 @@ describe("toConsultationSummaryDto — session-relative review", () => {
 
     expect(dto.hasReview).toBe(false);
     expect(dto.expertRating).toBeNull();
+  });
+});
+
+describe("toConsultationBillingSummaryDto — partial minutes round up", () => {
+  it("bills 4s at $35/min as 1 minute ($35), not the old $2.34 proration", () => {
+    const dto = toConsultationBillingSummaryDto(consultationFixture(null));
+
+    expect(dto.durationSeconds).toBe(4);
+    expect(dto.ratePerMinute).toBe(35);
+    expect(dto.subtotal).toBe(35);
+    expect(dto.total).toBe(35);
+    expect(dto.commission).toBe(5.25);
+  });
+
+  it("uses the captured charge breakdown when both shares are present", () => {
+    const dto = toConsultationBillingSummaryDto(consultationFixture(null), {
+      commissionCents: 525,
+      expertShareCents: 2975,
+    });
+
+    expect(dto.subtotal).toBe(35);
+    expect(dto.total).toBe(35);
+    expect(dto.commission).toBe(5.25);
+  });
+
+  it("does not prorate 10m20s at $1/min", () => {
+    const dto = toConsultationBillingSummaryDto({
+      ...consultationFixture(null),
+      ratePerMinuteCents: 100,
+      durationSeconds: 620,
+    });
+
+    expect(dto.subtotal).toBe(11);
+    expect(dto.total).toBe(11);
+    expect(dto.commission).toBe(1.65);
   });
 });
