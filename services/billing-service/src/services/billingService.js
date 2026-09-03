@@ -879,9 +879,53 @@ export async function getEarnings(auth, query) {
   const { page, limit, skip } = parsePagination(query);
   const db = getDb();
 
+  // ── Filters ────────────────────────────────────────────────────────────────
+  // Supported query params:
+  //   ?dateFrom=2026-01-01   — start of date range (inclusive, ISO date)
+  //   ?dateTo=2026-12-31     — end of date range (inclusive, ISO date)
+  //   ?status=PAID|PENDING   — filter by billing status
+  //   ?q=Jane                — search by customer first/last name (case-insensitive)
+
+  const where = { expertProfileId: auth.expertProfileId };
+
+  if (query.dateFrom || query.dateTo) {
+    where.createdAt = {};
+    if (query.dateFrom) {
+      where.createdAt.gte = new Date(query.dateFrom);
+    }
+    if (query.dateTo) {
+      // Include the full day of dateTo by advancing to midnight of next day
+      const to = new Date(query.dateTo);
+      to.setDate(to.getDate() + 1);
+      where.createdAt.lt = to;
+    }
+  }
+
+  // status filter maps PAID → billingStatus=charged, PENDING → everything else
+  if (query.status === "PAID") {
+    where.consultation = { billingStatus: "charged" };
+  } else if (query.status === "PENDING") {
+    where.consultation = { billingStatus: { not: "charged" } };
+  }
+
+  // Customer name search — filter via the nested consultation→customer relation
+  if (query.q && query.q.trim().length > 0) {
+    const term = query.q.trim();
+    // Merge with any existing consultation filter
+    where.consultation = {
+      ...(where.consultation ?? {}),
+      customer: {
+        OR: [
+          { firstName: { contains: term, mode: "insensitive" } },
+          { lastName: { contains: term, mode: "insensitive" } },
+        ],
+      },
+    };
+  }
+
   const [rows, total] = await Promise.all([
     db.expertEarningsLedger.findMany({
-      where: { expertProfileId: auth.expertProfileId },
+      where,
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
@@ -893,7 +937,7 @@ export async function getEarnings(auth, query) {
         },
       },
     }),
-    db.expertEarningsLedger.count({ where: { expertProfileId: auth.expertProfileId } }),
+    db.expertEarningsLedger.count({ where }),
   ]);
 
   const expert = await db.expertProfile.findUnique({
