@@ -39,6 +39,38 @@ const QUOTABLE_QUOTE_STATUSES = new Set(["pending_expert_review", "expert_review
 const INBOX_QUOTE_STATUSES = ["pending_expert_review", "expert_reviewed"];
 const ACTIVE_CONSULTATION_STATUSES = new Set(["requested", "ringing", "accepted", "in_progress"]);
 
+function stripUuid(id) {
+  return id ? String(id).replace(/-/g, "") : "";
+}
+
+export function matchJoinedParticipantId(targetId, idList) {
+  if (!targetId) return false;
+  const strippedTarget = stripUuid(targetId);
+  return (idList ?? []).some((id) => stripUuid(id) === strippedTarget);
+}
+
+/** Same join rules as GET /consultations/:id/call-status. */
+export function consultationJoinStatus(consultation) {
+  const customerJoined = matchJoinedParticipantId(
+    consultation.customer?.user?.id,
+    consultation.joinedParticipantIds
+  );
+  const expertJoined = matchJoinedParticipantId(
+    consultation.expert?.userId,
+    consultation.joinedParticipantIds
+  );
+  return {
+    customerJoined,
+    expertJoined,
+    wasSuccessfullyConnected: customerJoined === true && expertJoined === true,
+  };
+}
+
+function wasSuccessfullyConnectedConsultation(consultation) {
+  const join = consultationJoinStatus(consultation);
+  return join.customerJoined && join.expertJoined && join.wasSuccessfullyConnected;
+}
+
 // Crockford base32 alphabet — excludes ambiguous chars (0/O, 1/I/L, U).
 const REFERENCE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 
@@ -613,6 +645,22 @@ export async function listConsultations(auth, query) {
   if (query.status) where.status = query.status;
 
   const db = getDb();
+
+  // Customer history is only real connected sessions (both parties joined).
+  // Expert list stays unfiltered so incoming/missed requests remain visible.
+  if (auth.role === "customer") {
+    const rows = await db.consultation.findMany({
+      where,
+      orderBy: { requestedAt: "desc" },
+      include: CONSULTATION_INCLUDE,
+    });
+    const connected = rows.filter(wasSuccessfullyConnectedConsultation);
+    const items = connected
+      .slice(skip, skip + limit)
+      .map((c) => toConsultationSummaryDto(c, consultationContext(c)));
+    return paginatedResult(items, { page, limit, total: connected.length });
+  }
+
   const [rows, total] = await Promise.all([
     db.consultation.findMany({
       where,
@@ -962,19 +1010,16 @@ export async function getPendingReviews(auth, query) {
     review: null,
   };
 
-  const [rows, total] = await Promise.all([
-    db.consultation.findMany({
-      where,
-      orderBy: { endedAt: "desc" },
-      skip,
-      take: limit,
-      include: CONSULTATION_INCLUDE,
-    }),
-    db.consultation.count({ where }),
-  ]);
-
-  const items = rows.map((c) => toConsultationSummaryDto(c, consultationContext(c)));
-  return paginatedResult(items, { page, limit, total });
+  const rows = await db.consultation.findMany({
+    where,
+    orderBy: { endedAt: "desc" },
+    include: CONSULTATION_INCLUDE,
+  });
+  const connected = rows.filter(wasSuccessfullyConnectedConsultation);
+  const items = connected
+    .slice(skip, skip + limit)
+    .map((c) => toConsultationSummaryDto(c, consultationContext(c)));
+  return paginatedResult(items, { page, limit, total: connected.length });
 }
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
@@ -1008,18 +1053,8 @@ export async function getCallStatus(consultationId) {
     throw notFound("Consultation not found");
   }
 
-  const customerId = consultation.customer?.user?.id;
-  const expertId = consultation.expert?.userId;
-
-  const matchId = (targetId, idList) => {
-    if (!targetId) return false;
-    const strippedTarget = targetId.replace(/-/g, '');
-    return idList.some(id => id.replace(/-/g, '') === strippedTarget);
-  };
-
-  const customerJoined = matchId(customerId, consultation.joinedParticipantIds);
-  const expertJoined = matchId(expertId, consultation.joinedParticipantIds);
-  const wasSuccessfullyConnected = customerJoined === true && expertJoined === true;
+  const { customerJoined, expertJoined, wasSuccessfullyConnected } =
+    consultationJoinStatus(consultation);
 
   return {
     consultationId: consultation.id,
