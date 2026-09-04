@@ -12,6 +12,10 @@ import {
 } from "@xprtlink/shared/contracts";
 import { stripeGuard } from "../middleware/stripeGuard.js";
 import * as svc from "../services/billingService.js";
+import * as appleIapController from "../controllers/appleIapController.js";
+import * as googleIapController from "../controllers/googleIapController.js";
+import * as appleWebhookController from "../controllers/appleWebhookController.js";
+import * as googlePlayWebhookController from "../controllers/googlePlayWebhookController.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 
 const router = Router();
@@ -60,6 +64,11 @@ router.post(
     return res.status(200).json(result);
   })
 );
+
+// Unauthenticated Webhook Listeners for IAP
+router.post("/webhooks/apple", appleWebhookController.handleNotification);
+router.post("/webhooks/google", googlePlayWebhookController.handleNotification);
+
 
 /**
  * POST /api/v1/billing/consultations/:id/capture
@@ -203,6 +212,19 @@ router.post(
     return ResponseFormatter.success(res, { message: getMessage("subscribed"), data, status: 201 });
   })
 );
+
+router.post(
+  "/subscriptions/verify/apple",
+  requireRole("expert"),
+  asyncHandler(appleIapController.verifyPurchase)
+);
+
+router.post(
+  "/subscriptions/verify/google",
+  requireRole("expert"),
+  asyncHandler(googleIapController.verifyPurchase)
+);
+
 
 router.get(
   "/subscriptions/me",
