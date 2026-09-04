@@ -194,3 +194,17 @@ function calculateDelta(current, previous) {
   if (pct < 0) return { delta: `${pct}%`, trend: "down" };
   return { delta: "0%", trend: "neutral" };
 }
+
+export async function getTrends(req, res) {
+  return ResponseFormatter.success(res, {
+    data: {
+      revenue: [],
+      users: [],
+      consultations: [],
+    },
+  });
+}
+
+export async function getLowRatingAlerts(req, res) {
+  return ResponseFormatter.paginated(res, { items: [], page: 1, limit: 10, total: 0 });
+}

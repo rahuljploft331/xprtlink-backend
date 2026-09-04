@@ -9,8 +9,11 @@
 
 function getInternalHeaders() {
   const secret = process.env.SERVICE_SECRET;
+  if (!secret) {
+    throw new Error("SERVICE_SECRET is not configured");
+  }
   return {
-    "x-internal-service": secret || "true",
+    "x-internal-service": secret,
   };
 }
 

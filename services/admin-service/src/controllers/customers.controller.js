@@ -109,3 +109,38 @@ export async function getById(req, res, next) {
     next(err);
   }
 }
+
+export async function update(req, res, next) {
+  try {
+    const db = getDb();
+    const customer = await db.user.update({
+      where: { id: req.params.id },
+      data: req.body,
+    });
+    return ResponseFormatter.success(res, { data: customer });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function setStatus(req, res, next) {
+  try {
+    const db = getDb();
+    const status = req.path.endsWith("suspend") ? "suspended" : "active";
+    const customer = await db.user.update({
+      where: { id: req.params.id },
+      data: { status },
+    });
+    return ResponseFormatter.success(res, { data: customer });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getTransactions(req, res) {
+  return ResponseFormatter.paginated(res, { items: [], page: 1, limit: 10, total: 0 });
+}
+
+export async function getSupportChats(req, res) {
+  return ResponseFormatter.paginated(res, { items: [], page: 1, limit: 10, total: 0 });
+}

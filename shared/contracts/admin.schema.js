@@ -27,5 +27,5 @@ export const broadcastNotificationRequestSchema = z.object({
   audience: z.enum(["all", "customers", "experts"]),
   title: z.string().min(1).max(200),
   body: z.string().min(1),
-  type: z.string().default("system"),
+  type: z.enum(["marketing", "system", "transactional"]).default("system"),
 });

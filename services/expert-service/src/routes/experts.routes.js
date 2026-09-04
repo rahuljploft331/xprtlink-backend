@@ -32,10 +32,10 @@ router.get(
 );
 
 router.get(
-  "/banners/public",
-  asyncHandler(async (req, res) => {
-    const data = await bannerCtrl.getPublicBanners();
-    return ResponseFormatter.success(res, { data });
+    "/banners/public",
+    asyncHandler(async (req, res) => {
+      const data = await bannerCtrl.getPublicBanners(req.query.categoryId);
+      return ResponseFormatter.success(res, { data });
   })
 );
 

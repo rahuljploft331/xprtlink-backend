@@ -79,6 +79,7 @@ export async function getFeatured(limit = 10) {
       where: {
         ...PUBLIC_WHERE,
         id: { notIn: pinned.map((e) => e.id) },
+        subscriptions: { some: { status: "active" } },
       },
       // Over-fetch, then sort by tier (boost) in memory since visibilityBoost lives on the plan.
       take: (limit - pinned.length) * 5,

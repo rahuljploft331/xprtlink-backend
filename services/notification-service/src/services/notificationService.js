@@ -165,10 +165,27 @@ export async function dispatchNotification({ userIds, type, title, body: bodyTex
   const resolvedType = String(type ?? data?.type ?? "system").slice(0, 64);
 
   const db = getDb();
+  
+  // Load preferences for these users
+  const prefs = await db.notificationPreference.findMany({
+    where: { userId: { in: userIds } },
+  });
+  
+  const prefsMap = new Map(prefs.map((p) => [p.userId, p.preferences]));
+
+  const filteredUserIds = userIds.filter((userId) => {
+    const userPrefs = prefsMap.get(userId) ?? {};
+    // Default to true if the preference is undefined
+    const optIn = userPrefs[resolvedType] ?? true;
+    return optIn === true;
+  });
+
+  if (filteredUserIds.length === 0) return { dispatched: 0 };
+
   const created = await db.notification.createMany({
     // NOTE: the column is `payload`, not `data`. The wire contract keeps the name
     // `data` for callers; it is mapped here.
-    data: userIds.map((userId) => ({
+    data: filteredUserIds.map((userId) => ({
       userId,
       type: resolvedType,
       title: title ?? "Notification",

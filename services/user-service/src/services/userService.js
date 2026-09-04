@@ -580,6 +580,10 @@ export async function forgotPassword(body) {
   });
 
   if (!user) {
+    // Prevent timing attacks by hashing a dummy password to simulate the time taken 
+    // by createAndDeliverOtp (which does DB inserts).
+    await hashPassword("dummy_for_timing_consistency_1234");
+    
     // Return a plausible response without sending anything or revealing the email isn't registered.
     // Use the real OTP TTL config so the response is indistinguishable from a genuine send.
     const { ttlMs } = getOtpConfig();

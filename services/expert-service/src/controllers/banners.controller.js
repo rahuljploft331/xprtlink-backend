@@ -17,7 +17,7 @@ export const getMyBanners = async (auth) => {
   return banners;
 };
 
-export const createBanner = async (auth, { mediaUrl, linkUrl, isActive = true }) => {
+export const createBanner = async (auth, { mediaUrl, linkUrl, isActive = true, targetCategoryId, text }) => {
   const db = getDb();
 
   const profile = await db.expertProfile.findUnique({
@@ -53,6 +53,8 @@ export const createBanner = async (auth, { mediaUrl, linkUrl, isActive = true })
       expertProfileId: profile.id,
       mediaUrl,
       linkUrl,
+      text,
+      targetCategoryId,
       isActive,
     },
   });
@@ -78,7 +80,7 @@ export const deleteBanner = async (auth, bannerId) => {
   return { success: true };
 };
 
-export const getPublicBanners = async () => {
+export const getPublicBanners = async (categoryId) => {
   const db = getDb();
   
   // We want to fetch active banners from experts who have an active subscription
@@ -87,7 +89,10 @@ export const getPublicBanners = async () => {
   const banners = await db.expertBanner.findMany({
     where: {
       isActive: true,
+      ...(categoryId ? { targetCategoryId: categoryId } : {}),
       expert: {
+        verificationStatus: "approved",
+        user: { status: "active" },
         subscriptions: {
           some: { status: "active" }
         }
@@ -123,6 +128,8 @@ export const getPublicBanners = async () => {
     id: b.id,
     mediaUrl: b.mediaUrl,
     linkUrl: b.linkUrl,
+    text: b.text,
+    targetCategoryId: b.targetCategoryId,
     expert: {
       id: b.expert.id,
       firstName: b.expert.firstName,

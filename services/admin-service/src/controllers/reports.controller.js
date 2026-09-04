@@ -81,3 +81,10 @@ export async function getSummary(_req, res, next) {
     next(err);
   }
 }
+
+export async function exportReport(req, res) {
+  // Return a dummy CSV or empty response for the export
+  res.setHeader("Content-Type", "text/csv");
+  res.setHeader("Content-Disposition", `attachment; filename=report-${req.params.reportId}.csv`);
+  res.send("id,name\n1,Stubbed Report");
+}
