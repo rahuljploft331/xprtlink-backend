@@ -168,8 +168,41 @@ export async function register(body) {
     avatarMediaId,
   } = body;
 
-  // Pre-flight availability check (fast-fails common case; real enforcement is inside the transaction)
-  await assertIdentifierAvailable({ email, phone });
+  const db = getDb();
+  let existingActiveUserWithEmail = null;
+
+  if (email) {
+    existingActiveUserWithEmail = await db.user.findFirst({
+      where: { email, ...claimedAvailabilityFilter },
+      include: { customerProfile: true, expertProfile: true }
+    });
+  }
+
+  if (existingActiveUserWithEmail) {
+    const hasRequestedRole = role === "customer"
+      ? Boolean(existingActiveUserWithEmail.customerProfile)
+      : Boolean(existingActiveUserWithEmail.expertProfile);
+
+    if (hasRequestedRole) {
+      throw conflict("An account with this email already exists.", "EMAIL_TAKEN");
+    }
+
+    if (!password) {
+      throw badRequest("Password is required to add a profile to an existing account.", "PASSWORD_REQUIRED");
+    }
+
+    const isPasswordValid = await verifyPassword(password, existingActiveUserWithEmail.passwordHash);
+    if (!isPasswordValid) {
+      throw conflict("Email is already registered. Please provide your existing account password to add this profile.", "INVALID_PASSWORD");
+    }
+
+    if (existingActiveUserWithEmail.phone !== phone) {
+      throw conflict("This email is already registered with a different phone number. Please use your existing phone number to add this profile.", "PHONE_MISMATCH");
+    }
+  } else {
+    // Pre-flight availability check (fast-fails common case; real enforcement is inside the transaction)
+    await assertIdentifierAvailable({ email, phone });
+  }
 
   // Require phone to be pre-verified via OTP (consumed verify_phone challenge within 30 min)
   const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
@@ -189,7 +222,6 @@ export async function register(body) {
     );
   }
 
-  const db = getDb();
   const passwordHash = await hashPassword(password);
   const termsAcceptedAt = new Date();
 
@@ -200,17 +232,21 @@ export async function register(body) {
       // Re-check availability inside the transaction to close the TOCTOU window.
       // The partial unique indexes (added in Phase 1) provide the ultimate guard,
       // but this gives a clearer error message before hitting the constraint.
-      if (email) {
+      if (email && !existingActiveUserWithEmail) {
         const dup = await tx.user.findFirst({
           where: { email, ...claimedAvailabilityFilter },
         });
         if (dup) throw conflict("An account with this email already exists.", "EMAIL_TAKEN");
       }
-      if (phone) {
+      if (phone && !existingActiveUserWithEmail) {
         const dup = await tx.user.findFirst({
           where: { phone, ...claimedAvailabilityFilter },
         });
         if (dup) throw conflict("This mobile number is already in use.", "PHONE_TAKEN");
+      }
+
+      if (existingActiveUserWithEmail) {
+        return existingActiveUserWithEmail.id;
       }
 
       // Look for a pending user that matches BOTH identifiers (not just one).
@@ -782,6 +818,9 @@ export async function socialLogin(body) {
   if (!user && email && decoded.email_verified) {
     user = await db.user.findFirst({ where: { email, deletedAt: null }, include });
     if (user) {
+      if (!user.firebaseUid) {
+        throw conflict("This email is already registered with a password. Please log in using your email and password.", "SOCIAL_LINKING_NOT_ALLOWED");
+      }
       user = await db.user.update({
         where: { id: user.id },
         data: { firebaseUid },
