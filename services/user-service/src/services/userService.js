@@ -11,6 +11,7 @@ import { verifyFirebaseIdToken, isFirebaseConfigured } from "@xprtlink/shared/au
 import { signCompletionToken, verifyCompletionToken } from "@xprtlink/shared/auth/jwt.js";
 import { toAuthSessionDto } from "@xprtlink/shared/mappers/auth.mapper.js";
 import { toCustomerMeDto } from "@xprtlink/shared/mappers/customer.mapper.js";
+import { toExpertPublicDto } from "@xprtlink/shared/mappers/expert.mapper.js";
 import { badRequest, conflict, notFound, unauthorized, forbidden } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 import { DEFAULT_NOTIFICATION_PREFERENCES } from "@xprtlink/shared/constants/index.js";
@@ -990,23 +991,13 @@ export async function getRecentlyViewed(auth, query) {
       orderBy: { viewedAt: "desc" },
       skip,
       take: limit,
-      include: { expert: { include: { categories: true } } },
+      include: { expert: { include: { categories: true, avatarMedia: true } } },
     }),
     db.customerRecentlyViewed.count({ where: { customerProfileId: auth.customerProfileId } }),
   ]);
   const items = rows.map((r) => ({
-    id: r.expert.id,
-    firstName: r.expert.firstName,
-    lastName: r.expert.lastName,
-    headline: r.expert.headline,
-    categories: (r.expert.categories ?? []).map((c) => ({ id: c.id, slug: c.slug, name: c.name })),
-    consultationRate: r.expert.consultationRateCents / 100,
-    currency: r.expert.currency,
-    availabilityStatus: r.expert.availabilityStatus,
-    rating: r.expert.ratingCount > 0 ? Number(r.expert.ratingAvg) : null,
-    reviewCount: r.expert.ratingCount,
+    ...toExpertPublicDto(r.expert),
     viewedAt: r.viewedAt.toISOString(),
-    savedAt: r.viewedAt.toISOString(),
   }));
   return paginatedResult(items, { page, limit, total });
 }
@@ -1034,21 +1025,12 @@ export async function getSavedExperts(auth, query) {
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
-      include: { expert: { include: { categories: true } } },
+      include: { expert: { include: { categories: true, avatarMedia: true } } },
     }),
     db.customerSavedExpert.count({ where: { customerProfileId: auth.customerProfileId } }),
   ]);
   const items = rows.map((r) => ({
-    id: r.expert.id,
-    firstName: r.expert.firstName,
-    lastName: r.expert.lastName,
-    headline: r.expert.headline,
-    categories: (r.expert.categories ?? []).map((c) => ({ id: c.id, slug: c.slug, name: c.name })),
-    consultationRate: r.expert.consultationRateCents / 100,
-    currency: r.expert.currency,
-    availabilityStatus: r.expert.availabilityStatus,
-    rating: r.expert.ratingCount > 0 ? Number(r.expert.ratingAvg) : null,
-    reviewCount: r.expert.ratingCount,
+    ...toExpertPublicDto(r.expert),
     savedAt: r.createdAt.toISOString(),
   }));
   return paginatedResult(items, { page, limit, total });
