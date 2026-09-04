@@ -471,6 +471,7 @@ model SubscriptionPlan {
   keyFeatures       String[]        @default([]) @map("key_features")
   isMostPopular     Boolean         @default(false) @map("is_most_popular")
   isActive          Boolean         @default(true) @map("is_active")
+  maxBanners        Int             @default(0) @map("max_banners")
   stripeProductId   String?         @map("stripe_product_id") @db.VarChar(128)
   stripePriceId     String?         @map("stripe_price_id") @db.VarChar(128)
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -546,6 +547,7 @@ model ExpertProfile {
   conversations    Conversation[]
   reviews          Review[]
   reports          ExpertReport[]
+  banners          ExpertBanner[]
   payouts          ExpertPayout[]
   earningsLedger   ExpertEarningsLedger[]
 
@@ -612,6 +614,22 @@ model ExpertAvailabilityLog {
 
   @@index([expertProfileId, createdAt(sort: Desc)])
   @@map("expert_availability_logs")
+}
+
+model ExpertBanner {
+  id              String        @id @default(uuid()) @db.Uuid
+  expertProfileId String        @map("expert_profile_id") @db.Uuid
+  mediaUrl        String        @map("media_url")
+  linkUrl         String?       @map("link_url")
+  isActive        Boolean       @default(true) @map("is_active")
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  expert          ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+
+  @@index([expertProfileId])
+  @@index([isActive])
+  @@map("expert_banners")
 }
 
 // ─── Engagement (engagement-service) ─────────────────────────────────────────

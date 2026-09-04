@@ -4,6 +4,7 @@ import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { authenticate, optionalAuthenticate, requireRole } from "@xprtlink/shared/middleware/auth.js";
 import { expertMeUpdateRequestSchema, expertOnboardingRequestSchema, expertSettingsUpdateRequestSchema, expertVerificationDocumentsRequestSchema } from "@xprtlink/shared/contracts";
 import * as svc from "../services/expertService.js";
+import * as bannerCtrl from "../controllers/banners.controller.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 
@@ -27,6 +28,14 @@ router.get(
     const { limit } = parsePagination(req.query, { defaultLimit: 10, maxLimit: 50 });
     const data = await svc.getTrending(limit);
     return ResponseFormatter.success(res, { message: getMessage("trendingExperts"), data });
+  })
+);
+
+router.get(
+  "/banners/public",
+  asyncHandler(async (req, res) => {
+    const data = await bannerCtrl.getPublicBanners();
+    return ResponseFormatter.success(res, { data });
   })
 );
 
@@ -133,6 +142,38 @@ router.patch(
     return ResponseFormatter.success(res, { message: getMessage("settingsUpdated"), data });
   })
 );
+
+router.get(
+  "/me/banners",
+  authenticate,
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const data = await bannerCtrl.getMyBanners(req.auth);
+    return ResponseFormatter.success(res, { data });
+  })
+);
+
+router.post(
+  "/me/banners",
+  authenticate,
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    // We expect { mediaUrl, linkUrl, isActive }
+    const data = await bannerCtrl.createBanner(req.auth, req.body);
+    return ResponseFormatter.success(res, { data });
+  })
+);
+
+router.delete(
+  "/me/banners/:id",
+  authenticate,
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    await bannerCtrl.deleteBanner(req.auth, req.params.id);
+    return ResponseFormatter.success(res, { message: "Banner deleted successfully." });
+  })
+);
+
 
 router.get(
   "/:id/reviews",

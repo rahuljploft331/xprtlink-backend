@@ -21,7 +21,7 @@ export const getById = async (req, res) => {
 export const update = async (req, res) => {
   const db = getDb();
   const { id } = req.params;
-  const { code, name, tagline, description, priceMonthlyCents, visibilityBoost, keyFeatures, isActive, isMostPopular } = req.body;
+  const { code, name, tagline, description, priceMonthlyCents, visibilityBoost, keyFeatures, isActive, isMostPopular, maxBanners } = req.body;
 
   const exists = await db.subscriptionPlan.findUnique({ where: { id } });
   if (!exists) throw notFound("Subscription Plan not found");
@@ -38,6 +38,7 @@ export const update = async (req, res) => {
       keyFeatures,
       isActive,
       isMostPopular,
+      maxBanners,
     },
   });
 
