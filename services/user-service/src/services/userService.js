@@ -453,8 +453,9 @@ export async function verifyOtp(body) {
       });
     });
 
-    const tokens = await issueTokens(user, challenge.registrationData?.role || "customer");
-    if (!tokens) throw badRequest("Failed to create session");
+    const targetRole = challenge.registrationData?.role || "customer";
+    const tokens = await issueTokens(user, targetRole);
+    if (!tokens) throw badRequest(`No ${targetRole} profile on this account`, "PROFILE_MISSING");
     return tokens;
   }
 
