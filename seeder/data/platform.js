@@ -18,7 +18,7 @@ export const cmsPages = [
 
 export const subscriptionPlans = [
   {
-    code: "core",
+    code: "core_subscription",
     name: "Core",
     tagline: 'For "New Experts"',
     description: 'For "New Experts"',
@@ -32,7 +32,7 @@ export const subscriptionPlans = [
     ],
   },
   {
-    code: "professional",
+    code: "professional_subscription",
     name: "Professional",
     tagline: 'For "Active Professionals"',
     description: 'For "Active Professionals"',
@@ -46,7 +46,7 @@ export const subscriptionPlans = [
     ],
   },
   {
-    code: "elite",
+    code: "elite_subscription",
     name: "Elite",
     tagline: 'For "High-Volume Experts"',
     description: 'For "High-Volume Experts"',
