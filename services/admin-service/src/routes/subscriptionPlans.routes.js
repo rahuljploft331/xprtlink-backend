@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
-import { requirePermission } from "@xprtlink/shared/middleware/auth.js";
+import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
 import { list, getById, update } from "#controllers/subscriptionPlans.controller.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 
