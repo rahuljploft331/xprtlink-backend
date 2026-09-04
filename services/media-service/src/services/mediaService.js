@@ -159,8 +159,8 @@ export async function getMediaAsset(auth, assetId) {
  * based on their relationship to the resource that references it.
  */
 async function checkRelationshipAccess(db, auth, asset) {
-  // Avatars (expert or customer) are publicly readable by any authenticated user
-  if (asset.purpose === "avatar") return true;
+  // Avatars (expert or customer) and banners are publicly readable by any authenticated user
+  if (asset.purpose === "avatar" || asset.purpose === "banner") return true;
 
   // Chat attachments: user must be a participant in the conversation containing this media
   if (asset.purpose === "chat_attachment") {

@@ -96,6 +96,7 @@ export const MEDIA_PURPOSE = {
   QUOTE_ATTACHMENT: "quote_attachment",
   CHAT_ATTACHMENT: "chat_attachment",
   VERIFICATION_DOC: "verification_doc",
+  BANNER: "banner",
 };
 
 export const MEDIA_STATUS = {
