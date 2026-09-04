@@ -1,5 +1,6 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
+import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 
 export const getMyBanners = async (auth) => {
   const db = getDb();
@@ -95,8 +96,8 @@ export const getPublicBanners = async () => {
     include: {
       expert: {
         include: {
-          user: { select: { firstName: true, lastName: true, avatarUrl: true } },
-          category: { select: { name: true, slug: true } },
+          avatarMedia: true,
+          categories: { select: { name: true, slug: true } },
           subscriptions: {
             where: { status: "active" },
             include: { plan: true },
@@ -124,11 +125,11 @@ export const getPublicBanners = async () => {
     linkUrl: b.linkUrl,
     expert: {
       id: b.expert.id,
-      firstName: b.expert.user.firstName,
-      lastName: b.expert.user.lastName,
-      avatarUrl: b.expert.user.avatarUrl,
-      category: b.expert.category.name,
-      categorySlug: b.expert.category.slug,
+      firstName: b.expert.firstName,
+      lastName: b.expert.lastName,
+      avatarUrl: resolveMediaUrl(b.expert.avatarMedia?.storageKey),
+      category: b.expert.categories?.[0]?.name,
+      categorySlug: b.expert.categories?.[0]?.slug,
       plan: b.expert.subscriptions[0]?.plan?.name || "Core",
     }
   }));

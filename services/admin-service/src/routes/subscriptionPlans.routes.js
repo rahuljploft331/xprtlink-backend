@@ -5,6 +5,7 @@ import { list, getById, update } from "#controllers/subscriptionPlans.controller
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 
 const router = Router();
+router.use(requireAdmin);
 
 router.get(
   "/",

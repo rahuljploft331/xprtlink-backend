@@ -6,6 +6,8 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { logAdminAction } from "#utils/audit.js";
 import { adminSetFeaturedSchema } from "@xprtlink/shared/contracts/expert.schema.js";
 
+const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 
 /** GET /api/v1/admin/experts */
 export async function list(req, res, next) {
@@ -81,6 +83,9 @@ export async function list(req, res, next) {
 /** GET /api/v1/admin/experts/:id */
 export async function getById(req, res, next) {
   try {
+    if (!uuidRegex.test(req.params.id)) {
+      return res.status(404).json({ success: false, message: getMessage("expertNotFound"), code: "NOT_FOUND" });
+    }
     const db = getDb();
     const expert = await db.expertProfile.findUnique({
       where: { id: req.params.id },
@@ -109,6 +114,9 @@ export async function getById(req, res, next) {
 /** PATCH /api/v1/admin/experts/:id/featured */
 export async function setFeatured(req, res, next) {
   try {
+    if (!uuidRegex.test(req.params.id)) {
+      return res.status(404).json({ success: false, message: getMessage("expertNotFound"), code: "NOT_FOUND" });
+    }
     const db = getDb();
     const { isFeatured, featuredRank, featuredUntil } = adminSetFeaturedSchema.parse(req.body);
 
