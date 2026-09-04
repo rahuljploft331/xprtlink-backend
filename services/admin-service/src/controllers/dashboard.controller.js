@@ -1,5 +1,6 @@
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 
 /** GET /api/dashboard/stats */
 export async function getStats(_req, res, next) {
@@ -195,16 +196,112 @@ function calculateDelta(current, previous) {
   return { delta: "0%", trend: "neutral" };
 }
 
-export async function getTrends(req, res) {
-  return ResponseFormatter.success(res, {
-    data: {
-      revenue: [],
-      users: [],
-      consultations: [],
-    },
-  });
+export async function getTrends(req, res, next) {
+  try {
+    const db = getDb();
+    const now = new Date();
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const [transactions, customers, experts, consultations] = await Promise.all([
+      db.transaction.findMany({
+        where: {
+          status: "succeeded",
+          type: { in: ["consultation_charge", "subscription"] },
+          createdAt: { gte: thirtyDaysAgo },
+        },
+        select: { amountCents: true, createdAt: true },
+      }),
+      db.customerProfile.findMany({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+        select: { createdAt: true },
+      }),
+      db.expertProfile.findMany({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+        select: { createdAt: true },
+      }),
+      db.consultation.findMany({
+        where: { createdAt: { gte: thirtyDaysAgo } },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    // Grouping by date (YYYY-MM-DD)
+    const revenueByDate = {};
+    const usersByDate = {};
+    const consultationsByDate = {};
+
+    // Initialize all 30 days
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const dateStr = d.toISOString().split("T")[0];
+      revenueByDate[dateStr] = 0;
+      usersByDate[dateStr] = 0;
+      consultationsByDate[dateStr] = 0;
+    }
+
+    transactions.forEach(t => {
+      const d = t.createdAt.toISOString().split("T")[0];
+      if (revenueByDate[d] !== undefined) revenueByDate[d] += t.amountCents;
+    });
+
+    [...customers, ...experts].forEach(u => {
+      const d = u.createdAt.toISOString().split("T")[0];
+      if (usersByDate[d] !== undefined) usersByDate[d] += 1;
+    });
+
+    consultations.forEach(c => {
+      const d = c.createdAt.toISOString().split("T")[0];
+      if (consultationsByDate[d] !== undefined) consultationsByDate[d] += 1;
+    });
+
+    const revenue = Object.entries(revenueByDate).map(([date, value]) => ({ date, value: value / 100 }));
+    const users = Object.entries(usersByDate).map(([date, value]) => ({ date, value }));
+    const consultationsData = Object.entries(consultationsByDate).map(([date, value]) => ({ date, value }));
+
+    return ResponseFormatter.success(res, {
+      data: {
+        revenue,
+        users,
+        consultations: consultationsData,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function getLowRatingAlerts(req, res) {
-  return ResponseFormatter.paginated(res, { items: [], page: 1, limit: 10, total: 0 });
+export async function getLowRatingAlerts(req, res, next) {
+  try {
+    const db = getDb();
+    const { page, limit, skip } = parsePagination(req.query);
+
+    const [total, items] = await Promise.all([
+      db.review.count({ where: { rating: { lte: 3 } } }),
+      db.review.findMany({
+        where: { rating: { lte: 3 } },
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          customer: { select: { firstName: true, lastName: true } },
+          expert: { select: { firstName: true, lastName: true } },
+        },
+      }),
+    ]);
+
+    const formattedItems = items.map(r => ({
+      id: r.id,
+      consultationId: r.consultationId,
+      rating: r.rating,
+      comment: r.comment,
+      status: r.status,
+      customerName: `${r.customer.firstName} ${r.customer.lastName}`,
+      expertName: `${r.expert.firstName} ${r.expert.lastName}`,
+      createdAt: r.createdAt,
+    }));
+
+    return ResponseFormatter.paginated(res, { items: formattedItems, page, limit, total });
+  } catch (err) {
+    next(err);
+  }
 }

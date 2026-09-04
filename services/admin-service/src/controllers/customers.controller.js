@@ -137,10 +137,89 @@ export async function setStatus(req, res, next) {
   }
 }
 
-export async function getTransactions(req, res) {
-  return ResponseFormatter.paginated(res, { items: [], page: 1, limit: 10, total: 0 });
+export async function getTransactions(req, res, next) {
+  try {
+    const db = getDb();
+    const { page, limit, skip } = parsePagination(req.query);
+    
+    const user = await db.user.findUnique({ where: { id: req.params.id }, include: { customerProfile: true } });
+    if (!user || !user.customerProfile) {
+      return res.status(404).json({ success: false, message: getMessage("customerNotFound"), code: "NOT_FOUND" });
+    }
+
+    const [total, items] = await Promise.all([
+      db.transaction.count({
+        where: {
+          consultationCharge: {
+            consultation: { customerId: user.customerProfile.id }
+          }
+        }
+      }),
+      db.transaction.findMany({
+        where: {
+          consultationCharge: {
+            consultation: { customerId: user.customerProfile.id }
+          }
+        },
+        skip,
+        take: limit,
+        orderBy: { createdAt: "desc" },
+        include: {
+          consultationCharge: {
+            include: { consultation: { include: { expert: true } } }
+          }
+        }
+      })
+    ]);
+
+    const formattedItems = items.map(t => ({
+      id: t.id,
+      type: t.type,
+      amountCents: t.amountCents,
+      currency: t.currency,
+      status: t.status,
+      expertName: t.consultationCharge ? `${t.consultationCharge.consultation.expert.firstName} ${t.consultationCharge.consultation.expert.lastName}` : null,
+      createdAt: t.createdAt,
+    }));
+
+    return ResponseFormatter.paginated(res, { items: formattedItems, page, limit, total });
+  } catch (err) {
+    next(err);
+  }
 }
 
-export async function getSupportChats(req, res) {
-  return ResponseFormatter.paginated(res, { items: [], page: 1, limit: 10, total: 0 });
+export async function getSupportChats(req, res, next) {
+  try {
+    const db = getDb();
+    const { page, limit, skip } = parsePagination(req.query);
+
+    const [total, items] = await Promise.all([
+      db.supportConversation.count({
+        where: { userId: req.params.id }
+      }),
+      db.supportConversation.findMany({
+        where: { userId: req.params.id },
+        skip,
+        take: limit,
+        orderBy: { lastMessageAt: "desc" },
+        include: {
+          admin: { select: { name: true } },
+          _count: { select: { messages: true } }
+        }
+      })
+    ]);
+
+    const formattedItems = items.map(c => ({
+      id: c.id,
+      status: c.status,
+      assignedAdmin: c.admin?.name ?? "Unassigned",
+      messageCount: c._count.messages,
+      lastMessageAt: c.lastMessageAt,
+      createdAt: c.createdAt,
+    }));
+
+    return ResponseFormatter.paginated(res, { items: formattedItems, page, limit, total });
+  } catch (err) {
+    next(err);
+  }
 }
