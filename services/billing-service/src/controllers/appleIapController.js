@@ -1,7 +1,7 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
-import { AppStoreServerAPIClient, Environment, decodeSignedTransaction } from "@apple/app-store-server-library";
+import { AppStoreServerAPIClient, Environment } from "@apple/app-store-server-library";
 
 function getAppleClient() {
   const issuerId = process.env.APPLE_ISSUER_ID;
@@ -36,7 +36,8 @@ export const verifyPurchase = async (req, res, next) => {
       throw badRequest("Invalid Apple transaction");
     }
 
-    const decoded = await decodeSignedTransaction(transactionInfo.signedTransactionInfo);
+    const payloadBase64 = transactionInfo.signedTransactionInfo.split('.')[1];
+    const decoded = JSON.parse(Buffer.from(payloadBase64, 'base64').toString('utf8'));
     
     // 1. Verify the product ID matches the selected plan
     if (decoded.productId !== plan.code) {

@@ -27,6 +27,8 @@ export async function getStats(_req, res, next) {
       pendingPayouts,
       pendingReviews,
       pendingPaymentsInvestigating,
+      subs30d,
+      subsPrev30d,
     ] = await Promise.all([
       db.customerProfile.count(),
       db.expertProfile.count(),
@@ -59,6 +61,8 @@ export async function getStats(_req, res, next) {
       db.expertPayout.count({ where: { status: "pending" } }),
       db.review.count({ where: { status: "flagged" } }),
       db.transaction.count({ where: { status: "pending" } }),
+      db.expertSubscription.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
+      db.expertSubscription.count({ where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } } }),
     ]);
 
     // Platform Revenue last 30d (sum of succeeded consultation_charge + subscription transactions)
@@ -96,12 +100,13 @@ export async function getStats(_req, res, next) {
     const consDelta = calculateDelta(consultations30d, consultationsPrev30d);
     const quotesDelta = calculateDelta(quotes30d, quotesPrev30d);
     const revDelta = calculateDelta(revenueCents, revenuePrevCents);
+    const subsDelta = calculateDelta(subs30d, subsPrev30d);
 
     const stats = [
       { id: "customers", label: "Total Customers", value: totalCustomers.toLocaleString(), delta: custDelta.delta, trend: custDelta.trend },
       { id: "experts", label: "Total Experts", value: totalExperts.toLocaleString(), delta: expDelta.delta, trend: expDelta.trend },
       { id: "verifications", label: "Pending Verifications", value: String(pendingVerifications), delta: pendingVerifications > 0 ? `${pendingVerifications} pending` : "All clear", trend: pendingVerifications > 0 ? "neutral" : "up" },
-      { id: "subscriptions", label: "Active Subscriptions", value: activeSubscriptions.toLocaleString(), delta: totalExperts > 0 ? `${Math.round((activeSubscriptions / totalExperts) * 100)}% of experts` : null, trend: "up" },
+      { id: "subscriptions", label: "Active Subscriptions", value: activeSubscriptions.toLocaleString(), delta: subsDelta.delta, trend: subsDelta.trend },
       { id: "consultations", label: "Consultations (30d)", value: consultations30d.toLocaleString(), delta: consDelta.delta, trend: consDelta.trend },
       { id: "quotes", label: "Quote Requests (30d)", value: quotes30d.toLocaleString(), delta: quotesDelta.delta, trend: quotesDelta.trend },
       { id: "revenue", label: "Platform Revenue (30d)", value: revenue30d, delta: revDelta.delta, trend: revDelta.trend },

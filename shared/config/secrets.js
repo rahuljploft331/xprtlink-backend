@@ -62,7 +62,7 @@ export function getSecretSync(key, fallback = undefined) {
   if (envVal !== undefined && envVal !== "") return envVal;
 
   if (!cachedSecret) {
-    console.warn("[Secrets] getSecretSync called before async load – returning fallback");
+    // console.warn(`[Secrets] getSecretSync called before async load for key ${key} – returning fallback`);
     return fallback;
   }
   return cachedSecret[key] ?? fallback;
