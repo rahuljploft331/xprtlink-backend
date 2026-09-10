@@ -75,7 +75,7 @@ export async function updateSettings(req, res, next) {
     const entries = Object.entries(parsed).filter(([, value]) => value !== undefined);
 
     if (entries.length === 0) {
-      throw badRequest("At least one setting must be provided", "VALIDATION_ERROR");
+      throw badRequest("atLeastOneSettingRequired", "VALIDATION_ERROR");
     }
 
     const db = getDb();
@@ -123,7 +123,7 @@ export async function changePassword(req, res, next) {
     const admin = req.adminUser;
 
     const valid = await verifyPassword(currentPassword, admin.passwordHash);
-    if (!valid) return next(unauthorized("Current password is incorrect"));
+    if (!valid) return next(unauthorized("currentPasswordIncorrect"));
 
     await adminUsers().update({
       where: { id: admin.id },

@@ -7,7 +7,7 @@ export const getMyBanners = async (auth) => {
   const profile = await db.expertProfile.findUnique({
     where: { userId: auth.userId },
   });
-  if (!profile) throw notFound("Expert profile not found");
+  if (!profile) throw notFound("expertProfileNotFound");
 
   const banners = await db.expertBanner.findMany({
     where: { expertProfileId: profile.id },
@@ -31,13 +31,13 @@ export const createBanner = async (auth, { mediaUrl, linkUrl, isActive = true, t
     },
   });
 
-  if (!profile) throw notFound("Expert profile not found");
+  if (!profile) throw notFound("expertProfileNotFound");
 
   const activeSubscription = profile.subscriptions[0];
   const maxBanners = activeSubscription?.plan?.maxBanners || 0;
 
   if (maxBanners === 0) {
-    throw badRequest("Your current subscription plan does not support banners.");
+    throw badRequest("planDoesNotSupportBanners");
   }
 
   const currentBannersCount = await db.expertBanner.count({
@@ -45,7 +45,7 @@ export const createBanner = async (auth, { mediaUrl, linkUrl, isActive = true, t
   });
 
   if (currentBannersCount >= maxBanners) {
-    throw badRequest(`You have reached the maximum limit of ${maxBanners} banners for your plan.`);
+    throw badRequest("bannerLimitReached", "BAD_REQUEST", null, { maxBanners });
   }
 
   const banner = await db.expertBanner.create({
@@ -68,12 +68,12 @@ export const deleteBanner = async (auth, bannerId) => {
   const profile = await db.expertProfile.findUnique({
     where: { userId: auth.userId },
   });
-  if (!profile) throw notFound("Expert profile not found");
+  if (!profile) throw notFound("expertProfileNotFound");
 
   const banner = await db.expertBanner.findFirst({
     where: { id: bannerId, expertProfileId: profile.id },
   });
-  if (!banner) throw notFound("Banner not found or you don't have permission to delete it.");
+  if (!banner) throw notFound("bannerNotFound");
 
   await db.expertBanner.delete({ where: { id: bannerId } });
   

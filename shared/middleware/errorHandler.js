@@ -1,9 +1,10 @@
 import { Prisma } from "../generated/prisma/index.js";
+import { getMessage } from "../utils/messages.js";
 
 export function notFoundHandler(_req, res) {
   res.status(404).json({
     success: false,
-    message: "Not found",
+    message: getMessage("notFound"),
     code: "NOT_FOUND",
   });
 }
@@ -14,7 +15,7 @@ export function errorHandler(err, _req, res, _next) {
     const issues = err.issues || err.errors || [];
     const firstIssue = issues[0];
     const field = firstIssue?.path?.join(".");
-    const message = firstIssue?.message || "Validation failed";
+    const message = firstIssue?.message || getMessage("validationFailed");
     return res.status(400).json({
       success: false,
       message,
@@ -33,7 +34,7 @@ export function errorHandler(err, _req, res, _next) {
       console.error(`[db] Unique constraint violation on '${field}':`, err.message);
       return res.status(409).json({
         success: false,
-        message: "A record with this value already exists.",
+        message: getMessage("recordAlreadyExists"),
         code: "CONFLICT",
         field,
       });
@@ -42,7 +43,7 @@ export function errorHandler(err, _req, res, _next) {
     if (err.code === "P2025") {
       return res.status(404).json({
         success: false,
-        message: "Record not found.",
+        message: getMessage("recordNotFound"),
         code: "NOT_FOUND",
       });
     }
@@ -50,7 +51,7 @@ export function errorHandler(err, _req, res, _next) {
     if (err.code === "P2003") {
       return res.status(400).json({
         success: false,
-        message: "Related record not found.",
+        message: getMessage("relatedRecordNotFound"),
         code: "FOREIGN_KEY_VIOLATION",
       });
     }
@@ -58,7 +59,7 @@ export function errorHandler(err, _req, res, _next) {
     console.error("[db] Prisma error:", err.code, err.message);
     return res.status(500).json({
       success: false,
-      message: "Internal server error.",
+      message: getMessage("internalServerError"),
       code: "DB_ERROR",
     });
   }
@@ -67,13 +68,13 @@ export function errorHandler(err, _req, res, _next) {
     console.error("[db] Prisma validation error:", err.message);
     return res.status(400).json({
       success: false,
-      message: "Invalid query parameters.",
+      message: getMessage("invalidQueryParameters"),
       code: "DB_VALIDATION_ERROR",
     });
   }
 
   const statusCode = err.statusCode || err.status || 500;
-  const message = err.message || "Internal server error";
+  const message = err.message || getMessage("internalServerError");
 
   // ── H5: ALWAYS log 5xx errors server-side (was previously inverted — only logged in dev) ──
   if (statusCode >= 500) {

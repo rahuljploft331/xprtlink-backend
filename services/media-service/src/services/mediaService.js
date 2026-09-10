@@ -77,7 +77,7 @@ export async function directUpload(auth, body) {
   const { purpose = "chat_attachment", mimeType, fileName, base64Data, sizeBytes } = body;
 
   if (!mimeType) {
-    throw badRequest("mimeType is required");
+    throw badRequest("mimeTypeRequired");
   }
 
   if (purpose === "chat_attachment") {
@@ -124,8 +124,8 @@ export async function directUpload(auth, body) {
 export async function confirmUpload(auth, assetId) {
   const db = getDb();
   const asset = await db.mediaAsset.findUnique({ where: { id: assetId } });
-  if (!asset) throw notFound("Media not found");
-  if (asset.ownerUserId !== auth.userId) throw forbidden("Access denied");
+  if (!asset) throw notFound("mediaNotFound");
+  if (asset.ownerUserId !== auth.userId) throw forbidden("notAuthorizedForConsultation");
 
   const updated = await db.mediaAsset.update({
     where: { id: assetId },
@@ -138,8 +138,8 @@ export async function confirmUpload(auth, assetId) {
 export async function getMediaAsset(auth, assetId) {
   const db = getDb();
   const asset = await db.mediaAsset.findUnique({ where: { id: assetId } });
-  if (!asset) throw notFound("Media not found");
-  if (asset.status === "deleted") throw notFound("Media not found");
+  if (!asset) throw notFound("mediaNotFound");
+  if (asset.status === "deleted") throw notFound("mediaNotFound");
 
   // Owner always has access
   if (asset.ownerUserId === auth.userId) {
@@ -149,7 +149,7 @@ export async function getMediaAsset(auth, assetId) {
   // Relationship-based access: check if the requesting user is a participant
   // in a conversation, quote, or other context that references this media.
   const hasAccess = await checkRelationshipAccess(db, auth, asset);
-  if (!hasAccess) throw forbidden("Access denied");
+  if (!hasAccess) throw forbidden("notAuthorizedForConsultation");
 
   return toMediaAssetDto(asset);
 }

@@ -17,7 +17,7 @@ function conversationWhere(auth) {
   if (auth.role === "expert") {
     return { expertId: auth.expertProfileId };
   }
-  throw forbidden("Messaging requires customer or expert role");
+  throw forbidden("messagingRequiresRole");
 }
 
 export async function loadConversation(auth, conversationId) {
@@ -28,7 +28,7 @@ export async function loadConversation(auth, conversationId) {
       expert: true,
     },
   });
-  if (!conversation) throw notFound("Conversation not found");
+  if (!conversation) throw notFound("conversationNotFound");
   return conversation;
 }
 
@@ -144,25 +144,25 @@ export async function createConversation(auth, body) {
 
   if (auth.role === "customer") {
     if (!body.expertId) {
-      throw badRequest("expertId is required", "VALIDATION_ERROR", "expertId");
+      throw badRequest("expertIdRequired", "VALIDATION_ERROR", "expertId");
     }
     customerId = auth.customerProfileId;
     expertId = body.expertId;
   } else if (auth.role === "expert") {
     if (!body.customerId) {
-      throw badRequest("customerId is required", "VALIDATION_ERROR", "customerId");
+      throw badRequest("customerIdRequired", "VALIDATION_ERROR", "customerId");
     }
     customerId = body.customerId;
     expertId = auth.expertProfileId;
   } else {
-    throw forbidden("Messaging requires customer or expert role");
+    throw forbidden("messagingRequiresRole");
   }
 
   const expert = await db.expertProfile.findUnique({ where: { id: expertId } });
-  if (!expert) throw notFound("Expert not found");
+  if (!expert) throw notFound("expertNotFound");
 
   const customer = await db.customerProfile.findUnique({ where: { id: customerId } });
-  if (!customer) throw notFound("Customer not found");
+  if (!customer) throw notFound("customerNotFound");
 
   const conversation = await db.conversation.upsert({
     where: {
@@ -231,7 +231,7 @@ export async function listMessages(auth, conversationId, query) {
 
 export async function sendMessage(auth, conversationId, body) {
   if (!body.body && (!body.mediaIds || body.mediaIds.length === 0)) {
-    throw badRequest("Message body or attachments required");
+    throw badRequest("messageBodyRequired");
   }
 
   await loadConversation(auth, conversationId);
@@ -248,7 +248,7 @@ export async function sendMessage(auth, conversationId, body) {
     });
 
     if (assets.length !== body.mediaIds.length) {
-      throw badRequest("One or more media assets are invalid", "INVALID_MEDIA");
+      throw badRequest("mediaAssetsInvalid", "INVALID_MEDIA");
     }
 
     // Client decision (31 Aug 2026 call, §3.3): no image/video in standard chat.

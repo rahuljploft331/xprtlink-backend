@@ -1,3 +1,5 @@
+import { getMessage } from './messages.js';
+
 export class AppError extends Error {
   constructor(message, { statusCode = 400, code = "ERROR", details, field } = {}) {
     super(message);
@@ -8,22 +10,22 @@ export class AppError extends Error {
   }
 }
 
-export function notFound(message = "Not found", code = "NOT_FOUND") {
-  return new AppError(message, { statusCode: 404, code });
+export function notFound(messageKey = "notFound", code = "NOT_FOUND") {
+  return new AppError(getMessage(messageKey), { statusCode: 404, code });
 }
 
-export function unauthorized(message = "Unauthorized", code = "UNAUTHORIZED") {
-  return new AppError(message, { statusCode: 401, code });
+export function unauthorized(messageKey = "invalidCredentials", code = "UNAUTHORIZED") {
+  return new AppError(getMessage(messageKey), { statusCode: 401, code });
 }
 
-export function forbidden(message = "Forbidden", code = "FORBIDDEN") {
-  return new AppError(message, { statusCode: 403, code });
+export function forbidden(messageKey = "notFound", code = "FORBIDDEN", field, params) {
+  return new AppError(getMessage(messageKey, params), { statusCode: 403, code, field });
 }
 
-export function badRequest(message = "Bad request", code = "BAD_REQUEST", field) {
-  return new AppError(message, { statusCode: 400, code, field });
+export function badRequest(messageKey = "notFound", code = "BAD_REQUEST", field, params) {
+  return new AppError(getMessage(messageKey, params), { statusCode: 400, code, field });
 }
 
-export function conflict(message = "Conflict", code = "CONFLICT") {
-  return new AppError(message, { statusCode: 409, code });
+export function conflict(messageKey = "recordAlreadyExists", code = "CONFLICT") {
+  return new AppError(getMessage(messageKey), { statusCode: 409, code });
 }

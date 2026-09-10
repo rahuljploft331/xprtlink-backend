@@ -18,7 +18,7 @@ export async function login(req, res, next) {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return next(badRequest("Email and password are required"));
+      return next(badRequest("emailAndPasswordRequired"));
     }
 
     const admin = await adminUsers().findUnique({
@@ -26,11 +26,11 @@ export async function login(req, res, next) {
       include: { permissions: true },
     });
 
-    if (!admin) return next(unauthorized("Invalid email or password"));
-    if (admin.status !== "active") return next(unauthorized("Account is suspended"));
+    if (!admin) return next(unauthorized("invalidEmailOrPassword"));
+    if (admin.status !== "active") return next(unauthorized("accountSuspended"));
 
     const valid = await verifyPassword(password, admin.passwordHash);
-    if (!valid) return next(unauthorized("Invalid email or password"));
+    if (!valid) return next(unauthorized("invalidEmailOrPassword"));
 
     const accessToken = signAccessToken({
       sub: admin.id,

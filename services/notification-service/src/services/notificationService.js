@@ -60,7 +60,7 @@ export async function markNotificationRead(auth, notificationId) {
   const notification = await db.notification.findFirst({
     where: { id: notificationId, userId: auth.userId, clearedAt: null },
   });
-  if (!notification) throw notFound("Notification not found");
+  if (!notification) throw notFound("notificationNotFound");
 
   if (notification.readAt) {
     return toNotificationDto(notification);
@@ -93,7 +93,7 @@ export async function clearNotification(auth, notificationId) {
   const notification = await db.notification.findFirst({
     where: { id: notificationId, userId: auth.userId },
   });
-  if (!notification) throw notFound("Notification not found");
+  if (!notification) throw notFound("notificationNotFound");
 
   if (notification.clearedAt) {
     return { cleared: true };

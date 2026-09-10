@@ -26,6 +26,6 @@ export async function getCmsPage(slug) {
   const page = await getDb().cmsPage.findFirst({
     where: { slug, status: "published" },
   });
-  if (!page) throw notFound("Page not found");
+  if (!page) throw notFound("pageNotFound");
   return toCmsPageDto(page);
 }

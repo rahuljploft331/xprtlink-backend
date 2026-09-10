@@ -21,7 +21,7 @@ function getGoogleClient() {
 export const verifyPurchase = async (req, res, next) => {
   try {
     const { purchaseToken, subscriptionId, planCode } = req.body;
-    if (!purchaseToken || !subscriptionId) throw badRequest("Missing purchaseToken or subscriptionId");
+    if (!purchaseToken || !subscriptionId) throw badRequest("missingPurchaseTokenOrSubscriptionId");
 
     const db = getDb();
     
@@ -29,7 +29,7 @@ export const verifyPurchase = async (req, res, next) => {
     let plan = await db.subscriptionPlan.findFirst({
       where: { code: planCode, isActive: true },
     });
-    if (!plan) throw notFound("Subscription plan not found");
+    if (!plan) throw notFound("subscriptionPlanNotFound");
 
     const androidPublisher = getGoogleClient();
     const packageName = process.env.GOOGLE_PACKAGE_NAME;
@@ -43,7 +43,7 @@ export const verifyPurchase = async (req, res, next) => {
 
     const purchase = response.data;
     if (!purchase || !purchase.expiryTimeMillis) {
-      throw badRequest("Invalid Google Play transaction");
+      throw badRequest("invalidGooglePlayTransaction");
     }
     
     const externalSubscriptionId = purchase.orderId || purchaseToken;

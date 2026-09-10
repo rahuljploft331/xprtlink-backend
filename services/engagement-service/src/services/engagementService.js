@@ -102,38 +102,38 @@ async function uniqueQuoteReference(tx, attempts = 5) {
 
 function assertCustomer(auth) {
   if (auth.role !== "customer" || !auth.customerProfileId) {
-    throw forbidden("Customer access required");
+    throw forbidden("customerAccessRequired");
   }
 }
 
 function assertExpert(auth) {
   if (auth.role !== "expert" || !auth.expertProfileId) {
-    throw forbidden("Expert access required");
+    throw forbidden("expertAccessRequired");
   }
 }
 
 function assertQuoteParticipant(auth, quote) {
   const isCustomer = auth.customerProfileId === quote.customerId;
   const isExpert = auth.expertProfileId === quote.expertId;
-  if (!isCustomer && !isExpert) throw forbidden("Not authorized for this quote");
+  if (!isCustomer && !isExpert) throw forbidden("notAuthorizedForQuote");
 }
 
 function assertQuoteCustomer(auth, quote) {
   if (auth.customerProfileId !== quote.customerId) {
-    throw forbidden("Only the requesting customer can perform this action");
+    throw forbidden("onlyRequestingCustomerCanAct");
   }
 }
 
 function assertQuoteExpert(auth, quote) {
   if (auth.expertProfileId !== quote.expertId) {
-    throw forbidden("Only the assigned expert can perform this action");
+    throw forbidden("onlyAssignedExpertCanAct");
   }
 }
 
 function assertConsultationParticipant(auth, consultation) {
   const isCustomer = auth.customerProfileId === consultation.customerId;
   const isExpert = auth.expertProfileId === consultation.expertId;
-  if (!isCustomer && !isExpert) throw forbidden("Not authorized for this consultation");
+  if (!isCustomer && !isExpert) throw forbidden("notAuthorizedForConsultation");
 }
 
 function quoteContext(quote) {
@@ -161,7 +161,7 @@ async function loadQuote(id) {
     where: { id },
     include: QUOTE_INCLUDE,
   });
-  if (!quote) throw notFound("Quote not found");
+  if (!quote) throw notFound("quoteNotFound");
   return quote;
 }
 
@@ -170,7 +170,7 @@ async function loadConsultation(id) {
     where: { id },
     include: CONSULTATION_INCLUDE,
   });
-  if (!consultation) throw notFound("Consultation not found");
+  if (!consultation) throw notFound("consultationNotFound");
   return consultation;
 }
 
@@ -201,11 +201,11 @@ export async function createQuote(auth, body) {
   if (body.expertId) {
     // If client specified an expert, it MUST exist — no silent fallback
     expert = await db.expertProfile.findFirst({ where: { id: body.expertId } });
-    if (!expert) throw notFound("Expert not found");
+    if (!expert) throw notFound("expertNotFound");
   } else {
     // No specific expert requested — find any approved expert (discovery-style quote)
     expert = await db.expertProfile.findFirst({ where: { verificationStatus: "approved" } });
-    if (!expert) throw notFound("No approved experts available to receive quotes");
+    if (!expert) throw notFound("noApprovedExpertsAvailable");
   }
 
   let categoryName = null;
@@ -317,7 +317,7 @@ export async function updateQuote(auth, quoteId, body) {
         select: { status: true },
       });
       if (!current || !EDITABLE_QUOTE_STATUSES.has(current.status)) {
-        throw badRequest("Quote cannot be edited in its current status", "INVALID_STATUS");
+        throw badRequest("quoteCannotBeEdited", "INVALID_STATUS");
       }
     } else {
       const result = await tx.quoteRequest.updateMany({
@@ -326,7 +326,7 @@ export async function updateQuote(auth, quoteId, body) {
       });
 
       if (result.count === 0) {
-        throw badRequest("Quote cannot be edited in its current status", "INVALID_STATUS");
+        throw badRequest("quoteCannotBeEdited", "INVALID_STATUS");
       }
     }
 
@@ -356,16 +356,16 @@ export async function listQuotes(auth, query) {
 
   const where = {};
   if (role === "customer") {
-    if (!auth.customerProfileId) throw forbidden("Customer access required");
+    if (!auth.customerProfileId) throw forbidden("customerAccessRequired");
     where.customerId = auth.customerProfileId;
   } else if (role === "expert") {
-    if (!auth.expertProfileId) throw forbidden("Expert access required");
+    if (!auth.expertProfileId) throw forbidden("expertAccessRequired");
     where.expertId = auth.expertProfileId;
     if (query.inbox === "true" || query.inbox === true) {
       where.status = { in: INBOX_QUOTE_STATUSES };
     }
   } else {
-    throw badRequest("Invalid role filter");
+    throw badRequest("invalidRoleFilter");
   }
 
   if (query.status) where.status = query.status;
@@ -427,7 +427,7 @@ export async function submitQuotation(auth, quoteId, body) {
     // Re-read inside transaction with optimistic status guard
     const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
     if (!current || !QUOTABLE_QUOTE_STATUSES.has(current.status)) {
-      throw badRequest("Quote is not awaiting a quotation", "INVALID_STATUS");
+      throw badRequest("quoteNotAwaitingQuotation", "INVALID_STATUS");
     }
 
     // Persist any media the expert attached to their quotation, tagged with
@@ -485,7 +485,7 @@ export async function acceptQuote(auth, quoteId) {
   const updated = await getDb().$transaction(async (tx) => {
     const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
     if (!current || current.status !== "quoted") {
-      throw badRequest("Only quoted requests can be accepted", "INVALID_STATUS");
+      throw badRequest("onlyQuotedRequestsCanBeAccepted", "INVALID_STATUS");
     }
     return recordQuoteTransition(tx, {
       quoteId,
@@ -523,7 +523,7 @@ export async function rejectQuote(auth, quoteId) {
   const updated = await getDb().$transaction(async (tx) => {
     const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
     if (!current || current.status !== "quoted") {
-      throw badRequest("Only quoted requests can be rejected", "INVALID_STATUS");
+      throw badRequest("onlyQuotedRequestsCanBeRejected", "INVALID_STATUS");
     }
     return recordQuoteTransition(tx, {
       quoteId,
@@ -561,7 +561,7 @@ export async function cancelQuote(auth, quoteId) {
   const updated = await getDb().$transaction(async (tx) => {
     const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
     if (!current || !CANCELLABLE_QUOTE_STATUSES.has(current.status)) {
-      throw badRequest("Quote cannot be canceled in its current status", "INVALID_STATUS");
+      throw badRequest("quoteCannotBeCanceled", "INVALID_STATUS");
     }
     return recordQuoteTransition(tx, {
       quoteId,
@@ -614,7 +614,7 @@ function parseQueryDate(value, label) {
   const raw = String(value);
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) {
-    throw badRequest(`Invalid ${label} date`, "INVALID_DATE");
+    throw badRequest("invalidDate", "INVALID_DATE", null, { label });
   }
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw) && label === "to") {
     parsed.setUTCHours(23, 59, 59, 999);
@@ -718,14 +718,14 @@ export async function createConsultation(auth, body) {
   assertCustomer(auth);
   const db = getDb();
   const expert = await db.expertProfile.findUnique({ where: { id: body.expertId } });
-  if (!expert) throw notFound("Expert not found");
+  if (!expert) throw notFound("expertNotFound");
 
   // Guard: only allow consultations with verified, available experts
   if (expert.verificationStatus !== "approved") {
-    throw badRequest("This expert is not yet verified and cannot accept consultations.", "EXPERT_NOT_VERIFIED");
+    throw badRequest("expertNotVerified", "EXPERT_NOT_VERIFIED");
   }
   if (expert.availabilityStatus !== "online") {
-    throw badRequest("This expert is currently offline. Please try again when they are available.", "EXPERT_OFFLINE");
+    throw badRequest("expertCurrentlyOffline", "EXPERT_OFFLINE");
   }
 
   const consultation = await db.consultation.create({
@@ -762,8 +762,8 @@ export async function createConsultation(auth, body) {
 export async function listConsultations(auth, query) {
   const { page, limit, skip } = parsePagination(query);
 
-  if (auth.role === "expert" && !auth.expertProfileId) throw forbidden("Expert access required");
-  if (auth.role === "customer" && !auth.customerProfileId) throw forbidden("Customer access required");
+  if (auth.role === "expert" && !auth.expertProfileId) throw forbidden("expertAccessRequired");
+  if (auth.role === "customer" && !auth.customerProfileId) throw forbidden("customerAccessRequired");
 
   const where = buildConsultationListWhere(auth, query);
   const db = getDb();
@@ -871,7 +871,7 @@ export async function acceptConsultation(auth, consultationId) {
       },
     });
     if (result.count === 0) {
-      throw badRequest("Consultation is not awaiting acceptance", "INVALID_STATUS");
+      throw badRequest("consultationNotAwaitingAcceptance", "INVALID_STATUS");
     }
     return tx.consultation.findUnique({
       where: { id: consultationId },
@@ -909,7 +909,7 @@ export async function declineConsultation(auth, consultationId) {
       data: { status: "declined", endedAt: new Date() },
     });
     if (result.count === 0) {
-      throw badRequest("Consultation is not awaiting a response", "INVALID_STATUS");
+      throw badRequest("consultationNotAwaitingResponse", "INVALID_STATUS");
     }
     return tx.consultation.findUnique({
       where: { id: consultationId },
@@ -960,7 +960,7 @@ export async function endConsultation(auth, consultationId) {
       },
     });
     if (result.count === 0) {
-      throw badRequest("Consultation cannot be ended in its current status", "INVALID_STATUS");
+      throw badRequest("consultationCannotBeEnded", "INVALID_STATUS");
     }
     return tx.consultation.findUnique({
       where: { id: consultationId },
@@ -1017,7 +1017,7 @@ export async function getVideoToken(auth, consultationId) {
   const consultation = await loadConsultation(consultationId);
   assertConsultationParticipant(auth, consultation);
   if (!["accepted", "in_progress", "ringing"].includes(consultation.status)) {
-    throw badRequest("Video is not available for this consultation", "INVALID_STATUS");
+    throw badRequest("videoNotAvailable", "INVALID_STATUS");
   }
 
   const zegoData = generateZegoToken(
@@ -1038,7 +1038,7 @@ export async function getBillingSummary(auth, consultationId, { includeCustomerS
   const consultation = await loadConsultation(consultationId);
   assertConsultationParticipant(auth, consultation);
   if (consultation.status !== "completed") {
-    throw badRequest("Billing summary is available after consultation ends", "INVALID_STATUS");
+    throw badRequest("billingSummaryAfterConsultation", "INVALID_STATUS");
   }
 
   // Fetch the charge breakdown from billing-service via internal HTTP call
@@ -1072,10 +1072,10 @@ export async function submitReview(auth, consultationId, body) {
   const consultation = await loadConsultation(consultationId);
   assertConsultationParticipant(auth, consultation);
   if (consultation.status !== "completed") {
-    throw badRequest("Reviews are allowed only after consultation completion", "INVALID_STATUS");
+    throw badRequest("reviewsAfterConsultation", "INVALID_STATUS");
   }
   if (consultation.review) {
-    throw conflict("Review already submitted", "REVIEW_EXISTS");
+    throw conflict("reviewAlreadySubmitted", "REVIEW_EXISTS");
   }
 
   const db = getDb();
@@ -1157,7 +1157,7 @@ export async function createReport(auth, body) {
   assertCustomer(auth);
   const db = getDb();
   const expert = await db.expertProfile.findUnique({ where: { id: body.expertId } });
-  if (!expert) throw notFound("Expert not found");
+  if (!expert) throw notFound("expertNotFound");
 
   const report = await db.expertReport.create({
     data: {
@@ -1179,7 +1179,7 @@ export async function getCallStatus(consultationId) {
   });
 
   if (!consultation) {
-    throw notFound("Consultation not found");
+    throw notFound("consultationNotFound");
   }
 
   const { customerJoined, expertJoined, wasSuccessfullyConnected } =

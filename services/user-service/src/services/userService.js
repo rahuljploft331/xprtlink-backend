@@ -20,7 +20,7 @@ import { DEFAULT_NOTIFICATION_PREFERENCES } from "@xprtlink/shared/constants/ind
 
 export async function getSession(req) {
   const user = await loadUserContext(req.auth.userId);
-  if (!user || user.status !== "active") throw unauthorized("Session invalid");
+  if (!user || user.status !== "active") throw unauthorized("sessionInvalid");
 
   const role = req.auth.role;
   const subscriptionActive = Boolean(user.expertProfile?.subscriptions?.length);
@@ -59,7 +59,7 @@ async function assertIdentifierAvailable({ email, phone, excludeUserId }) {
       },
     });
     if (row) {
-      throw conflict("An account with this email already exists.", "EMAIL_TAKEN");
+      throw conflict("emailAlreadyExists", "EMAIL_TAKEN");
     }
   }
   if (phone) {
@@ -71,7 +71,7 @@ async function assertIdentifierAvailable({ email, phone, excludeUserId }) {
       },
     });
     if (row) {
-      throw conflict("This mobile number is already in use.", "PHONE_TAKEN");
+      throw conflict("phoneAlreadyInUse", "PHONE_TAKEN");
     }
   }
 }
@@ -113,7 +113,7 @@ async function createProfileForRole(
       where: { isActive: true },
       orderBy: { sortOrder: "asc" },
     });
-    if (!category) throw badRequest("No categories configured");
+    if (!category) throw badRequest("noCategoriesConfigured");
     resolvedCategoryIds = [category.id];
   }
 
@@ -184,20 +184,20 @@ export async function register(body) {
       : Boolean(existingActiveUserWithEmail.expertProfile);
 
     if (hasRequestedRole) {
-      throw conflict("An account with this email already exists.", "EMAIL_TAKEN");
+      throw conflict("emailAlreadyExists", "EMAIL_TAKEN");
     }
 
     if (!password) {
-      throw badRequest("Password is required to add a profile to an existing account.", "PASSWORD_REQUIRED");
+      throw badRequest("passwordRequiredForExistingAccount", "PASSWORD_REQUIRED");
     }
 
     const isPasswordValid = await verifyPassword(password, existingActiveUserWithEmail.passwordHash);
     if (!isPasswordValid) {
-      throw conflict("Email is already registered. Please provide your existing account password to add this profile.", "INVALID_PASSWORD");
+      throw conflict("emailRegisteredProvidePassword", "INVALID_PASSWORD");
     }
 
     if (existingActiveUserWithEmail.phone !== phone) {
-      throw conflict("This email is already registered with a different phone number. Please use your existing phone number to add this profile.", "PHONE_MISMATCH");
+      throw conflict("emailRegisteredWithDifferentPhone", "PHONE_MISMATCH");
     }
   } else {
     // Pre-flight availability check (fast-fails common case; real enforcement is inside the transaction)
@@ -236,13 +236,13 @@ export async function register(body) {
         const dup = await tx.user.findFirst({
           where: { email, ...claimedAvailabilityFilter },
         });
-        if (dup) throw conflict("An account with this email already exists.", "EMAIL_TAKEN");
+        if (dup) throw conflict("emailAlreadyExists", "EMAIL_TAKEN");
       }
       if (phone && !existingActiveUserWithEmail) {
         const dup = await tx.user.findFirst({
           where: { phone, ...claimedAvailabilityFilter },
         });
-        if (dup) throw conflict("This mobile number is already in use.", "PHONE_TAKEN");
+        if (dup) throw conflict("phoneAlreadyInUse", "PHONE_TAKEN");
       }
 
       if (existingActiveUserWithEmail) {
@@ -310,7 +310,7 @@ export async function register(body) {
 
 export async function login(body) {
   const { role, email, phone, password } = body;
-  if (!email && !phone) throw badRequest("Email or phone is required", "VALIDATION_ERROR", "email");
+  if (!email && !phone) throw badRequest("emailOrPhoneRequired", "VALIDATION_ERROR", "email");
 
   const db = getDb();
   const user = await db.user.findFirst({
@@ -325,14 +325,14 @@ export async function login(body) {
     // M7: constant-time dummy compare to prevent timing-based email enumeration.
     // Without this, nonexistent emails return ~0ms while valid ones take ~100ms (bcrypt).
     await verifyPassword("__dummy_password_that_never_matches__", "$2b$10$abcdefghijklmnopqrstuvuXzGO7fMC7VYzWH4HmM0vXcB9tBr7bq");
-    throw unauthorized("Invalid credentials");
+    throw unauthorized("invalidCredentials");
   }
 
   if (phone) {
     // Phone auth relies on OTP; we don't verify password here
   } else {
     const valid = await verifyPassword(password, user.passwordHash);
-    if (!valid) throw unauthorized("Invalid credentials");
+    if (!valid) throw unauthorized("invalidCredentials");
   }
 
   // Give a clear, actionable error instead of a generic 401
@@ -344,10 +344,10 @@ export async function login(body) {
   }
 
   if (user.status === "suspended") {
-    throw forbidden("Account suspended", "ACCOUNT_SUSPENDED");
+    throw forbidden("accountSuspended", "ACCOUNT_SUSPENDED");
   }
 
-  if (user.status !== "active") throw unauthorized("Invalid credentials");
+  if (user.status !== "active") throw unauthorized("invalidCredentials");
 
   if (phone) {
     const otpResult = await createAndDeliverOtp({
@@ -361,7 +361,7 @@ export async function login(body) {
   }
 
   const tokens = await issueTokens(user, role);
-  if (!tokens) throw badRequest(`No ${role} profile on this account`, "PROFILE_MISSING");
+  if (!tokens) throw badRequest("noProfileForRole", "PROFILE_MISSING", null, { role });
   return tokens;
 }
 
@@ -377,14 +377,14 @@ export async function logout(userId, refreshToken) {
 }
 
 export async function refresh(refreshToken, role) {
-  if (!refreshToken) throw unauthorized("Refresh token required");
+  if (!refreshToken) throw unauthorized("refreshTokenRequired");
 
   // O(1) SHA-256 indexed lookup — no more linear scan of all active tokens
   const result = await lookupRefreshToken(refreshToken, role);
-  if (!result) throw unauthorized("Invalid refresh token");
+  if (!result) throw unauthorized("invalidRefreshToken");
 
   const issued = await issueTokens(result.user, result.resolvedRole);
-  if (!issued) throw unauthorized("Session invalid");
+  if (!issued) throw unauthorized("sessionInvalid");
   return issued;
 }
 
@@ -392,7 +392,7 @@ export async function refresh(refreshToken, role) {
 
 export async function sendOtp(body) {
   const { email, phone, purpose } = body;
-  if (!email && !phone) throw badRequest("Email or phone required");
+  if (!email && !phone) throw badRequest("emailOrPhoneRequired");
 
   if (purpose === "register" || purpose === "reset_password") {
     throw badRequest(
@@ -428,7 +428,7 @@ export async function sendOtp(body) {
  */
 export async function verifyOtp(body) {
   const { email, phone, code, purpose } = body;
-  if (!email && !phone) throw badRequest("Email or phone required");
+  if (!email && !phone) throw badRequest("emailOrPhoneRequired");
 
   const db = getDb();
   const challenge = await findValidOtpChallenge({ email, phone, purpose });
@@ -455,7 +455,7 @@ export async function verifyOtp(body) {
 
     const targetRole = challenge.registrationData?.role || "customer";
     const tokens = await issueTokens(user, targetRole);
-    if (!tokens) throw badRequest(`No ${targetRole} profile on this account`, "PROFILE_MISSING");
+    if (!tokens) throw badRequest("noProfileForRole", "PROFILE_MISSING", null, { role: targetRole });
     return tokens;
   }
 
@@ -542,7 +542,7 @@ export async function verifyOtp(body) {
     }).catch(() => { /* ignore if already exists */ });
 
     const tokens = await issueTokens(user, role);
-    if (!tokens) throw badRequest("Failed to create session");
+    if (!tokens) throw badRequest("failedToCreateSession");
     return tokens;
   }
 
@@ -573,7 +573,7 @@ export async function verifyOtp(body) {
     }).catch(() => { /* ignore if already exists */ });
 
     const tokens = await issueTokens(user, role);
-    if (!tokens) throw badRequest("Failed to create session");
+    if (!tokens) throw badRequest("failedToCreateSession");
     return tokens;
   }
 
@@ -644,7 +644,7 @@ export async function resetPassword(body) {
   const user = await db.user.findFirst({
     where: email ? { email, deletedAt: null } : { phone, deletedAt: null },
   });
-  if (!user) throw notFound("User not found");
+  if (!user) throw notFound("userNotFound");
 
   await db.$transaction([
     db.user.update({
@@ -668,9 +668,9 @@ export async function changePassword(userId, body) {
   const { currentPassword, newPassword } = body;
   const db = getDb();
   const user = await db.user.findUnique({ where: { id: userId } });
-  if (!user) throw notFound("User not found");
+  if (!user) throw notFound("userNotFound");
   const valid = await verifyPassword(currentPassword, user.passwordHash);
-  if (!valid) throw badRequest("Current password is incorrect", "INVALID_CURRENT_PASSWORD", "currentPassword");
+  if (!valid) throw badRequest("currentPasswordIncorrect", "INVALID_CURRENT_PASSWORD", "currentPassword");
 
   await db.$transaction([
     db.user.update({
@@ -704,11 +704,11 @@ export async function requestPhoneChange(userId, body) {
   const db = getDb();
 
   const user = await db.user.findUnique({ where: { id: userId } });
-  if (!user) throw notFound("User not found");
-  if (user.status !== "active") throw unauthorized("Session invalid");
+  if (!user) throw notFound("userNotFound");
+  if (user.status !== "active") throw unauthorized("sessionInvalid");
 
   if (user.phone && user.phone === phone) {
-    throw badRequest("This is already your current mobile number.", "PHONE_UNCHANGED", "phone");
+    throw badRequest("samePhoneNumber", "PHONE_UNCHANGED", "phone");
   }
 
   // Uniqueness — reject if another account already claims this number
@@ -729,8 +729,8 @@ export async function verifyPhoneChange(userId, body) {
   const db = getDb();
 
   const user = await db.user.findUnique({ where: { id: userId } });
-  if (!user) throw notFound("User not found");
-  if (user.status !== "active") throw unauthorized("Session invalid");
+  if (!user) throw notFound("userNotFound");
+  if (user.status !== "active") throw unauthorized("sessionInvalid");
 
   // Re-check availability at confirm time (guards against a race between step 1 and 2)
   await assertIdentifierAvailable({ phone, excludeUserId: userId });
@@ -740,7 +740,7 @@ export async function verifyPhoneChange(userId, body) {
   // Bind the challenge to this user — a change-phone challenge is always stamped
   // with the requesting userId (registration pre-verify challenges have userId=null).
   if (challenge.userId !== userId) {
-    throw badRequest("OTP expired or not found", "OTP_EXPIRED", "phone");
+    throw badRequest("otpExpiredOrNotFound", "OTP_EXPIRED", "phone");
   }
 
   await verifyOtpCode(challenge, code);
@@ -763,7 +763,7 @@ export async function verifyPhoneChange(userId, body) {
     ]);
   } catch (err) {
     if (err?.code === "P2002") {
-      throw conflict("This mobile number is already in use.", "PHONE_TAKEN");
+      throw conflict("phoneAlreadyInUse", "PHONE_TAKEN");
     }
     throw err;
   }
@@ -799,14 +799,14 @@ export async function socialLogin(body) {
   const { idToken, role, firstName, lastName } = body;
 
   if (!isFirebaseConfigured()) {
-    throw badRequest("Social login not configured", "NOT_IMPLEMENTED");
+    throw badRequest("socialLoginNotConfigured", "NOT_IMPLEMENTED");
   }
 
   let decoded;
   try {
     decoded = await verifyFirebaseIdToken(idToken);
   } catch {
-    throw unauthorized("Invalid social authentication token");
+    throw unauthorized("invalidSocialAuthToken");
   }
 
   const firebaseUid = decoded.uid;
@@ -820,7 +820,7 @@ export async function socialLogin(body) {
     user = await db.user.findFirst({ where: { email, deletedAt: null }, include });
     if (user) {
       if (!user.firebaseUid) {
-        throw conflict("This email is already registered with a password. Please log in using your email and password.", "SOCIAL_LINKING_NOT_ALLOWED");
+        throw conflict("emailRegisteredWithPassword", "SOCIAL_LINKING_NOT_ALLOWED");
       }
       user = await db.user.update({
         where: { id: user.id },
@@ -870,7 +870,7 @@ export async function socialLogin(body) {
   }
 
   if (user.status === "suspended" || user.status === "deleted") {
-    throw forbidden("Your account has been suspended. Contact support.", "ACCOUNT_SUSPENDED");
+    throw forbidden("accountSuspendedContactSupport", "ACCOUNT_SUSPENDED");
   }
 
   user = await ensureProfileForRole(user, role, firstName, lastName);
@@ -890,7 +890,7 @@ export async function socialLogin(body) {
   }
 
   const tokens = await issueTokens(user, role);
-  if (!tokens) throw badRequest(`No ${role} profile on this account`, "PROFILE_MISSING");
+  if (!tokens) throw badRequest("noProfileForRole", "PROFILE_MISSING", null, { role });
   return tokens;
 }
 
@@ -901,16 +901,16 @@ export async function socialComplete(body) {
   try {
     decoded = verifyCompletionToken(completionToken);
   } catch {
-    throw badRequest("Profile completion session expired. Please sign in again.", "COMPLETION_EXPIRED");
+    throw badRequest("profileCompletionSessionExpired", "COMPLETION_EXPIRED");
   }
 
   const { sub: userId, role, firstName, lastName } = decoded;
   const db = getDb();
 
   const user = await db.user.findUnique({ where: { id: userId } });
-  if (!user) throw notFound("User not found");
+  if (!user) throw notFound("userNotFound");
   if (user.phone) {
-    throw badRequest("Phone number already provided", "PHONE_ALREADY_SET", "phone");
+    throw badRequest("phoneAlreadyProvided", "PHONE_ALREADY_SET", "phone");
   }
 
   await assertIdentifierAvailable({ phone, excludeUserId: userId });
@@ -989,20 +989,20 @@ export async function cleanupStalePendingUsers({ maxAgeMinutes = 1440 } = {}) {
 
 export async function getCustomerMe(auth) {
   const user = await loadUserContext(auth.userId);
-  if (!user?.customerProfile) throw notFound("Customer profile not found");
+  if (!user?.customerProfile) throw notFound("customerProfileNotFound");
   return toCustomerMeDto({ profile: user.customerProfile, user });
 }
 
 export async function updateCustomerMe(auth, body) {
   const db = getDb();
   const profile = await db.customerProfile.findFirst({ where: { userId: auth.userId } });
-  if (!profile) throw notFound("Customer profile not found");
+  if (!profile) throw notFound("customerProfileNotFound");
 
   if (body.avatarMediaId) {
     const media = await db.mediaAsset.findFirst({
       where: { id: body.avatarMediaId, ownerUserId: auth.userId, status: "ready" }
     });
-    if (!media) throw badRequest("Invalid or unready avatar media asset");
+    if (!media) throw badRequest("invalidAvatarMediaAsset");
   }
 
   const updated = await db.customerProfile.update({
@@ -1053,7 +1053,7 @@ const UUID_RE =
 // otherwise surface as an unhandled Prisma P2023 (invalid UUID) → 500.
 function assertUuid(value, field = "expertId") {
   if (!value || !UUID_RE.test(value)) {
-    throw badRequest("Invalid expert id", "VALIDATION_ERROR", field);
+    throw badRequest("invalidExpertId", "VALIDATION_ERROR", field);
   }
 }
 

@@ -46,7 +46,7 @@ export async function getTicket(auth, ticketId) {
   const ticket = await db.supportTicket.findFirst({
     where: { id: ticketId, userId: auth.userId },
   });
-  if (!ticket) throw notFound("Support ticket not found");
+  if (!ticket) throw notFound("supportTicketNotFound");
   return toTicketDto(ticket);
 }
 

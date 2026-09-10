@@ -81,7 +81,7 @@ export async function list(req, res, next) {
     if (adminId) {
       if (!UUID_RE.test(adminId)) {
         // Passing a non-uuid straight to Prisma raises P2023 → 500.
-        return next(badRequest("adminId must be a valid UUID", "BAD_REQUEST", "adminId"));
+        return next(badRequest("adminIdMustBeValidUuid", "BAD_REQUEST", "adminId"));
       }
       where.actorAdminId = adminId;
     }
