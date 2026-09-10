@@ -13,15 +13,15 @@
 | Service | Responsibility |
 |---------|----------------|
 | user-service | Auth + customers |
-| expert-service | Experts + verification + **search/discovery** |
-| catalog-service | Categories + CMS. **Not banners** (no banner model or route — G1) |
-| engagement-service | Quotes + consultations |
+| expert-service | Experts + verification + **search/discovery** + banners (`/experts/me/banners`, `GET /experts/banners/public`) |
+| catalog-service | Categories + CMS + app-config + support tickets. **Banners are in expert-service, not here.** |
+| engagement-service | Quotes + consultations + ZegoCloud webhooks (`zego_callback_logs`) |
 | messaging-service | Chat realtime (Socket.IO only; no REST messages) |
-| billing-service | Stripe payments + IAP subscriptions + payouts |
-| notification-service | Push / in-app. Write path fixed (`type` + `payload`). In-app dispatch triggers wired (T-018); FCM push + admin broadcast still open |
-| media-service | Uploads |
-| admin-service | Super admin + **subadmin RBAC** + reports. Audit **writes** only (no read API — G7) |
-| api-gateway | Ingress (no database connection) |
+| billing-service | Stripe payments + IAP subscriptions + payouts. **N5 fixed** (2026-09-10): `appleIapController.js` previously imported non-existent `decodeSignedTransaction` — now uses `SignedDataVerifier.verifyAndDecodeTransaction` (N3 also fixed). `appleWebhookController.js` stub replaced with real `verifyAndDecodeNotification`. |
+| notification-service | Push / in-app. Write path fixed (`type` + `payload`). In-app dispatch triggers wired (T-018); FCM push (T-018b) + quote expiry cron (T-018c) still open. |
+| media-service | Uploads (S3 presigned + base64 direct, up to 100MB) |
+| admin-service | Super admin + **subadmin RBAC** + reports + audit-log read + broadcast + SSE events. All 13 previously-404 endpoints **closed** (B2′). |
+| api-gateway | Ingress (no database connection); proxies all `/api/v1/*` + WebSocket |
 
 ## Database (PostgreSQL + Prisma)
 
@@ -104,3 +104,19 @@ Dev `.env` uses high limits so `init:flows` is not 429’d. Production must use 
 ## Consultations / billing (Aug 31)
 
 Manual accept before paid session. Listed expert rate is **per 30 minutes**. Convert duration to whole minutes (`ceil(seconds / 60)`), then `charge = minutes × rate / 30`. Same duration for customer charge, expert earnings, and commission.
+
+## Apple IAP env vars (billing-service)
+
+After the N5 + N3 fix (2026-09-10) the following env vars drive Apple IAP verification. Add to `.env.example`:
+
+```
+APPLE_ISSUER_ID=       # App Store Connect → Keys → Issuer ID
+APPLE_KEY_ID=          # App Store Connect → Keys → Key ID
+APPLE_PRIVATE_KEY=     # PEM content with \n escaped as \\n
+APPLE_BUNDLE_ID=       # com.xprtlink.app
+APPLE_APP_ID=          # Numeric App Store Connect App ID (optional — needed for OCSP in prod)
+APPLE_ROOT_CA_PEM=     # Base64-encoded Apple Root CA PEM (production); leave empty in sandbox
+```
+
+- `enableOnlineChecks` is `true` in `NODE_ENV=production` (OCSP revocation) and `false` in sandbox/dev.
+- `APPLE_ROOT_CA_PEM` accepts multiple certs separated by `;`.

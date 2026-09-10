@@ -1,7 +1,31 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
-import { AppStoreServerAPIClient, Environment } from "@apple/app-store-server-library";
+import {
+  SignedDataVerifier,
+  Environment,
+} from "@apple/app-store-server-library";
 
-// A simple webhook handler for Apple App Store Server Notifications V2
+/**
+ * Build a SignedDataVerifier for server-to-server notification payloads.
+ * Same env vars as appleIapController: APPLE_BUNDLE_ID, APPLE_ROOT_CA_PEM, APPLE_APP_ID.
+ */
+function getAppleVerifier() {
+  const bundleId = process.env.APPLE_BUNDLE_ID;
+  const appAppleId = process.env.APPLE_APP_ID ? Number(process.env.APPLE_APP_ID) : undefined;
+  const environment = process.env.NODE_ENV === "production" ? Environment.PRODUCTION : Environment.SANDBOX;
+  const enableOnlineChecks = process.env.NODE_ENV === "production";
+
+  const rootCerts = [];
+  if (process.env.APPLE_ROOT_CA_PEM) {
+    for (const pem of process.env.APPLE_ROOT_CA_PEM.split(";")) {
+      const trimmed = pem.trim();
+      if (trimmed) rootCerts.push(Buffer.from(trimmed, "base64"));
+    }
+  }
+
+  return new SignedDataVerifier(rootCerts, enableOnlineChecks, environment, bundleId, appAppleId);
+}
+
+// Apple App Store Server Notifications V2 handler
 export const handleNotification = async (req, res, next) => {
   try {
     const { signedPayload } = req.body;
@@ -9,19 +33,15 @@ export const handleNotification = async (req, res, next) => {
       return res.status(400).send("Missing signedPayload");
     }
 
-    // In a production environment, you would decode and verify the signedPayload
-    // using the @apple/app-store-server-library's Webhook tools (e.g. verifyAndDecodeNotification)
-    // For this boilerplate, we'll assume it's decoded into `notificationType` and `data`.
-    
-    // Stub for decoded payload (you should implement actual JWT decoding here)
-    // const decodedNotification = await decodePayload(signedPayload);
-    const decodedNotification = { notificationType: "TEST", data: {} }; // Placeholder
-    
+    // Verify and decode the signed notification payload (JWS)
+    const verifier = getAppleVerifier();
+    const decodedNotification = await verifier.verifyAndDecodeNotification(signedPayload);
+
     const db = getDb();
-    
+
     const { notificationType, subtype, data } = decodedNotification;
     const externalSubscriptionId = data?.signedTransactionInfo?.originalTransactionId;
-    
+
     if (externalSubscriptionId) {
       const subscription = await db.expertSubscription.findFirst({
         where: { store: "apple", externalSubscriptionId },
@@ -68,3 +88,5 @@ export const handleNotification = async (req, res, next) => {
     res.status(500).send("Error");
   }
 };
+
+
