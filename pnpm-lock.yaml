@@ -156,6 +156,9 @@ importers:
       express:
         specifier: ^4.21.2
         version: 4.22.2(supports-color@7.2.0)
+      firebase-admin:
+        specifier: ^13.10.0
+        version: 13.10.0(supports-color@7.2.0)
 
   services/user-service:
     dependencies:

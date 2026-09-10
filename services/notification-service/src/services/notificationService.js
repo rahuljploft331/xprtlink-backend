@@ -7,6 +7,7 @@ import {
 import { notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 import { DEFAULT_NOTIFICATION_PREFERENCES } from "@xprtlink/shared/constants/index.js";
+import { sendPushToUsers } from "./fcmSender.js";
 
 export async function registerDeviceToken(auth, body) {
   const db = getDb();
@@ -150,11 +151,15 @@ export async function updatePreferences(auth, body) {
 }
 
 /**
- * Internal dispatch — create in-app notification records for a list of users.
+ * Internal dispatch — create in-app notification records and send FCM push.
  * Called by other microservices via POST /api/v1/notifications/dispatch.
- * Does NOT send push notifications yet (FCM/APNs integration is a future task).
  *
- * @param {{ userIds: string[], title: string, body: string, data?: object }} payload
+ * Flow:
+ *   1. Filter userIds by NotificationPreference (default: opt-in)
+ *   2. Write notification rows to DB (in-app feed)
+ *   3. Send FCM push to all device tokens for those users (non-fatal)
+ *
+ * @param {{ userIds: string[], type: string, title: string, body: string, data?: object }} payload
  */
 export async function dispatchNotification({ userIds, type, title, body: bodyText, data = {} }) {
   if (!Array.isArray(userIds) || userIds.length === 0) return { dispatched: 0 };
@@ -165,12 +170,12 @@ export async function dispatchNotification({ userIds, type, title, body: bodyTex
   const resolvedType = String(type ?? data?.type ?? "system").slice(0, 64);
 
   const db = getDb();
-  
+
   // Load preferences for these users
   const prefs = await db.notificationPreference.findMany({
     where: { userId: { in: userIds } },
   });
-  
+
   const prefsMap = new Map(prefs.map((p) => [p.userId, p.preferences]));
 
   const filteredUserIds = userIds.filter((userId) => {
@@ -182,6 +187,7 @@ export async function dispatchNotification({ userIds, type, title, body: bodyTex
 
   if (filteredUserIds.length === 0) return { dispatched: 0 };
 
+  // 1. Write in-app notification rows
   const created = await db.notification.createMany({
     // NOTE: the column is `payload`, not `data`. The wire contract keeps the name
     // `data` for callers; it is mapped here.
@@ -193,6 +199,14 @@ export async function dispatchNotification({ userIds, type, title, body: bodyTex
       payload: data ?? {},
     })),
     skipDuplicates: true,
+  });
+
+  // 2. Send FCM push to device tokens (non-fatal — never blocks the response)
+  sendPushToUsers(db, filteredUserIds, title ?? "Notification", bodyText ?? "", {
+    type: resolvedType,
+    ...data,
+  }).catch((err) => {
+    console.error("[dispatchNotification] FCM push error:", err.message);
   });
 
   return { dispatched: created.count };
