@@ -109,15 +109,33 @@ async function handleUserLogin(payload) {
     return;
   }
 
-  // Check if both the customer and the expert have joined
-  const customerId = consultation.customer?.user?.id;
-  const expertId = consultation.expert?.userId;
+  // Check if both the customer and the expert have joined.
+  // The Flutter app may join the Zego room using either the Account ID (user.id)
+  // or the Profile ID (customer.id / expert.id), so we accept either.
+  const normalize = (id) => (id ?? '').replace(/-/g, '');
 
-  const hasCustomerJoined = customerId && consultation.joinedParticipantIds.some(id => id.replace(/-/g, '') === customerId.replace(/-/g, ''));
-  const hasExpertJoined = expertId && consultation.joinedParticipantIds.some(id => id.replace(/-/g, '') === expertId.replace(/-/g, ''));
+  const customerAccountId  = consultation.customer?.user?.id;   // Account/user UUID
+  const customerProfileId  = consultation.customer?.id;          // Customer-profile UUID
+  const expertAccountId    = consultation.expert?.userId;        // Account/user UUID
+  const expertProfileId    = consultation.expert?.id;            // Expert-profile UUID
+
+  const matchesCustomer = (id) =>
+    (customerAccountId && normalize(id) === normalize(customerAccountId)) ||
+    (customerProfileId && normalize(id) === normalize(customerProfileId));
+
+  const matchesExpert = (id) =>
+    (expertAccountId && normalize(id) === normalize(expertAccountId)) ||
+    (expertProfileId && normalize(id) === normalize(expertProfileId));
+
+  const hasCustomerJoined = consultation.joinedParticipantIds.some(matchesCustomer);
+  const hasExpertJoined   = consultation.joinedParticipantIds.some(matchesExpert);
 
   if (!hasCustomerJoined || !hasExpertJoined) {
-    console.log(`[zego-callback] Consultation ${consultation.id} — waiting for both participants to join (hasCustomer=${hasCustomerJoined}, hasExpert=${hasExpertJoined})`);
+    console.log(
+      `[zego-callback] Consultation ${consultation.id} — waiting for both participants to join` +
+      ` (hasCustomer=${hasCustomerJoined}, hasExpert=${hasExpertJoined})` +
+      ` joinedIds=${JSON.stringify(consultation.joinedParticipantIds)}`
+    );
     return;
   }
 
