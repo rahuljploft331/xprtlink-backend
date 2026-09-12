@@ -61,10 +61,10 @@ export async function getSupportConversation(id, callerAuth) {
     }
   });
 
-  if (!conversation) throw notFound("Support conversation not found");
+  if (!conversation) throw notFound("supportConversationNotFound");
 
   if (["customer", "expert"].includes(callerAuth.role) && conversation.userId !== callerAuth.userId) {
-    throw forbidden("You do not have access to this conversation");
+    throw forbidden("noAccessToConversation");
   }
 
   return toSupportConversationDto(conversation);
@@ -75,7 +75,7 @@ export async function getSupportConversation(id, callerAuth) {
  */
 export async function listSupportConversations(callerAuth, query) {
   if (!["super_admin", "subadmin"].includes(callerAuth.role)) {
-    throw forbidden("Admin access required to list support conversations");
+    throw forbidden("adminAccessRequiredForSupport");
   }
   
   const db = getDb();
@@ -142,10 +142,10 @@ export async function listSupportMessages(conversationId, query, callerAuth) {
 export async function sendSupportMessage(conversationId, payload, callerAuth) {
   const conversation = await getSupportConversation(conversationId, callerAuth);
   if (conversation.status === "closed") {
-    throw badRequest("Cannot send messages to a closed conversation");
+    throw badRequest("cannotSendToClosedConversation");
   }
   if (!payload.body?.trim()) {
-    throw badRequest("Message body is required");
+    throw badRequest("messageBodyRequired");
   }
 
   const db = getDb();
@@ -200,7 +200,7 @@ export async function sendSupportMessage(conversationId, payload, callerAuth) {
  */
 export async function assignSupportConversation(conversationId, callerAuth) {
   if (!["super_admin", "subadmin"].includes(callerAuth.role)) {
-    throw forbidden("Admin access required");
+    throw forbidden("adminAccessRequired");
   }
   const db = getDb();
   await db.supportConversation.update({
@@ -214,7 +214,7 @@ export async function assignSupportConversation(conversationId, callerAuth) {
  */
 export async function unassignSupportConversation(conversationId, callerAuth) {
   if (!["super_admin", "subadmin"].includes(callerAuth.role)) {
-    throw forbidden("Admin access required");
+    throw forbidden("adminAccessRequired");
   }
   const db = getDb();
   await db.supportConversation.update({
@@ -239,7 +239,7 @@ export async function releaseAdminConversations(adminUserId) {
  */
 export async function resolveSupportConversation(conversationId, callerAuth) {
   if (!["super_admin", "subadmin"].includes(callerAuth.role)) {
-    throw forbidden("Admin access required");
+    throw forbidden("adminAccessRequired");
   }
   const db = getDb();
   await db.supportConversation.update({

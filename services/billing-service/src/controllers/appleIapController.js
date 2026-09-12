@@ -52,7 +52,7 @@ function getAppleVerifier() {
 export const verifyPurchase = async (req, res, next) => {
   try {
     const { transactionId, planCode } = req.body;
-    if (!transactionId) throw badRequest("Missing transactionId");
+    if (!transactionId) throw badRequest("missingTransactionId");
 
     const db = getDb();
 
@@ -60,13 +60,13 @@ export const verifyPurchase = async (req, res, next) => {
     let plan = await db.subscriptionPlan.findFirst({
       where: { code: planCode, isActive: true },
     });
-    if (!plan) throw notFound("Subscription plan not found");
+    if (!plan) throw notFound("subscriptionPlanNotFound");
 
     const client = getAppleClient();
     const transactionInfo = await client.getTransactionInfo(transactionId);
 
     if (!transactionInfo || !transactionInfo.signedTransactionInfo) {
-      throw badRequest("Invalid Apple transaction");
+      throw badRequest("invalidAppleTransaction");
     }
 
     // N3 fix: verify JWS signature before trusting any payload field.
@@ -76,7 +76,7 @@ export const verifyPurchase = async (req, res, next) => {
 
     // 1. Verify the product ID matches the selected plan
     if (decoded.productId !== plan.code) {
-      throw badRequest("Transaction product ID does not match the requested plan");
+      throw badRequest("transactionProductMismatch");
     }
 
     // 2. Prevent replay attacks (has someone else already claimed this?)
@@ -85,7 +85,7 @@ export const verifyPurchase = async (req, res, next) => {
       where: { externalSubscriptionId, expertProfileId: { not: req.auth.expertProfileId } }
     });
     if (existingSub) {
-      throw badRequest("This transaction has already been claimed by another account");
+      throw badRequest("transactionAlreadyClaimed");
     }
     
     const now = new Date();

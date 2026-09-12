@@ -77,7 +77,7 @@ function generateTempPassword() {
 export async function resetPassword(req, res, next) {
   try {
     const admin = await adminUsers().findUnique({ where: { id: req.params.id } });
-    if (!admin) throw notFound("Admin not found");
+    if (!admin) throw notFound("adminNotFound");
     if (admin.role === "super_admin") {
       throw badRequest("Super admin passwords can't be reset from here", "NOT_SUPPORTED");
     }
@@ -104,7 +104,7 @@ export async function setPermissions(req, res, next) {
   try {
     const { permissions } = setPermissionsSchema.parse(req.body); // { moduleName: "view"|"edit"|"none" }
     const existing = await adminUsers().findUnique({ where: { id: req.params.id } });
-    if (!existing) throw notFound("Admin not found");
+    if (!existing) throw notFound("adminNotFound");
 
     const db = getDb();
     await db.$transaction(

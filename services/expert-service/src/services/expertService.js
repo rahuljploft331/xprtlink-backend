@@ -19,7 +19,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // return a clean 404 instead of surfacing a Prisma P2023 stack trace.
 function assertExpertId(id) {
   if (typeof id !== "string" || !UUID_RE.test(id)) {
-    throw notFound("Expert not found");
+    throw notFound("expertNotFound");
   }
 }
 
@@ -252,7 +252,7 @@ export async function getExpertById(id, auth) {
     where: { id },
     include: { categories: true, avatarMedia: true },
   });
-  if (!expert) throw notFound("Expert not found");
+  if (!expert) throw notFound("expertNotFound");
 
   let isSaved;
   if (auth?.customerProfileId) {
@@ -303,7 +303,7 @@ export async function getExpertReviews(id, query) {
 export async function getExpertAvailability(id) {
   assertExpertId(id);
   const expert = await getDb().expertProfile.findUnique({ where: { id } });
-  if (!expert) throw notFound("Expert not found");
+  if (!expert) throw notFound("expertNotFound");
   return {
     expertId: id,
     availabilityStatus: expert.availabilityStatus,
@@ -321,7 +321,7 @@ async function getExpertProfileOrThrow(auth) {
       settings: true,
     },
   });
-  if (!expert) throw notFound("Expert profile not found");
+  if (!expert) throw notFound("expertProfileNotFound");
   const user = await getDb().user.findUnique({ where: { id: auth.userId } });
   // subscriptionActive is true when expert has an active subscription,
   // including those scheduled to cancel at period end (access remains until currentPeriodEnd)
@@ -342,7 +342,7 @@ export async function updateExpertMe(auth, body) {
     const media = await getDb().mediaAsset.findFirst({
       where: { id: body.avatarMediaId, ownerUserId: auth.userId, status: "ready" }
     });
-    if (!media) throw badRequest("Invalid or unready avatar media asset");
+    if (!media) throw badRequest("invalidAvatarMediaAsset");
   }
 
   // Resolve categories when provided: must be a non-empty set of active categories.
@@ -385,7 +385,7 @@ export async function updateExpertMe(auth, body) {
 export async function resolveCategoryConnect(categoryIds) {
   if (categoryIds === undefined) return null;
   if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
-    throw badRequest("At least one category is required", "VALIDATION_ERROR", "categoryIds");
+    throw badRequest("atLeastOneCategoryRequired", "VALIDATION_ERROR", "categoryIds");
   }
   const unique = [...new Set(categoryIds)];
   const found = await getDb().category.findMany({
@@ -393,7 +393,7 @@ export async function resolveCategoryConnect(categoryIds) {
     select: { id: true },
   });
   if (found.length !== unique.length) {
-    throw badRequest("One or more categories are invalid or inactive", "VALIDATION_ERROR", "categoryIds");
+    throw badRequest("categoriesInvalidOrInactive", "VALIDATION_ERROR", "categoryIds");
   }
   return unique.map((id) => ({ id }));
 }
@@ -401,14 +401,14 @@ export async function resolveCategoryConnect(categoryIds) {
 export async function submitOnboarding(auth, body) {
   const db = getDb();
   const expert = await db.expertProfile.findFirst({ where: { userId: auth.userId } });
-  if (!expert) throw notFound("Expert profile not found");
+  if (!expert) throw notFound("expertProfileNotFound");
 
   // Validate avatar if provided
   if (body.avatarMediaId) {
     const media = await db.mediaAsset.findFirst({
       where: { id: body.avatarMediaId, ownerUserId: auth.userId, status: "ready" }
     });
-    if (!media) throw badRequest("Invalid or unready avatar media asset");
+    if (!media) throw badRequest("invalidAvatarMediaAsset");
   }
 
   // Resolve categories when provided (must be a non-empty set of active categories).
@@ -457,7 +457,7 @@ export async function submitOnboarding(auth, body) {
 
 export async function getVerification(auth) {
   const expert = await getDb().expertProfile.findFirst({ where: { userId: auth.userId } });
-  if (!expert) throw notFound("Expert profile not found");
+  if (!expert) throw notFound("expertProfileNotFound");
   const verification = await getDb().expertVerification.findFirst({
     where: { expertProfileId: expert.id },
     orderBy: { submittedAt: "desc" },
@@ -469,7 +469,7 @@ export async function getVerification(auth) {
 export async function submitVerificationDocuments(auth, body) {
   const db = getDb();
   const expert = await db.expertProfile.findFirst({ where: { userId: auth.userId } });
-  if (!expert) throw notFound("Expert profile not found");
+  if (!expert) throw notFound("expertProfileNotFound");
 
   // Validate submitted media IDs — must exist, belong to this user, and be ready
   const docIds = [];
@@ -477,7 +477,7 @@ export async function submitVerificationDocuments(auth, body) {
   if (body.secondaryId) docIds.push(body.secondaryId);
 
   if (docIds.length === 0) {
-    throw badRequest("At least one document (primaryId) is required", "VALIDATION_ERROR", "primaryId");
+    throw badRequest("atLeastOneDocumentRequired", "VALIDATION_ERROR", "primaryId");
   }
 
   const mediaAssets = await db.mediaAsset.findMany({
@@ -685,7 +685,7 @@ export async function getDashboard(auth) {
 
 export async function getRatingSummary(auth) {
   const expert = await getDb().expertProfile.findFirst({ where: { userId: auth.userId } });
-  if (!expert) throw notFound("Expert profile not found");
+  if (!expert) throw notFound("expertProfileNotFound");
   const reviews = await getDb().review.groupBy({
     by: ["rating"],
     where: { expertId: expert.id, status: "published" },
@@ -708,7 +708,7 @@ export async function getRatingSummary(auth) {
 
 export async function getMyReviews(auth, query) {
   const expert = await getDb().expertProfile.findFirst({ where: { userId: auth.userId } });
-  if (!expert) throw notFound("Expert profile not found");
+  if (!expert) throw notFound("expertProfileNotFound");
   return getExpertReviews(expert.id, query);
 }
 
@@ -722,7 +722,7 @@ export async function updateSettings(auth, body) {
     where: { userId: auth.userId },
     include: { settings: true },
   });
-  if (!expert) throw notFound("Expert profile not found");
+  if (!expert) throw notFound("expertProfileNotFound");
   const settings = await getDb().expertSettings.upsert({
     where: { expertProfileId: expert.id },
     create: { expertProfileId: expert.id, preferences: body.preferences || {} },

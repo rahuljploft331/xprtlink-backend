@@ -139,7 +139,7 @@ export async function removePaymentMethod(auth, methodId) {
   const method = await db.paymentMethod.findFirst({
     where: { id: methodId, customerProfileId: auth.customerProfileId },
   });
-  if (!method) throw notFound("Payment method not found");
+  if (!method) throw notFound("paymentMethodNotFound");
 
   // Detach from Stripe (non-fatal — local record is still deleted regardless)
   try {
@@ -173,15 +173,15 @@ export async function holdConsultationFunds(auth, consultationId, body) {
     where: { id: consultationId, customerId: auth.customerProfileId },
     include: { expert: true },
   });
-  if (!consultation) throw notFound("Consultation not found");
-  if (consultation.billingStatus === "charged") throw conflict("Consultation already paid", "ALREADY_PAID");
+  if (!consultation) throw notFound("consultationNotFound");
+  if (consultation.billingStatus === "charged") throw conflict("consultationAlreadyPaid", "ALREADY_PAID");
 
   // Retrieve customer with stripeCustomerId
   const customerProfile = await db.customerProfile.findUnique({
     where: { id: auth.customerProfileId },
   });
   if (!customerProfile.stripeCustomerId) {
-    throw badRequest("No Stripe customer found. Add a payment method first.", "NO_STRIPE_CUSTOMER");
+    throw badRequest("noStripeCustomerFound", "NO_STRIPE_CUSTOMER");
   }
 
   let paymentMethod;
@@ -195,7 +195,7 @@ export async function holdConsultationFunds(auth, consultationId, body) {
       orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
     });
   }
-  if (!paymentMethod) throw notFound("Payment method not found");
+  if (!paymentMethod) throw notFound("paymentMethodNotFound");
 
   // Listed rate is per 30 minutes. Hold one block, or $30, whichever is larger.
   const serverMinimumCents = consultationHoldMinimumCents(consultation.ratePerMinuteCents);
@@ -235,22 +235,22 @@ export async function payConsultation(auth, consultationId, body) {
     where: { id: consultationId, customerId: auth.customerProfileId },
     include: { expert: true, charge: true },
   });
-  if (!consultation) throw notFound("Consultation not found");
+  if (!consultation) throw notFound("consultationNotFound");
   if (consultation.status !== "completed") {
-    throw badRequest("Consultation must be completed before payment", "INVALID_STATE");
+    throw badRequest("consultationMustBeCompletedBeforePayment", "INVALID_STATE");
   }
   if (consultation.billingStatus === "charged" || consultation.charge) {
-    throw conflict("Consultation already paid", "ALREADY_PAID");
+    throw conflict("consultationAlreadyPaid", "ALREADY_PAID");
   }
 
   const paymentMethod = await db.paymentMethod.findFirst({
     where: { id: body.paymentMethodId, customerProfileId: auth.customerProfileId },
   });
-  if (!paymentMethod) throw notFound("Payment method not found");
+  if (!paymentMethod) throw notFound("paymentMethodNotFound");
 
   const amountCents = computeConsultationChargeCents(consultation);
   if (amountCents <= 0) {
-    throw badRequest("Nothing to charge for this consultation", "INVALID_AMOUNT");
+    throw badRequest("nothingToCharge", "INVALID_AMOUNT");
   }
 
   const currency = consultation.expert.currency || "USD";
@@ -497,7 +497,7 @@ export async function submitCustomConnectKyc(auth, body) {
     include: { user: true },
   });
 
-  if (!expert) throw notFound("Expert profile not found");
+  if (!expert) throw notFound("expertProfileNotFound");
 
   // Call Stripe Custom Account creation API
   const account = await stripeSvc.createCustomConnectAccount({
@@ -531,7 +531,7 @@ export async function attachBankAccount(auth, body) {
     where: { id: auth.expertProfileId },
   });
 
-  if (!expert) throw notFound("Expert profile not found");
+  if (!expert) throw notFound("expertProfileNotFound");
 
   // Expert must have completed KYC (Stripe Custom Connect account) before adding a bank account
   if (!expert.stripeAccountId) {
@@ -630,7 +630,7 @@ export async function handleStripeWebhook(payload, signature) {
 
 
 export async function listTransactions(auth, query) {
-  if (!auth.customerProfileId) throw forbidden("Customer access required");
+  if (!auth.customerProfileId) throw forbidden("customerAccessRequired");
   const { page, limit, skip } = parsePagination(query);
   const db = getDb();
 
@@ -693,14 +693,14 @@ export async function getTransaction(auth, transactionId) {
     },
   });
 
-  if (!tx) throw notFound("Transaction not found");
+  if (!tx) throw notFound("transactionNotFound");
 
   const consultation = tx.consultationCharge?.consultation;
   if (consultation) {
     // Consultation-linked transaction: check participant ownership
     const isCustomer = consultation.customerId === auth.customerProfileId;
     const isExpert = consultation.expertId === auth.expertProfileId;
-    if (!isCustomer && !isExpert) throw forbidden("Access denied");
+    if (!isCustomer && !isExpert) throw forbidden("notFound");
   } else {
     // C7: Subscription / other transaction: check ownership via metadata
     // metadata is stored as { expertProfileId, customerProfileId, ... } at creation time
@@ -712,7 +712,7 @@ export async function getTransaction(auth, transactionId) {
       (auth.expertProfileId && ownerExpertId === auth.expertProfileId) ||
       (auth.customerProfileId && ownerCustomerId === auth.customerProfileId);
 
-    if (!isOwner) throw forbidden("Access denied");
+    if (!isOwner) throw forbidden("notFound");
   }
 
   return toTransactionDto(tx);
@@ -755,7 +755,7 @@ export async function subscribe(auth, body) {
       where: { isActive: true },
     });
   }
-  if (!plan) throw notFound("Subscription plan not found");
+  if (!plan) throw notFound("subscriptionPlanNotFound");
 
   // IAP receipt validation stub — accept any non-empty receiptData.
   const externalSubscriptionId = `iap_stub_${crypto.randomUUID()}`;
@@ -871,7 +871,7 @@ export async function getMySubscription(auth) {
     orderBy: { createdAt: "desc" },
   });
 
-  if (!subscription) throw notFound("No active subscription");
+  if (!subscription) throw notFound("noActiveSubscription");
   return toExpertSubscriptionDto(subscription, subscription.plan);
 }
 
@@ -957,7 +957,7 @@ export async function cancelSubscription(auth) {
     orderBy: { createdAt: "desc" },
   });
 
-  if (!subscription) throw notFound("No active subscription to cancel");
+  if (!subscription) throw notFound("noActiveSubscriptionToCancel");
 
   // If already scheduled to cancel at period end, no-op
   if (subscription.cancelAtPeriodEnd) {

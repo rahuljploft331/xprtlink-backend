@@ -14,10 +14,10 @@ export async function requireAdmin(req, res, next) {
   // First verify JWT generically
   authenticate(req, res, async (err) => {
     if (err) return next(err);
-    if (!req.auth) return next(unauthorized());
+    if (!req.auth) return next(unauthorized("invalidOrExpiredToken"));
 
     if (!ADMIN_ROLES.includes(req.auth.role)) {
-      return next(forbidden("Admin access required"));
+      return next(forbidden("adminAccessRequired"));
     }
 
     try {
@@ -30,7 +30,7 @@ export async function requireAdmin(req, res, next) {
           where: { tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
         });
         if (!session) {
-          return next(unauthorized("Session has been revoked. Please log in again."));
+          return next(unauthorized("sessionRevoked"));
         }
       }
 
@@ -40,7 +40,7 @@ export async function requireAdmin(req, res, next) {
       });
 
       if (!admin || admin.status !== "active") {
-        return next(unauthorized("Admin account not found or suspended"));
+        return next(unauthorized("adminAccountSuspended"));
       }
 
       req.adminUser = admin;
@@ -71,7 +71,7 @@ export function hasPermission(adminUser, module, level = "view") {
 export function requirePermission(module, level = "view") {
   return (req, _res, next) => {
     if (!hasPermission(req.adminUser, module, level)) {
-      return next(forbidden(`Insufficient permission for module: ${module}`));
+      return next(forbidden("insufficientPermissionForModule", "FORBIDDEN", null, { module }));
     }
     next();
   };
@@ -83,7 +83,7 @@ export function requirePermission(module, level = "view") {
  */
 export function requireSuperAdmin(req, _res, next) {
   if (req.adminUser?.role !== "super_admin") {
-    return next(forbidden("Super admin access required"));
+    return next(forbidden("superAdminAccessRequired"));
   }
   next();
 }

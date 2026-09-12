@@ -52,7 +52,48 @@ Constants: `ADMIN_ROLES`, `ADMIN_MODULES`, `ADMIN_PERMISSION_LEVELS` in `shared/
 2. Mount under `src/routes` at `/api` **and** add the gateway proxy path
 3. `ResponseFormatter` — paginated lists use `data: { items, page, limit, total }`
 4. Return DTOs via mappers
-5. Update `postman.json` and sync (see `docs/postman-collections-reference.md`)
+5. **Add all user-facing strings to `shared/constants/messages.json` first** (see rule below)
+6. Update `postman.json` and sync (see `docs/postman-collections-reference.md`)
+
+## API response messages — SSOT
+
+**`shared/constants/messages.json` is the single source of truth for every string that reaches a client.**
+
+### Rules (mandatory for every agent, every PR)
+
+- **Never hardcode a prose string** inside an error helper call, `res.json()`, or `AppError` constructor.  
+  ❌ `throw notFound("Expert not found")`  
+  ✅ `throw notFound("expertNotFound")`
+
+- **Before writing a new user-facing string**, add its camelCase key to `messages.json`.  
+  Parameterised strings use `{placeholder}` syntax — `getMessage()` interpolates them.  
+  ```js
+  // messages.json
+  "insufficientPermissionForModule": "Insufficient permission for module: {module}"
+
+  // call site
+  throw forbidden("insufficientPermissionForModule", "FORBIDDEN", null, { module })
+  ```
+
+- **Error helpers** (`notFound`, `unauthorized`, `forbidden`, `badRequest`, `conflict` in `shared/utils/errors.js`) accept a **message key** as their first argument and resolve it via `getMessage()` internally.  
+  `badRequest` and `forbidden` also accept an optional 4th `params` object for interpolation.
+
+- **`errorHandler.js`** (Prisma-mapped errors, `notFoundHandler`, Zod fallback) — already uses `getMessage()`. Keep it that way; do not add hardcoded strings.
+
+- **Verify** before committing: run this one-liner to confirm every key you used exists in `messages.json`:
+  ```bash
+  node -e "
+    const fs = require('fs'), path = require('path');
+    const keys = new Set(Object.keys(JSON.parse(fs.readFileSync('shared/constants/messages.json','utf8'))));
+    const src = require('child_process').execSync('grep -rn --include=\"*.js\" getMessage services', {encoding:'utf8'});
+    const missing = [...src.matchAll(/getMessage\(\"([^\"]+)\"/g)]
+      .map(m => m[1]).filter(k => !keys.has(k));
+    if (missing.length) { console.error('Unknown keys:', missing); process.exit(1); }
+    else console.log('✅ All message keys valid');
+  "
+  ```
+
+
 
 ## Featured / trending
 
