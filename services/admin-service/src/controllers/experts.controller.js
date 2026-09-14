@@ -178,7 +178,13 @@ export async function update(req, res, next) {
     if (businessName !== undefined) profileData.businessName = businessName;
     if (consultationRateCents !== undefined) profileData.consultationRateCents = consultationRateCents;
     if (currency !== undefined) profileData.currency = currency;
-    if (experienceYears !== undefined) profileData.experienceYears = experienceYears;
+    if (experienceYears !== undefined) {
+      const parsedExperience = parseInt(experienceYears, 10);
+      if (isNaN(parsedExperience) || parsedExperience < 0 || parsedExperience > 99) {
+        return res.status(400).json({ success: false, message: getMessage("invalidQueryParameters"), code: "VALIDATION_ERROR" });
+      }
+      profileData.experienceYears = parsedExperience;
+    }
     if (searchEligible !== undefined) profileData.searchEligible = searchEligible;
 
     const expertProfile = await db.expertProfile.findUnique({ where: { id: req.params.id } });

@@ -27,7 +27,7 @@ export const expertPublicDtoSchema = z.object({
   serviceAreas: z.array(serviceAreaLocationSchema),
   consultationRate: z.number(),
   currency: z.string().length(3),
-  experienceYears: z.number().int().nonnegative(),
+  experienceYears: z.number().int().nonnegative().max(99),
   availabilityStatus: z.enum(["online", "offline", "busy"]),
   verificationStatus: z.enum([
     "unverified",
@@ -70,7 +70,7 @@ export const expertMeUpdateRequestSchema = z.object({
   languages: z.array(z.string().max(50)).max(20).optional(),
   serviceAreas: z.array(serviceAreaLocationSchema).max(20).optional(),
   consultationRate: z.number().positive().optional(),
-  experienceYears: z.number().int().nonnegative().optional(),
+  experienceYears: z.number().int().nonnegative().max(99).optional(),
   availabilityStatus: z.enum(["online", "offline", "busy"]).optional(),
   categoryIds: z.array(z.string().uuid()).min(1).max(20).optional(),
   avatarMediaId: z.string().uuid().optional(),
@@ -183,7 +183,7 @@ export const expertOnboardingRequestSchema = z.object({
   languages: z.array(z.string().max(50)).max(20).optional(),
   serviceAreas: z.array(serviceAreaLocationSchema).max(20).optional(),
   consultationRate: z.number().positive().optional(),
-  experienceYears: z.number().int().nonnegative().optional(),
+  experienceYears: z.number().int().nonnegative().max(99).optional(),
   categoryIds: z.array(z.string().uuid()).min(1).max(20).optional(),
   avatarMediaId: z.string().uuid().nullable().optional(),
 });
