@@ -181,8 +181,13 @@ export async function update(req, res, next) {
     if (experienceYears !== undefined) profileData.experienceYears = experienceYears;
     if (searchEligible !== undefined) profileData.searchEligible = searchEligible;
 
+    const expertProfile = await db.expertProfile.findUnique({ where: { id: req.params.id } });
+    if (!expertProfile) {
+      return res.status(404).json({ success: false, message: getMessage("expertNotFound"), code: "NOT_FOUND" });
+    }
+
     const expert = await db.user.update({
-      where: { id: req.params.id },
+      where: { id: expertProfile.userId },
       data: {
         ...userData,
         ...(Object.keys(profileData).length > 0 && {
@@ -205,9 +210,14 @@ export async function update(req, res, next) {
 export async function setStatus(req, res, next) {
   try {
     const db = getDb();
+    const expertProfile = await db.expertProfile.findUnique({ where: { id: req.params.id } });
+    if (!expertProfile) {
+      return res.status(404).json({ success: false, message: getMessage("expertNotFound"), code: "NOT_FOUND" });
+    }
+
     const status = req.path.endsWith("suspend") ? "suspended" : "active";
     const expert = await db.user.update({
-      where: { id: req.params.id },
+      where: { id: expertProfile.userId },
       data: { status },
     });
     return ResponseFormatter.success(res, { data: expert });
@@ -221,12 +231,12 @@ export async function getTransactions(req, res, next) {
     const db = getDb();
     const { page, limit, skip } = parsePagination(req.query);
     
-    const user = await db.user.findUnique({ where: { id: req.params.id }, include: { expertProfile: true } });
-    if (!user || !user.expertProfile) {
+    const expertProfile = await db.expertProfile.findUnique({ where: { id: req.params.id } });
+    if (!expertProfile) {
       return res.status(404).json({ success: false, message: getMessage("expertNotFound"), code: "NOT_FOUND" });
     }
 
-    const expertProfileId = user.expertProfile.id;
+    const expertProfileId = expertProfile.id;
 
     const [total, items] = await Promise.all([
       db.transaction.count({
@@ -274,12 +284,17 @@ export async function getSupportChats(req, res, next) {
     const db = getDb();
     const { page, limit, skip } = parsePagination(req.query);
 
+    const expertProfile = await db.expertProfile.findUnique({ where: { id: req.params.id } });
+    if (!expertProfile) {
+      return res.status(404).json({ success: false, message: getMessage("expertNotFound"), code: "NOT_FOUND" });
+    }
+
     const [total, items] = await Promise.all([
       db.supportConversation.count({
-        where: { userId: req.params.id }
+        where: { userId: expertProfile.userId }
       }),
       db.supportConversation.findMany({
-        where: { userId: req.params.id },
+        where: { userId: expertProfile.userId },
         skip,
         take: limit,
         orderBy: { lastMessageAt: "desc" },
