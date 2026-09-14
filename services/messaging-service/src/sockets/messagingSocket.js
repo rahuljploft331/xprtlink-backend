@@ -188,11 +188,15 @@ export function registerMessagingSockets(io) {
             senderUserId: auth.userId,
           });
 
-          // Also create a persistent in-app notification record so the peer
           // sees a badge even if they were offline when the message arrived.
           try {
-            const peerSockets = await io.in(`user:${peerUserId}`).fetchSockets();
-            if (peerSockets.length === 0) {
+            // Fetch all sockets currently in this specific conversation room
+            const roomSockets = await io.in(`conversation:${conversationId}`).fetchSockets();
+            // Check if the peer has any socket actively in this room
+            const peerIsActiveInRoom = roomSockets.some(s => s.data.auth?.userId === peerUserId);
+
+            // If they are not actively looking at this conversation room, dispatch a notification
+            if (!peerIsActiveInRoom) {
               const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
               const preview = message.body
                 ? message.body.slice(0, 80) + (message.body.length > 80 ? "..." : "")
