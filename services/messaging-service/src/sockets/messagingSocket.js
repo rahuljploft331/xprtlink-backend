@@ -167,11 +167,13 @@ export function registerMessagingSockets(io) {
 
     // 6. Send message
     socket.on("message:send", async (payload = {}, callback) => {
+      console.log(`[messaging-service] message:send received for conversation: ${payload.conversationId}`);
       try {
         const { conversationId, ...body } = payload;
         if (!conversationId) throw new Error("conversationId is required");
         const validated = sendMessageRequestSchema.parse(body);
         const message = await svc.sendMessage(auth, conversationId, validated);
+        console.log(`[messaging-service] message:send - Message created in DB: ${message.id}`);
 
         // Broadcast to conversation room (realtime chat inside thread)
         io.to(`conversation:${conversationId}`).emit("message:new", {
@@ -181,7 +183,9 @@ export function registerMessagingSockets(io) {
 
         // Notify peer's user room for badge/inbox preview updates
         const peerUserId = await svc.getConversationPeerUserId(conversationId, auth.userId);
+        console.log(`[messaging-service] message:send - Resolved peerUserId: ${peerUserId}`);
         if (peerUserId) {
+          console.log(`[messaging-service] message:send - Emitting inbox:updated to user:${peerUserId}`);
           io.to(`user:${peerUserId}`).emit("inbox:updated", {
             conversationId,
             lastMessage: message,
@@ -194,6 +198,7 @@ export function registerMessagingSockets(io) {
             const roomSockets = await io.in(`conversation:${conversationId}`).fetchSockets();
             // Check if the peer has any socket actively in this room
             const peerIsActiveInRoom = roomSockets.some(s => s.data.auth?.userId === peerUserId);
+            console.log(`[messaging-service] message:send - Is peer active in room? ${peerIsActiveInRoom} (Sockets in room: ${roomSockets.length})`);
 
             // If they are not actively looking at this conversation room, dispatch a notification
             if (!peerIsActiveInRoom) {
@@ -201,6 +206,8 @@ export function registerMessagingSockets(io) {
               const preview = message.body
                 ? message.body.slice(0, 80) + (message.body.length > 80 ? "..." : "")
                 : "Sent an attachment";
+              
+              console.log(`[messaging-service] message:send - Dispatching push notification via ${notifUrl}...`);
               await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
                 userIds: [peerUserId],
                 type: "new_message",
@@ -208,6 +215,7 @@ export function registerMessagingSockets(io) {
                 body: preview,
                 data: { conversationId, messageId: message.id, senderUserId: auth.userId },
               });
+              console.log(`[messaging-service] message:send - Push notification dispatched successfully.`);
             }
           } catch (err) {
             console.error(`[messaging:message:send] Notification dispatch failed: ${err.message}`);
