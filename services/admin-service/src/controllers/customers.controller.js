@@ -113,10 +113,32 @@ export async function getById(req, res, next) {
 export async function update(req, res, next) {
   try {
     const db = getDb();
+    const { email, phone, status, firstName, lastName } = req.body;
+    
+    const userData = {};
+    if (email !== undefined) userData.email = email;
+    if (phone !== undefined) userData.phone = phone;
+    if (status !== undefined) userData.status = status;
+    
+    const profileData = {};
+    if (firstName !== undefined) profileData.firstName = firstName;
+    if (lastName !== undefined) profileData.lastName = lastName;
+
     const customer = await db.user.update({
       where: { id: req.params.id },
-      data: req.body,
+      data: {
+        ...userData,
+        ...(Object.keys(profileData).length > 0 && {
+          customerProfile: {
+            update: profileData
+          }
+        })
+      },
+      include: {
+        customerProfile: true
+      }
     });
+
     return ResponseFormatter.success(res, { data: customer });
   } catch (err) {
     next(err);

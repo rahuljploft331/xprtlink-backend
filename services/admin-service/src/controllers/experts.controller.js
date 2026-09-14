@@ -158,10 +158,44 @@ export async function setFeatured(req, res, next) {
 export async function update(req, res, next) {
   try {
     const db = getDb();
+    const { 
+      email, phone, status, 
+      firstName, lastName, headline, bio, title, businessName, 
+      consultationRateCents, currency, experienceYears, searchEligible
+    } = req.body;
+    
+    const userData = {};
+    if (email !== undefined) userData.email = email;
+    if (phone !== undefined) userData.phone = phone;
+    if (status !== undefined) userData.status = status;
+    
+    const profileData = {};
+    if (firstName !== undefined) profileData.firstName = firstName;
+    if (lastName !== undefined) profileData.lastName = lastName;
+    if (headline !== undefined) profileData.headline = headline;
+    if (bio !== undefined) profileData.bio = bio;
+    if (title !== undefined) profileData.title = title;
+    if (businessName !== undefined) profileData.businessName = businessName;
+    if (consultationRateCents !== undefined) profileData.consultationRateCents = consultationRateCents;
+    if (currency !== undefined) profileData.currency = currency;
+    if (experienceYears !== undefined) profileData.experienceYears = experienceYears;
+    if (searchEligible !== undefined) profileData.searchEligible = searchEligible;
+
     const expert = await db.user.update({
       where: { id: req.params.id },
-      data: req.body,
+      data: {
+        ...userData,
+        ...(Object.keys(profileData).length > 0 && {
+          expertProfile: {
+            update: profileData
+          }
+        })
+      },
+      include: {
+        expertProfile: true
+      }
     });
+
     return ResponseFormatter.success(res, { data: expert });
   } catch (err) {
     next(err);
