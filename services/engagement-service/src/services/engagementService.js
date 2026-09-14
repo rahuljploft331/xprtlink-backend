@@ -202,9 +202,18 @@ export async function createQuote(auth, body) {
     // If client specified an expert, it MUST exist — no silent fallback
     expert = await db.expertProfile.findFirst({ where: { id: body.expertId } });
     if (!expert) throw notFound("expertNotFound");
+    
+    if (expert.userId === auth.userId) {
+      throw badRequest("cannotEngageWithSelf");
+    }
   } else {
     // No specific expert requested — find any approved expert (discovery-style quote)
-    expert = await db.expertProfile.findFirst({ where: { verificationStatus: "approved" } });
+    expert = await db.expertProfile.findFirst({ 
+      where: { 
+        verificationStatus: "approved",
+        userId: { not: auth.userId } 
+      } 
+    });
     if (!expert) throw notFound("noApprovedExpertsAvailable");
   }
 
@@ -719,6 +728,10 @@ export async function createConsultation(auth, body) {
   const db = getDb();
   const expert = await db.expertProfile.findUnique({ where: { id: body.expertId } });
   if (!expert) throw notFound("expertNotFound");
+
+  if (expert.userId === auth.userId) {
+    throw badRequest("cannotEngageWithSelf");
+  }
 
   // Guard: only allow consultations with verified, available experts
   if (expert.verificationStatus !== "approved") {

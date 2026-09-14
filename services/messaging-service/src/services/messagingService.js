@@ -164,6 +164,10 @@ export async function createConversation(auth, body) {
   const customer = await db.customerProfile.findUnique({ where: { id: customerId } });
   if (!customer) throw notFound("customerNotFound");
 
+  if (expert.userId === customer.userId) {
+    throw badRequest("cannotEngageWithSelf");
+  }
+
   const conversation = await db.conversation.upsert({
     where: {
       customerId_expertId: { customerId, expertId },

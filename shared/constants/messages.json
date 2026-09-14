@@ -223,5 +223,6 @@
   "transactions": "Transactions",
   "expertIdRequired": "expertId is required",
   "customerIdRequired": "customerId is required",
-  "phoneAlreadyProvided": "Phone number already provided"
+  "phoneAlreadyProvided": "Phone number already provided",
+  "cannotEngageWithSelf": "You cannot interact with your own profile"
 }

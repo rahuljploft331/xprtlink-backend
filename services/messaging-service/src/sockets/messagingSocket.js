@@ -182,7 +182,7 @@ export function registerMessagingSockets(io) {
         // Notify peer's user room for badge/inbox preview updates
         const peerUserId = await svc.getConversationPeerUserId(conversationId, auth.userId);
         if (peerUserId) {
-          io.to(`user:${peerUserId}`).emit("conversation:updated", {
+          io.to(`user:${peerUserId}`).emit("inbox:updated", {
             conversationId,
             lastMessage: message,
             senderUserId: auth.userId,
