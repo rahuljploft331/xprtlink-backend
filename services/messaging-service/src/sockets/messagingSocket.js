@@ -196,9 +196,10 @@ export function registerMessagingSockets(io) {
           try {
             // Fetch all sockets currently in this specific conversation room
             const roomSockets = await io.in(`conversation:${conversationId}`).fetchSockets();
+            console.log(`[messaging-service] message:send - Sockets in room: ${roomSockets.length}. Details:`, JSON.stringify(roomSockets.map(s => ({ id: s.id, auth: s.data.auth }))));
             // Check if the peer has any socket actively in this room
             const peerIsActiveInRoom = roomSockets.some(s => s.data.auth?.userId === peerUserId);
-            console.log(`[messaging-service] message:send - Is peer active in room? ${peerIsActiveInRoom} (Sockets in room: ${roomSockets.length})`);
+            console.log(`[messaging-service] message:send - Is peer active in room? ${peerIsActiveInRoom} (Target peerUserId: ${peerUserId})`);
 
             // If they are not actively looking at this conversation room, dispatch a notification
             if (!peerIsActiveInRoom) {
