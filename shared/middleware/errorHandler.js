@@ -73,8 +73,9 @@ export function errorHandler(err, _req, res, _next) {
     });
   }
 
-  const statusCode = err.statusCode || err.status || 500;
-  const message = err.message || getMessage("internalServerError");
+  let statusCode = err.statusCode || err.status || 500;
+  let message = err.message || getMessage("internalServerError");
+  let code = err.code || "INTERNAL_ERROR";
 
   // ── H5: ALWAYS log 5xx errors server-side (was previously inverted — only logged in dev) ──
   if (statusCode >= 500) {
@@ -83,12 +84,16 @@ export function errorHandler(err, _req, res, _next) {
     } catch {
       console.error(`[error] ${statusCode}:`, String(err));
     }
+    
+    // Sanitize the response for 500s so we don't leak raw 3rd-party error strings/codes (Rule 15)
+    message = getMessage("internalServerError");
+    code = "INTERNAL_ERROR";
   }
 
   res.status(statusCode).json({
     success: false,
     message,
-    code: err.code || "INTERNAL_ERROR",
+    code,
     ...(err.details !== undefined ? { details: err.details } : {}),
     ...(err.field !== undefined ? { field: err.field } : {}),
   });
