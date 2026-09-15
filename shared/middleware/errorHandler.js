@@ -29,14 +29,23 @@ export function errorHandler(err, _req, res, _next) {
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     // P2002 — Unique constraint violation
     if (err.code === "P2002") {
-      const field = err.meta?.target?.[0] ?? "field";
+      const target = err.meta?.target;
+      const targetStr = Array.isArray(target) ? target.join("_") : String(target || "field");
+      
+      let messageKey = "recordAlreadyExists";
+      if (targetStr.toLowerCase().includes("email")) {
+        messageKey = "emailAlreadyExists";
+      } else if (targetStr.toLowerCase().includes("phone")) {
+        messageKey = "phoneAlreadyInUse";
+      }
+
       // Always log constraint violations server-side for debugging
-      console.error(`[db] Unique constraint violation on '${field}':`, err.message);
+      console.error(`[db] Unique constraint violation on '${targetStr}':`, err.message);
       return res.status(409).json({
         success: false,
-        message: getMessage("recordAlreadyExists"),
+        message: getMessage(messageKey),
         code: "CONFLICT",
-        field,
+        field: targetStr,
       });
     }
     // P2025 — Record not found (e.g. update/delete on missing row)
