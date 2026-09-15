@@ -280,8 +280,15 @@ export async function payConsultation(auth, consultationId, body) {
     throw { statusCode: 502, code: "CAPTURE_FAILED", message: err.message };
   }
 
+  // Fetch dynamic commission rate
+  const commissionSetting = await db.platformSetting.findUnique({ where: { key: "commissionPercent" } });
+  let rate = 0.15;
+  if (commissionSetting && typeof commissionSetting.value === "number") {
+    rate = commissionSetting.value / 100;
+  }
+  
   // Record transaction
-  const commissionCents = computeConsultationCommissionCents(amountCents);
+  const commissionCents = computeConsultationCommissionCents(amountCents, rate);
   const expertShareCents = amountCents - commissionCents;
 
   const result = await db.$transaction(async (tx) => {
@@ -362,7 +369,12 @@ export async function captureConsultation(consultationId, durationSeconds) {
     return { skipped: true, reason: "zero_amount" };
   }
 
-  const commissionCents = computeConsultationCommissionCents(amountCents);
+  const commissionSetting = await db.platformSetting.findUnique({ where: { key: "commissionPercent" } });
+  let rate = 0.15;
+  if (commissionSetting && typeof commissionSetting.value === "number") {
+    rate = commissionSetting.value / 100;
+  }
+  const commissionCents = computeConsultationCommissionCents(amountCents, rate);
   const expertShareCents = amountCents - commissionCents;
   const currency = consultation.expert?.currency || "USD";
 
