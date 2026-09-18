@@ -755,6 +755,8 @@ export async function createConsultation(auth, body) {
   });
 
   // Notify expert of the incoming consultation request (non-fatal)
+  // DISABLED PER USER REQUEST for now
+  /*
   try {
     const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
     const customerName = `${consultation.customer.firstName ?? ""} ${consultation.customer.lastName ?? ""}`.trim() || "A customer";
@@ -768,6 +770,7 @@ export async function createConsultation(auth, body) {
   } catch (err) {
     console.error(`[createConsultation] Notification dispatch failed: ${err.message}`);
   }
+  */
 
   return toConsultationDetailDto(consultation, consultationContext(consultation));
 }
