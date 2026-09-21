@@ -174,7 +174,13 @@ export async function update(req, res, next) {
     const userData = {};
     if (email !== undefined) userData.email = email;
     if (phone !== undefined) userData.phone = phone;
-    if (status !== undefined) userData.status = status;
+    if (status !== undefined) {
+      userData.status = status;
+      if (status === "deleted") {
+        userData.deletedAt = new Date();
+        userData.firebaseUid = null;
+      }
+    }
     
     const profileData = {};
     if (firstName !== undefined) profileData.firstName = firstName;

@@ -1021,7 +1021,7 @@ export async function updateCustomerMe(auth, body) {
 export async function deleteCustomerAccount(auth) {
   await getDb().user.update({
     where: { id: auth.userId },
-    data: { status: "deleted", deletedAt: new Date() },
+    data: { status: "deleted", deletedAt: new Date(), firebaseUid: null },
   });
   return { deleted: true };
 }
