@@ -779,8 +779,11 @@ export async function checkAvailability(query) {
   if (query.email) {
     const row = await db.user.findFirst({
       where: { email: query.email, ...claimedAvailabilityFilter },
+      include: { customerProfile: true, expertProfile: true },
     });
-    result.emailAvailable = !row;
+    // If the user exists but doesn't have both profiles, we must return available: true
+    // so the frontend allows them to verify OTP and add the missing profile via /register
+    result.emailAvailable = !row || (!row.customerProfile || !row.expertProfile);
   }
   if (query.mobile || query.phone) {
     let phone = query.mobile || query.phone;
@@ -789,8 +792,10 @@ export async function checkAvailability(query) {
     if (!phone.startsWith("+")) phone = `+${phone}`;
     const row = await db.user.findFirst({
       where: { phone, ...claimedAvailabilityFilter },
+      include: { customerProfile: true, expertProfile: true },
     });
-    result.phoneAvailable = !row;
+    // Same logic as email: allow proceeding if they might be adding a missing profile
+    result.phoneAvailable = !row || (!row.customerProfile || !row.expertProfile);
   }
   return result;
 }
