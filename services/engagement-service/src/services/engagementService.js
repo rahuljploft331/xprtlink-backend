@@ -741,15 +741,25 @@ export async function createConsultation(auth, body) {
     throw badRequest("expertCurrentlyOffline", "EXPERT_OFFLINE");
   }
 
-  const activeConsultation = await db.consultation.findFirst({
+  // Guard: prevent creating multiple active consultations for the same pair
+  const activeConsultations = await db.consultation.findMany({
     where: {
       customerId: auth.customerProfileId,
       expertId: body.expertId,
       status: { in: ["requested", "ringing", "accepted", "in_progress"] },
     },
   });
-  if (activeConsultation) {
-    throw conflict("activeConsultationExists", "ACTIVE_CONSULTATION_EXISTS");
+  
+  for (const active of activeConsultations) {
+    if (active.status === "requested" || active.status === "ringing") {
+      // Auto-cancel ghost consultations that were abandoned before connecting
+      await db.consultation.update({
+        where: { id: active.id },
+        data: { status: "failed" },
+      });
+    } else {
+      throw conflict("activeConsultationExists", "ACTIVE_CONSULTATION_EXISTS");
+    }
   }
 
   const consultation = await db.consultation.create({
