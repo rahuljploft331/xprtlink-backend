@@ -531,6 +531,7 @@ model ExpertProfile {
   featuredRank          Int?               @map("featured_rank")
   featuredUntil         DateTime?          @map("featured_until") @db.Timestamptz(6)
   stripeAccountId       String?            @map("stripe_account_id") @db.VarChar(128)
+  poorReviewsAlert      Boolean            @default(false) @map("poor_reviews_alert")
   createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 

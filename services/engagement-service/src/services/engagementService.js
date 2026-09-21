@@ -1145,8 +1145,44 @@ export async function submitReview(auth, consultationId, body) {
     const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
     const expertProfile = await getDb().expertProfile.findUnique({
       where: { id: consultation.expertId },
-      select: { userId: true },
+      select: { userId: true, firstName: true, lastName: true },
     });
+    
+    // 1. Dispatch alert if rating <= 3 and the preceding review was also <= 3
+    if (body.rating <= 3) {
+      const lastTwoReviews = await getDb().review.findMany({
+        where: { expertId: consultation.expertId },
+        orderBy: { createdAt: "desc" },
+        take: 2,
+        select: { rating: true }
+      });
+      
+      if (lastTwoReviews.length === 2 && lastTwoReviews[0].rating <= 3 && lastTwoReviews[1].rating <= 3) {
+        await getDb().expertProfile.update({
+          where: { id: consultation.expertId },
+          data: { poorReviewsAlert: true }
+        });
+        
+        const admins = await getDb().adminUser.findMany({ select: { userId: true } });
+        const adminIds = admins.map(a => a.userId);
+        
+        if (adminIds.length > 0) {
+          const expertName = expertProfile ? `${expertProfile.firstName} ${expertProfile.lastName}` : "An expert";
+          await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+            userIds: adminIds,
+            type: "poor_reviews_alert",
+            title: "Expert Alert: Consecutive Poor Reviews",
+            body: `${expertName} has received back-to-back reviews of 3 stars or below.`,
+            data: { expertId: consultation.expertId },
+          }).catch(err => console.error(`[submitReview] Admin alert dispatch failed: ${err.message}`));
+          
+          // Trigger email logic here if email service is connected
+          console.log(`[MAIL_MOCK] Triggering alert email to admins regarding poor reviews for expert ${consultation.expertId}`);
+        }
+      }
+    }
+    
+    // 2. Notify the expert of the new review
     if (expertProfile?.userId) {
       const stars = "★".repeat(body.rating) + "☆".repeat(5 - body.rating);
       await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
