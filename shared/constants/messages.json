@@ -224,5 +224,6 @@
   "expertIdRequired": "expertId is required",
   "customerIdRequired": "customerId is required",
   "phoneAlreadyProvided": "Phone number already provided",
-  "cannotEngageWithSelf": "You cannot interact with your own profile"
+  "cannotEngageWithSelf": "You cannot interact with your own profile",
+  "activeConsultationExists": "You already have an active consultation with this expert."
 }

@@ -741,6 +741,17 @@ export async function createConsultation(auth, body) {
     throw badRequest("expertCurrentlyOffline", "EXPERT_OFFLINE");
   }
 
+  const activeConsultation = await db.consultation.findFirst({
+    where: {
+      customerId: auth.customerProfileId,
+      expertId: body.expertId,
+      status: { in: ["requested", "ringing", "accepted", "in_progress"] },
+    },
+  });
+  if (activeConsultation) {
+    throw conflict("activeConsultationExists", "ACTIVE_CONSULTATION_EXISTS");
+  }
+
   const consultation = await db.consultation.create({
     data: {
       customerId: auth.customerProfileId,
