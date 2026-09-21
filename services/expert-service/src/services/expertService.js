@@ -42,7 +42,7 @@ function activeBoostRank(expert) {
  * Rating / founding-member are only tiebreakers. All candidates must still satisfy
  * marketplace eligibility (approved + search-eligible) and also appear in normal search.
  */
-export async function getFeatured(limit = 10) {
+export async function getFeatured(limit = 10, categoryId = null) {
   const db = getDb();
   const now = new Date();
   const include = {
@@ -55,10 +55,13 @@ export async function getFeatured(limit = 10) {
     },
   };
 
+  const categoryFilter = categoryId ? { categories: { some: { id: categoryId } } } : {};
+
   // 1. Admin-pinned featured experts (respecting optional expiry), ordered by rank.
   const pinned = await db.expertProfile.findMany({
     where: {
       ...PUBLIC_WHERE,
+      ...categoryFilter,
       isFeatured: true,
       OR: [{ featuredUntil: null }, { featuredUntil: { gt: now } }],
     },
@@ -78,6 +81,7 @@ export async function getFeatured(limit = 10) {
     const backfill = await db.expertProfile.findMany({
       where: {
         ...PUBLIC_WHERE,
+        ...categoryFilter,
         id: { notIn: pinned.map((e) => e.id) },
         subscriptions: { some: { status: "active" } },
       },
@@ -104,8 +108,8 @@ export async function getFeatured(limit = 10) {
  * Currently reuses getFeatured() logic as requested by the client,
  * to be updated later with actual trending calculation (e.g. by activity/popularity).
  */
-export async function getTrending(limit = 10) {
-  return getFeatured(limit);
+export async function getTrending(limit = 10, categoryId = null) {
+  return getFeatured(limit, categoryId);
 }
 
 

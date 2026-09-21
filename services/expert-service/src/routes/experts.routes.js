@@ -16,7 +16,8 @@ router.get(
   optionalAuthenticate,
   asyncHandler(async (req, res) => {
     const { limit } = parsePagination(req.query, { defaultLimit: 10, maxLimit: 50 });
-    const data = await svc.getFeatured(limit);
+    const categoryId = req.query.categoryId;
+    const data = await svc.getFeatured(limit, categoryId);
     return ResponseFormatter.success(res, { message: getMessage("featuredExperts"), data });
   })
 );
@@ -26,7 +27,8 @@ router.get(
   optionalAuthenticate,
   asyncHandler(async (req, res) => {
     const { limit } = parsePagination(req.query, { defaultLimit: 10, maxLimit: 50 });
-    const data = await svc.getTrending(limit);
+    const categoryId = req.query.categoryId;
+    const data = await svc.getTrending(limit, categoryId);
     return ResponseFormatter.success(res, { message: getMessage("trendingExperts"), data });
   })
 );
