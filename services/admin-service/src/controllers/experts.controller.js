@@ -16,9 +16,13 @@ export async function list(req, res, next) {
     const { page, limit, skip } = parsePagination(req.query);
     const q = req.query.q?.trim();
     const status = req.query.status;
+    const poorReviewsAlert = req.query.poorReviewsAlert;
 
     const where = {};
     if (status) where.verificationStatus = status;
+    if (poorReviewsAlert === "Yes" || poorReviewsAlert === "true") where.poorReviewsAlert = true;
+    else if (poorReviewsAlert === "No" || poorReviewsAlert === "false") where.poorReviewsAlert = false;
+    
     if (q) {
       where.OR = [
         { firstName: { contains: q, mode: "insensitive" } },
