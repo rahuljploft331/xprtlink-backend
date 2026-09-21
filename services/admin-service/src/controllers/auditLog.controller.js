@@ -94,13 +94,28 @@ export async function list(req, res, next) {
       ];
     }
 
+    const validSortFields = {
+      createdAt: "createdAt",
+      action: "action",
+      module: "entityType",
+    };
+    const sortParam = req.query.sort?.trim();
+    const orderParam = req.query.order?.trim()?.toLowerCase() === "asc" ? "asc" : "desc";
+    const orderBy = {};
+
+    if (sortParam && validSortFields[sortParam]) {
+      orderBy[validSortFields[sortParam]] = orderParam;
+    } else {
+      orderBy.createdAt = "desc";
+    }
+
     const [total, logs] = await Promise.all([
       db.adminAuditLog.count({ where }),
       db.adminAuditLog.findMany({
         where,
         skip,
         take: limit,
-        orderBy: { createdAt: "desc" },
+        orderBy,
         include: {
           actor: { select: { id: true, name: true, email: true } },
         },
