@@ -297,6 +297,7 @@ export async function getLowRatingAlerts(req, res, next) {
     const formattedItems = items.map(r => ({
       id: r.id,
       consultationId: r.consultationId,
+      expertId: r.expertId,
       rating: r.rating,
       comment: r.comment,
       status: r.status,
