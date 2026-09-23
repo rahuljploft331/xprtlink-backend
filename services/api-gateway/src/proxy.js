@@ -37,6 +37,7 @@ export function createGatewayProxies() {
 
   const routes = [
     { path: "/api/v1/auth", target: serviceUrls.user },
+    { path: "/api/v1/users", target: serviceUrls.user },
     { path: "/api/v1/customers", target: serviceUrls.user },
     { path: "/api/v1/experts", target: serviceUrls.expert },
     { path: "/api/v1/search", target: serviceUrls.expert },

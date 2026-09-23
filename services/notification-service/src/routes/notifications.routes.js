@@ -66,6 +66,15 @@ router.post(
   })
 );
 
+router.delete(
+  "/device-token",
+  asyncHandler(async (req, res) => {
+    const body = deviceTokenRequestSchema.parse(req.body);
+    const data = await svc.removeDeviceToken(req.auth, body);
+    return ResponseFormatter.success(res, { message: getMessage("deviceTokenRemoved"), data });
+  })
+);
+
 router.get(
   "/unread-count",
   asyncHandler(async (req, res) => {

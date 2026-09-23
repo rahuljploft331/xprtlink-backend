@@ -107,8 +107,17 @@ export async function sendPushToUsers(db, userIds, title, body, data = {}) {
 
   if (!tokens.length) return;
 
+  // Deduplicate by token string — a single physical device should only
+  // receive one push even if stale rows exist for the same token.
+  const seen = new Set();
+  const unique = tokens.filter(({ token }) => {
+    if (seen.has(token)) return false;
+    seen.add(token);
+    return true;
+  });
+
   const results = await Promise.all(
-    tokens.map(async ({ id, token }) => ({
+    unique.map(async ({ id, token }) => ({
       id,
       token,
       ok: await sendPushToToken(token, title, body, data),

@@ -11,6 +11,18 @@ import { sendPushToUsers, resetBadgeForUser } from "./fcmSender.js";
 
 export async function registerDeviceToken(auth, body) {
   const db = getDb();
+
+  // A physical device has exactly one FCM token at a time.
+  // If this token was previously registered under a different userId
+  // (e.g. user switched accounts), remove it so only the current
+  // user receives pushes on this device.
+  await db.deviceToken.deleteMany({
+    where: {
+      token: body.token,
+      userId: { not: auth.userId },
+    },
+  });
+
   await db.deviceToken.upsert({
     where: {
       userId_token: {
@@ -29,6 +41,21 @@ export async function registerDeviceToken(auth, body) {
     },
   });
   return { registered: true };
+}
+
+/**
+ * Remove a device token on logout so the user no longer receives
+ * push notifications on this device for this account.
+ */
+export async function removeDeviceToken(auth, body) {
+  const db = getDb();
+  await db.deviceToken.deleteMany({
+    where: {
+      userId: auth.userId,
+      token: body.token,
+    },
+  });
+  return { removed: true };
 }
 
 export async function listNotifications(auth, query) {
