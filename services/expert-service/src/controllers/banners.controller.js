@@ -2,15 +2,7 @@ import { getDb } from "@xprtlink/shared/db/index.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
-import { z } from "zod";
-
-const createBannerSchema = z.object({
-  mediaUrl: z.string().url("Banner media URL must be a valid URL"),
-  linkUrl: z.string().url("Banner link URL must be a valid URL").optional().nullable(),
-  text: z.string().max(200).optional().nullable(),
-  targetCategoryId: z.string().uuid().optional().nullable(),
-  isActive: z.boolean().default(false), // NOT auto-published per §5.4
-});
+import { createBannerSchema } from "@xprtlink/shared/contracts/index.js";
 
 export const getMyBanners = async (auth) => {
   const db = getDb();

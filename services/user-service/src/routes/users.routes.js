@@ -2,7 +2,7 @@ import { Router } from "express";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { authenticate } from "@xprtlink/shared/middleware/auth.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
-import { getDb } from "@xprtlink/shared/db/prisma.js";
+import { getDb } from "@xprtlink/shared/db";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 
@@ -27,20 +27,20 @@ router.post(
       throw notFound("userNotFound");
     }
 
-    if (userIdToBlock === req.auth.id) {
+    if (userIdToBlock === req.auth.userId) {
       throw badRequest("cannotBlockSelf");
     }
 
     await db.userBlock.upsert({
       where: {
         blockerUserId_blockedUserId: {
-          blockerUserId: req.auth.id,
+          blockerUserId: req.auth.userId,
           blockedUserId: userIdToBlock,
         },
       },
       update: {},
       create: {
-        blockerUserId: req.auth.id,
+        blockerUserId: req.auth.userId,
         blockedUserId: userIdToBlock,
       },
     });
@@ -63,7 +63,7 @@ router.delete(
       await db.userBlock.delete({
         where: {
           blockerUserId_blockedUserId: {
-            blockerUserId: req.auth.id,
+            blockerUserId: req.auth.userId,
             blockedUserId,
           },
         },
