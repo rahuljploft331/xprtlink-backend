@@ -400,7 +400,6 @@ export async function blockUser(auth, targetUserId) {
   if (auth.userId === targetUserId) {
     throw badRequest("cannotBlockSelf");
   }
-  const db = getDb();
   await db.userBlock.upsert({
     where: {
       blockerUserId_blockedUserId: {
