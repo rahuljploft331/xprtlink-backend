@@ -36,7 +36,7 @@ router.get(
 router.get(
     "/banners/public",
     asyncHandler(async (req, res) => {
-      const data = await bannerCtrl.getPublicBanners(req.query.categoryId);
+      const data = await bannerCtrl.getPublicBanners(req.query.categoryId, req.query);
       return ResponseFormatter.success(res, { data });
   })
 );

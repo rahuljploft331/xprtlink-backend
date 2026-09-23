@@ -637,12 +637,17 @@ export async function forgotPassword(body) {
     return { sent: true, expiresInSeconds: ttlMs / 1000, channel: email ? "email" : "phone" };
   }
 
-  return createAndDeliverOtp({
+  await hashPassword("dummy_for_timing_consistency_1234");
+  const { ttlMs } = getOtpConfig();
+
+  createAndDeliverOtp({
     email,
     phone,
     purpose: "reset_password",
     channel: email ? "email" : "phone",
-  });
+  }).catch((err) => console.error("[forgotPassword] OTP delivery failed:", err.message));
+
+  return { sent: true, expiresInSeconds: ttlMs / 1000, channel: email ? "email" : "phone" };
 }
 
 export async function resetPassword(body) {

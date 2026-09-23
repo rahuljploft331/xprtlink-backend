@@ -247,5 +247,7 @@
   "userBlockRemoved": "User unblocked",
   "userBlockedCannotMessage": "You cannot message this user due to a block.",
   "cannotBlockSelf": "You cannot block yourself.",
-  "deviceTokenRemoved": "Device token removed"
+  "deviceTokenRemoved": "Device token removed",
+  "quoteExpiredCustomer": "Your quote request has expired",
+  "quoteExpiredExpert": "A quote request has expired"
 }

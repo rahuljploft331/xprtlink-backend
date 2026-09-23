@@ -46,7 +46,7 @@ function getApp() {
  */
 export async function sendPushToToken(token, title, body, data = {}) {
   const firebaseApp = getApp();
-  if (!firebaseApp) return false;
+  if (!firebaseApp) return { ok: false, isStale: false };
 
   // FCM data payloads require all values to be strings
   const stringData = {};
@@ -76,11 +76,11 @@ export async function sendPushToToken(token, title, body, data = {}) {
   try {
     const response = await admin.messaging().send(message);
     console.info(`[fcmSender] Push sent → ${response}`);
-    return true;
+    return { ok: true, isStale: false };
   } catch (err) {
-    // UNREGISTERED / INVALID_ARGUMENT means the token is stale — log but don't crash
     console.warn(`[fcmSender] Push failed for token ${token.slice(0, 20)}…: ${err.message}`);
-    return false;
+    const isStale = err.code === 'messaging/invalid-registration-token' || err.code === 'messaging/registration-token-not-registered';
+    return { ok: false, isStale };
   }
 }
 
@@ -117,15 +117,14 @@ export async function sendPushToUsers(db, userIds, title, body, data = {}) {
   });
 
   const results = await Promise.all(
-    unique.map(async ({ id, token }) => ({
-      id,
-      token,
-      ok: await sendPushToToken(token, title, body, data),
-    }))
+    unique.map(async ({ id, token }) => {
+      const res = await sendPushToToken(token, title, body, data);
+      return { id, isStale: res.isStale };
+    })
   );
 
   // Prune stale tokens that permanently failed
-  const deadIds = results.filter((r) => !r.ok).map((r) => r.id);
+  const deadIds = results.filter((r) => r.isStale).map((r) => r.id);
   if (deadIds.length) {
     await db.deviceToken.deleteMany({ where: { id: { in: deadIds } } }).catch(() => {});
     console.info(`[fcmSender] Pruned ${deadIds.length} stale device token(s)`);

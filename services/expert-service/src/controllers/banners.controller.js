@@ -1,6 +1,16 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
+import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
+import { z } from "zod";
+
+const createBannerSchema = z.object({
+  mediaUrl: z.string().url("Banner media URL must be a valid URL"),
+  linkUrl: z.string().url("Banner link URL must be a valid URL").optional().nullable(),
+  text: z.string().max(200).optional().nullable(),
+  targetCategoryId: z.string().uuid().optional().nullable(),
+  isActive: z.boolean().default(false), // NOT auto-published per §5.4
+});
 
 export const getMyBanners = async (auth) => {
   const db = getDb();
@@ -17,7 +27,13 @@ export const getMyBanners = async (auth) => {
   return banners;
 };
 
-export const createBanner = async (auth, { mediaUrl, linkUrl, isActive = true, targetCategoryId, text }) => {
+export const createBanner = async (auth, inputData) => {
+  const parsed = createBannerSchema.safeParse(inputData);
+  if (!parsed.success) {
+    throw badRequest("validationFailed", "BAD_REQUEST", null, parsed.error.format());
+  }
+  const { mediaUrl, linkUrl, isActive, targetCategoryId, text } = parsed.data;
+
   const db = getDb();
 
   const profile = await db.expertProfile.findUnique({
@@ -80,8 +96,9 @@ export const deleteBanner = async (auth, bannerId) => {
   return { success: true };
 };
 
-export const getPublicBanners = async (categoryId) => {
+export const getPublicBanners = async (categoryId, query = {}) => {
   const db = getDb();
+  const { limit, skip } = parsePagination(query, { defaultLimit: 20 });
   
   // We want to fetch active banners from experts who have an active subscription
   // and order them by the highest tier plan first (e.g. priceMonthlyCents desc)
@@ -110,7 +127,9 @@ export const getPublicBanners = async (categoryId) => {
           }
         }
       }
-    }
+    },
+    take: limit,
+    skip: skip,
   });
 
   // Since Prisma doesn't easily let us order by a relation's relation field (subscription plan price),

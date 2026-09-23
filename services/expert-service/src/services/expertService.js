@@ -86,8 +86,8 @@ export async function getFeatured(limit = 10, categoryId = null) {
         subscriptions: { some: { status: "active" } },
       },
       // Over-fetch, then sort by tier (boost) in memory since visibilityBoost lives on the plan.
-      take: (limit - pinned.length) * 5,
-      orderBy: [{ ratingAvg: "desc" }, { foundingMember: "desc" }],
+      take: (limit - pinned.length) * 20,
+      orderBy: [{ createdAt: "desc" }],
       include,
     });
 
