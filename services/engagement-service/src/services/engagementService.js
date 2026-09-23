@@ -54,9 +54,15 @@ export function consultationJoinStatus(consultation) {
   const customerJoined = matchJoinedParticipantId(
     consultation.customer?.user?.id,
     consultation.joinedParticipantIds
+  ) || matchJoinedParticipantId(
+    consultation.customer?.id || consultation.customerId,
+    consultation.joinedParticipantIds
   );
   const expertJoined = matchJoinedParticipantId(
     consultation.expert?.userId,
+    consultation.joinedParticipantIds
+  ) || matchJoinedParticipantId(
+    consultation.expert?.id || consultation.expertId,
     consultation.joinedParticipantIds
   );
   return {
@@ -684,8 +690,10 @@ async function consultationHistoryStats(db, auth) {
     select: {
       endedAt: true,
       joinedParticipantIds: true,
-      customer: { select: { user: { select: { id: true } } } },
-      expert: { select: { userId: true } },
+      customerId: true,
+      expertId: true,
+      customer: { select: { id: true, user: { select: { id: true } } } },
+      expert: { select: { id: true, userId: true } },
     }
   });
 

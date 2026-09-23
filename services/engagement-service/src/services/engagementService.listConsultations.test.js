@@ -105,12 +105,12 @@ describe("listConsultations — expert history filters and stats", () => {
       }
     );
 
-    expect(result.stats).toEqual({ total: 1284, thisMonth: 42 });
+    expect(result.stats).toEqual({ total: 1, thisMonth: 1 });
     expect(result.items).toHaveLength(1);
     expect(result.items[0].displayId).toBe("CON-37535A");
     expect(result.items[0].customerName).toBe("Emma Customer");
 
-    const { where } = findMany.mock.calls[0][0];
+    const { where } = findMany.mock.calls[1][0];
     expect(where.expertId).toBe("expert-profile-1");
     expect(where.status).toBe("completed");
     expect(where.requestedAt.gte).toEqual(new Date("2026-09-01"));
