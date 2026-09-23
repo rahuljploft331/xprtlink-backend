@@ -249,26 +249,29 @@ export async function register(body) {
         return existingActiveUserWithEmail.id;
       }
 
-      // Look for a pending user that matches BOTH identifiers (not just one).
-      // This prevents cross-contamination where a pending user with matching email
-      // but different phone gets its phone overwritten.
-      const pendingWhere = {
-        status: "pending_verification",
-        ...(email && phone
-          ? { email, phone }
-          : email
-            ? { email }
-            : { phone }),
-      };
+      // Look for any pending user that matches EITHER identifier.
+      // If we find them, delete all but one to free up the unique constraints,
+      // and update the remaining one to act as our new pending user.
+      const pendings = await tx.user.findMany({
+        where: {
+          status: "pending_verification",
+          OR: [
+            ...(email ? [{ email }] : []),
+            ...(phone ? [{ phone }] : []),
+          ],
+        },
+      });
 
-      const pending = await tx.user.findFirst({ where: pendingWhere });
-
-      if (pending) {
+      if (pendings.length > 0) {
+        const [keep, ...rest] = pendings;
+        for (const p of rest) {
+          await tx.user.delete({ where: { id: p.id } });
+        }
         await tx.user.update({
-          where: { id: pending.id },
+          where: { id: keep.id },
           data: { email, phone, passwordHash, termsAcceptedAt },
         });
-        return pending.id;
+        return keep.id;
       }
 
       const user = await tx.user.create({
@@ -287,9 +290,7 @@ export async function register(body) {
     if (err?.code === "P2002") {
       const field = err.meta?.target?.includes("email") ? "email" : "phone";
       throw conflict(
-        field === "email"
-          ? "An account with this email already exists."
-          : "This mobile number is already in use.",
+        field === "email" ? "emailAlreadyExists" : "phoneAlreadyInUse",
         field === "email" ? "EMAIL_TAKEN" : "PHONE_TAKEN"
       );
     }
