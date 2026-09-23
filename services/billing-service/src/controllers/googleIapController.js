@@ -35,20 +35,24 @@ export const verifyPurchase = async (req, res, next) => {
     const packageName = process.env.GOOGLE_PACKAGE_NAME;
 
     // Verify the subscription with Google
-    const response = await androidPublisher.purchases.subscriptions.get({
+    const response = await androidPublisher.purchases.subscriptionsv2.get({
       packageName,
-      subscriptionId, // The product ID (e.g. core_monthly)
       token: purchaseToken,
     });
 
     const purchase = response.data;
-    if (!purchase || !purchase.expiryTimeMillis) {
+    if (!purchase || !purchase.lineItems || purchase.lineItems.length === 0) {
       throw badRequest("invalidGooglePlayTransaction");
     }
     
-    const externalSubscriptionId = purchase.orderId || purchaseToken;
+    const lineItem = purchase.lineItems[0];
+    if (!lineItem.expiryTime) {
+      throw badRequest("invalidGooglePlayTransaction");
+    }
+
+    const externalSubscriptionId = purchaseToken;
     const now = new Date();
-    const periodEnd = new Date(parseInt(purchase.expiryTimeMillis, 10));
+    const periodEnd = new Date(lineItem.expiryTime);
 
     const subscription = await db.$transaction(async (tx) => {
       // Deactivate old active subscriptions for this expert

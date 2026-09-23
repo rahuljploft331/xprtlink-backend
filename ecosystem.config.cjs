@@ -39,9 +39,10 @@ const baseEnv = {
     process.env.MEDIA_SERVICE_URL || `http://localhost:${portMap["media-service"]}`,
   ADMIN_SERVICE_URL:
     process.env.ADMIN_SERVICE_URL || `http://localhost:${portMap["admin-service"]}`,
-  // Firebase credentials — required by notification-service for FCM push sending
+  // Service Account JSON — required by notification-service and billing-service
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
-  FIREBASE_SERVICE_ACCOUNT_JSON: process.env.FIREBASE_SERVICE_ACCOUNT_JSON,
+  SERVICE_ACCOUNT_JSON: process.env.SERVICE_ACCOUNT_JSON,
+  GOOGLE_PACKAGE_NAME: process.env.GOOGLE_PACKAGE_NAME,
 };
 
 const services = Object.keys(portMap).map((name) => ({
