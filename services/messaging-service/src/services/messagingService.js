@@ -132,7 +132,30 @@ export async function listConversations(auth, query) {
     rows.map((c) => [c.id, c.readStates[0] ?? null])
   );
 
+  // Batch fetch block status
+  const otherUserIds = rows.map(c => auth.role === 'customer' ? c.expert?.userId : c.customer?.userId).filter(Boolean);
+  const blocks = otherUserIds.length ? await db.userBlock.findMany({
+    where: {
+      OR: [
+        { blockerUserId: auth.userId, blockedUserId: { in: otherUserIds } },
+        { blockerUserId: { in: otherUserIds }, blockedUserId: auth.userId }
+      ]
+    }
+  }) : [];
+  
+  const blockMap = {};
+  for (const block of blocks) {
+    if (block.blockerUserId === auth.userId) {
+      blockMap[block.blockedUserId] = { isBlocked: true, blockedByMe: true };
+    } else if (block.blockedUserId === auth.userId) {
+      blockMap[block.blockerUserId] = { isBlocked: true, blockedByMe: false };
+    }
+  }
+
   const items = rows.map((conversation) => {
+    const otherUserId = auth.role === 'customer' ? conversation.expert?.userId : conversation.customer?.userId;
+    const blockState = blockMap[otherUserId] || { isBlocked: false, blockedByMe: false };
+
     const readState = readStateMap[conversation.id];
     const totalUnread = unreadByConvId[conversation.id] ?? 0;
     // If user has a read state, the unreadCount from groupBy is an overcount
@@ -145,6 +168,8 @@ export async function listConversations(auth, query) {
       ...peerInfo(conversation, auth),
       unreadCount,
       lastMessage,
+      isBlocked: blockState.isBlocked,
+      blockedByMe: blockState.blockedByMe,
     });
   });
 

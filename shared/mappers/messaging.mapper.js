@@ -3,7 +3,7 @@ import { resolveMediaUrl, toIso } from "./common.js";
 
 export function toConversationSummaryDto(
   conversation,
-  { peerName, peerAvatarUrl, unreadCount, lastMessage }
+  { peerName, peerAvatarUrl, unreadCount, lastMessage, isBlocked, blockedByMe }
 ) {
   return {
     id: conversation.id,
@@ -14,6 +14,8 @@ export function toConversationSummaryDto(
     lastMessagePreview: lastMessage?.body ?? null,
     lastMessageAt: toIso(conversation.lastMessageAt),
     unreadCount,
+    isBlocked: isBlocked ?? false,
+    blockedByMe: blockedByMe ?? false,
   };
 }
 
