@@ -6,7 +6,7 @@ import { getDb } from "@xprtlink/shared/db";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
-import { getConfig } from "@xprtlink/shared/config/index.js";
+import { getConfig } from "@xprtlink/shared/config/loadEnv.js";
 
 const router = Router();
 
