@@ -319,6 +319,11 @@ export function registerMessagingSockets(io) {
       try {
         if (!targetUserId) throw new Error(getMessage("conversationIdRequired"));
         const data = await svc.blockUser(auth, targetUserId);
+        // Broadcast to both users that block status changed
+        io.to(`user:${auth.userId}`).to(`user:${targetUserId}`).emit("user:blocked", {
+          blockerUserId: auth.userId,
+          blockedUserId: targetUserId,
+        });
         if (typeof callback === "function") {
           callback({ success: true, data });
         }
@@ -334,6 +339,10 @@ export function registerMessagingSockets(io) {
       try {
         if (!targetUserId) throw new Error(getMessage("conversationIdRequired"));
         const data = await svc.unblockUser(auth, targetUserId);
+        io.to(`user:${auth.userId}`).to(`user:${targetUserId}`).emit("user:unblocked", {
+          blockerUserId: auth.userId,
+          blockedUserId: targetUserId,
+        });
         if (typeof callback === "function") {
           callback({ success: true, data });
         }

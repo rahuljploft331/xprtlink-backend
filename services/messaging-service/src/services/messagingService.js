@@ -385,6 +385,18 @@ export async function markConversationRead(auth, conversationId) {
 }
 
 export async function blockUser(auth, targetUserId) {
+  const db = getDb();
+  let actualUserId = targetUserId;
+  const targetUser = await db.user.findUnique({ where: { id: actualUserId } });
+  if (!targetUser) {
+    const expert = await db.expertProfile.findUnique({ where: { id: actualUserId } });
+    if (expert) actualUserId = expert.userId;
+    else {
+      const customer = await db.customerProfile.findUnique({ where: { id: actualUserId } });
+      if (customer) actualUserId = customer.userId;
+    }
+  }
+  targetUserId = actualUserId;
   if (auth.userId === targetUserId) {
     throw badRequest("cannotBlockSelf");
   }
@@ -404,6 +416,17 @@ export async function blockUser(auth, targetUserId) {
 
 export async function unblockUser(auth, targetUserId) {
   const db = getDb();
+  let actualUserId = targetUserId;
+  const targetUser = await db.user.findUnique({ where: { id: actualUserId } });
+  if (!targetUser) {
+    const expert = await db.expertProfile.findUnique({ where: { id: actualUserId } });
+    if (expert) actualUserId = expert.userId;
+    else {
+      const customer = await db.customerProfile.findUnique({ where: { id: actualUserId } });
+      if (customer) actualUserId = customer.userId;
+    }
+  }
+  targetUserId = actualUserId;
   await db.userBlock.deleteMany({
     where: { blockerUserId: auth.userId, blockedUserId: targetUserId },
   });
