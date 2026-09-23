@@ -79,6 +79,8 @@ async function syncStripePlans(plans) {
 const TRUNCATE_ORDER = [
   "admin_audit_logs",
   "admin_permissions",
+  "user_blocks",
+  "conversation_reports",
   "conversation_read_states",
   "message_attachments",
   "messages",
@@ -146,10 +148,11 @@ export async function truncateAllTables() {
 }
 
 /**
- * Insert demo data from buildSeedPayload() into PostgreSQL.
+ * Seed platform-essential data only: categories, subscription plans,
+ * platform settings, app config, CMS pages, and admin users.
+ * This is the minimum data the platform needs to function.
  */
-export async function seedPostgres(payload) {
-  await truncateAllTables();
+export async function seedPlatformEssentials(payload) {
   const db = getDb();
 
   // Categories
@@ -250,6 +253,19 @@ export async function seedPostgres(payload) {
       }
     }
   }
+
+  return { categoryBySlug, planByCode };
+}
+
+/**
+ * Insert demo data from buildSeedPayload() into PostgreSQL.
+ */
+export async function seedPostgres(payload) {
+  await truncateAllTables();
+  const db = getDb();
+
+  // Seed platform essentials first
+  const { categoryBySlug, planByCode } = await seedPlatformEssentials(payload);
 
   // Customers
   for (const customer of payload.customers) {

@@ -1,18 +1,26 @@
 #!/usr/bin/env node
 /**
- * Reset backend seed data: clear local seed state + PostgreSQL then reseed.
+ * Reset backend data: clear local seed state + PostgreSQL then reseed.
  *
  * Usage:
- *   pnpm reset
- *   pnpm reset -- --no-seed   # wipe only
+ *   pnpm reset              # wipe ALL + reseed everything (platform + demo data)
+ *   pnpm reset -- --no-seed  # wipe ALL + reseed platform essentials only
+ *                             (admins, subscription plans, categories,
+ *                              platform settings, CMS pages, app config)
  *
- * Safe for local/dev. Do not run against production without intent.
+ * Platform essentials are ALWAYS restored so the admin portal remains
+ * functional after a reset.
  */
 import path from "path";
 import { fileURLToPath } from "url";
 import dotenv from "dotenv";
 import { buildSeedPayload } from "../seeder/index.js";
-import { closePostgres, resetPostgres, seedPostgres } from "../seeder/lib/pg.js";
+import {
+  closePostgres,
+  resetPostgres,
+  seedPostgres,
+  seedPlatformEssentials,
+} from "../seeder/lib/pg.js";
 import {
   clearSeedState,
   getStatePath,
@@ -31,29 +39,31 @@ async function main() {
 
   if (!process.env.DATABASE_URL) {
     console.log("[reset] postgres: skipped (DATABASE_URL not set)");
-  } else {
-    console.log("[reset] truncating postgres tables…");
-    await resetPostgres();
-    console.log("[reset] postgres: truncated");
-  }
-
-  if (noSeed) {
-    if (process.env.DATABASE_URL) await closePostgres();
-    console.log("[reset] wipe-only complete (--no-seed)");
     return;
   }
 
-  console.log("[reset] reseeding…");
-  const payload = buildSeedPayload();
-  writeSeedState(payload);
+  console.log("[reset] truncating postgres tables…");
+  await resetPostgres();
+  console.log("[reset] postgres: truncated");
 
-  if (process.env.DATABASE_URL) {
-    const pg = await seedPostgres(payload);
-    console.log(`[reset] postgres seed: ${JSON.stringify(pg.counts)}`);
+  const payload = buildSeedPayload();
+
+  if (noSeed) {
+    // --no-seed: restore only platform essentials (no demo customers/experts/etc.)
+    console.log("[reset] seeding platform essentials only (--no-seed)…");
+    await seedPlatformEssentials(payload);
     await closePostgres();
-  } else {
-    console.log("[reset] postgres seed: skipped (DATABASE_URL not set)");
+    console.log("[reset] done — platform essentials restored (admins, plans, categories, settings, CMS)");
+    console.log("[reset] no demo data seeded (customers, experts, consultations, quotes)");
+    console.log("[reset] tip: pnpm pm2:restart  if services are running");
+    return;
   }
+
+  console.log("[reset] reseeding everything (platform + demo data)…");
+  writeSeedState(payload);
+  const pg = await seedPostgres(payload);
+  console.log(`[reset] postgres seed: ${JSON.stringify(pg.counts)}`);
+  await closePostgres();
 
   console.log("[reset] done — backend seed restored to demo baseline");
   console.log("[reset] tip: pnpm pm2:restart  if services are running");
