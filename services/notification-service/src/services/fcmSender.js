@@ -2,10 +2,10 @@
  * FCM push sender using firebase-admin (FCM HTTP v1 API).
  *
  * Initialised lazily on first call so the service can still start
- * when FIREBASE_SERVICE_ACCOUNT_JSON is missing (dev without Firebase).
+ * when SERVICE_ACCOUNT_JSON is missing (dev without Firebase).
  *
  * Env vars required in production:
- *   FIREBASE_SERVICE_ACCOUNT_JSON  — full service-account JSON string
+ *   SERVICE_ACCOUNT_JSON  — full service-account JSON string
  *   FIREBASE_PROJECT_ID            — e.g. "xprtlink-2026"
  */
 
@@ -16,9 +16,9 @@ let app = null;
 function getApp() {
   if (app) return app;
 
-  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_JSON;
+  const raw = process.env.SERVICE_ACCOUNT_JSON;
   if (!raw) {
-    console.warn("[fcmSender] FIREBASE_SERVICE_ACCOUNT_JSON not set — push disabled");
+    console.warn("[fcmSender] SERVICE_ACCOUNT_JSON not set — push disabled");
     return null;
   }
 

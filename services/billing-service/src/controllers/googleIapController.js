@@ -4,9 +4,9 @@ import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { google } from "googleapis";
 
 function getGoogleClient() {
-  const serviceAccount = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  const serviceAccount = process.env.SERVICE_ACCOUNT_JSON;
   if (!serviceAccount) {
-    throw new Error("Google Service Account JSON is not configured in env");
+    throw new Error("Service Account JSON is not configured in env");
   }
 
   const credentials = JSON.parse(serviceAccount);

@@ -13,7 +13,7 @@ async function getFirebaseAdmin() {
   const { default: admin } = await import("firebase-admin");
 
   if (admin.apps.length === 0) {
-    const credentialsJson = getSecretSync("FIREBASE_SERVICE_ACCOUNT_JSON");
+    const credentialsJson = getSecretSync("SERVICE_ACCOUNT_JSON");
     const credentialsPath = getSecretSync("FIREBASE_SERVICE_ACCOUNT_PATH");
 
     if (credentialsJson) {
@@ -30,7 +30,7 @@ async function getFirebaseAdmin() {
       });
     } else {
       throw new Error(
-        "Firebase credentials not configured (FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH)"
+        "Firebase credentials not configured (SERVICE_ACCOUNT_JSON or FIREBASE_SERVICE_ACCOUNT_PATH)"
       );
     }
   }
