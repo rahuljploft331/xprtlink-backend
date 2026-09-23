@@ -53,7 +53,7 @@ router.post(
   "/logout",
   authenticate,
   asyncHandler(async (req, res) => {
-    await svc.logout(req.auth.userId, req.body.refreshToken);
+    await svc.logout(req.auth.userId, req.body.refreshToken, req.body.deviceToken);
     return ResponseFormatter.success(res, { message: getMessage("loggedOut"), data: null });
   })
 );

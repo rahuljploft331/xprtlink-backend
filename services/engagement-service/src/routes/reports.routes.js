@@ -6,6 +6,7 @@ import { expertReportRequestSchema } from "@xprtlink/shared/contracts/index.js";
 import * as svc from "../services/engagementService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { getDb } from "@xprtlink/shared/db/prisma.js";
+import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 
 const router = Router();
 
@@ -25,7 +26,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const { conversationId, reason } = req.body;
     if (!conversationId || !reason) {
-      return res.status(400).json({ success: false, message: "conversationId and reason are required" });
+      throw badRequest("missingRequiredFields");
     }
 
     const db = getDb();
@@ -33,7 +34,7 @@ router.post(
     // Check if conversation exists
     const conversation = await db.conversation.findUnique({ where: { id: conversationId } });
     if (!conversation) {
-      return res.status(404).json({ success: false, message: "Conversation not found" });
+      throw notFound("conversationNotFound");
     }
 
     const report = await db.conversationReport.create({
@@ -44,7 +45,7 @@ router.post(
       },
     });
 
-    return ResponseFormatter.success(res, { message: "Conversation reported successfully", data: report, status: 201 });
+    return ResponseFormatter.success(res, { message: getMessage("conversationReported"), data: report, status: 201 });
   })
 );
 

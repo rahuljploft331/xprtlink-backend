@@ -369,12 +369,20 @@ export async function login(body) {
 
 // ─── Logout & Token Refresh ───────────────────────────────────────────────────
 
-export async function logout(userId, refreshToken) {
+export async function logout(userId, refreshToken, deviceToken) {
   if (refreshToken) {
     await revokeRefreshToken(refreshToken);
   } else {
     // No specific token provided — revoke ALL sessions for this user as a safety measure
     await revokeAllUserSessions(userId);
+  }
+
+  // Remove the device's push token so the user stops receiving
+  // notifications on this device after logout.
+  if (deviceToken) {
+    await getDb().deviceToken.deleteMany({
+      where: { userId, token: deviceToken },
+    }).catch(() => {});
   }
 }
 

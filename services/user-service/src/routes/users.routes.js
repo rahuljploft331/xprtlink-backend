@@ -3,6 +3,8 @@ import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { authenticate } from "@xprtlink/shared/middleware/auth.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { getDb } from "@xprtlink/shared/db/prisma.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 
 const router = Router();
 
@@ -14,7 +16,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const { userIdToBlock } = req.body;
     if (!userIdToBlock) {
-      return res.status(400).json({ success: false, message: "userIdToBlock is required" });
+      throw badRequest("missingRequiredFields");
     }
 
     const db = getDb();
@@ -22,11 +24,11 @@ router.post(
     // Check if target user exists
     const targetUser = await db.user.findUnique({ where: { id: userIdToBlock } });
     if (!targetUser) {
-      return res.status(404).json({ success: false, message: "Target user not found" });
+      throw notFound("userNotFound");
     }
 
     if (userIdToBlock === req.auth.id) {
-      return res.status(400).json({ success: false, message: "You cannot block yourself" });
+      throw badRequest("cannotBlockSelf");
     }
 
     await db.userBlock.upsert({
@@ -44,7 +46,7 @@ router.post(
     });
 
     return ResponseFormatter.success(res, {
-      message: "User blocked successfully",
+      message: getMessage("userBlockCreated"),
       status: 201,
     });
   })
@@ -75,7 +77,7 @@ router.delete(
     }
 
     return ResponseFormatter.success(res, {
-      message: "User unblocked successfully",
+      message: getMessage("userBlockRemoved"),
       status: 200,
     });
   })

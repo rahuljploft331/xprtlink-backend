@@ -85,6 +85,7 @@
   "quoteHistoryLoaded": "Quote history loaded",
   "invalidSignature": "Invalid signature",
   "reportSubmitted": "Report submitted",
+  "missingRequiredFields": "Missing required fields",
   "pendingReviewsLoaded": "Pending reviews loaded",
   "consultationRequested": "Consultation requested",
   "consultationsLoaded": "Consultations loaded",
