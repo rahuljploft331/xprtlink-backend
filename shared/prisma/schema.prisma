@@ -280,7 +280,11 @@ model User {
   supportTickets       SupportTicket[]
   supportConversations SupportConversation[]
   supportMessagesSent  SupportMessage[]
+  blocksMade           UserBlock[]           @relation("BlocksMade")
+  blocksReceived       UserBlock[]           @relation("BlocksReceived")
+  conversationReports  ConversationReport[]  @relation("ConversationReports")
 
+  @@index([email])
   @@index([status])
   @@map("users")
 }
@@ -788,6 +792,7 @@ model Conversation {
   expert     ExpertProfile           @relation(fields: [expertId], references: [id], onDelete: Cascade)
   messages   Message[]
   readStates ConversationReadState[]
+  reports    ConversationReport[]
 
   @@unique([customerId, expertId])
   @@index([lastMessageAt(sort: Desc)])
@@ -840,6 +845,35 @@ model ConversationReadState {
 
   @@unique([conversationId, userId])
   @@map("conversation_read_states")
+}
+
+model UserBlock {
+  id            String   @id @default(uuid()) @db.Uuid
+  blockerUserId String   @map("blocker_user_id") @db.Uuid
+  blockedUserId String   @map("blocked_user_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  blocker User @relation("BlocksMade", fields: [blockerUserId], references: [id], onDelete: Cascade)
+  blocked User @relation("BlocksReceived", fields: [blockedUserId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerUserId, blockedUserId])
+  @@index([blockedUserId])
+  @@map("user_blocks")
+}
+
+model ConversationReport {
+  id               String   @id @default(uuid()) @db.Uuid
+  conversationId   String   @map("conversation_id") @db.Uuid
+  reporterUserId   String   @map("reporter_user_id") @db.Uuid
+  reason           String   @db.VarChar(500)
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  reporter     User         @relation("ConversationReports", fields: [reporterUserId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([reporterUserId])
+  @@map("conversation_reports")
 }
 
 // ─── Media (media-service) ───────────────────────────────────────────────────

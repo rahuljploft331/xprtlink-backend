@@ -63,6 +63,7 @@ export async function sendPushToToken(token, title, body, data = {}) {
       notification: {
         sound: "default",
         click_action: "FLUTTER_NOTIFICATION_CLICK",
+        tag: stringData.messageId || stringData.quoteId || stringData.consultationId || stringData.type || "xprtlink",
       },
     },
     apns: {
@@ -120,4 +121,37 @@ export async function sendPushToUsers(db, userIds, title, body, data = {}) {
     await db.deviceToken.deleteMany({ where: { id: { in: deadIds } } }).catch(() => {});
     console.info(`[fcmSender] Pruned ${deadIds.length} stale device token(s)`);
   }
+}
+
+/**
+ * Send a silent push to all of a user's iOS devices to reset the badge to 0.
+ * @param {import('@prisma/client').PrismaClient} db
+ * @param {string} userId
+ */
+export async function resetBadgeForUser(db, userId) {
+  const firebaseApp = getApp();
+  if (!firebaseApp) return;
+
+  const tokens = await db.deviceToken.findMany({
+    where: { userId },
+    select: { token: true },
+  });
+
+  if (!tokens.length) return;
+
+  await Promise.all(
+    tokens.map(async ({ token }) => {
+      try {
+        await admin.messaging().send({
+          token,
+          apns: {
+            payload: { aps: { "content-available": 1, badge: 0 } },
+          },
+        });
+      } catch (err) {
+        // Token may be dead — non-fatal
+        console.warn(`[fcmSender] Badge reset failed for token ${token.slice(0, 20)}…: ${err.message}`);
+      }
+    })
+  );
 }

@@ -1,3 +1,4 @@
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { verifyAccessToken } from "@xprtlink/shared/auth/jwt.js";
 import { getDb } from "@xprtlink/shared/db";
 import {
@@ -21,7 +22,7 @@ export function registerMessagingSockets(io) {
         socket.handshake.query?.token;
 
       if (!token) {
-        return next(new Error("Authentication token required"));
+        return next(new Error(getMessage("authTokenRequired")));
       }
 
       if (typeof token === "string" && token.startsWith("Bearer ")) {
@@ -36,7 +37,7 @@ export function registerMessagingSockets(io) {
         select: { status: true },
       });
       if (!user || user.status !== "active") {
-        return next(new Error("Account suspended or deleted"));
+        return next(new Error(getMessage("accountSuspendedOrDeleted")));
       }
 
       socket.data.auth = {
@@ -48,7 +49,7 @@ export function registerMessagingSockets(io) {
 
       next();
     } catch (err) {
-      return next(new Error("Invalid or expired authentication token"));
+      return next(new Error(getMessage("invalidOrExpiredAuthToken")));
     }
   });
 
@@ -75,7 +76,7 @@ export function registerMessagingSockets(io) {
         if (typeof callback === "function") {
           callback({
             success: false,
-            message: err.message || "Failed to list conversations",
+            message: err.message || getMessage("failedToListConversations"),
             code: err.code || "INTERNAL_ERROR",
           });
         }
@@ -104,7 +105,7 @@ export function registerMessagingSockets(io) {
         if (typeof callback === "function") {
           callback({
             success: false,
-            message: err.message || "Failed to create conversation",
+            message: err.message || getMessage("failedToCreateConversation"),
             code: err.code || "INTERNAL_ERROR",
           });
         }
@@ -114,7 +115,7 @@ export function registerMessagingSockets(io) {
     // 3. Join conversation room
     socket.on("conversation:join", async ({ conversationId } = {}, callback) => {
       try {
-        if (!conversationId) throw new Error("conversationId is required");
+        if (!conversationId) throw new Error(getMessage("conversationIdRequired"));
         await svc.loadConversation(auth, conversationId);
         socket.join(`conversation:${conversationId}`);
 
@@ -126,7 +127,7 @@ export function registerMessagingSockets(io) {
         if (typeof callback === "function") {
           callback({
             success: false,
-            message: err.message || "Failed to join conversation",
+            message: err.message || getMessage("failedToJoinConversation"),
             code: err.code || "FORBIDDEN",
           });
         }
@@ -147,7 +148,7 @@ export function registerMessagingSockets(io) {
     socket.on("message:history", async (payload = {}, callback) => {
       try {
         const { conversationId, ...query } = payload;
-        if (!conversationId) throw new Error("conversationId is required");
+        if (!conversationId) throw new Error(getMessage("conversationIdRequired"));
         const data = await svc.listMessages(auth, conversationId, query);
 
         if (typeof callback === "function") {
@@ -158,7 +159,7 @@ export function registerMessagingSockets(io) {
         if (typeof callback === "function") {
           callback({
             success: false,
-            message: err.message || "Failed to load messages",
+            message: err.message || getMessage("failedToLoadMessages"),
             code: err.code || "INTERNAL_ERROR",
           });
         }
@@ -170,7 +171,7 @@ export function registerMessagingSockets(io) {
       console.log(`[messaging-service] message:send received for conversation: ${payload.conversationId}`);
       try {
         const { conversationId, ...body } = payload;
-        if (!conversationId) throw new Error("conversationId is required");
+        if (!conversationId) throw new Error(getMessage("conversationIdRequired"));
         const validated = sendMessageRequestSchema.parse(body);
         const message = await svc.sendMessage(auth, conversationId, validated);
         console.log(`[messaging-service] message:send - Message created in DB: ${message.id}`);
@@ -231,7 +232,7 @@ export function registerMessagingSockets(io) {
         if (typeof callback === "function") {
           callback({
             success: false,
-            message: err.message || "Failed to send message",
+            message: err.message || getMessage("failedToSendMessage"),
             code: err.code || "INTERNAL_ERROR",
           });
         }
@@ -241,7 +242,7 @@ export function registerMessagingSockets(io) {
     // 7. Mark conversation read
     socket.on("message:read", async ({ conversationId } = {}, callback) => {
       try {
-        if (!conversationId) throw new Error("conversationId is required");
+        if (!conversationId) throw new Error(getMessage("conversationIdRequired"));
         const result = await svc.markConversationRead(auth, conversationId);
 
         // Broadcast read receipt to conversation room
@@ -259,7 +260,7 @@ export function registerMessagingSockets(io) {
         if (typeof callback === "function") {
           callback({
             success: false,
-            message: err.message || "Failed to mark conversation read",
+            message: err.message || getMessage("failedToMarkConversationRead"),
             code: err.code || "INTERNAL_ERROR",
           });
         }
@@ -311,6 +312,55 @@ export function registerMessagingSockets(io) {
           userId: auth.userId,
           isTyping: false,
         });
+      }
+    });
+    // 9. Block / unblock user
+    socket.on("user:block", async ({ targetUserId } = {}, callback) => {
+      try {
+        if (!targetUserId) throw new Error(getMessage("conversationIdRequired"));
+        const data = await svc.blockUser(auth, targetUserId);
+        if (typeof callback === "function") {
+          callback({ success: true, data });
+        }
+      } catch (err) {
+        console.error("[messaging-service] user:block error:", err.message);
+        if (typeof callback === "function") {
+          callback({ success: false, message: err.message, code: err.code || "INTERNAL_ERROR" });
+        }
+      }
+    });
+
+    socket.on("user:unblock", async ({ targetUserId } = {}, callback) => {
+      try {
+        if (!targetUserId) throw new Error(getMessage("conversationIdRequired"));
+        const data = await svc.unblockUser(auth, targetUserId);
+        if (typeof callback === "function") {
+          callback({ success: true, data });
+        }
+      } catch (err) {
+        console.error("[messaging-service] user:unblock error:", err.message);
+        if (typeof callback === "function") {
+          callback({ success: false, message: err.message, code: err.code || "INTERNAL_ERROR" });
+        }
+      }
+    });
+
+    // 10. Report conversation
+    socket.on("conversation:report", async ({ conversationId, reason } = {}, callback) => {
+      try {
+        if (!conversationId) throw new Error(getMessage("conversationIdRequired"));
+        if (!reason || typeof reason !== "string" || !reason.trim()) {
+          throw new Error("Reason is required");
+        }
+        const data = await svc.reportConversation(auth, conversationId, reason.trim());
+        if (typeof callback === "function") {
+          callback({ success: true, data });
+        }
+      } catch (err) {
+        console.error("[messaging-service] conversation:report error:", err.message);
+        if (typeof callback === "function") {
+          callback({ success: false, message: err.message, code: err.code || "INTERNAL_ERROR" });
+        }
       }
     });
 

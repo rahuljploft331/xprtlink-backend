@@ -1,3 +1,4 @@
+import { getMessage } from "../utils/messages.js";
 import { badRequest } from "../utils/errors.js";
 
 /**
@@ -78,7 +79,7 @@ export function getChatAttachmentConfig() {
  */
 export function validateChatAttachment(mimeType, sizeBytes) {
   if (!mimeType) {
-    throw badRequest("MIME type is required for chat attachments", "INVALID_MIME_TYPE");
+    throw badRequest(getMessage("chatMimeTypeRequired"), "INVALID_MIME_TYPE");
   }
 
   const normalizedMime = mimeType.trim().toLowerCase();
@@ -99,7 +100,7 @@ export function validateChatAttachment(mimeType, sizeBytes) {
   // the right workflow rather than the generic "allowed formats: <empty>" below.
   if (catConfig.enabled === false) {
     throw badRequest(
-      `${category === "video" ? "Video" : "Image"} attachments are not supported in chat. Share photos or videos through a Quote Request instead.`,
+      getMessage("chatMediaNotAllowedUpload").replace("{category}", category === "video" ? "Video" : "Image"),
       "CHAT_MEDIA_NOT_ALLOWED"
     );
   }

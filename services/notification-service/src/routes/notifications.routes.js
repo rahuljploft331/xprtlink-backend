@@ -82,6 +82,14 @@ router.post(
   })
 );
 
+router.post(
+  "/badge/reset",
+  asyncHandler(async (req, res) => {
+    await svc.resetBadge(req.auth);
+    return ResponseFormatter.success(res, { message: getMessage("badgeReset") });
+  })
+);
+
 router.get(
   "/preferences",
   asyncHandler(async (req, res) => {

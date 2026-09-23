@@ -325,6 +325,7 @@ export async function login(body) {
     // M7: constant-time dummy compare to prevent timing-based email enumeration.
     // Without this, nonexistent emails return ~0ms while valid ones take ~100ms (bcrypt).
     await verifyPassword("__dummy_password_that_never_matches__", "$2b$10$abcdefghijklmnopqrstuvuXzGO7fMC7VYzWH4HmM0vXcB9tBr7bq");
+    if (phone) throw unauthorized("mobileNotRegistered");
     throw unauthorized("invalidCredentials");
   }
 

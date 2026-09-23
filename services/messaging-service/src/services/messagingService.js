@@ -1,3 +1,4 @@
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { getDb } from "@xprtlink/shared/db";
 import { moveS3Object } from "@xprtlink/shared/utils/s3.js";
 import { customerDisplayName, resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
@@ -239,6 +240,24 @@ export async function sendMessage(auth, conversationId, body) {
   }
 
   await loadConversation(auth, conversationId);
+  
+  // Check if either party has blocked the other
+  const peerUserId = await getConversationPeerUserId(conversationId, auth.userId);
+  if (peerUserId) {
+    const db = getDb();
+    const block = await db.userBlock.findFirst({
+      where: {
+        OR: [
+          { blockerUserId: auth.userId, blockedUserId: peerUserId },
+          { blockerUserId: peerUserId, blockedUserId: auth.userId },
+        ],
+      },
+    });
+    if (block) {
+      throw forbidden("userBlockedCannotMessage");
+    }
+  }
+
   const db = getDb();
   const type = body.mediaIds?.length ? "attachment" : "text";
 
@@ -266,10 +285,7 @@ export async function sendMessage(auth, conversationId, body) {
           a.mimeType?.toLowerCase().startsWith("video/")
       );
       if (blocked) {
-        throw badRequest(
-          "Images and videos cannot be sent in chat. Share them through a Quote Request instead.",
-          "CHAT_MEDIA_NOT_ALLOWED"
-        );
+        throw badRequest(getMessage("chatMediaNotAllowed"), "CHAT_MEDIA_NOT_ALLOWED");
       }
     }
 
@@ -366,4 +382,43 @@ export async function markConversationRead(auth, conversationId) {
   });
 
   return { read: true, unreadCount: 0 };
+}
+
+export async function blockUser(auth, targetUserId) {
+  if (auth.userId === targetUserId) {
+    throw badRequest("cannotBlockSelf");
+  }
+  const db = getDb();
+  await db.userBlock.upsert({
+    where: {
+      blockerUserId_blockedUserId: {
+        blockerUserId: auth.userId,
+        blockedUserId: targetUserId,
+      },
+    },
+    create: { blockerUserId: auth.userId, blockedUserId: targetUserId },
+    update: {},
+  });
+  return { blocked: true };
+}
+
+export async function unblockUser(auth, targetUserId) {
+  const db = getDb();
+  await db.userBlock.deleteMany({
+    where: { blockerUserId: auth.userId, blockedUserId: targetUserId },
+  });
+  return { blocked: false };
+}
+
+export async function reportConversation(auth, conversationId, reason) {
+  await loadConversation(auth, conversationId);
+  const db = getDb();
+  const report = await db.conversationReport.create({
+    data: {
+      conversationId,
+      reporterUserId: auth.userId,
+      reason,
+    },
+  });
+  return { id: report.id, reported: true };
 }

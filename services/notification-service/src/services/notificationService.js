@@ -7,7 +7,7 @@ import {
 import { notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 import { DEFAULT_NOTIFICATION_PREFERENCES } from "@xprtlink/shared/constants/index.js";
-import { sendPushToUsers } from "./fcmSender.js";
+import { sendPushToUsers, resetBadgeForUser } from "./fcmSender.js";
 
 export async function registerDeviceToken(auth, body) {
   const db = getDb();
@@ -80,6 +80,7 @@ export async function markAllRead(auth) {
     where: { userId: auth.userId, readAt: null, clearedAt: null },
     data: { readAt: new Date() },
   });
+  resetBadgeForUser(getDb(), auth.userId).catch(() => {});
   return { marked: result.count };
 }
 
@@ -210,4 +211,9 @@ export async function dispatchNotification({ userIds, type, title, body: bodyTex
   });
 
   return { dispatched: created.count };
+}
+
+export async function resetBadge(auth) {
+  await resetBadgeForUser(getDb(), auth.userId);
+  return { reset: true };
 }
