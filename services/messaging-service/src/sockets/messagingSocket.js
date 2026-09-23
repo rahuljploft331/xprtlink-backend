@@ -214,10 +214,13 @@ export function registerMessagingSockets(io) {
                 : "Sent an attachment";
               
               let senderName = "New Message";
+              let senderAvatarUrl = null;
               try {
-                senderName = await svc.getConversationSenderName(conversationId, auth);
+                const info = await svc.getConversationSenderInfo(conversationId, auth);
+                senderName = info.name;
+                senderAvatarUrl = info.avatarUrl;
               } catch (e) {
-                console.warn(`[messaging-service] Failed to get sender name for push:`, e.message);
+                console.warn(`[messaging-service] Failed to get sender info for push:`, e.message);
               }
 
               console.log(`[messaging-service] message:send - Dispatching push notification via ${notifUrl}...`);
@@ -226,7 +229,7 @@ export function registerMessagingSockets(io) {
                 type: "new_message",
                 title: senderName,
                 body: preview,
-                data: { conversationId, messageId: message.id, senderUserId: auth.userId, senderName },
+                data: { conversationId, messageId: message.id, senderUserId: auth.userId, senderName, senderAvatarUrl },
               });
               console.log(`[messaging-service] message:send - Push notification dispatched successfully.`);
             }

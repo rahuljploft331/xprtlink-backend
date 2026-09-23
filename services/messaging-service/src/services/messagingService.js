@@ -48,12 +48,18 @@ export async function getConversationPeerUserId(conversationId, currentUserId) {
   return conversation.customer?.userId ?? null;
 }
 
-export async function getConversationSenderName(conversationId, auth) {
+export async function getConversationSenderInfo(conversationId, auth) {
   const conversation = await loadConversation(auth, conversationId);
   if (auth.role === "customer") {
-    return customerDisplayName(conversation.customer?.user, conversation.customer) || "Customer";
+    return {
+      name: customerDisplayName(conversation.customer?.user, conversation.customer) || "Customer",
+      avatarUrl: resolveMediaUrl(conversation.customer?.avatarMedia?.storageKey),
+    };
   }
-  return expertDisplayName(conversation.expert) || "Expert";
+  return {
+    name: expertDisplayName(conversation.expert) || "Expert",
+    avatarUrl: resolveMediaUrl(conversation.expert?.avatarMedia?.storageKey),
+  };
 }
 
 async function countUnreadMessages(conversationId, userId, lastReadMessage) {
