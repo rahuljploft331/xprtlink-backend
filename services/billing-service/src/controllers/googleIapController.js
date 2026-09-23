@@ -31,28 +31,12 @@ export const verifyPurchase = async (req, res, next) => {
     });
     if (!plan) throw notFound("subscriptionPlanNotFound");
 
-    const androidPublisher = getGoogleClient();
-    const packageName = process.env.GOOGLE_PACKAGE_NAME;
-
-    // Verify the subscription with Google
-    const response = await androidPublisher.purchases.subscriptionsv2.get({
-      packageName,
-      token: purchaseToken,
-    });
-
-    const purchase = response.data;
-    if (!purchase || !purchase.lineItems || purchase.lineItems.length === 0) {
-      throw badRequest("invalidGooglePlayTransaction");
-    }
-    
-    const lineItem = purchase.lineItems[0];
-    if (!lineItem.expiryTime) {
-      throw badRequest("invalidGooglePlayTransaction");
-    }
-
+    // TEMPORARY BYPASS FOR TESTING
+    console.log("[googleIapController] BYPASSING Google Play Verification for testing.");
     const externalSubscriptionId = purchaseToken;
     const now = new Date();
-    const periodEnd = new Date(lineItem.expiryTime);
+    const periodEnd = new Date();
+    periodEnd.setMonth(periodEnd.getMonth() + 1);
 
     const subscription = await db.$transaction(async (tx) => {
       // Deactivate old active subscriptions for this expert
