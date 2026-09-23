@@ -861,10 +861,10 @@ export async function socialLogin(body) {
     }
   }
 
-  if (!user.phone) {
+  if (!user.phone || user.status === "pending_verification") {
     return {
       needsProfileCompletion: true,
-      missing: ["phone"],
+      missing: user.phone ? [] : ["phone"],
       completionToken: signCompletionToken({
         sub: user.id,
         role,
@@ -914,7 +914,7 @@ export async function socialComplete(body) {
 
   const user = await db.user.findUnique({ where: { id: userId } });
   if (!user) throw notFound("userNotFound");
-  if (user.phone) {
+  if (user.phone && user.status !== "pending_verification") {
     throw badRequest("phoneAlreadyProvided", "PHONE_ALREADY_SET", "phone");
   }
 

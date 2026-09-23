@@ -734,3 +734,11 @@ export async function updateSettings(auth, body) {
   });
   return toExpertSettingsDto(settings);
 }
+
+export async function deleteExpertAccount(auth) {
+  await getDb().user.update({
+    where: { id: auth.userId },
+    data: { status: "deleted", deletedAt: new Date(), firebaseUid: null },
+  });
+  return { deleted: true };
+}

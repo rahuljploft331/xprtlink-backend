@@ -145,6 +145,16 @@ router.patch(
   })
 );
 
+router.post(
+  "/me/delete",
+  authenticate,
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const data = await svc.deleteExpertAccount(req.auth);
+    return ResponseFormatter.success(res, { message: getMessage("accountDeleted"), data });
+  })
+);
+
 router.get(
   "/me/banners",
   authenticate,
