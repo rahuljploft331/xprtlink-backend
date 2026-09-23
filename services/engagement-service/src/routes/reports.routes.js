@@ -5,7 +5,7 @@ import { authenticate } from "@xprtlink/shared/middleware/auth.js";
 import { expertReportRequestSchema } from "@xprtlink/shared/contracts/index.js";
 import * as svc from "../services/engagementService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
-import { getDb } from "@xprtlink/shared/db/prisma.js";
+import { getDb } from "@xprtlink/shared/db";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 
 const router = Router();
@@ -40,7 +40,7 @@ router.post(
     const report = await db.conversationReport.create({
       data: {
         conversationId,
-        reporterUserId: req.auth.id,
+        reporterUserId: req.auth.userId,
         reason: reason.substring(0, 500),
       },
     });
