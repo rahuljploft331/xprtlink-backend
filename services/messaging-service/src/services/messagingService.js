@@ -48,6 +48,14 @@ export async function getConversationPeerUserId(conversationId, currentUserId) {
   return conversation.customer?.userId ?? null;
 }
 
+export async function getConversationSenderName(conversationId, auth) {
+  const conversation = await loadConversation(auth, conversationId);
+  if (auth.role === "customer") {
+    return customerDisplayName(conversation.customer?.user, conversation.customer) || "Customer";
+  }
+  return expertDisplayName(conversation.expert) || "Expert";
+}
+
 async function countUnreadMessages(conversationId, userId, lastReadMessage) {
   return getDb().message.count({
     where: {

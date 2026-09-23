@@ -12,4 +12,31 @@ router.get("/", (_req, res) => {
   });
 });
 
+
+import { getIo } from "../sockets/messagingSocket.js";
+
+router.post("/internal/events/user-blocked", (req, res) => {
+  const { blockerUserId, blockedUserId } = req.body;
+  const io = getIo();
+  if (io) {
+    io.to(`user:${blockerUserId}`).to(`user:${blockedUserId}`).emit("user:blocked", {
+      blockerUserId,
+      blockedUserId,
+    });
+  }
+  return res.json({ success: true });
+});
+
+router.post("/internal/events/user-unblocked", (req, res) => {
+  const { blockerUserId, blockedUserId } = req.body;
+  const io = getIo();
+  if (io) {
+    io.to(`user:${blockerUserId}`).to(`user:${blockedUserId}`).emit("user:unblocked", {
+      blockerUserId,
+      blockedUserId,
+    });
+  }
+  return res.json({ success: true });
+});
+
 export default router;

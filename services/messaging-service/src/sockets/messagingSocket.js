@@ -12,7 +12,11 @@ import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
  * Register Socket.IO authentication and event listeners for real-time messaging.
  * @param {import("socket.io").Server} io
  */
+let _io = null;
+export function getIo() { return _io; }
+
 export function registerMessagingSockets(io) {
+  _io = io;
   // Handshake authentication middleware
   io.use(async (socket, next) => {
     try {
@@ -209,13 +213,20 @@ export function registerMessagingSockets(io) {
                 ? message.body.slice(0, 80) + (message.body.length > 80 ? "..." : "")
                 : "Sent an attachment";
               
+              let senderName = "New Message";
+              try {
+                senderName = await svc.getConversationSenderName(conversationId, auth);
+              } catch (e) {
+                console.warn(`[messaging-service] Failed to get sender name for push:`, e.message);
+              }
+
               console.log(`[messaging-service] message:send - Dispatching push notification via ${notifUrl}...`);
               await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
                 userIds: [peerUserId],
                 type: "new_message",
-                title: "New Message",
+                title: senderName,
                 body: preview,
-                data: { conversationId, messageId: message.id, senderUserId: auth.userId },
+                data: { conversationId, messageId: message.id, senderUserId: auth.userId, senderName },
               });
               console.log(`[messaging-service] message:send - Push notification dispatched successfully.`);
             }

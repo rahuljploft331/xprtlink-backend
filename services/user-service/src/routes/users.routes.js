@@ -5,6 +5,8 @@ import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { getDb } from "@xprtlink/shared/db";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
+import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
+import { getConfig } from "@xprtlink/shared/config/index.js";
 
 const router = Router();
 
@@ -61,6 +63,17 @@ router.post(
       },
     });
 
+    
+    try {
+      const { serviceUrls } = getConfig("user-service");
+      await internalPost(serviceUrls.messaging, '/internal/events/user-blocked', {
+        blockerUserId: req.auth.userId,
+        blockedUserId: actualUserId,
+      });
+    } catch(err) {
+      console.error("[user-service] Failed to broadcast block event:", err.message);
+    }
+
     return ResponseFormatter.success(res, {
       message: getMessage("userBlockCreated"),
       status: 201,
@@ -74,13 +87,23 @@ router.delete(
   asyncHandler(async (req, res) => {
     const db = getDb();
     const blockedUserId = req.params.id;
+    let actualUserId = blockedUserId;
+    const targetUser = await db.user.findUnique({ where: { id: actualUserId } });
+    if (!targetUser) {
+      const expert = await db.expertProfile.findUnique({ where: { id: blockedUserId } });
+      if (expert) actualUserId = expert.userId;
+      else {
+        const customer = await db.customerProfile.findUnique({ where: { id: blockedUserId } });
+        if (customer) actualUserId = customer.userId;
+      }
+    }
 
     try {
       await db.userBlock.delete({
         where: {
           blockerUserId_blockedUserId: {
             blockerUserId: req.auth.userId,
-            blockedUserId,
+            blockedUserId: actualUserId,
           },
         },
       });
@@ -90,6 +113,17 @@ router.delete(
       } else {
         throw err;
       }
+    }
+
+
+    try {
+      const { serviceUrls } = getConfig("user-service");
+      await internalPost(serviceUrls.messaging, '/internal/events/user-unblocked', {
+        blockerUserId: req.auth.userId,
+        blockedUserId: actualUserId,
+      });
+    } catch(err) {
+      console.error("[user-service] Failed to broadcast unblock event:", err.message);
     }
 
     return ResponseFormatter.success(res, {
