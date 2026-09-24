@@ -19,7 +19,11 @@ export async function list(req, res) {
     where.status = status;
   }
   if (role) {
-    where.user = { role };
+    if (role === "expert") {
+      where.user = { expertProfile: { isNot: null } };
+    } else if (role === "customer") {
+      where.user = { customerProfile: { isNot: null } };
+    }
   }
 
   const [total, items] = await Promise.all([
@@ -30,14 +34,29 @@ export async function list(req, res) {
       take,
       orderBy: { createdAt: "desc" },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+        user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true } }, expertProfile: { select: { firstName: true, lastName: true } } } },
         attachment: { select: { id: true, url: true } }
       }
     })
   ]);
 
+  const formattedItems = items.map(ticket => {
+    const profile = ticket.user?.customerProfile || ticket.user?.expertProfile || {};
+    const role = ticket.user?.expertProfile ? "expert" : "customer";
+    return {
+      ...ticket,
+      user: {
+        id: ticket.user?.id,
+        email: ticket.user?.email,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        role: role
+      }
+    };
+  });
+
   return ResponseFormatter.success(res, {
-    data: items,
+    data: formattedItems,
     meta: { total, page: Number(page), limit: Number(limit) }
   });
 }
@@ -57,7 +76,7 @@ export async function reply(req, res) {
 
   const ticket = await db.supportTicket.findUnique({
     where: { id },
-    include: { user: true }
+    include: { user: { include: { customerProfile: true, expertProfile: true } } }
   });
 
   if (!ticket) {
@@ -75,7 +94,8 @@ export async function reply(req, res) {
 
   // Send email to the user
   const user = ticket.user;
-  const userName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User';
+  const profile = user?.customerProfile || user?.expertProfile || {};
+  const userName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'User';
   
   const textBody = `Hi ${userName},\n\nYour support ticket regarding "${ticket.subject || ticket.category}" has been updated.\n\nReply from Admin:\n${message}\n\nBest regards,\nXprtLink Support Team`;
 
@@ -106,7 +126,7 @@ export async function getById(req, res) {
   const ticket = await db.supportTicket.findUnique({
     where: { id },
     include: {
-      user: { select: { id: true, firstName: true, lastName: true, email: true, role: true } },
+      user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true } }, expertProfile: { select: { firstName: true, lastName: true } } } },
       attachment: { select: { id: true, url: true } }
     }
   });
@@ -115,5 +135,19 @@ export async function getById(req, res) {
     throw notFound("supportTicketNotFound");
   }
 
-  return ResponseFormatter.success(res, { data: ticket });
+  const profile = ticket.user?.customerProfile || ticket.user?.expertProfile || {};
+  const role = ticket.user?.expertProfile ? "expert" : "customer";
+  
+  return ResponseFormatter.success(res, { 
+    data: {
+      ...ticket,
+      user: {
+        id: ticket.user?.id,
+        email: ticket.user?.email,
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        role: role
+      }
+    } 
+  });
 }
