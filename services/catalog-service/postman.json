@@ -24,7 +24,8 @@
           ]
         },
         "description": "Splash / Update validation: returns minimum app version, force update flag, and maintenance message."
-      }
+      },
+      "id": "9e526367-8af7-42ae-93a2-0e76d8ed7c77"
     },
     {
       "name": "Get Active Categories",
@@ -44,7 +45,8 @@
           ]
         },
         "description": "Fetch active expert categories for dashboard strips, search filters, and onboarding dropdowns."
-      }
+      },
+      "id": "90f97b54-abdb-4ef4-83a1-b6212484413e"
     },
     {
       "name": "Get CMS Page by Slug",
@@ -72,7 +74,8 @@
           ]
         },
         "description": "Retrieve static CMS page by slug. Now returns raw HTML directly instead of JSON. Used for Privacy Policy, Terms of Service, Help Centre, FAQ, About Us screens."
-      }
+      },
+      "id": "596e4b67-7d97-4441-bd9d-93190881dc55"
     },
     {
       "name": "Support Tickets",
@@ -140,9 +143,11 @@
               ],
               "body": "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"errors\": [{ \"field\": \"subject\", \"message\": \"String must contain at least 5 character(s)\" }]\n}"
             }
-          ]
+          ],
+          "id": "9e4edf97-3220-45c9-9f1b-7b95b4124626"
         }
-      ]
+      ],
+      "id": "af56a569-5a51-4e94-9741-67eaa5cd23d4"
     }
   ]
 }
