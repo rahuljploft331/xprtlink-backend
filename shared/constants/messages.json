@@ -129,6 +129,8 @@
   "invalidEmailOrPassword": "Invalid email or password",
   "emailAndPasswordRequired": "Email and password are required",
   "accountSuspended": "Account suspended",
+  "accountDisabledFriendly": "Your account is currently disabled. Please reach out to our support team, and we'll be happy to help you!",
+  "insufficientRole": "You do not have the required role to access this resource",
   "accountSuspendedContactSupport": "Your account has been suspended. Contact support.",
   "failedToCreateSession": "Failed to create session",
   "emailAlreadyExists": "An account with this email already exists.",

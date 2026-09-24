@@ -47,12 +47,12 @@ async function checkUserStatus(userId, role) {
 export async function authenticate(req, _res, next) {
   try {
     const token = parseBearer(req);
-    if (!token) throw unauthorized("Missing or invalid authorization token");
+    if (!token) throw unauthorized("missingOrInvalidAuthToken");
     const payload = verifyAccessToken(token);
 
     const status = await checkUserStatus(payload.sub, payload.role);
     if (status !== "active") {
-      throw unauthorized("User account is disabled or suspended");
+      throw unauthorized("accountDisabledFriendly");
     }
 
     req.auth = {
@@ -64,7 +64,7 @@ export async function authenticate(req, _res, next) {
     next();
   } catch (err) {
     if (err?.name === "TokenExpiredError" || err?.name === "JsonWebTokenError") {
-      return next(unauthorized("Invalid or expired token"));
+      return next(unauthorized("invalidOrExpiredToken"));
     }
     if (err?.statusCode === 401) {
       return next(err);
@@ -104,9 +104,9 @@ export async function optionalAuthenticate(req, _res, next) {
 
 export function requireRole(...roles) {
   return (req, _res, next) => {
-    if (!req.auth) return next(unauthorized());
+    if (!req.auth) return next(unauthorized("missingOrInvalidAuthToken"));
     if (!roles.includes(req.auth.role)) {
-      return next(forbidden(`Requires role: ${roles.join(" or ")}`));
+      return next(forbidden("insufficientRole"));
     }
     next();
   };

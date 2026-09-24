@@ -124,6 +124,15 @@ export async function uploadIdentityDocument({ fileBuffer, mimeType, fileName = 
 
 /**
  * Creates a Stripe Custom Connect Account for an Expert (fully native white-label KYC).
+ *
+ * NOTE: Stripe deprecated POST /v1/accounts for new Connect integrations.
+ * To keep using Custom accounts (v1), you MUST enable "Accounts v1 support" in the
+ * Stripe Dashboard → Developers → API policies → feat_accounts_v1_support.
+ * URL: https://dashboard.stripe.com/settings/developers/api-policies/feat_accounts_v1_support
+ *
+ * If that setting is enabled, this function works as-is with the existing apiVersion.
+ * The `verification.document` block is omitted when no document file IDs are provided
+ * to avoid sending an empty object that Stripe rejects.
  */
 export async function createCustomConnectAccount({
   expertEmail,
@@ -137,6 +146,19 @@ export async function createCustomConnectAccount({
   userIpAddress = "127.0.0.1",
 }) {
   const sdk = requireStripe();
+
+  // Only include document verification if at least a front doc ID was provided.
+  const verificationBlock = frontDocumentFileId
+    ? {
+        verification: {
+          document: {
+            front: frontDocumentFileId,
+            ...(backDocumentFileId ? { back: backDocumentFileId } : {}),
+          },
+        },
+      }
+    : {};
+
   return await sdk.accounts.create({
     type: "custom",
     country: address.country || "US",
@@ -162,12 +184,7 @@ export async function createCustomConnectAccount({
         country: address.country || "US",
       },
       ssn_last_4: ssnLast4,
-      verification: {
-        document: {
-          front: frontDocumentFileId,
-          back: backDocumentFileId || undefined,
-        },
-      },
+      ...verificationBlock,
     },
     tos_acceptance: {
       date: Math.floor(Date.now() / 1000),
