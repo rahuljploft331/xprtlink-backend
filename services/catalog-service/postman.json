@@ -78,62 +78,6 @@
       "name": "Support Tickets",
       "item": [
         {
-          "name": "List My Support Tickets",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/catalog/support/tickets?page=1&limit=20",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "catalog",
-                "support",
-                "tickets"
-              ],
-              "query": [
-                {
-                  "key": "status",
-                  "value": "open",
-                  "disabled": true,
-                  "description": "Filter by status: open | in_progress | resolved | closed"
-                },
-                {
-                  "key": "page",
-                  "value": "1"
-                },
-                {
-                  "key": "limit",
-                  "value": "20"
-                }
-              ]
-            },
-            "description": "Returns the authenticated user's support tickets, newest first. Optionally filter by status.\n\n**Figma screen**: No Support Tickets (empty state), Support Tickets (list view).\n\n**Response** `{ success, message, data: { items, page, limit, total } }`"
-          },
-          "response": [
-            {
-              "name": "200 - Tickets listed",
-              "status": "OK",
-              "code": 200,
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Support tickets\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"uuid\",\n        \"subject\": \"Cannot access my consultation history\",\n        \"body\": \"I am unable to see my past consultations...\",\n        \"category\": \"consultation\",\n        \"status\": \"open\",\n        \"resolutionNote\": null,\n        \"resolvedAt\": null,\n        \"createdAt\": \"2026-08-19T09:00:00.000Z\",\n        \"updatedAt\": \"2026-08-19T09:00:00.000Z\"\n      }\n    ],\n    \"page\": 1,\n    \"limit\": 20,\n    \"total\": 1\n  }\n}"
-            }
-          ]
-        },
-        {
           "name": "Create Support Ticket",
           "request": {
             "method": "POST",
@@ -195,54 +139,6 @@
                 }
               ],
               "body": "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"errors\": [{ \"field\": \"subject\", \"message\": \"String must contain at least 5 character(s)\" }]\n}"
-            }
-          ]
-        },
-        {
-          "name": "Get Support Ticket by ID",
-          "request": {
-            "method": "GET",
-            "header": [
-              {
-                "key": "Authorization",
-                "value": "Bearer {{accessToken}}"
-              }
-            ],
-            "url": {
-              "raw": "{{base_url}}/api/v1/catalog/support/tickets/:id",
-              "host": [
-                "{{base_url}}"
-              ],
-              "path": [
-                "api",
-                "v1",
-                "catalog",
-                "support",
-                "tickets",
-                ":id"
-              ],
-              "variable": [
-                {
-                  "key": "id",
-                  "value": "{{ticketId}}",
-                  "description": "UUID of the support ticket"
-                }
-              ]
-            },
-            "description": "Retrieve a single support ticket by ID. Returns 404 if ticket does not belong to the authenticated user.\n\n**Figma screen**: Ticket Details."
-          },
-          "response": [
-            {
-              "name": "404 - Not found",
-              "status": "Not Found",
-              "code": 404,
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "body": "{\n  \"success\": false,\n  \"message\": \"Support ticket not found\"\n}"
             }
           ]
         }
