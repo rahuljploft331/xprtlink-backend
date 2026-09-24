@@ -56,7 +56,7 @@ export async function renderEmailTemplate({
  * Send a transactional email via SendGrid.
  * Falls back to console logging in non-production when SENDGRID_API_KEY isn't configured.
  */
-export async function sendEmail({ to, subject, text, html }) {
+export async function sendEmail({ to, subject, text, html, replyTo }) {
   const apiKey = getSecretSync("SENDGRID_API_KEY");
   const fromEmail = getSecretSync("SENDGRID_FROM_EMAIL", "noreply@xpertlink.local");
 
@@ -71,5 +71,5 @@ export async function sendEmail({ to, subject, text, html }) {
   const { default: sgMail } = await import("@sendgrid/mail");
   sgMail.setApiKey(apiKey);
 
-  await sgMail.send({ to, from: fromEmail, subject, text, html });
+  const msg = { to, from: fromEmail, subject, text, html }; if (replyTo) msg.replyTo = replyTo; await sgMail.send(msg);
 }
