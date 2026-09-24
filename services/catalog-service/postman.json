@@ -13,8 +13,15 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/api/v1/catalog/app-config",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "catalog", "app-config"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "catalog",
+            "app-config"
+          ]
         },
         "description": "Splash / Update validation: returns minimum app version, force update flag, and maintenance message."
       }
@@ -26,8 +33,15 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/api/v1/catalog/categories",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "catalog", "categories"]
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "catalog",
+            "categories"
+          ]
         },
         "description": "Fetch active expert categories for dashboard strips, search filters, and onboarding dropdowns."
       }
@@ -39,10 +53,22 @@
         "header": [],
         "url": {
           "raw": "{{base_url}}/api/v1/catalog/cms/:slug",
-          "host": ["{{base_url}}"],
-          "path": ["api", "v1", "catalog", "cms", ":slug"],
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "catalog",
+            "cms",
+            ":slug"
+          ],
           "variable": [
-            { "key": "slug", "value": "privacy", "description": "Supported slugs: privacy, terms, help, faq, about, expert-standards" }
+            {
+              "key": "slug",
+              "value": "privacy",
+              "description": "Supported slugs: privacy, terms, help, faq, about, expert-standards"
+            }
           ]
         },
         "description": "Retrieve static CMS page by slug. Now returns raw HTML directly instead of JSON. Used for Privacy Policy, Terms of Service, Help Centre, FAQ, About Us screens."
@@ -56,16 +82,38 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/catalog/support/tickets?page=1&limit=20",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "catalog", "support", "tickets"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "catalog",
+                "support",
+                "tickets"
+              ],
               "query": [
-                { "key": "status", "value": "open", "disabled": true, "description": "Filter by status: open | in_progress | resolved | closed" },
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "20" }
+                {
+                  "key": "status",
+                  "value": "open",
+                  "disabled": true,
+                  "description": "Filter by status: open | in_progress | resolved | closed"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
               ]
             },
             "description": "Returns the authenticated user's support tickets, newest first. Optionally filter by status.\n\n**Figma screen**: No Support Tickets (empty state), Support Tickets (list view).\n\n**Response** `{ success, message, data: { items, page, limit, total } }`"
@@ -75,7 +123,12 @@
               "name": "200 - Tickets listed",
               "status": "OK",
               "code": 200,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Support tickets\",\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"uuid\",\n        \"subject\": \"Cannot access my consultation history\",\n        \"body\": \"I am unable to see my past consultations...\",\n        \"category\": \"consultation\",\n        \"status\": \"open\",\n        \"resolutionNote\": null,\n        \"resolvedAt\": null,\n        \"createdAt\": \"2026-08-19T09:00:00.000Z\",\n        \"updatedAt\": \"2026-08-19T09:00:00.000Z\"\n      }\n    ],\n    \"page\": 1,\n    \"limit\": 20,\n    \"total\": 1\n  }\n}"
             }
           ]
@@ -85,18 +138,36 @@
           "request": {
             "method": "POST",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" },
-              { "key": "Content-Type", "value": "application/json" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"subject\": \"Cannot access my consultation history\",\n  \"body\": \"I am unable to see my past consultations in the app. The list shows empty even though I have completed sessions.\",\n  \"category\": \"consultation\"\n}",
-              "options": { "raw": { "language": "json" } }
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
             },
             "url": {
               "raw": "{{base_url}}/api/v1/catalog/support/tickets",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "catalog", "support", "tickets"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "catalog",
+                "support",
+                "tickets"
+              ]
             },
             "description": "Submit a new support ticket. Available for both customer and expert roles.\n\n**Figma screen**: Create New Ticket, Ticket Created - Successful.\n\n**categories**: `billing` | `account` | `technical` | `expert_issue` | `consultation` | `other`\n\n**Response**: 201 with ticket object."
           },
@@ -105,14 +176,24 @@
               "name": "201 - Ticket created",
               "status": "Created",
               "code": 201,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Ticket created\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"subject\": \"Cannot access my consultation history\",\n    \"body\": \"I am unable to see my past consultations...\",\n    \"category\": \"consultation\",\n    \"status\": \"open\",\n    \"resolutionNote\": null,\n    \"resolvedAt\": null,\n    \"createdAt\": \"2026-08-19T09:00:00.000Z\",\n    \"updatedAt\": \"2026-08-19T09:00:00.000Z\"\n  }\n}"
             },
             {
               "name": "400 - Validation error",
               "status": "Bad Request",
               "code": 400,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"success\": false,\n  \"message\": \"Validation error\",\n  \"errors\": [{ \"field\": \"subject\", \"message\": \"String must contain at least 5 character(s)\" }]\n}"
             }
           ]
@@ -122,14 +203,30 @@
           "request": {
             "method": "GET",
             "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/catalog/support/tickets/:id",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "catalog", "support", "tickets", ":id"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "catalog",
+                "support",
+                "tickets",
+                ":id"
+              ],
               "variable": [
-                { "key": "id", "value": "{{ticketId}}", "description": "UUID of the support ticket" }
+                {
+                  "key": "id",
+                  "value": "{{ticketId}}",
+                  "description": "UUID of the support ticket"
+                }
               ]
             },
             "description": "Retrieve a single support ticket by ID. Returns 404 if ticket does not belong to the authenticated user.\n\n**Figma screen**: Ticket Details."
@@ -139,7 +236,12 @@
               "name": "404 - Not found",
               "status": "Not Found",
               "code": 404,
-              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
               "body": "{\n  \"success\": false,\n  \"message\": \"Support ticket not found\"\n}"
             }
           ]
