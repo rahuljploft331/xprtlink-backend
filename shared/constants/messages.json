@@ -160,6 +160,7 @@
   "subscriptionPlanNotFound": "Subscription plan not found",
   "supportConversationNotFound": "Support conversation not found",
   "supportTicketNotFound": "Support ticket not found",
+  "replyMessageRequired": "A reply message is required",
   "bannerNotFound": "Banner not found or you don't have permission to delete it.",
   "pageNotFound": "Page not found",
   "expertAccessRequired": "Expert access required",
