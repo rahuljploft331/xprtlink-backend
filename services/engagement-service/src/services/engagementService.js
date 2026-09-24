@@ -213,16 +213,6 @@ export async function createQuote(auth, body) {
     throw badRequest("cannotEngageWithSelf");
   }
 
-  const block = await db.userBlock.findFirst({
-    where: {
-      OR: [
-        { blockerUserId: auth.userId, blockedUserId: expert.userId },
-        { blockerUserId: expert.userId, blockedUserId: auth.userId },
-      ],
-    },
-  });
-  if (block) throw forbidden("userBlockedCannotEngage");
-
     const block = await db.userBlock.findFirst({
       where: {
         OR: [
