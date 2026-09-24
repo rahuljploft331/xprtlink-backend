@@ -38,22 +38,56 @@ export const listConversationReports = async (req, res) => {
     include: {
       reporter: {
         select: {
+          id: true,
           email: true,
-          customerProfile: { select: { id: true } },
-          expertProfile: { select: { id: true } },
+          customerProfile: { select: { id: true, firstName: true, lastName: true } },
+          expertProfile: { select: { id: true, firstName: true, lastName: true } },
         }
       },
-      conversation: { select: { id: true, customerId: true, expertId: true } }
+      conversation: { 
+        select: { 
+          id: true, 
+          customerId: true, 
+          expertId: true,
+          customer: { select: { userId: true, firstName: true, lastName: true, user: { select: { email: true } } } },
+          expert: { select: { userId: true, firstName: true, lastName: true, user: { select: { email: true } } } }
+        } 
+      }
     }
   });
 
-  const formattedReports = reports.map((r) => ({
-    ...r,
-    reporter: r.reporter ? {
-      email: r.reporter.email,
-      role: r.reporter.expertProfile ? "expert" : r.reporter.customerProfile ? "customer" : "unknown",
-    } : null,
-  }));
+  const formattedReports = reports.map((r) => {
+    let reportedUser = null;
+    if (r.reporter) {
+      if (r.reporter.expertProfile && r.conversation.customer) {
+        reportedUser = {
+          userId: r.conversation.customer.userId,
+          profileId: r.conversation.customerId,
+          email: r.conversation.customer.user?.email || "Unknown",
+          name: `${r.conversation.customer.firstName} ${r.conversation.customer.lastName}`,
+          role: "customer"
+        };
+      } else if (r.reporter.customerProfile && r.conversation.expert) {
+        reportedUser = {
+          userId: r.conversation.expert.userId,
+          profileId: r.conversation.expertId,
+          email: r.conversation.expert.user?.email || "Unknown",
+          name: `${r.conversation.expert.firstName} ${r.conversation.expert.lastName}`,
+          role: "expert"
+        };
+      }
+    }
+
+    return {
+      ...r,
+      reporter: r.reporter ? {
+        id: r.reporter.id,
+        email: r.reporter.email,
+        role: r.reporter.expertProfile ? "expert" : r.reporter.customerProfile ? "customer" : "unknown",
+      } : null,
+      reportedUser
+    };
+  });
 
   return ResponseFormatter.success(res, { data: formattedReports });
 };
