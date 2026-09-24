@@ -14,7 +14,9 @@ import subscriptionsRoutes from "./subscriptions.routes.js";
 import subscriptionPlansRoutes from "./subscriptionPlans.routes.js";
 import reviewsRoutes from "./reviews.routes.js";
 import cmsRoutes from "./cms.routes.js";
+import faqsRoutes from "./faqs.routes.js";
 import adminsRoutes from "./admins.routes.js";
+
 import auditLogRoutes from "./auditLog.routes.js";
 import notificationsRoutes from "./notifications.routes.js";
 import reportsRoutes from "./reports.routes.js";
@@ -42,6 +44,7 @@ router.use("/subscriptions", subscriptionsRoutes);
 router.use("/subscription-plans", subscriptionPlansRoutes);
 router.use("/reviews", reviewsRoutes);
 router.use("/cms", cmsRoutes);
+router.use("/faqs", faqsRoutes);
 router.use("/admins", adminsRoutes);
 router.use("/audit-log", auditLogRoutes);
 router.use("/notifications", notificationsRoutes);

@@ -50,4 +50,13 @@ router.get(
   })
 );
 
+router.get(
+  "/faqs",
+  optionalAuthenticate,
+  asyncHandler(async (_req, res) => {
+    const data = await svc.getFaqs();
+    return ResponseFormatter.success(res, { message: getMessage("faqsFetched"), data });
+  })
+);
+
 export default router;

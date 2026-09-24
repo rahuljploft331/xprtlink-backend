@@ -29,3 +29,15 @@ export async function getCmsPage(slug) {
   if (!page) throw notFound("pageNotFound");
   return toCmsPageDto(page);
 }
+export async function getFaqs() {
+  const rows = await getDb().faq.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: "asc" },
+  });
+  return rows.map((faq) => ({
+    id: faq.id,
+    question: faq.question,
+    answer: faq.answer,
+    sortOrder: faq.sortOrder,
+  }));
+}
