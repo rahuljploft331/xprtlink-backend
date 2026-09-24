@@ -5,14 +5,17 @@ import { sendEmail } from "@xprtlink/shared/lib/email.js";
 /**
  * Submit a support request (forwards via email to admin).
  */
-export async function createTicket(auth, { subject, body, category }) {
+export async function createTicket(auth, { subject, body, category, referenceId, attachmentId }) {
   const db = getDb();
   
   // Get user details for the email
   const user = await db.user.findUnique({
     where: { id: auth.userId },
-    select: { email: true, firstName: true, lastName: true, phone: true }
+    include: { customerProfile: true, expertProfile: true }
   });
+  const profile = user?.customerProfile || user?.expertProfile || {};
+  const firstName = profile.firstName || '';
+  const lastName = profile.lastName || '';
 
   // Get the support email from platform settings
   let supportEmail = "support@xpertlink.com";
@@ -32,25 +35,28 @@ export async function createTicket(auth, { subject, body, category }) {
     }
   }
 
-  // Also log the ticket just for record keeping, even though the admin portal won't show it anymore
+  const finalSubject = subject || `Support Ticket - ${category}`;
+  
   const ticket = await db.supportTicket.create({
     data: {
       userId: auth.userId,
-      subject,
+      subject: finalSubject,
       body,
       category,
+      referenceId,
+      attachmentId,
       status: "open",
     },
   });
 
   // Send the email to support
-  const userName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User';
-  const textBody = `New Support Request from ${userName} (${user?.email || 'No email'})\nCategory: ${category}\n\nSubject: ${subject}\n\nMessage:\n${body}`;
+  const userName = `${firstName} ${lastName}`.trim() || 'User';
+  const textBody = `New Support Request from ${userName} (${user?.email || 'No email'})\nCategory: ${category}\n\nSubject: ${finalSubject}\n\nMessage:\n${body}`;
   
   try {
     await sendEmail({
       to: supportEmail,
-      subject: `[Support] ${subject}`,
+      subject: `[Support] ${finalSubject}`,
       text: textBody,
       html: textBody.replace(/\n/g, "<br>"),
       replyTo: user?.email // Optional: allows support team to hit 'reply' directly

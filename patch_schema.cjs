@@ -1,8 +1,10 @@
 const fs = require('fs');
-const schemaPath = 'shared/prisma/schema.prisma';
-let schema = fs.readFileSync(schemaPath, 'utf8');
-schema = schema.replace(
-  /subject        String              @db.VarChar\(200\)/,
-  'subject        String?             @db.VarChar(200)'
+const path = './shared/contracts/support.schema.js';
+let content = fs.readFileSync(path, 'utf8');
+
+content = content.replace(
+  'subject: z.string().min(5).max(200),',
+  'subject: z.string().max(200).optional(),\n  referenceId: z.string().max(100).optional(),\n  attachmentId: z.string().uuid().optional(),'
 );
-fs.writeFileSync(schemaPath, schema);
+
+fs.writeFileSync(path, content);
