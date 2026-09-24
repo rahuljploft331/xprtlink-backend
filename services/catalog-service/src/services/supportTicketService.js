@@ -15,8 +15,11 @@ export async function createTicket(auth, { subject, body, category, referenceId,
   // Get user details for the email
   const user = await db.user.findUnique({
     where: { id: auth.userId },
-    select: { email: true, firstName: true, lastName: true, phone: true }
+    include: { customerProfile: true, expertProfile: true }
   });
+  const profile = user?.customerProfile || user?.expertProfile || {};
+  const firstName = profile.firstName || '';
+  const lastName = profile.lastName || '';
 
   // Get the support email from platform settings
   let supportEmail = "support@xpertlink.com";
@@ -36,11 +39,12 @@ export async function createTicket(auth, { subject, body, category, referenceId,
     }
   }
 
-  // Also log the ticket just for record keeping, even though the admin portal won't show it anymore
+  const finalSubject = subject || `Support Ticket - ${category}`;
+  
   const ticket = await db.supportTicket.create({
     data: {
       userId: auth.userId,
-      subject,
+      subject: finalSubject,
       body,
       category,
       referenceId,
@@ -50,7 +54,7 @@ export async function createTicket(auth, { subject, body, category, referenceId,
   });
 
   // Send the email to support
-  const userName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User';
+  const userName = `${firstName} ${lastName}`.trim() || 'User';
   let attachmentUrl = "";
   if (attachmentId) {
     const media = await db.mediaAsset.findUnique({ where: { id: attachmentId } });
@@ -59,12 +63,12 @@ export async function createTicket(auth, { subject, body, category, referenceId,
     }
   }
 
-  const textBody = `New Support Request from ${userName} (${user?.email || 'No email'})\nCategory: ${category}${referenceId ? '\nReference ID: ' + referenceId : ''}\n\nSubject: ${subject}\n\nMessage:\n${body}${attachmentUrl}`;
+  const textBody = `New Support Request from ${userName} (${user?.email || 'No email'})\nCategory: ${category}${referenceId ? '\nReference ID: ' + referenceId : ''}\n\nSubject: ${finalSubject}\n\nMessage:\n${body}${attachmentUrl}`;
   
   try {
     await sendEmail({
       to: supportEmail,
-      subject: `[Support] ${subject}`,
+      subject: `[Support] ${finalSubject}`,
       text: textBody,
       html: textBody.replace(/\n/g, "<br>"),
       replyTo: user?.email // Optional: allows support team to hit 'reply' directly

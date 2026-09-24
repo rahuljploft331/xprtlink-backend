@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
-import { requirePermission } from "@xprtlink/shared/middleware/auth.js";
+import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
 import { listIssues, updateIssueStatus } from "../controllers/platformIssues.controller.js";
 
 const router = Router();
