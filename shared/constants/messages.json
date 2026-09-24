@@ -249,5 +249,7 @@
   "deviceTokenRemoved": "Device token removed",
   "quoteExpiredCustomer": "Your quote request has expired",
   "quoteExpiredExpert": "A quote request has expired",
-  "userBlockedCannotEngage": "You cannot engage with this user due to a block."
+  "userBlockedCannotEngage": "You cannot engage with this user due to a block.",
+  "expertNoEmail": "Expert has no email address associated with their account.",
+  "emailSentSuccessfully": "Email sent successfully."
 }

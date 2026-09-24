@@ -5,6 +5,7 @@ import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { logAdminAction } from "#utils/audit.js";
 import { adminSetFeaturedSchema } from "@xprtlink/shared/contracts/expert.schema.js";
+import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -334,6 +335,45 @@ export async function getSupportChats(req, res, next) {
     }));
 
     return ResponseFormatter.paginated(res, { items: formattedItems, page, limit, total });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function sendEmailToExpert(req, res, next) {
+  try {
+    const db = getDb();
+    const { subject, bodyHtml } = req.body;
+
+    const expertProfile = await db.expertProfile.findUnique({
+      where: { id: req.params.id },
+      include: { user: true }
+    });
+
+    if (!expertProfile) {
+      return res.status(404).json({ success: false, message: getMessage("expertNotFound"), code: "NOT_FOUND" });
+    }
+
+    if (!expertProfile.user || !expertProfile.user.email) {
+      return res.status(400).json({ success: false, message: getMessage("expertNoEmail"), code: "BAD_REQUEST" });
+    }
+
+    const html = await renderEmailTemplate({
+      title: subject,
+      bodyHtml,
+    });
+
+    await sendEmail({
+      to: expertProfile.user.email,
+      subject,
+      html,
+    });
+
+    await logAdminAction(req, "expert.sendEmail", "ExpertProfile", expertProfile.id, {
+      subject,
+    });
+
+    return ResponseFormatter.success(res, { message: getMessage("emailSentSuccessfully") });
   } catch (err) {
     next(err);
   }
