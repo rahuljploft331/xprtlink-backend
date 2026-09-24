@@ -10,12 +10,34 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get("/options", (req, res) => {
+  const categories = [
+    "Technical Bug",
+    "Billing & Payments",
+    "Account & Security",
+    "Consultations",
+    "General Inquiry",
+    "Other"
+  ];
+  
+  const urgencies = [
+    "Low - General Feedback",
+    "Medium - Affects My Work",
+    "High - Blocking Consultations",
+    "Critical - Payment or Security"
+  ];
+
+  return ResponseFormatter.success(res, {
+    data: { categories, urgencies },
+    status: 200
+  });
+});
+
 router.post(
   "/",
   asyncHandler(async (req, res) => {
     const body = createPlatformIssueSchema.parse(req.body);
     const data = await svc.createIssue(req.auth, body);
-    // Let's add issueSubmitted to messages.json if not present
     return ResponseFormatter.success(res, { message: getMessage("issueSubmitted"), data, status: 201 });
   })
 );

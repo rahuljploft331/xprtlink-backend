@@ -81,7 +81,7 @@ export async function list(req, res) {
 export async function reply(req, res) {
   const db = getDb();
   const { id } = req.params;
-  const { message } = req.body;
+  const { message, action } = req.body;
 
   if (!message) {
     throw badRequest("replyMessageRequired");
@@ -96,12 +96,13 @@ export async function reply(req, res) {
     throw notFound("supportTicketNotFound");
   }
 
+  const isClosing = action === "close";
   const updatedTicket = await db.supportTicket.update({
     where: { id },
     data: {
-      status: "closed",
+      status: isClosing ? "closed" : "in_progress",
       resolutionNote: message,
-      resolvedAt: new Date()
+      ...(isClosing ? { resolvedAt: new Date() } : {})
     }
   });
 
