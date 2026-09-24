@@ -286,9 +286,15 @@ export async function getExpertReviews(id, query) {
   assertExpertId(id);
   const { page, limit, skip } = parsePagination(query);
   const db = getDb();
+  
+  const where = { expertId: id, status: "published" };
+  if (query.filter === "critical") {
+    where.rating = { lte: 3 };
+  }
+
   const [reviews, total] = await Promise.all([
     db.review.findMany({
-      where: { expertId: id, status: "published" },
+      where,
       skip,
       take: limit,
       orderBy: { createdAt: "desc" },
@@ -298,7 +304,7 @@ export async function getExpertReviews(id, query) {
         expert: true,
       },
     }),
-    db.review.count({ where: { expertId: id, status: "published" } }),
+    db.review.count({ where }),
   ]);
   const items = reviews.map((r) => toExpertReviewDto(r));
   return paginatedResult(items, { page, limit, total });
