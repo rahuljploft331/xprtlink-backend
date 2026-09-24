@@ -5,8 +5,12 @@ import { sendEmail } from "@xprtlink/shared/lib/email.js";
 /**
  * Submit a support request (forwards via email to admin).
  */
-export async function createTicket(auth, { subject, body, category }) {
+export async function createTicket(auth, { subject, body, category, referenceId, attachmentId }) {
   const db = getDb();
+  
+  if (!subject) {
+    subject = `Support Ticket - ${category}`;
+  }
   
   // Get user details for the email
   const user = await db.user.findUnique({
@@ -39,13 +43,23 @@ export async function createTicket(auth, { subject, body, category }) {
       subject,
       body,
       category,
+      referenceId,
+      attachmentId,
       status: "open",
     },
   });
 
   // Send the email to support
   const userName = `${user?.firstName || ''} ${user?.lastName || ''}`.trim() || 'User';
-  const textBody = `New Support Request from ${userName} (${user?.email || 'No email'})\nCategory: ${category}\n\nSubject: ${subject}\n\nMessage:\n${body}`;
+  let attachmentUrl = "";
+  if (attachmentId) {
+    const media = await db.mediaAsset.findUnique({ where: { id: attachmentId } });
+    if (media) {
+      attachmentUrl = `\n\nAttachment ID: ${media.id} (Key: ${media.storageKey})`;
+    }
+  }
+
+  const textBody = `New Support Request from ${userName} (${user?.email || 'No email'})\nCategory: ${category}${referenceId ? '\nReference ID: ' + referenceId : ''}\n\nSubject: ${subject}\n\nMessage:\n${body}${attachmentUrl}`;
   
   try {
     await sendEmail({

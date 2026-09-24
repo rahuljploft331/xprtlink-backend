@@ -96,7 +96,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"subject\": \"Cannot access my consultation history\",\n  \"body\": \"I am unable to see my past consultations in the app. The list shows empty even though I have completed sessions.\",\n  \"category\": \"consultation\"\n}",
+              "raw": "{\n  \"subject\": \"Cannot access my consultation history\",\n  \"body\": \"I am unable to see my past consultations in the app. The list shows empty even though I have completed sessions.\",\n  \"category\": \"consultation\",\n  \"referenceId\": \"BK-9821\",\n  \"attachmentId\": \"00000000-0000-0000-0000-000000000000\"\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -129,7 +129,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n  \"success\": true,\n  \"message\": \"Ticket created\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"subject\": \"Cannot access my consultation history\",\n    \"body\": \"I am unable to see my past consultations...\",\n    \"category\": \"consultation\",\n    \"status\": \"open\",\n    \"resolutionNote\": null,\n    \"resolvedAt\": null,\n    \"createdAt\": \"2026-08-19T09:00:00.000Z\",\n    \"updatedAt\": \"2026-08-19T09:00:00.000Z\"\n  }\n}"
+              "body": "{\n  \"success\": true,\n  \"message\": \"Ticket created\",\n  \"data\": {\n    \"id\": \"uuid\",\n    \"subject\": \"Cannot access my consultation history\",\n    \"body\": \"I am unable to see my past consultations...\",\n    \"category\": \"consultation\",\n    \"status\": \"open\",\n    \"resolutionNote\": null,\n    \"resolvedAt\": null,\n    \"createdAt\": \"2026-08-19T09:00:00.000Z\",\n    \"updatedAt\": \"2026-08-19T09:00:00.000Z\",\n    \"referenceId\": \"BK-9821\",\n    \"attachmentId\": \"00000000-0000-0000-0000-000000000000\"\n  }\n}"
             },
             {
               "name": "400 - Validation error",
