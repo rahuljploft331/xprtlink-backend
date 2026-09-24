@@ -2,6 +2,7 @@ import { getDb } from "@xprtlink/shared/db/index.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { notFound, badRequest } from "@xprtlink/shared/utils/errors.js";
 import { sendEmail } from "@xprtlink/shared/lib/email.js";
+import { generatePresignedDownloadUrl } from "@xprtlink/shared/utils/s3.js";
 
 /**
  * List support tickets (admin view).
@@ -35,15 +36,21 @@ export async function list(req, res) {
       orderBy: { createdAt: "desc" },
       include: {
         user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true } }, expertProfile: { select: { firstName: true, lastName: true } } } },
-        attachment: { select: { id: true, url: true } }
+        attachment: { select: { id: true, storageKey: true } }
       }
     })
   ]);
 
-  const formattedItems = items.map(ticket => {
+  const formattedItems = await Promise.all(items.map(async ticket => {
     const profile = ticket.user?.customerProfile || ticket.user?.expertProfile || {};
     const role = ticket.user?.expertProfile ? "expert" : "customer";
-    return {
+    
+    let url = null;
+    if (ticket.attachment?.storageKey) {
+      url = await generatePresignedDownloadUrl(ticket.attachment.storageKey);
+    }
+    
+    const mappedTicket = {
       ...ticket,
       user: {
         id: ticket.user?.id,
@@ -53,7 +60,13 @@ export async function list(req, res) {
         role: role
       }
     };
-  });
+    
+    if (ticket.attachment) {
+      mappedTicket.attachment = { id: ticket.attachment.id, url };
+    }
+    
+    return mappedTicket;
+  }));
 
   return ResponseFormatter.success(res, {
     data: formattedItems,
@@ -127,7 +140,7 @@ export async function getById(req, res) {
     where: { id },
     include: {
       user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true } }, expertProfile: { select: { firstName: true, lastName: true } } } },
-      attachment: { select: { id: true, url: true } }
+      attachment: { select: { id: true, storageKey: true } }
     }
   });
 
@@ -138,16 +151,25 @@ export async function getById(req, res) {
   const profile = ticket.user?.customerProfile || ticket.user?.expertProfile || {};
   const role = ticket.user?.expertProfile ? "expert" : "customer";
   
-  return ResponseFormatter.success(res, { 
-    data: {
-      ...ticket,
-      user: {
-        id: ticket.user?.id,
-        email: ticket.user?.email,
-        firstName: profile.firstName,
-        lastName: profile.lastName,
-        role: role
-      }
-    } 
-  });
+  let url = null;
+  if (ticket.attachment?.storageKey) {
+    url = await generatePresignedDownloadUrl(ticket.attachment.storageKey);
+  }
+  
+  const mappedTicket = {
+    ...ticket,
+    user: {
+      id: ticket.user?.id,
+      email: ticket.user?.email,
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      role: role
+    }
+  };
+  
+  if (ticket.attachment) {
+    mappedTicket.attachment = { id: ticket.attachment.id, url };
+  }
+  
+  return ResponseFormatter.success(res, { data: mappedTicket });
 }
