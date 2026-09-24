@@ -166,6 +166,27 @@ export async function removePaymentMethod(auth, methodId) {
   return { removed: true };
 }
 
+export async function setDefaultPaymentMethod(auth, methodId) {
+  const db = getDb();
+  
+  const method = await db.paymentMethod.findFirst({
+    where: { id: methodId, customerProfileId: auth.customerProfileId },
+  });
+  if (!method) throw notFound("paymentMethodNotFound");
+
+  await db.paymentMethod.updateMany({
+    where: { customerProfileId: auth.customerProfileId },
+    data: { isDefault: false },
+  });
+
+  const updated = await db.paymentMethod.update({
+    where: { id: methodId },
+    data: { isDefault: true },
+  });
+
+  return toPaymentMethodDto(updated);
+}
+
 export async function holdConsultationFunds(auth, consultationId, body) {
   const db = getDb();
 

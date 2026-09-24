@@ -133,6 +133,15 @@ router.delete(
   })
 );
 
+router.put(
+  "/payment-methods/:id/default",
+  requireRole("customer"),
+  asyncHandler(async (req, res) => {
+    const data = await svc.setDefaultPaymentMethod(req.auth, req.params.id);
+    return ResponseFormatter.success(res, { message: getMessage("paymentMethodUpdated"), data });
+  })
+);
+
 router.post(
   "/consultations/:id/hold",
   requireRole("customer"),

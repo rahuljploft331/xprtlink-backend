@@ -81,6 +81,31 @@
             },
             "description": "Delete a customer's saved payment method. Does NOT require Stripe to be configured."
           }
+        },
+        {
+          "id": "57225879-11111111-0000-4000-8000-000000000005",
+          "name": "Set Default Payment Method",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/payment-methods/:id/default",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "payment-methods", ":id", "default"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "pm-uuid-here"
+                }
+              ]
+            },
+            "description": "Set a customer's saved payment method as the default."
+          }
         }
       ]
     },

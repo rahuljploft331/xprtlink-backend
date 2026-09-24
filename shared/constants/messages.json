@@ -61,6 +61,7 @@
   "paymentMethods": "Payment methods",
   "paymentMethodAdded": "Payment method added",
   "paymentMethodRemoved": "Payment method removed",
+  "paymentMethodUpdated": "Payment method updated",
   "preauthorizationHoldPlaced": "Pre-authorization hold placed",
   "paymentSuccessful": "Payment successful",
   "transaction": "Transaction",
