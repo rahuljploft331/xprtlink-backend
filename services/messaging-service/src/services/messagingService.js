@@ -111,28 +111,7 @@ export async function listConversations(auth, query) {
     db.conversation.count({ where: conversationWhere(auth) }),
   ]);
 
-  // Batch-fetch unread counts for all conversations in one query (fixes N+1)
-  const conversationIds = rows.map((c) => c.id);
-  const unreadGroups = conversationIds.length
-    ? await db.message.groupBy({
-        by: ["conversationId"],
-        where: {
-          conversationId: { in: conversationIds },
-          senderUserId: { not: auth.userId },
-        },
-        _count: { id: true },
-      })
-    : [];
-  const unreadByConvId = Object.fromEntries(
-    unreadGroups.map((g) => [g.conversationId, g._count.id])
-  );
-
-  // Adjust for messages already read (subtract messages before lastReadMessage)
-  const readStateMap = Object.fromEntries(
-    rows.map((c) => [c.id, c.readStates[0] ?? null])
-  );
-
-  // Batch fetch block status
+  // Fetch block status
   const otherUserIds = rows.map(c => auth.role === 'customer' ? c.expert?.userId : c.customer?.userId).filter(Boolean);
   const blocks = otherUserIds.length ? await db.userBlock.findMany({
     where: {
@@ -152,17 +131,19 @@ export async function listConversations(auth, query) {
     }
   }
 
-  const items = rows.map((conversation) => {
+  const items = await Promise.all(rows.map(async (conversation) => {
     const otherUserId = auth.role === 'customer' ? conversation.expert?.userId : conversation.customer?.userId;
     const blockState = blockMap[otherUserId] || { isBlocked: false, blockedByMe: false };
 
-    const readState = readStateMap[conversation.id];
-    const totalUnread = unreadByConvId[conversation.id] ?? 0;
-    // If user has a read state, the unreadCount from groupBy is an overcount
-    // because it includes all messages from others — we correct with the stored count
-    // For simplicity and correctness, use 0 if we have a readState with lastReadMessage
-    // (the old per-query logic was also approximate). A future improvement can do exact math.
-    const unreadCount = readState?.lastReadMessageId ? totalUnread : totalUnread;
+    const readState = conversation.readStates[0];
+    const unreadCount = await db.message.count({
+      where: {
+        conversationId: conversation.id,
+        senderUserId: { not: auth.userId },
+        ...(readState ? { createdAt: { gt: readState.readAt } } : {})
+      }
+    });
+
     const lastMessage = conversation.messages[0] ?? null;
     return toConversationSummaryDto(conversation, {
       ...peerInfo(conversation, auth),
@@ -171,7 +152,7 @@ export async function listConversations(auth, query) {
       isBlocked: blockState.isBlocked,
       blockedByMe: blockState.blockedByMe,
     });
-  });
+  }));
 
   return paginatedResult(items, { page, limit, total });
 
