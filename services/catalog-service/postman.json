@@ -81,6 +81,34 @@
       "name": "Support Tickets",
       "item": [
         {
+          "name": "Get Support Categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/catalog/support/tickets/categories",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "catalog",
+                "support",
+                "tickets",
+                "categories"
+              ]
+            },
+            "description": "Fetch the valid categories/topics for the Help & Contact Support dropdown."
+          },
+          "response": []
+        },
+        {
           "name": "Create Support Ticket",
           "request": {
             "method": "POST",

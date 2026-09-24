@@ -138,6 +138,7 @@ enum MediaPurpose {
   chat_attachment
   verification_doc
   banner
+  support_attachment
 
   @@map("media_purpose")
 }
