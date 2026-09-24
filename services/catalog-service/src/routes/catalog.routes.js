@@ -53,8 +53,8 @@ router.get(
 router.get(
   "/faqs",
   optionalAuthenticate,
-  asyncHandler(async (_req, res) => {
-    const data = await svc.getFaqs();
+  asyncHandler(async (req, res) => {
+    const data = await svc.getFaqs({ type: req.query.type });
     return ResponseFormatter.success(res, { message: getMessage("faqsFetched"), data });
   })
 );

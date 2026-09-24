@@ -29,15 +29,21 @@ export async function getCmsPage(slug) {
   if (!page) throw notFound("pageNotFound");
   return toCmsPageDto(page);
 }
-export async function getFaqs() {
+export async function getFaqs({ type } = {}) {
+  const where = { isActive: true };
+  if (type) {
+    where.type = { in: [type, "both"] };
+  }
+
   const rows = await getDb().faq.findMany({
-    where: { isActive: true },
+    where,
     orderBy: { sortOrder: "asc" },
   });
   return rows.map((faq) => ({
     id: faq.id,
     question: faq.question,
     answer: faq.answer,
+    type: faq.type,
     sortOrder: faq.sortOrder,
   }));
 }

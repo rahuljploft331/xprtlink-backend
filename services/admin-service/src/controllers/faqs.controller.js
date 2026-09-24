@@ -7,6 +7,7 @@ import { z } from "zod";
 const createSchema = z.object({
   question: z.string().min(1),
   answer: z.string().min(1),
+  type: z.enum(["customer", "expert", "both"]).optional().default("customer"),
   sortOrder: z.number().int().optional().default(0),
   isActive: z.boolean().optional().default(true),
 });

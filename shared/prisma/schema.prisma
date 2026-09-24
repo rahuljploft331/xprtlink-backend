@@ -454,6 +454,7 @@ model Faq {
   id        String   @id @default(uuid()) @db.Uuid
   question  String   @db.VarChar(500)
   answer    String   @db.Text
+  type      String   @default("customer") @db.VarChar(32)
   sortOrder Int      @default(0) @map("sort_order")
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
