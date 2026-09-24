@@ -36,11 +36,26 @@ export const listConversationReports = async (req, res) => {
   const reports = await db.conversationReport.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      reporter: { select: { email: true, role: true } },
+      reporter: {
+        select: {
+          email: true,
+          customerProfile: { select: { id: true } },
+          expertProfile: { select: { id: true } },
+        }
+      },
       conversation: { select: { id: true, customerId: true, expertId: true } }
     }
   });
-  return ResponseFormatter.success(res, { data: reports });
+
+  const formattedReports = reports.map((r) => ({
+    ...r,
+    reporter: r.reporter ? {
+      email: r.reporter.email,
+      role: r.reporter.expertProfile ? "expert" : r.reporter.customerProfile ? "customer" : "unknown",
+    } : null,
+  }));
+
+  return ResponseFormatter.success(res, { data: formattedReports });
 };
 
 export const deleteConversationReport = async (req, res) => {
