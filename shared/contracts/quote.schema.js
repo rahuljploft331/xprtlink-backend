@@ -98,7 +98,7 @@ export const createQuoteRequestSchema = z.object({
   description: z.string().min(1),
   categoryId: z.string().uuid().optional(),
   preferredLocation: z.string().min(1).max(200).optional(),
-  budget: z.number().positive().optional(),
+  budget: z.number().positive().max(20000000).optional(),
   notes: z.string().optional(),
   mediaIds: z.array(z.string().uuid()).optional(),
 });
@@ -108,13 +108,13 @@ export const updateQuoteRequestSchema = z.object({
   description: z.string().min(1).optional(),
   categoryId: z.string().uuid().optional(),
   preferredLocation: z.string().min(1).max(200).optional(),
-  budget: z.number().positive().optional(),
+  budget: z.number().positive().max(20000000).optional(),
   mediaIds: z.array(z.string().uuid()).optional(),
   notes: z.string().optional(),
 });
 
 export const submitQuotationRequestSchema = z.object({
-  amount: z.number().positive(),
+  amount: z.number().positive().max(20000000),
   timeline: z.string().min(1).max(120).optional(),
   notes: z.string().optional(),
   // Media the expert attaches alongside their quotation (optional).
