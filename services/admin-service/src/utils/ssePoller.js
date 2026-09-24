@@ -105,14 +105,14 @@ async function poll() {
     const newChatReports = await db.conversationReport.findMany({
       where: { createdAt: { gt: cursors.chatReportFiled } },
       orderBy: { createdAt: "asc" },
-      select: { id: true, senderId: true, reportedId: true, reason: true, createdAt: true },
+      select: { id: true, conversationId: true, reporterUserId: true, reason: true, createdAt: true },
     });
     for (const r of newChatReports) {
       publish("report:filed", {
         id: r.id,
         type: "chat",
-        expertId: r.reportedId, // using this for toast compatibility
-        customerId: r.senderId,
+        conversationId: r.conversationId,
+        reporterUserId: r.reporterUserId,
         reason: r.reason,
         createdAt: r.createdAt.toISOString(),
       });
