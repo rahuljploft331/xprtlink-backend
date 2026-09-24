@@ -1222,3 +1222,17 @@ model PlatformIssue {
   @@index([status])
   @@map("platform_issues")
 }
+
+model AdminBroadcast {
+  id          String    @id @default(uuid()) @db.Uuid
+  title       String    @db.VarChar(200)
+  body        String
+  audience    String    @db.VarChar(64)
+  type        String    @db.VarChar(64)
+  status      String    @db.VarChar(64) @default("draft") // draft, scheduled, sent, failed
+  scheduledAt DateTime? @map("scheduled_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  @@map("admin_broadcasts")
+}

@@ -7,16 +7,48 @@ import { getDb } from "@xprtlink/shared/db/getClient.js";
  * Admin broadcast notifications are not yet in schema.
  * This returns an empty list until a broadcast model is added.
  */
-export async function list(_req, res) {
+export async function list(req, res) {
+  const db = getDb();
+  
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 20;
+  const skip = (page - 1) * limit;
+
+  const logs = await db.adminBroadcast.findMany({
+    orderBy: { createdAt: "desc" },
+    skip,
+    take: limit,
+  });
+  
+  const total = await db.adminBroadcast.count();
+
+  const items = logs.map(log => ({
+    id: log.id,
+    title: log.title,
+    audience: log.audience,
+    type: log.type,
+    status: log.status.charAt(0).toUpperCase() + log.status.slice(1),
+    createdAt: log.createdAt
+  }));
+
   return ResponseFormatter.paginated(res, {
-    items: [],
-    page: 1, limit: 20, total: 0,
-    message: getMessage("broadcastNotificationsNotYetImplemented"),
+    items,
+    page,
+    limit,
+    total,
+    message: "Notifications retrieved",
   });
 }
 
 export async function getById(req, res) {
-  return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
+  const db = getDb();
+  const notification = await db.adminBroadcast.findUnique({
+    where: { id: req.params.id }
+  });
+  if (!notification) {
+    return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
+  }
+  return ResponseFormatter.success(res, { data: notification });
 }
 
 import { broadcastNotificationRequestSchema } from "@xprtlink/shared/contracts/admin.schema.js";
@@ -34,6 +66,9 @@ export async function send(req, res) {
   }
 
   const { title, body, audience, type } = validated;
+  const status = req.body.status || "Sent";
+  const scheduledAt = req.body.scheduledAt ? new Date(req.body.scheduledAt) : null;
+
 
   let roleFilter = {};
   if (audience === "customers") roleFilter = { customerProfile: { isNot: null } };
@@ -71,9 +106,29 @@ export async function send(req, res) {
     targetUserIds.push(u.id);
   }
 
-  if (targetUserIds.length === 0) {
+  if (targetUserIds.length === 0 && status !== "draft") {
     return ResponseFormatter.success(res, { message: "No matching users found for audience.", data: { dispatched: 0 } });
   }
+  
+  // Save to AdminBroadcast
+  await db.adminBroadcast.create({
+    data: {
+      title,
+      body,
+      audience,
+      type,
+      status: status,
+      scheduledAt: scheduledAt,
+    }
+  });
+
+  if (status === "draft" || status === "scheduled") {
+    return ResponseFormatter.success(res, { 
+      message: `Notification saved as ${status}.`,
+      data: { dispatched: 0 }
+    });
+  }
+
 
   const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
   const CHUNK_SIZE = 500;
