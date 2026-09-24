@@ -279,11 +279,12 @@ model User {
   conversationReads    ConversationReadState[]
   quoteStatusEvents    QuoteStatusEvent[]      @relation("QuoteStatusActor")
   supportTickets       SupportTicket[]
+  platformIssues       PlatformIssue[]
   supportConversations SupportConversation[]
   supportMessagesSent  SupportMessage[]
-  blocksMade           UserBlock[]           @relation("BlocksMade")
-  blocksReceived       UserBlock[]           @relation("BlocksReceived")
-  conversationReports  ConversationReport[]  @relation("ConversationReports")
+  blocksMade           UserBlock[]             @relation("BlocksMade")
+  blocksReceived       UserBlock[]             @relation("BlocksReceived")
+  conversationReports  ConversationReport[]    @relation("ConversationReports")
 
   @@index([email])
   @@index([status])
@@ -326,7 +327,6 @@ model RefreshToken {
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
 
   @@index([userId])
   @@index([expiresAt])
@@ -449,7 +449,6 @@ model CmsPage {
   @@map("cms_pages")
 }
 
-
 model Faq {
   id        String   @id @default(uuid()) @db.Uuid
   question  String   @db.VarChar(500)
@@ -518,7 +517,7 @@ model SupportTicket {
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   attachment MediaAsset? @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
 
   @@index([userId])
@@ -643,17 +642,17 @@ model ExpertAvailabilityLog {
 }
 
 model ExpertBanner {
-  id              String        @id @default(uuid()) @db.Uuid
-  expertProfileId String        @map("expert_profile_id") @db.Uuid
-  mediaUrl        String        @map("media_url")
-  linkUrl         String?       @map("link_url")
-  text            String?       @map("text")
-  targetCategoryId String?      @map("target_category_id") @db.Uuid
-  isActive        Boolean       @default(true) @map("is_active")
-  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String   @id @default(uuid()) @db.Uuid
+  expertProfileId  String   @map("expert_profile_id") @db.Uuid
+  mediaUrl         String   @map("media_url")
+  linkUrl          String?  @map("link_url")
+  text             String?  @map("text")
+  targetCategoryId String?  @map("target_category_id") @db.Uuid
+  isActive         Boolean  @default(true) @map("is_active")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  expert          ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  expert ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
 
   @@index([expertProfileId])
   @@index([isActive])
@@ -882,11 +881,11 @@ model UserBlock {
 }
 
 model ConversationReport {
-  id               String   @id @default(uuid()) @db.Uuid
-  conversationId   String   @map("conversation_id") @db.Uuid
-  reporterUserId   String   @map("reporter_user_id") @db.Uuid
-  reason           String   @db.VarChar(500)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  reporterUserId String   @map("reporter_user_id") @db.Uuid
+  reason         String   @db.VarChar(500)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   reporter     User         @relation("ConversationReports", fields: [reporterUserId], references: [id], onDelete: Cascade)
@@ -1196,4 +1195,30 @@ model ZegoCallbackLog {
   @@index([roomId])
   @@index([event])
   @@map("zego_callback_logs")
+}
+
+enum PlatformIssueStatus {
+  open
+  in_progress
+  resolved
+  closed
+
+  @@map("platform_issue_status")
+}
+
+model PlatformIssue {
+  id          String              @id @default(uuid()) @db.Uuid
+  userId      String              @map("user_id") @db.Uuid
+  category    String              @db.VarChar(100)
+  urgency     String              @db.VarChar(100)
+  description String
+  status      PlatformIssueStatus @default(open)
+  createdAt   DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("platform_issues")
 }
