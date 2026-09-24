@@ -31,6 +31,7 @@ async function checkUserStatus(userId, role) {
   let status = null;
 
   if (role === 'super_admin' || role === 'subadmin') {
+    console.log('ADMIN DB FIND', userId, process.env.DATABASE_URL);
     const admin = await db.adminUser.findUnique({ where: { id: userId }, select: { status: true } });
     status = admin ? admin.status : null;
   } else {
@@ -38,6 +39,7 @@ async function checkUserStatus(userId, role) {
     status = user ? user.status : null;
   }
   
+  console.log('CHECKED STATUS FOR', userId, role, 'RESULT:', status);
   userStatusCache.set(userId, { status, timestamp: now });
   return status;
 }
