@@ -17,6 +17,7 @@ import cmsRoutes from "./cms.routes.js";
 import faqsRoutes from "./faqs.routes.js";
 import adminsRoutes from "./admins.routes.js";
 import supportTicketsRoutes from "./supportTickets.routes.js";
+import platformIssuesRoutes from "./platformIssues.routes.js";
 
 import auditLogRoutes from "./auditLog.routes.js";
 import notificationsRoutes from "./notifications.routes.js";
@@ -48,6 +49,7 @@ router.use("/cms", cmsRoutes);
 router.use("/faqs", faqsRoutes);
 router.use("/admins", adminsRoutes);
 router.use("/support-tickets", supportTicketsRoutes);
+router.use("/platform-issues", platformIssuesRoutes);
 router.use("/audit-log", auditLogRoutes);
 router.use("/notifications", notificationsRoutes);
 router.use("/reports", reportsRoutes);
