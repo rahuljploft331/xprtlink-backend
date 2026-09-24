@@ -72,7 +72,7 @@ router.post(
         db.expertProfile.findUnique({ where: { userId: actualUserId } }),
         db.customerProfile.findUnique({ where: { userId: actualUserId } }),
       ]);
-      await internalPost(serviceUrls.messaging, '/internal/events/user-blocked', {
+      await internalPost(serviceUrls.messaging, '/api/internal/events/user-blocked', {
         blockerUserId: req.auth.userId,
         blockedUserId: actualUserId,
         blockerProfileIds: [blockerE?.id, blockerC?.id].filter(Boolean),
@@ -132,7 +132,7 @@ router.delete(
         db.expertProfile.findUnique({ where: { userId: actualUserId } }),
         db.customerProfile.findUnique({ where: { userId: actualUserId } }),
       ]);
-      await internalPost(serviceUrls.messaging, '/internal/events/user-unblocked', {
+      await internalPost(serviceUrls.messaging, '/api/internal/events/user-unblocked', {
         blockerUserId: req.auth.userId,
         blockedUserId: actualUserId,
         blockerProfileIds: [blockerE?.id, blockerC?.id].filter(Boolean),

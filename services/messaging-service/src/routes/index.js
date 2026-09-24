@@ -19,6 +19,7 @@ router.post("/internal/events/user-blocked", (req, res) => {
   const { blockerUserId, blockedUserId, blockerProfileIds, blockedProfileIds } = req.body;
   const io = getIo();
   if (io) {
+    console.log("EMITTING user:blocked", { blockerUserId, blockedUserId, blockerProfileIds, blockedProfileIds });
     io.to(`user:${blockerUserId}`).to(`user:${blockedUserId}`).emit("user:blocked", {
       blockerUserId,
       blockedUserId,
