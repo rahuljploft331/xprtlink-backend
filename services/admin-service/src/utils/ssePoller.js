@@ -27,6 +27,7 @@ const cursors = {
   ticketCreated: new Date(),
   verificationSubmitted: new Date(),
   reportFiled: new Date(),
+  chatReportFiled: new Date(),
   consultationCompleted: new Date(),
   userRegistered: new Date(),
   reviewFlagged: new Date(),
@@ -98,6 +99,26 @@ async function poll() {
     }
     if (newReports.length > 0) {
       cursors.reportFiled = newReports.at(-1).createdAt;
+    }
+
+    // ── 3b. Conversation reports ─────────────────────────────────────────────
+    const newChatReports = await db.conversationReport.findMany({
+      where: { createdAt: { gt: cursors.chatReportFiled } },
+      orderBy: { createdAt: "asc" },
+      select: { id: true, senderId: true, reportedId: true, reason: true, createdAt: true },
+    });
+    for (const r of newChatReports) {
+      publish("report:filed", {
+        id: r.id,
+        type: "chat",
+        expertId: r.reportedId, // using this for toast compatibility
+        customerId: r.senderId,
+        reason: r.reason,
+        createdAt: r.createdAt.toISOString(),
+      });
+    }
+    if (newChatReports.length > 0) {
+      cursors.chatReportFiled = newChatReports.at(-1).createdAt;
     }
 
     // ── 4. Completed consultations ──────────────────────────────────────────
