@@ -9,7 +9,6 @@ export const platformConfig = {
 
 export const cmsPages = [
   { slug: "home", title: "Homepage", status: "published" },
-  { slug: "faq", title: "FAQs", status: "published" },
   { slug: "privacy", title: "Privacy Policy", status: "published" },
   { slug: "terms", title: "Terms of Service", status: "published" },
   { slug: "contact", title: "Contact", status: "published" },

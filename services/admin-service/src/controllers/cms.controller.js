@@ -7,7 +7,10 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
 export async function list(_req, res, next) {
   try {
     const db = getDb();
-    const items = await db.cmsPage.findMany({ orderBy: { updatedAt: "desc" } });
+    const items = await db.cmsPage.findMany({ 
+      where: { slug: { not: "faq" } },
+      orderBy: { updatedAt: "desc" } 
+    });
     return ResponseFormatter.success(res, { data: { items } });
   } catch (err) { next(err); }
 }

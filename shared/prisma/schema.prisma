@@ -326,6 +326,7 @@ model RefreshToken {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+
   @@index([userId])
   @@index([expiresAt])
   @@map("refresh_tokens")
@@ -504,7 +505,9 @@ model SubscriptionPlan {
 model SupportTicket {
   id             String              @id @default(uuid()) @db.Uuid
   userId         String              @map("user_id") @db.Uuid
-  subject        String              @db.VarChar(200)
+  referenceId    String?             @map("reference_id") @db.VarChar(100)
+  attachmentId   String?             @map("attachment_id") @db.Uuid
+  subject        String?             @db.VarChar(200)
   body           String
   category       String              @db.VarChar(64)
   status         SupportTicketStatus @default(open)
@@ -514,6 +517,7 @@ model SupportTicket {
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachment MediaAsset? @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([status])
@@ -909,6 +913,7 @@ model MediaAsset {
   quoteAttachments      QuoteAttachment[]
   messageAttachments    MessageAttachment[]
   verificationDocuments ExpertVerificationDocument[]
+  supportTickets        SupportTicket[]
 
   @@index([ownerUserId])
   @@index([status])
