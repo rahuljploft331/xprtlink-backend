@@ -240,6 +240,21 @@ export async function setStatus(req, res, next) {
       where: { id: expertProfile.userId },
       data: { status },
     });
+
+    if (status === "suspended") {
+      const { revokeAllUserSessions } = await import("@xprtlink/shared/auth/tokens.js");
+      await revokeAllUserSessions(expertProfile.userId);
+
+      try {
+        const { getConfig } = await import("@xprtlink/shared/config/loadEnv.js");
+        const { internalPost } = await import("@xprtlink/shared/lib/internalFetch.js");
+        const messagingUrl = getConfig("admin-service").serviceUrls.messaging;
+        await internalPost(messagingUrl, "/api/internal/events/account-disabled", { userId: expertProfile.userId });
+      } catch (err) {
+        console.error("Failed to notify messaging service about disabled account", err);
+      }
+    }
+
     return ResponseFormatter.success(res, { data: expert });
   } catch (err) {
     next(err);

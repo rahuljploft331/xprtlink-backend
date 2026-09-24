@@ -44,4 +44,20 @@ router.post("/internal/events/user-unblocked", (req, res) => {
   return res.json({ success: true });
 });
 
+
+router.post("/internal/events/account-disabled", (req, res) => {
+  const { userId } = req.body;
+  const io = getIo();
+  if (io) {
+    console.log("EMITTING account:disabled", { userId });
+    io.to(`user:${userId}`).emit("account:disabled", { userId });
+    
+    // Give the client a tiny moment to receive the event, then forcibly disconnect their sockets
+    setTimeout(() => {
+      io.in(`user:${userId}`).disconnectSockets(true);
+    }, 1000);
+  }
+  return res.json({ success: true });
+});
+
 export default router;
