@@ -210,8 +210,28 @@ export async function createQuote(auth, body) {
     if (!expert) throw notFound("expertNotFound");
     
     if (expert.userId === auth.userId) {
-      throw badRequest("cannotEngageWithSelf");
-    }
+    throw badRequest("cannotEngageWithSelf");
+  }
+
+  const block = await db.userBlock.findFirst({
+    where: {
+      OR: [
+        { blockerUserId: auth.userId, blockedUserId: expert.userId },
+        { blockerUserId: expert.userId, blockedUserId: auth.userId },
+      ],
+    },
+  });
+  if (block) throw forbidden("userBlockedCannotEngage");
+
+    const block = await db.userBlock.findFirst({
+      where: {
+        OR: [
+          { blockerUserId: auth.userId, blockedUserId: expert.userId },
+          { blockerUserId: expert.userId, blockedUserId: auth.userId },
+        ],
+      },
+    });
+    if (block) throw forbidden("userBlockedCannotEngage");
   } else {
     // No specific expert requested — find any approved expert (discovery-style quote)
     expert = await db.expertProfile.findFirst({ 

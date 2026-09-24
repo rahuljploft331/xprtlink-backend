@@ -116,7 +116,6 @@
   "auditLogLoaded": "Audit log loaded",
   "platformSettingsLoaded": "Platform settings loaded",
   "platformSettingsUpdated": "Platform settings updated",
-
   "adminNotFound": "Admin not found",
   "adminAccessRequired": "Admin access required",
   "adminAccessRequiredForSupport": "Admin access required to list support conversations",
@@ -249,5 +248,6 @@
   "cannotBlockSelf": "You cannot block yourself.",
   "deviceTokenRemoved": "Device token removed",
   "quoteExpiredCustomer": "Your quote request has expired",
-  "quoteExpiredExpert": "A quote request has expired"
+  "quoteExpiredExpert": "A quote request has expired",
+  "userBlockedCannotEngage": "You cannot engage with this user due to a block."
 }

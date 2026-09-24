@@ -20,6 +20,7 @@ import notificationsRoutes from "./notifications.routes.js";
 import reportsRoutes from "./reports.routes.js";
 import eventsRoutes from "./events.routes.js";
 import settingsRoutes from "./settings.routes.js";
+import moderationRoutes from "./moderation.routes.js";
 
 const router = Router();
 
@@ -47,5 +48,6 @@ router.use("/notifications", notificationsRoutes);
 router.use("/reports", reportsRoutes);
 router.use("/events", eventsRoutes);
 router.use("/settings", settingsRoutes);
+router.use("/moderation", moderationRoutes);
 
 export default router;
