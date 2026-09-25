@@ -3,6 +3,9 @@ import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { notFound, badRequest } from "@xprtlink/shared/utils/errors.js";
 import { sendEmail } from "@xprtlink/shared/lib/email.js";
 import { generatePresignedDownloadUrl } from "@xprtlink/shared/utils/s3.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+const log = logger.child({ module: "supportTickets.controller" });
 
 /**
  * List support tickets (admin view).
@@ -121,11 +124,11 @@ export async function reply(req, res) {
       html: textBody.replace(/\n/g, "<br>")
     });
   } catch (err) {
-    console.error("[supportTickets.controller] Failed to send email:", err.message);
+    log.error({ err: err.message }, "[supportTickets.controller] Failed to send email:");
   }
 
   return ResponseFormatter.success(res, {
-    message: "Reply sent successfully",
+    message: getMessage("replySent"),
     data: updatedTicket
   });
 }

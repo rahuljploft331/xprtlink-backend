@@ -1,6 +1,8 @@
 import { getSecretSync } from "../config/secrets.js";
 import { badRequest } from "../utils/errors.js";
 import { sendEmail } from "../lib/email.js";
+import { logger } from "../lib/logger.js";
+const log = logger.child({ module: "otpDelivery" });
 
 const OTP_PURPOSE_LABELS = {
   register: "account verification",
@@ -15,7 +17,7 @@ function isDevFallbackEnabled() {
 
 function logDevOtp(channel, destination, code, purpose) {
   if (isDevFallbackEnabled()) {
-    console.log(`[otp] ${purpose} code via ${channel} to ${destination}: ${code}`);
+    log.info(`[otp] ${purpose} code via ${channel} to ${destination}: ${code}`);
   }
 }
 
@@ -52,7 +54,7 @@ async function sendSmsOtp({ phone, purpose }) {
   if (!accountSid || !authToken || !verifyServiceSid || useHardcode) {
     if (isDevFallbackEnabled()) {
       const devCode = useHardcode ? process.env.OTP_HARDCODE_CODE : "<twilio-verify-simulated>";
-      console.log(`[otp] ${purpose} verify SMS via Twilio to ${phone}: ${devCode}`);
+      log.info(`[otp] ${purpose} verify SMS via Twilio to ${phone}: ${devCode}`);
       return;
     }
     throw badRequest(
@@ -77,7 +79,7 @@ export async function verifySmsOtp({ phone, code }) {
   const verifyServiceSid = getSecretSync("TWILIO_VERIFY_SERVICE_SID");
 
   if (!accountSid || !authToken || !verifyServiceSid) {
-    throw badRequest("Twilio Verify configuration is missing.", "OTP_CONFIG_ERROR");
+    throw badRequest("twilioConfigMissing", "OTP_CONFIG_ERROR");
   }
 
   const twilio = await import("twilio");
@@ -102,12 +104,12 @@ export async function deliverOtp({ email, phone, code, purpose, channel }) {
   const resolvedChannel = channel ?? (phone ? "phone" : "email");
 
   if (resolvedChannel === "phone") {
-    if (!phone) throw badRequest("Phone is required for SMS OTP", "VALIDATION_ERROR", "phone");
+    if (!phone) throw badRequest("phoneRequiredForSmsOtp", "VALIDATION_ERROR", "phone");
     await sendSmsOtp({ phone, purpose });
     return "phone";
   }
 
-  if (!email) throw badRequest("Email is required for email OTP", "VALIDATION_ERROR", "email");
+  if (!email) throw badRequest("emailRequiredForEmailOtp", "VALIDATION_ERROR", "email");
   await sendEmailOtp({ email, code, purpose });
   return "email";
 }

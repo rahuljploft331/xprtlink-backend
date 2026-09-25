@@ -1,6 +1,9 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+const log = logger.child({ module: "appleIapController" });
 // N5 fix: decodeSignedTransaction does NOT exist on @apple/app-store-server-library.
 // Only import the symbols that the library actually exports.
 // N3 fix: SignedDataVerifier is added so we verify the JWS signature before trusting any payload.
@@ -132,10 +135,10 @@ export const verifyPurchase = async (req, res, next) => {
         data: { subscriptionId: subscription.id, planId: subscription.planId },
       });
     } catch (err) {
-      console.error(`[appleIapController] Notification dispatch failed: ${err.message}`);
+      log.error(`[appleIapController] Notification dispatch failed: ${err.message}`);
     }
 
-    res.status(200).json({ success: true, message: "Apple subscription verified successfully", data: subscription });
+    res.status(200).json({ success: true, message: getMessage("appleSubscriptionVerified"), data: subscription });
   } catch (error) {
     next(error);
   }

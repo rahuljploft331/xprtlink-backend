@@ -69,12 +69,12 @@ export async function findValidOtpChallenge({ email, phone, purpose }) {
   });
 
   if (!challenge) {
-    throw badRequest("OTP expired or not found", "OTP_EXPIRED", email ? "email" : "phone");
+    throw badRequest("otpExpiredOrNotFound", "OTP_EXPIRED", email ? "email" : "phone");
   }
 
   if (challenge.blockedUntil && challenge.blockedUntil > new Date()) {
     throw badRequest(
-      "Too many incorrect attempts. Please try again later.",
+      "otpTooManyAttempts",
       "OTP_MAX_ATTEMPTS",
       email ? "email" : "phone"
     );
@@ -121,13 +121,13 @@ export async function verifyOtpCode(challenge, code) {
 
   if (blockedUntil) {
     throw badRequest(
-      "Too many incorrect attempts. Please try again later.",
+      "otpTooManyAttempts",
       "OTP_MAX_ATTEMPTS",
       challenge.email ? "email" : "phone"
     );
   }
 
-  throw badRequest("The verification code entered is incorrect.", "INVALID_OTP", "code");
+  throw badRequest("otpIncorrect", "INVALID_OTP", "code");
 }
 
 /**

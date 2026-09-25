@@ -111,7 +111,7 @@ router.get(
   requireUuidId,
   asyncHandler(async (req, res) => {
     const data = await svc.getCallStatus(req.params.id);
-    return ResponseFormatter.success(res, { message: "Call status loaded", data });
+    return ResponseFormatter.success(res, { message: getMessage("callStatusLoaded"), data });
   })
 );
 

@@ -2,6 +2,9 @@ import { getDb } from "@xprtlink/shared/db/index.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { google } from "googleapis";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+const log = logger.child({ module: "googleIapController" });
 
 function getGoogleClient() {
   const serviceAccount = process.env.SERVICE_ACCOUNT_JSON;
@@ -94,10 +97,10 @@ export const verifyPurchase = async (req, res, next) => {
         data: { subscriptionId: subscription.id, planId: subscription.planId },
       });
     } catch (err) {
-      console.error(`[googleIapController] Notification dispatch failed: ${err.message}`);
+      log.error(`[googleIapController] Notification dispatch failed: ${err.message}`);
     }
 
-    res.status(200).json({ success: true, message: "Google Play subscription verified successfully", data: subscription });
+    res.status(200).json({ success: true, message: getMessage("googlePlaySubscriptionVerified"), data: subscription });
   } catch (error) {
     next(error);
   }

@@ -80,6 +80,6 @@ export async function reorder(req, res, next) {
       )
     );
     await logAdminAction(req, "category.reorder", "Category", "batch", { count: items.length });
-    return ResponseFormatter.success(res, { message: "Category order saved." });
+    return ResponseFormatter.success(res, { message: getMessage("categoryOrderSaved") });
   } catch (err) { next(err); }
 }

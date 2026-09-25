@@ -182,7 +182,7 @@ router.delete(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     await bannerCtrl.deleteBanner(req.auth, req.params.id);
-    return ResponseFormatter.success(res, { message: "Banner deleted successfully." });
+    return ResponseFormatter.success(res, { message: getMessage("bannerDeleted") });
   })
 );
 

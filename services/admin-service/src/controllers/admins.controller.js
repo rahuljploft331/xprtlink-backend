@@ -79,7 +79,7 @@ export async function resetPassword(req, res, next) {
     const admin = await adminUsers().findUnique({ where: { id: req.params.id } });
     if (!admin) throw notFound("adminNotFound");
     if (admin.role === "super_admin") {
-      throw badRequest("Super admin passwords can't be reset from here", "NOT_SUPPORTED");
+      throw badRequest("superAdminPasswordResetNotSupported", "NOT_SUPPORTED");
     }
 
     const tempPassword = generateTempPassword();
@@ -96,7 +96,7 @@ export async function resetPassword(req, res, next) {
     });
 
     await logAdminAction(req, "admin.password_reset", "AdminUser", admin.id, { email: admin.email });
-    return ResponseFormatter.success(res, { message: `Password reset. New password sent to ${admin.email}.` });
+    return ResponseFormatter.success(res, { message: getMessage("adminPasswordResetEmailed", { email: admin.email }) });
   } catch (err) { next(err); }
 }
 

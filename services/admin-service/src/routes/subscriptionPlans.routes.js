@@ -3,6 +3,7 @@ import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
 import { list, getById, update } from "#controllers/subscriptionPlans.controller.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -30,7 +31,7 @@ router.put(
   requirePermission("subscriptions", "edit"),
   asyncHandler(async (req, res) => {
     const data = await update(req, res);
-    return ResponseFormatter.success(res, { data, message: "Subscription Plan updated successfully" });
+    return ResponseFormatter.success(res, { data, message: getMessage("subscriptionPlanUpdated") });
   })
 );
 

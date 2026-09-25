@@ -3,6 +3,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { getSecretSync } from "../config/secrets.js";
 import { badRequest } from "../utils/errors.js";
+import { logger } from "../lib/logger.js";
+const log = logger.child({ module: "email" });
 
 function isDevFallbackEnabled() {
   return process.env.NODE_ENV !== "production";
@@ -62,10 +64,10 @@ export async function sendEmail({ to, subject, text, html, replyTo }) {
 
   if (!apiKey) {
     if (isDevFallbackEnabled()) {
-      console.log(`[email] to ${to}: ${subject}\n${text}`);
+      log.info(`[email] to ${to}: ${subject}\n${text}`);
       return;
     }
-    throw badRequest("Unable to send email. Please try again.", "EMAIL_DELIVERY_FAILED");
+    throw badRequest("emailDeliveryFailed", "EMAIL_DELIVERY_FAILED");
   }
 
   const { default: sgMail } = await import("@sendgrid/mail");

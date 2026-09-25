@@ -16,13 +16,24 @@ try {
 }
 
 export function getMessage(key, params = {}) {
-  let message = messages[key] || key;
-  
-  // Basic interpolation if needed in the future:
-  // e.g. "Welcome {name}" -> getMessage("welcome", { name: "John" })
+  const hasKey = Object.prototype.hasOwnProperty.call(messages, key);
+
+  // Self-enforce the SSOT: outside production, surface any key that isn't
+  // defined in messages.json (or any raw prose string passed instead of a key)
+  // so it can't silently slip through via the fallback below.
+  if (!hasKey && process.env.NODE_ENV !== "production") {
+    console.warn(
+      `[messages] Unknown message key "${key}" — add it to shared/constants/messages.json ` +
+      `(never pass a raw prose string to getMessage/error helpers).`
+    );
+  }
+
+  let message = hasKey ? messages[key] : key;
+
+  // Interpolate {placeholder} tokens, e.g. getMessage("welcome", { name: "John" })
   for (const [paramKey, paramValue] of Object.entries(params)) {
     message = message.replace(`{${paramKey}}`, paramValue);
   }
-  
+
   return message;
 }

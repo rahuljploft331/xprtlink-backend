@@ -1,6 +1,9 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { notFound } from "@xprtlink/shared/utils/errors.js";
 import { sendEmail } from "@xprtlink/shared/lib/email.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+const log = logger.child({ module: "supportTicketService" });
 
 /**
  * Submit a support request (forwards via email to admin).
@@ -74,9 +77,9 @@ export async function createTicket(auth, { subject, body, category, referenceId,
       replyTo: user?.email // Optional: allows support team to hit 'reply' directly
     });
   } catch (err) {
-    console.error("[supportTicketService] Failed to send email:", err.message);
+    log.error({ err: err.message }, "[supportTicketService] Failed to send email:");
     // Non-fatal, we still created the ticket record
   }
 
-  return { success: true, message: "Ticket forwarded to support" };
+  return { success: true, message: getMessage("ticketForwardedToSupport") };
 }

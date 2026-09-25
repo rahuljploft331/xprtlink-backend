@@ -1,6 +1,8 @@
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { getDb } from "@xprtlink/shared/db/getClient.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "notifications.controller" });
 
 /**
  * Notifications stub — the DB notifications table is per-user push notifications.
@@ -36,7 +38,7 @@ export async function list(req, res) {
     page,
     limit,
     total,
-    message: "Notifications retrieved",
+    message: getMessage("notificationsRetrieved"),
   });
 }
 
@@ -107,7 +109,7 @@ export async function send(req, res) {
   }
 
   if (targetUserIds.length === 0 && status !== "draft") {
-    return ResponseFormatter.success(res, { message: "No matching users found for audience.", data: { dispatched: 0 } });
+    return ResponseFormatter.success(res, { message: getMessage("broadcastNoMatchingUsers"), data: { dispatched: 0 } });
   }
   
   // Save to AdminBroadcast
@@ -124,7 +126,7 @@ export async function send(req, res) {
 
   if (status === "draft" || status === "scheduled") {
     return ResponseFormatter.success(res, { 
-      message: `Notification saved as ${status}.`,
+      message: getMessage("broadcastSavedAs", { status }),
       data: { dispatched: 0 }
     });
   }
@@ -144,7 +146,7 @@ export async function send(req, res) {
         data: {}, // no extra payload needed for simple broadcast
       });
     } catch (err) {
-      console.error(`[admin-service] Failed to dispatch broadcast chunk: ${err.message}`);
+      log.error(`[admin-service] Failed to dispatch broadcast chunk: ${err.message}`);
     }
   }
 
@@ -156,7 +158,7 @@ export async function send(req, res) {
   });
 
   return ResponseFormatter.success(res, { 
-    message: `Notification sent to ${targetUserIds.length} user(s).`,
+    message: getMessage("broadcastSent", { count: targetUserIds.length }),
     data: { dispatched: targetUserIds.length }
   });
 }

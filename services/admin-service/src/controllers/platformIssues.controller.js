@@ -1,5 +1,6 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
 
 export async function listIssues(req, res) {
   const { page = 1, limit = 20, status } = req.query;
@@ -50,5 +51,5 @@ export async function updateIssueStatus(req, res) {
     data: { status },
   });
 
-  return ResponseFormatter.success(res, { data: issue, message: "Issue status updated successfully" });
+  return ResponseFormatter.success(res, { data: issue, message: getMessage("issueStatusUpdated") });
 }
