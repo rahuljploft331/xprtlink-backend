@@ -1,4 +1,3 @@
-import crypto from "crypto";
 import { getDb } from "@xprtlink/shared/db";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 const log = logger.child({ module: "billingService" });
@@ -856,127 +855,23 @@ export async function listSubscriptionPlans() {
   return plans.map((plan) => toSubscriptionPlanDto(plan));
 }
 
-export async function subscribe(auth, body) {
-  const db = getDb();
-  let plan = null;
-  if (body.planId) {
-    plan = await db.subscriptionPlan.findFirst({
-      where: { id: body.planId, isActive: true },
-    });
-  }
-  if (!plan && body.planCode) {
-    plan = await db.subscriptionPlan.findFirst({
-      where: { code: body.planCode, isActive: true },
-    });
-  }
-  if (!plan) {
-    plan = await db.subscriptionPlan.findFirst({
-      where: { isActive: true },
-    });
-  }
-  if (!plan) throw notFound("subscriptionPlanNotFound");
-
-  // IAP receipt validation stub — accept any non-empty receiptData.
-  const externalSubscriptionId = `iap_stub_${crypto.randomUUID()}`;
-  const now = new Date();
-  const periodEnd = new Date(now);
-  periodEnd.setMonth(periodEnd.getMonth() + 1);
-
-  const subscription = await db.$transaction(async (tx) => {
-    // ── Guard: block re-subscribing to the same active plan ─────────────────
-    const existingActive = await tx.expertSubscription.findFirst({
-      where: { expertProfileId: auth.expertProfileId, status: "active" },
-    });
-
-    if (existingActive && existingActive.planId === plan.id) {
-      if (existingActive.cancelAtPeriodEnd) {
-        // Expert is reinstating a plan they scheduled to cancel — undo the cancel
-        const reinstated = await tx.expertSubscription.update({
-          where: { id: existingActive.id },
-          data: { cancelAtPeriodEnd: false },
-          include: { plan: true },
-        });
-        return reinstated;
-      }
-      throw conflict(
-        "You are already subscribed to this plan. To change your plan, choose a different one.",
-        "ALREADY_SUBSCRIBED"
-      );
-    }
-
-    // Cancel any other active subscription (upgrade / downgrade)
-    if (existingActive) {
-      await tx.expertSubscription.update({
-        where: { id: existingActive.id },
-        data: { status: "canceled", canceledAt: now, cancelAtPeriodEnd: false },
-      });
-    }
-
-
-    const created = await tx.expertSubscription.create({
-      data: {
-        expertProfileId: auth.expertProfileId,
-        planId: plan.id,
-        store: body.store,
-        externalSubscriptionId,
-        status: "active",
-        currentPeriodStart: now,
-        currentPeriodEnd: periodEnd,
-      },
-      include: { plan: true },
-    });
-
-    await tx.transaction.create({
-      data: {
-        type: "subscription",
-        amountCents: plan.priceMonthlyCents,
-        currency: "USD",
-        status: "succeeded",
-        metadata: {
-          expertProfileId: auth.expertProfileId,
-          planId: plan.id,
-          store: body.store,
-          receiptStub: true,
-        },
-      },
-    });
-
-    // Marketplace eligibility: an expert becomes discoverable in search only
-    // when they are BOTH approved AND hold an active subscription. Approval
-    // sets searchEligible based on the subscription state at approval time
-    // (see admin verifications controller). When an already-approved expert
-    // subscribes afterwards, flip the flag on here so they surface in search
-    // without needing to be re-approved.
-    await tx.expertProfile.updateMany({
-      where: {
-        id: auth.expertProfileId,
-        verificationStatus: "approved",
-        searchEligible: false,
-      },
-      data: { searchEligible: true },
-    });
-
-    return created;
-  });
-
-  // Notify expert that their subscription is now active (non-fatal)
-  try {
-    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
-    const periodEnd = subscription.currentPeriodEnd
-      ? new Date(subscription.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
-      : "next month";
-    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
-      userIds: [auth.userId],
-      type: "subscription_activated",
-      title: "Subscription Activated",
-      body: `Your ${subscription.plan.name} plan is now active. You're discoverable to customers until ${periodEnd}.`,
-      data: { subscriptionId: subscription.id, planId: subscription.planId },
-    });
-  } catch (err) {
-    log.error(`[subscribe] Notification dispatch failed: ${err.message}`);
-  }
-
-  return toExpertSubscriptionDto(subscription, subscription.plan);
+/**
+ * Legacy generic subscribe entry point (`POST /subscriptions`).
+ *
+ * DISABLED as an activation path. It previously minted an active subscription
+ * from an unvalidated `receiptData` (`iap_stub_<uuid>`), which let any expert
+ * grant themselves a paid plan for free — a revenue bypass. All real activations
+ * MUST carry a verified store receipt, so this now hard-rejects and points the
+ * caller at the store-specific verification endpoints:
+ *   - Apple:  POST /api/v1/billing/subscriptions/verify/apple
+ *   - Google: POST /api/v1/billing/subscriptions/verify/google
+ *
+ * Those controllers (appleIapController / googleIapController) do the full JWS/
+ * receipt verification, replay protection, real expiry dates, plan reinstatement,
+ * upgrade/downgrade, and search-eligibility flip.
+ */
+export async function subscribe() {
+  throw badRequest("subscriptionRequiresStoreReceipt", "STORE_RECEIPT_REQUIRED");
 }
 
 export async function getMySubscription(auth) {

@@ -10,7 +10,6 @@ import {
   preAuthHoldRequestSchema,
   customConnectKycRequestSchema,
   attachBankAccountRequestSchema,
-  subscribeRequestSchema,
 } from "@xprtlink/shared/contracts";
 import { stripeGuard } from "../middleware/stripeGuard.js";
 import * as svc from "../services/billingService.js";
@@ -272,13 +271,16 @@ router.get(
   })
 );
 
+// Legacy generic subscribe route. DISABLED as an activation path — it used to mint
+// a subscription from an unvalidated receipt (revenue bypass). Real activations must
+// go through the store verification endpoints below. `subscribe()` hard-rejects.
 router.post(
   "/subscriptions",
   requireRole("expert"),
   asyncHandler(async (req, res) => {
-    const body = subscribeRequestSchema.parse(req.body);
-    const data = await svc.subscribe(req.auth, body);
-    return ResponseFormatter.success(res, { message: getMessage("subscribed"), data, status: 201 });
+    await svc.subscribe(req.auth, req.body);
+    // Unreachable: subscribe() always throws STORE_RECEIPT_REQUIRED.
+    return ResponseFormatter.success(res, { message: getMessage("subscribed") });
   })
 );
 
