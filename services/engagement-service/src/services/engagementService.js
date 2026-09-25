@@ -395,7 +395,21 @@ export async function listQuotes(auth, query) {
     throw badRequest("invalidRoleFilter");
   }
 
-  if (query.status) where.status = query.status;
+  if (query.status) {
+    if (role === "customer") {
+      if (query.status === "pending") {
+        where.status = { in: ["draft", "submitted", "pending_expert_review", "expert_reviewed"] };
+      } else if (query.status === "quoteReceived") {
+        where.status = { in: ["quoted", "accepted"] };
+      } else if (query.status === "cancelled" || query.status === "canceled") {
+        where.status = { in: ["canceled", "rejected", "expired"] };
+      } else {
+        where.status = query.status;
+      }
+    } else {
+      where.status = query.status;
+    }
+  }
 
   const db = getDb();
   const [rows, total] = await Promise.all([
