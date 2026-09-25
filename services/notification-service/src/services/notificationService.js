@@ -1,4 +1,6 @@
 import { getDb } from "@xprtlink/shared/db";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "notificationService" });
 import {
   toNotificationDto,
   toNotificationPreferencesDto,
@@ -234,7 +236,7 @@ export async function dispatchNotification({ userIds, type, title, body: bodyTex
     type: resolvedType,
     ...data,
   }).catch((err) => {
-    console.error("[dispatchNotification] FCM push error:", err.message);
+    log.error({ err: err.message }, "[dispatchNotification] FCM push error:");
   });
 
   return { dispatched: created.count };

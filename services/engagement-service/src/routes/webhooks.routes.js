@@ -2,6 +2,8 @@ import { Router } from "express";
 import { verifyZegoSignature } from "@xprtlink/shared/lib/zegoWebhook.js";
 import * as svc from "../services/zegoCallbackService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "webhooks.routes" });
 
 
 const router = Router();
@@ -22,12 +24,12 @@ router.post(
 
     // 1. Verify signature
     if (!verifyZegoSignature(signature, timestamp, nonce)) {
-      console.warn("[zego-webhook] Invalid signature, rejecting callback");
+      log.warn("[zego-webhook] Invalid signature, rejecting callback");
       return res.status(401).json({ code: 1, message: getMessage("invalidSignature") });
     }
 
     // 2. Log every callback for debugging
-    console.log(`[zego-webhook] event=${event} room=${req.body.room_id || "N/A"}`);
+    log.info(`[zego-webhook] event=${event} room=${req.body.room_id || "N/A"}`);
 
     // 3. Dispatch to handler — always return 200 to ZegoCloud first
     //    (process async to avoid timeout retries)
@@ -35,7 +37,7 @@ router.post(
       await svc.handleZegoCallback(req.body);
     } catch (err) {
       // Log but don't fail — ZegoCloud must get 200
-      console.error("[zego-webhook] handler error:", err.message);
+      log.error({ err: err.message }, "[zego-webhook] handler error:");
     }
 
     // ZegoCloud expects { code: 0 } for success

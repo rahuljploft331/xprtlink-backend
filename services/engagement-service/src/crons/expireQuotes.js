@@ -1,6 +1,8 @@
 import { getDb } from "@xprtlink/shared/db";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "expireQuotes" });
 
 /**
  * Expire stale quotes that have been in "pending_expert_review" for longer than
@@ -29,7 +31,7 @@ export async function expireStaleQuotes() {
       data: { status: "expired" },
     });
 
-    console.log(`[cron] Expired ${expiredQuotes.length} stale quote(s) older than ${QUOTE_EXPIRY_DAYS} days`);
+    log.info(`[cron] Expired ${expiredQuotes.length} stale quote(s) older than ${QUOTE_EXPIRY_DAYS} days`);
 
     const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
     const customerIds = [...new Set(expiredQuotes.map((q) => q.customerId))];
@@ -42,7 +44,7 @@ export async function expireStaleQuotes() {
         title: "Quote Expired",
         body: getMessage("quoteExpiredCustomer"),
         data: {},
-      }).catch((err) => console.error("[cron] Failed to notify customers:", err.message));
+      }).catch((err) => log.error({ err: err.message }, "[cron] Failed to notify customers:"));
     }
 
     if (expertIds.length > 0) {
@@ -52,7 +54,7 @@ export async function expireStaleQuotes() {
         title: "Quote Expired",
         body: getMessage("quoteExpiredExpert"),
         data: {},
-      }).catch((err) => console.error("[cron] Failed to notify experts:", err.message));
+      }).catch((err) => log.error({ err: err.message }, "[cron] Failed to notify experts:"));
     }
   }
 

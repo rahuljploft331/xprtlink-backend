@@ -1,5 +1,7 @@
 import { getDb } from "@xprtlink/shared/db";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "zegoCallbackService" });
 
 /**
  * ZegoCloud Callback Event Handlers.
@@ -29,7 +31,7 @@ const handlers = {
  * Main dispatcher — called from the webhook route.
  */
 export async function handleZegoCallback(payload) {
-  console.log(`[zego-callback] Received event '${payload.event}' with payload:`, JSON.stringify(payload));
+  log.info(`[zego-callback] Received event '${payload.event}' with payload:`, JSON.stringify(payload));
   
   try {
     const db = getDb();
@@ -41,12 +43,12 @@ export async function handleZegoCallback(payload) {
       },
     });
   } catch (err) {
-    console.error(`[zego-callback] Failed to log raw event to DB: ${err.message}`);
+    log.error(`[zego-callback] Failed to log raw event to DB: ${err.message}`);
   }
 
   const handler = handlers[payload.event];
   if (!handler) {
-    console.log(`[zego-callback] Unhandled event: ${payload.event}`);
+    log.info(`[zego-callback] Unhandled event: ${payload.event}`);
     return;
   }
   await handler(payload);
@@ -59,7 +61,7 @@ export async function handleZegoCallback(payload) {
  */
 async function handleRoomCreate(payload) {
   const roomId = payload.room_id;
-  console.log(`[zego-callback] Room created: ${roomId}`);
+  log.info(`[zego-callback] Room created: ${roomId}`);
   // No DB update needed — consultation already has zegoRoomId from createConsultation
 }
 
@@ -74,11 +76,11 @@ async function handleRoomCreate(payload) {
 async function handleUserLogin(payload) {
   const roomId = payload.room_id;
   const userId = payload.user_account || payload.id_name;
-  console.log(`[zego-callback] User joined: userId=${userId} room=${roomId}`);
+  log.info(`[zego-callback] User joined: userId=${userId} room=${roomId}`);
 
   // Clear any existing missing participant timer since someone rejoined
   if (disconnectTimers.has(roomId)) {
-    console.log(`[zego-callback] Clearing disconnect timer for room ${roomId}`);
+    log.info(`[zego-callback] Clearing disconnect timer for room ${roomId}`);
     clearTimeout(disconnectTimers.get(roomId));
     disconnectTimers.delete(roomId);
   }
@@ -90,7 +92,7 @@ async function handleUserLogin(payload) {
   });
 
   if (!consultation) {
-    console.warn(`[zego-callback] No consultation found for room ${roomId}`);
+    log.warn(`[zego-callback] No consultation found for room ${roomId}`);
     return;
   }
 
@@ -105,7 +107,7 @@ async function handleUserLogin(payload) {
 
   // Only transition to in_progress if currently in accepted/ringing/requested
   if (!["requested", "ringing", "accepted"].includes(consultation.status)) {
-    console.log(`[zego-callback] Consultation ${consultation.id} already ${consultation.status}, skipping`);
+    log.info(`[zego-callback] Consultation ${consultation.id} already ${consultation.status}, skipping`);
     return;
   }
 
@@ -131,7 +133,7 @@ async function handleUserLogin(payload) {
   const hasExpertJoined   = consultation.joinedParticipantIds.some(matchesExpert);
 
   if (!hasCustomerJoined || !hasExpertJoined) {
-    console.log(
+    log.info(
       `[zego-callback] Consultation ${consultation.id} — waiting for both participants to join` +
       ` (hasCustomer=${hasCustomerJoined}, hasExpert=${hasExpertJoined})` +
       ` joinedIds=${JSON.stringify(consultation.joinedParticipantIds)}`
@@ -149,7 +151,7 @@ async function handleUserLogin(payload) {
     },
   });
 
-  console.log(`[zego-callback] Consultation ${consultation.id} → in_progress (both participants joined)`);
+  log.info(`[zego-callback] Consultation ${consultation.id} → in_progress (both participants joined)`);
 }
 
 /**
@@ -161,7 +163,7 @@ async function handleUserLogin(payload) {
 async function handleUserLogout(payload) {
   const roomId = payload.room_id;
   const userId = payload.user_account || payload.id_name;
-  console.log(`[zego-callback] User left: userId=${userId} room=${roomId}`);
+  log.info(`[zego-callback] User left: userId=${userId} room=${roomId}`);
   
   const timeoutMins = Number(process.env.MISSING_PARTICIPANT_TIMEOUT_MINS) || 0;
   if (timeoutMins > 0) {
@@ -171,13 +173,13 @@ async function handleUserLogout(payload) {
     });
 
     if (consultation && consultation.status === "in_progress") {
-      console.log(`[zego-callback] Starting ${timeoutMins}m missing participant timer for room ${roomId}`);
+      log.info(`[zego-callback] Starting ${timeoutMins}m missing participant timer for room ${roomId}`);
       if (disconnectTimers.has(roomId)) {
         clearTimeout(disconnectTimers.get(roomId));
       }
       
       const timer = setTimeout(async () => {
-        console.log(`[zego-callback] Timeout reached for missing participant in room ${roomId}. Force closing.`);
+        log.info(`[zego-callback] Timeout reached for missing participant in room ${roomId}. Force closing.`);
         disconnectTimers.delete(roomId);
         // Simulate a room_close to complete the consultation properly
         await handleRoomClose({
@@ -206,7 +208,7 @@ async function handleRoomClose(payload) {
     ? new Date(Number(payload.timestamp) * 1000)
     : new Date();
 
-  console.log(`[zego-callback] Room closed: ${roomId}`);
+  log.info(`[zego-callback] Room closed: ${roomId}`);
 
   if (disconnectTimers.has(roomId)) {
     clearTimeout(disconnectTimers.get(roomId));
@@ -223,13 +225,13 @@ async function handleRoomClose(payload) {
   });
 
   if (!consultation) {
-    console.warn(`[zego-callback] No consultation found for room ${roomId}`);
+    log.warn(`[zego-callback] No consultation found for room ${roomId}`);
     return;
   }
 
   // Only end if currently active
   if (!["requested", "ringing", "accepted", "in_progress"].includes(consultation.status)) {
-    console.log(`[zego-callback] Consultation ${consultation.id} already ${consultation.status}, skipping room_close`);
+    log.info(`[zego-callback] Consultation ${consultation.id} already ${consultation.status}, skipping room_close`);
     return;
   }
 
@@ -255,7 +257,7 @@ async function handleRoomClose(payload) {
     },
   });
 
-  console.log(
+  log.info(
     `[zego-callback] Consultation ${consultation.id} → ${finalStatus} ` +
     `(duration=${wasConnected ? durationSeconds : 0}s, connected=${wasConnected})`
   );
@@ -269,13 +271,13 @@ async function handleRoomClose(payload) {
         `/api/v1/billing/consultations/${consultation.id}/capture`,
         { durationSeconds }
       );
-      console.log(`[zego-callback] Billing capture result:`, JSON.stringify(result));
+      log.info(`[zego-callback] Billing capture result:`, JSON.stringify(result));
     } catch (err) {
       // Non-fatal — consultation is already marked completed; billing can be retried
-      console.error(`[zego-callback] Billing capture call failed: ${err.message}`);
+      log.error(`[zego-callback] Billing capture call failed: ${err.message}`);
     }
   } else {
-    console.log(`[zego-callback] Consultation ${consultation.id} — no charge (wasConnected=${wasConnected}, duration=${durationSeconds}s)`);
+    log.info(`[zego-callback] Consultation ${consultation.id} — no charge (wasConnected=${wasConnected}, duration=${durationSeconds}s)`);
   }
 
   // Notify both participants that the call has ended — ONLY when the call
@@ -305,6 +307,6 @@ async function handleRoomClose(payload) {
     }
   } catch (err) {
     // Non-fatal — consultation is already marked completed
-    console.error(`[zego-callback] Post-call notification failed: ${err.message}`);
+    log.error(`[zego-callback] Post-call notification failed: ${err.message}`);
   }
 }

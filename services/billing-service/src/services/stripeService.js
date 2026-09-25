@@ -1,5 +1,7 @@
 import Stripe from "stripe";
 import { getSecretSync } from "@xprtlink/shared/config/secrets.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "stripeService" });
 
 let stripe = null;
 
@@ -8,7 +10,7 @@ function requireStripe() {
     const key = getSecretSync("STRIPE_SECRET_KEY");
     if (key && key.trim() && !key.includes("placeholder")) {
       stripe = new Stripe(key, { apiVersion: "2024-12-18.acacia" });
-      console.log("[Stripe Service] Stripe SDK initialized successfully.");
+      log.info("[Stripe Service] Stripe SDK initialized successfully.");
     } else {
       const err = new Error("Stripe SDK not initialized (missing STRIPE_SECRET_KEY)");
       err.code = "STRIPE_UNAVAILABLE";
@@ -221,6 +223,7 @@ export async function attachExternalBankAccount({
 
 /**
  * Transfers net consultation earnings to Expert's Stripe Connect account.
+ * Per-consultation scope (idempotency keyed on the consultation).
  */
 export async function transferEarningsToExpert({
   amountCents,
@@ -237,6 +240,32 @@ export async function transferEarningsToExpert({
     },
     {
       idempotencyKey: `transfer_${consultationId}`,
+    }
+  );
+}
+
+/**
+ * Transfers an aggregated PAYOUT (many consultations rolled into one) to an
+ * Expert's Stripe Connect account. Payout-scoped: the transfer_group and
+ * idempotencyKey are keyed on the payout id, so a retried payout-run can never
+ * double-send the same payout.
+ */
+export async function transferEarningsToExpertPayout({
+  amountCents,
+  currency = "usd",
+  destinationStripeAccountId,
+  payoutId,
+}) {
+  const sdk = requireStripe();
+  return await sdk.transfers.create(
+    {
+      amount: amountCents,
+      currency: (currency || "usd").toLowerCase(),
+      destination: destinationStripeAccountId,
+      transfer_group: `PAYOUT_${payoutId}`,
+    },
+    {
+      idempotencyKey: `payout_${payoutId}`,
     }
   );
 }

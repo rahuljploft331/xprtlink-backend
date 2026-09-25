@@ -1,4 +1,6 @@
 import { getDb } from "@xprtlink/shared/db";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "expertService" });
 import {
   toExpertPublicDto,
   toExpertMeDto,
@@ -276,7 +278,7 @@ export async function getExpertById(id, auth) {
       create: { customerProfileId: auth.customerProfileId, expertProfileId: id },
       update: { viewedAt: new Date() },
     }).catch((err) => {
-      console.error(`[getExpertById] Failed to record recently viewed for expert ${id}:`, err.message);
+      log.error({ err: err.message }, `[getExpertById] Failed to record recently viewed for expert ${id}:`);
     });
   }
   return toExpertPublicDto(expert, { categories: expert.categories, isSaved });

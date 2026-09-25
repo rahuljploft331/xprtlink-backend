@@ -9,14 +9,21 @@ import { z } from "zod";
  * e.g. `maintenanceMode`). Renaming a key silently changes the mobile payload —
  * add new keys instead.
  */
-export const PAYOUT_SCHEDULES = ["daily", "weekly", "monthly"];
+/**
+ * `payoutSchedule` is the payout cadence expressed as an integer number of DAYS.
+ * The payout-run job reads this to size its rolling settlement window (e.g. 7 = weekly,
+ * 5 = every 5 days). Admin-configurable to any N in [1, 90]. Default 7.
+ */
+export const PAYOUT_SCHEDULE_MIN_DAYS = 1;
+export const PAYOUT_SCHEDULE_MAX_DAYS = 90;
+export const PAYOUT_SCHEDULE_DEFAULT_DAYS = 7;
 
 /** Defaults returned when a row has never been written (fresh DB). */
 export const PLATFORM_SETTING_DEFAULTS = {
   commissionPercent: 15,
   maintenanceMode: false,
   supportEmail: "support@xpertlink.com",
-  payoutSchedule: "weekly",
+  payoutSchedule: PAYOUT_SCHEDULE_DEFAULT_DAYS,
 };
 
 /**
@@ -32,7 +39,12 @@ export const updatePlatformSettingsSchema = z.object({
     .optional(),
   maintenanceMode: z.boolean().optional(),
   supportEmail: z.string().email("supportEmail must be a valid email address").optional(),
-  payoutSchedule: z.enum(PAYOUT_SCHEDULES).optional(),
+  payoutSchedule: z
+    .number()
+    .int("payoutSchedule must be a whole number of days")
+    .min(PAYOUT_SCHEDULE_MIN_DAYS, `payoutSchedule must be between ${PAYOUT_SCHEDULE_MIN_DAYS} and ${PAYOUT_SCHEDULE_MAX_DAYS} days`)
+    .max(PAYOUT_SCHEDULE_MAX_DAYS, `payoutSchedule must be between ${PAYOUT_SCHEDULE_MIN_DAYS} and ${PAYOUT_SCHEDULE_MAX_DAYS} days`)
+    .optional(),
 });
 
 /**

@@ -6,6 +6,8 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { logAdminAction } from "#utils/audit.js";
 import { adminSetFeaturedSchema } from "@xprtlink/shared/contracts/expert.schema.js";
 import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "experts.controller" });
 
 const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -251,7 +253,7 @@ export async function setStatus(req, res, next) {
         const messagingUrl = getConfig("admin-service").serviceUrls.messaging;
         await internalPost(messagingUrl, "/api/internal/events/account-disabled", { userId: expertProfile.userId });
       } catch (err) {
-        console.error("Failed to notify messaging service about disabled account", err);
+        log.error({ err: err }, "Failed to notify messaging service about disabled account");
       }
     }
 

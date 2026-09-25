@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import { getSecretSync } from "../config/secrets.js";
+import { logger } from "../lib/logger.js";
+const log = logger.child({ module: "zegoWebhook" });
 
 /** Maximum allowed age of a webhook callback (5 minutes) */
 const MAX_CALLBACK_AGE_MS = 5 * 60 * 1000;
@@ -24,7 +26,7 @@ const MAX_CALLBACK_AGE_MS = 5 * 60 * 1000;
 export function verifyZegoSignature(signature, timestamp, nonce) {
   const callbackSecret = getSecretSync("ZEGO_CALLBACK_SECRET");
   if (!callbackSecret) {
-    console.error("[zego-webhook] ZEGO_CALLBACK_SECRET is not set");
+    log.error("[zego-webhook] ZEGO_CALLBACK_SECRET is not set");
     return false;
   }
 
@@ -32,7 +34,7 @@ export function verifyZegoSignature(signature, timestamp, nonce) {
   const callbackTime = Number(timestamp) * 1000; // Convert Unix seconds to ms
   const age = Date.now() - callbackTime;
   if (isNaN(callbackTime) || age > MAX_CALLBACK_AGE_MS || age < -MAX_CALLBACK_AGE_MS) {
-    console.warn(`[zego-webhook] Rejecting stale/future callback (age=${Math.round(age / 1000)}s)`);
+    log.warn(`[zego-webhook] Rejecting stale/future callback (age=${Math.round(age / 1000)}s)`);
     return false;
   }
 

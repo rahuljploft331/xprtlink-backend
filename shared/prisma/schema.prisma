@@ -1008,7 +1008,8 @@ model ExpertPayout {
   createdAt        DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  expert ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  expert        ExpertProfile          @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  ledgerEntries ExpertEarningsLedger[]
 
   @@unique([expertProfileId, periodStart, periodEnd])
   @@index([expertProfileId])
@@ -1023,13 +1024,19 @@ model ExpertEarningsLedger {
   grossCents      Int      @map("gross_cents")
   commissionCents Int      @map("commission_cents")
   netCents        Int      @map("net_cents")
+  // Links a settled earning to the payout that paid it out. Null = not yet paid
+  // (the "owed" queue the payout-run job aggregates). onDelete:SetNull returns
+  // earnings to the unpaid pool if a failed payout row is deleted.
+  payoutId        String?  @map("payout_id") @db.Uuid
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   expert       ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
   consultation Consultation  @relation(fields: [consultationId], references: [id], onDelete: Restrict)
+  payout       ExpertPayout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
 
   @@unique([consultationId])
   @@index([expertProfileId, createdAt(sort: Desc)])
+  @@index([expertProfileId, payoutId])
   @@map("expert_earnings_ledger")
 }
 

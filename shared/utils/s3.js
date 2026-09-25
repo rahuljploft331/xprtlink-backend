@@ -8,6 +8,8 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import { getSecretSync } from "../config/secrets.js";
+import { logger } from "../lib/logger.js";
+const log = logger.child({ module: "s3" });
 
 let s3ClientInstance = null;
 
@@ -76,7 +78,7 @@ export async function generatePresignedDownloadUrl(key, expiresIn = 86400) {
 
     return await getSignedUrl(client, command, { expiresIn });
   } catch (err) {
-    console.error("[S3] generatePresignedDownloadUrl error:", err.message);
+    log.error({ err: err.message }, "[S3] generatePresignedDownloadUrl error:");
     return null;
   }
 }
@@ -131,9 +133,9 @@ export async function moveS3Object(sourceKey, destinationKey) {
       })
     );
 
-    console.log(`[S3] Moved object from '${sourceKey}' to '${destinationKey}'`);
+    log.info(`[S3] Moved object from '${sourceKey}' to '${destinationKey}'`);
   } catch (err) {
-    console.error(`[S3] moveS3Object failed (${sourceKey} -> ${destinationKey}):`, err.message);
+    log.error({ err: err.message }, `[S3] moveS3Object failed (${sourceKey} -> ${destinationKey}):`);
     // If copy failed, throw or log
     throw err;
   }

@@ -1,4 +1,6 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "googlePlayWebhookController" });
 
 // A simple webhook handler for Google Play Real-Time Developer Notifications (RTDN)
 export const handleNotification = async (req, res, next) => {
@@ -64,7 +66,7 @@ export const handleNotification = async (req, res, next) => {
     // Google Pub/Sub expects a 200 OK
     res.status(200).send("OK");
   } catch (error) {
-    console.error("[googlePlayWebhookController] Error handling webhook", error);
+    log.error({ err: error }, "[googlePlayWebhookController] Error handling webhook");
     res.status(500).send("Error");
   }
 };

@@ -477,6 +477,58 @@
           }
         },
         {
+          "id": "57225879-77777777-0000-4000-8000-000000000004",
+          "name": "Retry Failed Captures (Cron)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-service",
+                "value": "{{service_secret}}",
+                "description": "Required — internal service secret. Guards this endpoint from public access."
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"graceMinutes\": 2,\n  \"maxAgeDays\": 7,\n  \"limit\": 100\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/consultations/retry-captures",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "consultations", "retry-captures"]
+            },
+            "description": "Internal cron endpoint. Finds consultations that completed but were never charged (room_close → capture handoff failed or left billingStatus=failed) and re-invokes the idempotent capture path. Body params are optional overrides: graceMinutes (skip calls that just ended), maxAgeDays (stop retrying uncollectible calls), limit (batch size). Returns { scanned, charged, stillFailed, skipped }."
+          }
+        },
+        {
+          "id": "57225879-77777777-0000-4000-8000-000000000005",
+          "name": "Run Payouts (Cron)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "x-internal-service",
+                "value": "{{service_secret}}",
+                "description": "Required — internal service secret. Guards this endpoint from public access."
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/payouts/run",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "billing", "payouts", "run"]
+            },
+            "description": "Internal cron endpoint. Aggregates unpaid ExpertEarningsLedger rows in the current settlement window into one ExpertPayout per expert and initiates a Stripe Connect transfer (Stripe is the source of truth). The window size is the admin-configured `payoutSchedule` (integer days, default 7). Idempotent per (expert, period) — safe to re-run. Experts without a stripeAccountId are skipped and roll into the next run. Returns a run summary."
+          }
+        },
+        {
           "id": "57225879-77777777-0000-4000-8000-000000000003",
           "name": "Get Consultation Charge (Internal)",
           "request": {

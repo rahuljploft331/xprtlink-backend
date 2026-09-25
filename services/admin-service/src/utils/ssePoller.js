@@ -19,6 +19,8 @@
 
 import { getDb } from "@xprtlink/shared/db";
 import { publish } from "./sseHub.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "ssePoller" });
 
 const POLL_INTERVAL = 5_000; // 5 seconds
 
@@ -206,7 +208,7 @@ async function poll() {
 
   } catch (err) {
     // Log but never crash — poller must survive transient DB issues
-    console.error("[SSE Poller] poll error:", err.message);
+    log.error({ err: err.message }, "[SSE Poller] poll error:");
   }
 }
 
@@ -216,7 +218,7 @@ async function poll() {
  */
 export function startPoller() {
   if (pollTimer) return; // already running
-  console.log("[SSE Poller] started — poll interval:", POLL_INTERVAL, "ms");
+  log.info("[SSE Poller] started — poll interval:", POLL_INTERVAL, "ms");
   pollTimer = setInterval(poll, POLL_INTERVAL);
 }
 
@@ -227,6 +229,6 @@ export function stopPoller() {
   if (pollTimer) {
     clearInterval(pollTimer);
     pollTimer = null;
-    console.log("[SSE Poller] stopped");
+    log.info("[SSE Poller] stopped");
   }
 }

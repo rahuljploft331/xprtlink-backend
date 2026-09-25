@@ -1,4 +1,6 @@
 import { auditLogs } from "@xprtlink/shared/db/repositories/admin/index.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "audit" });
 
 /**
  * Record a sensitive admin action to the audit log.
@@ -24,6 +26,6 @@ export async function logAdminAction(req, action, entityType, entityId, payload 
       },
     });
   } catch (err) {
-    console.error("Failed to write admin audit log:", err);
+    log.error({ err: err }, "Failed to write admin audit log:");
   }
 }

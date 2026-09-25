@@ -3,6 +3,8 @@ import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "customers.controller" });
 
 
 /** GET /api/v1/admin/customers */
@@ -170,7 +172,7 @@ export async function setStatus(req, res, next) {
         const messagingUrl = getConfig("admin-service").serviceUrls.messaging;
         await internalPost(messagingUrl, "/api/internal/events/account-disabled", { userId: customer.id });
       } catch (err) {
-        console.error("Failed to notify messaging service about disabled account", err);
+        log.error({ err: err }, "Failed to notify messaging service about disabled account");
       }
     }
     

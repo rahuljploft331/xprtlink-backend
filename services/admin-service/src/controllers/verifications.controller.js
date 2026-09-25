@@ -5,6 +5,8 @@ import { logAdminAction } from "#utils/audit.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "verifications.controller" });
 
 
 /** GET /api/v1/admin/verifications */
@@ -136,7 +138,7 @@ export async function approve(req, res, next) {
         });
       }
     } catch (err) {
-      console.error(`[verifications.approve] Notification dispatch failed: ${err.message}`);
+      log.error(`[verifications.approve] Notification dispatch failed: ${err.message}`);
     }
 
     return ResponseFormatter.success(res, { message: getMessage("verificationApproved"), data: result });
@@ -182,7 +184,7 @@ export async function reject(req, res, next) {
         });
       }
     } catch (err) {
-      console.error(`[verifications.reject] Notification dispatch failed: ${err.message}`);
+      log.error(`[verifications.reject] Notification dispatch failed: ${err.message}`);
     }
 
     return ResponseFormatter.success(res, { message: getMessage("verificationRejected"), data: v });

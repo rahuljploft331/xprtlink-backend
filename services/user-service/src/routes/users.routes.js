@@ -7,6 +7,8 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { getConfig } from "@xprtlink/shared/config/loadEnv.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "users.routes" });
 
 const router = Router();
 
@@ -79,7 +81,7 @@ router.post(
         blockedProfileIds: [blockedE?.id, blockedC?.id].filter(Boolean),
       });
     } catch(err) {
-      console.error("[user-service] Failed to broadcast block event:", err.message);
+      log.error({ err: err.message }, "[user-service] Failed to broadcast block event:");
     }
 
     return ResponseFormatter.success(res, {
@@ -139,7 +141,7 @@ router.delete(
         blockedProfileIds: [blockedE?.id, blockedC?.id].filter(Boolean),
       });
     } catch(err) {
-      console.error("[user-service] Failed to broadcast unblock event:", err.message);
+      log.error({ err: err.message }, "[user-service] Failed to broadcast unblock event:");
     }
 
     return ResponseFormatter.success(res, {

@@ -2,6 +2,8 @@ import { Router, raw } from "express";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { authenticate, requireRole } from "@xprtlink/shared/middleware/auth.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "billing.routes" });
 import {
   addPaymentMethodRequestSchema,
   payConsultationRequestSchema,
@@ -41,11 +43,11 @@ function internalServiceGuard(req, res, next) {
     }
   } else if (process.env.NODE_ENV === "production") {
     // No secret configured in production — reject to fail safe
-    console.error("[billing] CRITICAL: SERVICE_SECRET not configured in production — rejecting internal request");
+    log.error("[billing] CRITICAL: SERVICE_SECRET not configured in production — rejecting internal request");
     return res.status(403).json({ success: false, message: getMessage("internalEndpoint") });
   } else {
     // Dev without secret: warn but allow (backward compat for local tooling)
-    console.warn("[billing] WARNING: SERVICE_SECRET not set — accepting internal request without validation. Set SERVICE_SECRET in .env.");
+    log.warn("[billing] WARNING: SERVICE_SECRET not set — accepting internal request without validation. Set SERVICE_SECRET in .env.");
   }
 
   next();
@@ -57,10 +59,10 @@ router.post(
   "/webhook",
   raw({ type: "application/json" }),
   asyncHandler(async (req, res) => {
-    console.log(`[Billing Service Webhook] ${new Date().toISOString()} Incoming Stripe Webhook event`);
+    log.info(`[Billing Service Webhook] ${new Date().toISOString()} Incoming Stripe Webhook event`);
     const signature = req.headers["stripe-signature"];
     const result = await svc.handleStripeWebhook(req.body, signature);
-    console.log(`[Billing Service Webhook] Handled event: ${result.eventType || "ok"}`);
+    log.info(`[Billing Service Webhook] Handled event: ${result.eventType || "ok"}`);
     return res.status(200).json(result);
   })
 );
@@ -271,6 +273,34 @@ router.post(
   asyncHandler(async (_req, res) => {
     const data = await svc.expireSubscriptions();
     return ResponseFormatter.success(res, { message: `Expired ${data.expired} subscription(s)`, data });
+  })
+);
+
+// ── Internal cron endpoint — retry consultations that completed but were never
+// charged (room_close → capture handoff failed). Idempotent. ─────────────────
+router.post(
+  "/consultations/retry-captures",
+  internalServiceGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.retryFailedCaptures(req.body ?? {});
+    return ResponseFormatter.success(res, {
+      message: getMessage("retryCapturesProcessed", { count: data.charged }),
+      data,
+    });
+  })
+);
+
+// ── Internal cron endpoint — run the payout job: aggregate unpaid earnings into
+// ExpertPayouts and initiate Stripe Connect transfers. Idempotent per window. ─
+router.post(
+  "/payouts/run",
+  internalServiceGuard,
+  asyncHandler(async (_req, res) => {
+    const data = await svc.runPayouts();
+    return ResponseFormatter.success(res, {
+      message: getMessage("payoutRunComplete", { count: data.payoutsCreated }),
+      data,
+    });
   })
 );
 

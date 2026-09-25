@@ -2,6 +2,8 @@ import { Router } from "express";
 import crypto from "crypto";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "index" });
 
 // ── Internal-route guard — validates x-internal-service header against SERVICE_SECRET ──
 function internalServiceGuard(req, res, next) {
@@ -41,7 +43,7 @@ router.post("/internal/events/user-blocked", internalServiceGuard, (req, res) =>
   const { blockerUserId, blockedUserId, blockerProfileIds, blockedProfileIds } = req.body;
   const io = getIo();
   if (io) {
-    console.log("EMITTING user:blocked", { blockerUserId, blockedUserId, blockerProfileIds, blockedProfileIds });
+    log.info("EMITTING user:blocked", { blockerUserId, blockedUserId, blockerProfileIds, blockedProfileIds });
     io.to(`user:${blockerUserId}`).to(`user:${blockedUserId}`).emit("user:blocked", {
       blockerUserId,
       blockedUserId,
@@ -70,7 +72,7 @@ router.post("/internal/events/account-disabled", internalServiceGuard, (req, res
   const { userId } = req.body;
   const io = getIo();
   if (io) {
-    console.log("EMITTING account:disabled", { userId });
+    log.info("EMITTING account:disabled", { userId });
     io.to(`user:${userId}`).emit("account:disabled", { userId });
 
     // Give the client a tiny moment to receive the event, then forcibly disconnect their sockets

@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import { getDb } from "@xprtlink/shared/db";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "billingService" });
 import {
   toEarningsEntryDto,
   toExpertSubscriptionDto,
@@ -19,6 +21,7 @@ import {
 } from "@xprtlink/shared/lib/consultationBilling.js";
 import { sendEmail } from "@xprtlink/shared/lib/email.js";
 import { buildConsultationInvoiceEmail } from "@xprtlink/shared/lib/consultationInvoice.js";
+import { PAYOUT_SCHEDULE_DEFAULT_DAYS } from "@xprtlink/shared/contracts/settings.schema.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { customerDisplayName } from "@xprtlink/shared/mappers/common.js";
 import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
@@ -72,7 +75,7 @@ export async function addPaymentMethod(auth, body) {
     });
   } catch (attachErr) {
     // In test mode, pm_card_* tokens may not be attachable — log and continue
-    console.warn(`[billing] Stripe attach PM failed (non-fatal): ${attachErr.message}`);
+    log.warn(`[billing] Stripe attach PM failed (non-fatal): ${attachErr.message}`);
   }
 
   // 4. Persist locally — upsert to avoid duplicate stripe_payment_method_id constraint errors
@@ -121,7 +124,7 @@ export async function addPaymentMethod(auth, body) {
     }
   } catch (err) {
     // Non-fatal — use client-supplied values (test mode pm_card_* may not be retrievable)
-    console.warn(`[billing] Stripe retrieve PM metadata failed (non-fatal): ${err.message}`);
+    log.warn(`[billing] Stripe retrieve PM metadata failed (non-fatal): ${err.message}`);
   }
 
   const method = await db.paymentMethod.create({
@@ -150,7 +153,7 @@ export async function removePaymentMethod(auth, methodId) {
   try {
     await stripeSvc.detachPaymentMethod({ stripePaymentMethodId: method.stripePaymentMethodId });
   } catch (err) {
-    console.warn(`[billing] Stripe detach PM failed (non-fatal): ${err.message}`);
+    log.warn(`[billing] Stripe detach PM failed (non-fatal): ${err.message}`);
   }
 
   await db.paymentMethod.delete({ where: { id: method.id } });
@@ -378,12 +381,12 @@ export async function captureConsultation(consultationId, durationSeconds) {
   });
 
   if (!consultation) {
-    console.warn(`[billing] captureConsultation: consultation ${consultationId} not found`);
+    log.warn(`[billing] captureConsultation: consultation ${consultationId} not found`);
     return { skipped: true, reason: "not_found" };
   }
 
   if (consultation.billingStatus === "charged" || consultation.charge) {
-    console.log(`[billing] captureConsultation: ${consultationId} already charged — skipping`);
+    log.info(`[billing] captureConsultation: ${consultationId} already charged — skipping`);
     return { skipped: true, reason: "already_charged" };
   }
 
@@ -391,7 +394,7 @@ export async function captureConsultation(consultationId, durationSeconds) {
   const amountCents = computeConsultationChargeCents(consultation, durationSeconds);
 
   if (amountCents <= 0) {
-    console.log(`[billing] captureConsultation: ${consultationId} — zero amount, skipping charge`);
+    log.info(`[billing] captureConsultation: ${consultationId} — zero amount, skipping charge`);
     return { skipped: true, reason: "zero_amount" };
   }
 
@@ -413,9 +416,9 @@ export async function captureConsultation(consultationId, durationSeconds) {
         paymentIntentId: consultation.stripePaymentIntentId,
         amountToCaptureCents: amountCents,
       });
-      console.log(`[billing] captureConsultation: captured PI=${stripeResult.id} amount=${amountCents}¢`);
+      log.info(`[billing] captureConsultation: captured PI=${stripeResult.id} amount=${amountCents}¢`);
     } catch (err) {
-      console.error(`[billing] captureConsultation: Stripe capture failed — ${err.message}`);
+      log.error(`[billing] captureConsultation: Stripe capture failed — ${err.message}`);
       await db.consultation.update({
         where: { id: consultationId },
         data: { billingStatus: "failed" },
@@ -439,14 +442,14 @@ export async function captureConsultation(consultationId, durationSeconds) {
           });
         }
       } catch (notifErr) {
-        console.error(`[captureConsultation] Failure notification failed: ${notifErr.message}`);
+        log.error(`[captureConsultation] Failure notification failed: ${notifErr.message}`);
       }
 
       return { skipped: false, captured: false, reason: "stripe_capture_failed", error: err.message };
     }
   } else {
     // No hold placed — customer had no payment method on file
-    console.warn(`[billing] captureConsultation: ${consultationId} has no stripePaymentIntentId — marking failed`);
+    log.warn(`[billing] captureConsultation: ${consultationId} has no stripePaymentIntentId — marking failed`);
     await db.consultation.update({
       where: { id: consultationId },
       data: { billingStatus: "failed" },
@@ -494,7 +497,7 @@ export async function captureConsultation(consultationId, durationSeconds) {
     return transaction;
   });
 
-  console.log(`[billing] captureConsultation: ${consultationId} → charged $${(amountCents / 100).toFixed(2)}`);
+  log.info(`[billing] captureConsultation: ${consultationId} → charged $${(amountCents / 100).toFixed(2)}`);
 
   // Notify customer (charge confirmation) and expert (earnings credit) — non-fatal.
   // Also email a soft-copy invoice to each party (customer=debit, expert=credit).
@@ -534,10 +537,10 @@ export async function captureConsultation(consultationId, durationSeconds) {
       currency,
       notifUrl,
     }).catch((err) => {
-      console.error(`[captureConsultation] Invoice email dispatch failed: ${err.message}`);
+      log.error(`[captureConsultation] Invoice email dispatch failed: ${err.message}`);
     });
   } catch (err) {
-    console.error(`[captureConsultation] Payment notification failed: ${err.message}`);
+    log.error(`[captureConsultation] Payment notification failed: ${err.message}`);
   }
 
   return { captured: true, transactionId: result.id, amountCents, commissionCents, expertShareCents };
@@ -586,7 +589,7 @@ async function sendConsultationInvoices({
 
   for (const recipient of recipients) {
     if (!recipient.email) {
-      console.warn(
+      log.warn(
         `[captureConsultation] No email for ${recipient.audience} on consultation ${consultation.id} — skipping invoice`
       );
       continue;
@@ -603,7 +606,7 @@ async function sendConsultationInvoices({
         customerName,
       });
       await sendEmail({ to: recipient.email, subject, html });
-      console.log(
+      log.info(
         `[captureConsultation] Invoice emailed to ${recipient.audience} (${recipient.email}) for consultation ${consultation.id}`
       );
 
@@ -616,13 +619,13 @@ async function sendConsultationInvoices({
           body: recipient.notifBody,
           data: { consultationId: consultation.id },
         }).catch((err) => {
-          console.error(
+          log.error(
             `[captureConsultation] invoice_issued notification failed for ${recipient.audience}: ${err.message}`
           );
         });
       }
     } catch (err) {
-      console.error(
+      log.error(
         `[captureConsultation] Failed to send invoice to ${recipient.audience} (${recipient.email}): ${err.message}`
       );
     }
@@ -703,7 +706,7 @@ export async function handleStripeWebhook(payload, signature) {
     where: { id: event.id },
   });
   if (alreadyProcessed) {
-    console.log(`[billing-webhook] Skipping duplicate event: ${event.id} (${event.type})`);
+    log.info(`[billing-webhook] Skipping duplicate event: ${event.id} (${event.type})`);
     return { received: true, eventType: event.type, duplicate: true };
   }
 
@@ -722,7 +725,7 @@ export async function handleStripeWebhook(payload, signature) {
           data: { billingStatus: "charged" },
         });
       }
-      console.log(`[billing-webhook] payment_intent.succeeded PI=${pi.id}`);
+      log.info(`[billing-webhook] payment_intent.succeeded PI=${pi.id}`);
       break;
     }
 
@@ -740,7 +743,7 @@ export async function handleStripeWebhook(payload, signature) {
           data: { billingStatus: "failed" },
         });
       }
-      console.log(`[billing-webhook] payment_intent.payment_failed PI=${pi.id}`);
+      log.info(`[billing-webhook] payment_intent.payment_failed PI=${pi.id}`);
       break;
     }
 
@@ -761,7 +764,7 @@ export async function handleStripeWebhook(payload, signature) {
     data: { id: event.id, eventType: event.type },
   }).catch((err) => {
     // Non-fatal — if insert fails (e.g., duplicate from race), the event was still processed
-    console.warn(`[billing-webhook] Failed to record processed event ${event.id}: ${err.message}`);
+    log.warn(`[billing-webhook] Failed to record processed event ${event.id}: ${err.message}`);
   });
 
   return { received: true, eventType: event.type };
@@ -993,7 +996,7 @@ export async function subscribe(auth, body) {
       data: { subscriptionId: subscription.id, planId: subscription.planId },
     });
   } catch (err) {
-    console.error(`[subscribe] Notification dispatch failed: ${err.message}`);
+    log.error(`[subscribe] Notification dispatch failed: ${err.message}`);
   }
 
   return toExpertSubscriptionDto(subscription, subscription.plan);
@@ -1124,7 +1127,7 @@ export async function cancelSubscription(auth) {
       data: { subscriptionId: updated.id, planId: updated.planId },
     });
   } catch (err) {
-    console.error(`[cancelSubscription] Notification dispatch failed: ${err.message}`);
+    log.error(`[cancelSubscription] Notification dispatch failed: ${err.message}`);
   }
 
   return toExpertSubscriptionDto(updated, updated.plan);
@@ -1179,7 +1182,7 @@ export async function expireSubscriptions() {
     }
   }
 
-  console.log(`[billing] expireSubscriptions: expired ${result.count} subscription(s) at ${now.toISOString()}`);
+  log.info(`[billing] expireSubscriptions: expired ${result.count} subscription(s) at ${now.toISOString()}`);
 
   // Notify each affected expert that their subscription has expired — non-fatal
   if (affectedExpertIds.length > 0) {
@@ -1201,9 +1204,256 @@ export async function expireSubscriptions() {
         });
       }
     } catch (err) {
-      console.error(`[expireSubscriptions] Notification dispatch failed: ${err.message}`);
+      log.error(`[expireSubscriptions] Notification dispatch failed: ${err.message}`);
     }
   }
 
   return { expired: result.count };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Durable settlement — failed-capture retry sweep
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Retry consultations that completed but were never charged.
+ *
+ * The room_close → capture handoff is best-effort (fire-and-forget internal HTTP).
+ * If billing was down, the network blipped, or a transient Stripe error left a
+ * consultation at billingStatus="failed", nothing re-attempts it. This sweep finds
+ * those stuck rows and re-invokes the SAME captureConsultation() path — which is
+ * idempotent (it no-ops on already-charged rows), so re-running is always safe.
+ *
+ * Selection window:
+ *   - status = completed, billingStatus in (pending, failed), durationSeconds > 0
+ *   - endedAt older than graceMinutes (don't race a capture still in flight)
+ *   - endedAt newer than maxAgeDays (stop retrying genuinely uncollectible calls;
+ *     no-hold rows have no card to charge and would otherwise be scanned forever)
+ *
+ * @returns {Promise<{scanned:number, charged:number, stillFailed:number, skipped:number}>}
+ */
+export async function retryFailedCaptures({
+  graceMinutes = Number(process.env.CAPTURE_RETRY_GRACE_MINUTES || 2),
+  maxAgeDays = Number(process.env.CAPTURE_MAX_AGE_DAYS || 7),
+  limit = Number(process.env.CAPTURE_RETRY_BATCH || 100),
+} = {}) {
+  const db = getDb();
+  const now = Date.now();
+  const graceCutoff = new Date(now - graceMinutes * 60 * 1000);
+  const ageCutoff = new Date(now - maxAgeDays * 24 * 60 * 60 * 1000);
+
+  const stuck = await db.consultation.findMany({
+    where: {
+      status: "completed",
+      billingStatus: { in: ["pending", "failed"] },
+      durationSeconds: { gt: 0 },
+      endedAt: { lt: graceCutoff, gt: ageCutoff },
+    },
+    select: { id: true, durationSeconds: true },
+    orderBy: { endedAt: "asc" },
+    take: limit,
+  });
+
+  let charged = 0;
+  let stillFailed = 0;
+  let skipped = 0;
+
+  for (const c of stuck) {
+    try {
+      const result = await captureConsultation(c.id, c.durationSeconds);
+      if (result?.captured) charged += 1;
+      else if (result?.skipped) skipped += 1;
+      else stillFailed += 1;
+    } catch (err) {
+      stillFailed += 1;
+      log.error(`[retryFailedCaptures] ${c.id} threw: ${err.message}`);
+    }
+  }
+
+  log.info(
+    `[retryFailedCaptures] scanned=${stuck.length} charged=${charged} stillFailed=${stillFailed} skipped=${skipped}`
+  );
+  return { scanned: stuck.length, charged, stillFailed, skipped };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Durable settlement — payout-run job
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Read the admin-configured payout cadence (integer days) from platform_settings.
+ * Handles legacy enum strings ("weekly" etc.) and falls back to the default.
+ */
+export async function getPayoutScheduleDays() {
+  const db = getDb();
+  const row = await db.platformSetting.findUnique({ where: { key: "payoutSchedule" } });
+  const value = row?.value;
+  const legacyDays = { daily: 1, weekly: 7, monthly: 30 };
+  if (typeof value === "string" && value in legacyDays) return legacyDays[value];
+  const num = Number(value);
+  return Number.isInteger(num) && num >= 1 ? num : PAYOUT_SCHEDULE_DEFAULT_DAYS;
+}
+
+/**
+ * Compute the rolling settlement window for a run.
+ * periodEnd = start of today (UTC 00:00); periodStart = periodEnd - N days.
+ * A run on any given day settles the N days that ended at last midnight.
+ */
+export function computePayoutWindow(days, now = new Date()) {
+  const periodEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+  const periodStart = new Date(periodEnd.getTime() - days * 24 * 60 * 60 * 1000);
+  return { periodStart, periodEnd };
+}
+
+/**
+ * Payout-run job. For each expert with unpaid earnings in the current window,
+ * aggregate their ExpertEarningsLedger rows (payoutId=null) into one ExpertPayout
+ * and initiate a Stripe Connect transfer (Stripe is the source of truth).
+ *
+ * Money is NOT recomputed here — netCents was already settled per-call. This is
+ * pure aggregation + transfer.
+ *
+ * Idempotency is triple-guarded:
+ *   1. @@unique(expertProfileId, periodStart, periodEnd) on ExpertPayout (P2002 → skip)
+ *   2. the `payoutId: null` guard in the ledger updateMany (never re-claims a row)
+ *   3. the create+stamp is one $transaction; the Stripe transfer uses a
+ *      payout-scoped idempotencyKey so a retried run can't double-send.
+ *
+ * Experts without a stripeAccountId (Connect/KYC incomplete) are skipped; their
+ * earnings stay unpaid and roll into a later run.
+ *
+ * @returns {Promise<object>} run summary
+ */
+export async function runPayouts({ now = new Date() } = {}) {
+  const db = getDb();
+  const days = await getPayoutScheduleDays();
+  const { periodStart, periodEnd } = computePayoutWindow(days, now);
+
+  // Unpaid, in-window ledger rows grouped by expert.
+  const unpaid = await db.expertEarningsLedger.findMany({
+    where: {
+      payoutId: null,
+      createdAt: { gte: periodStart, lt: periodEnd },
+    },
+    select: { id: true, expertProfileId: true, netCents: true },
+  });
+
+  // Group ledger rows + sum net per expert.
+  const byExpert = new Map();
+  for (const row of unpaid) {
+    const g = byExpert.get(row.expertProfileId) ?? { ids: [], netCents: 0 };
+    g.ids.push(row.id);
+    g.netCents += row.netCents;
+    byExpert.set(row.expertProfileId, g);
+  }
+
+  const summary = {
+    scheduleDays: days,
+    periodStart: periodStart.toISOString(),
+    periodEnd: periodEnd.toISOString(),
+    expertsConsidered: byExpert.size,
+    payoutsCreated: 0,
+    transfersSucceeded: 0,
+    transfersFailed: 0,
+    skippedNoStripeAccount: 0,
+    skippedZero: 0,
+    skippedDuplicate: 0,
+    totalCents: 0,
+  };
+
+  for (const [expertProfileId, group] of byExpert) {
+    if (group.netCents <= 0) {
+      summary.skippedZero += 1;
+      continue;
+    }
+
+    const expert = await db.expertProfile.findUnique({
+      where: { id: expertProfileId },
+      select: { stripeAccountId: true, currency: true, userId: true },
+    });
+
+    if (!expert?.stripeAccountId) {
+      // Connect/KYC not complete — leave earnings unpaid for a later run.
+      summary.skippedNoStripeAccount += 1;
+      log.warn(`[runPayouts] expert ${expertProfileId} has no stripeAccountId — skipping ${group.netCents}¢`);
+      continue;
+    }
+
+    // 1. Create the payout + claim ledger rows in one transaction (status=processing).
+    let payout;
+    try {
+      payout = await db.$transaction(async (tx) => {
+        const created = await tx.expertPayout.create({
+          data: {
+            expertProfileId,
+            amountCents: group.netCents,
+            currency: expert.currency || "USD",
+            periodStart,
+            periodEnd,
+            status: "processing",
+          },
+        });
+        // Only claim rows still unpaid — guards against an overlapping run.
+        await tx.expertEarningsLedger.updateMany({
+          where: { id: { in: group.ids }, payoutId: null },
+          data: { payoutId: created.id },
+        });
+        return created;
+      });
+    } catch (err) {
+      // P2002 = unique violation on (expert, periodStart, periodEnd): already run for this window.
+      if (err?.code === "P2002") {
+        summary.skippedDuplicate += 1;
+        log.info(`[runPayouts] payout already exists for expert ${expertProfileId} in window — skipping`);
+        continue;
+      }
+      throw err;
+    }
+
+    summary.payoutsCreated += 1;
+    summary.totalCents += group.netCents;
+
+    // 2. Initiate the Stripe Connect transfer (source of truth).
+    try {
+      const transfer = await stripeSvc.transferEarningsToExpertPayout({
+        amountCents: group.netCents,
+        currency: expert.currency || "usd",
+        destinationStripeAccountId: expert.stripeAccountId,
+        payoutId: payout.id,
+      });
+      await db.expertPayout.update({
+        where: { id: payout.id },
+        data: { status: "paid", stripeTransferId: transfer.id },
+      });
+      summary.transfersSucceeded += 1;
+      log.info(`[runPayouts] expert ${expertProfileId} → transfer ${transfer.id} $${(group.netCents / 100).toFixed(2)}`);
+
+      // Notify the expert their payout was sent — non-fatal.
+      if (expert.userId) {
+        const amountFormatted = `$${(group.netCents / 100).toFixed(2)}`;
+        internalPost(process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007", "/api/v1/notifications/dispatch", {
+          userIds: [expert.userId],
+          type: "payout_sent",
+          title: "Payout Sent",
+          body: `Your earnings payout of ${amountFormatted} is on its way to your bank.`,
+          data: { payoutId: payout.id, amountCents: group.netCents },
+        }).catch((e) => log.error(`[runPayouts] payout notify failed: ${e.message}`));
+      }
+    } catch (err) {
+      // Transfer failed. Mark payout failed; ledger rows stay stamped so we never
+      // double the amount. A later run re-attempts transfer for failed payouts by id
+      // (see reattemptFailedPayouts). Do NOT unstamp here.
+      summary.transfersFailed += 1;
+      await db.expertPayout.update({
+        where: { id: payout.id },
+        data: { status: "failed" },
+      });
+      log.error(`[runPayouts] transfer failed for expert ${expertProfileId} payout ${payout.id}: ${err.message}`);
+    }
+  }
+
+  log.info(
+    `[runPayouts] window=${summary.periodStart}..${summary.periodEnd} created=${summary.payoutsCreated} paid=${summary.transfersSucceeded} failed=${summary.transfersFailed} noAcct=${summary.skippedNoStripeAccount}`
+  );
+  return summary;
 }

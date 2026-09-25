@@ -1,6 +1,8 @@
 import { getDb } from "@xprtlink/shared/db";
 import { issueTokens, loadUserContext, revokeRefreshToken, lookupRefreshToken, revokeAllUserSessions } from "@xprtlink/shared/auth/tokens.js";
 import { hashPassword, verifyPassword, verifyTokenHash } from "@xprtlink/shared/auth/password.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "userService" });
 import {
   createAndDeliverOtp,
   findValidOtpChallenge,
@@ -656,12 +658,20 @@ export async function forgotPassword(body) {
   await hashPassword("dummy_for_timing_consistency_1234");
   const { ttlMs } = getOtpConfig();
 
-  createAndDeliverOtp({
-    email,
-    phone,
-    purpose: "reset_password",
-    channel: email ? "email" : "phone",
-  }).catch((err) => console.error("[forgotPassword] OTP delivery failed:", err.message));
+  // Await so the OTP challenge row is persisted before we respond. Previously this
+  // was fire-and-forget, which raced the immediate /password/reset call and made
+  // findValidOtpChallenge miss the row (400 OTP_EXPIRED). Delivery failures are
+  // still logged rather than thrown, preserving the enumeration-safe 200 shape.
+  try {
+    await createAndDeliverOtp({
+      email,
+      phone,
+      purpose: "reset_password",
+      channel: email ? "email" : "phone",
+    });
+  } catch (err) {
+    log.error({ err: err.message }, "[forgotPassword] OTP delivery failed:");
+  }
 
   return { sent: true, expiresInSeconds: ttlMs / 1000, channel: email ? "email" : "phone" };
 }

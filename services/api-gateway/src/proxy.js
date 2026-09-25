@@ -1,6 +1,8 @@
 import { createProxyMiddleware, fixRequestBody } from "http-proxy-middleware";
 import { getConfig } from "@xprtlink/shared/config/loadEnv.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "proxy" });
 
 
 export function createSocketProxy() {
@@ -12,7 +14,7 @@ export function createSocketProxy() {
     pathFilter: "/socket.io",
     on: {
       error(err, _req, res) {
-        console.error("[gateway] socket proxy error:", err.message);
+        log.error({ err: err.message }, "[gateway] socket proxy error:");
         if (res.writeHead) {
           res.writeHead(502, { "Content-Type": "application/json" });
           res.end(
@@ -57,7 +59,7 @@ export function createGatewayProxies() {
       on: {
         proxyReq: fixRequestBody,
         error(err, _req, res) {
-          console.error(`[gateway] proxy error ${path}:`, err.message);
+          log.error({ err: err.message }, `[gateway] proxy error ${path}:`);
           res.writeHead(502, { "Content-Type": "application/json" });
           res.end(JSON.stringify({ success: false, message: getMessage("serviceUnavailable"), code: "BAD_GATEWAY" }));
         },

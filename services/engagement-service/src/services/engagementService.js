@@ -3,6 +3,8 @@ import { generateZegoToken } from "@xprtlink/shared/lib/zegoToken.js";
 import { getDb } from "@xprtlink/shared/db";
 import { internalGet, internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { amountToCents } from "@xprtlink/shared/mappers/common.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "engagementService" });
 import {
   toQuoteSummaryDto,
   toQuoteDetailDto,
@@ -303,7 +305,7 @@ export async function createQuote(auth, body) {
       data: { quoteId: quote.id, referenceNumber: quote.referenceNumber },
     });
   } catch (err) {
-    console.error(`[createQuote] Notification dispatch failed: ${err.message}`);
+    log.error(`[createQuote] Notification dispatch failed: ${err.message}`);
   }
 
   return toQuoteDetailDto(quote, quoteContext(quote));
@@ -495,7 +497,7 @@ export async function submitQuotation(auth, quoteId, body) {
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
     });
   } catch (err) {
-    console.error(`[submitQuotation] Notification dispatch failed: ${err.message}`);
+    log.error(`[submitQuotation] Notification dispatch failed: ${err.message}`);
   }
 
   return toQuoteDetailDto(updated, quoteContext(updated));
@@ -534,7 +536,7 @@ export async function acceptQuote(auth, quoteId) {
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
     });
   } catch (err) {
-    console.error(`[acceptQuote] Notification dispatch failed: ${err.message}`);
+    log.error(`[acceptQuote] Notification dispatch failed: ${err.message}`);
   }
 
   return toQuoteDetailDto(updated, quoteContext(updated));
@@ -572,7 +574,7 @@ export async function rejectQuote(auth, quoteId) {
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
     });
   } catch (err) {
-    console.error(`[rejectQuote] Notification dispatch failed: ${err.message}`);
+    log.error(`[rejectQuote] Notification dispatch failed: ${err.message}`);
   }
 
   return toQuoteDetailDto(updated, quoteContext(updated));
@@ -610,7 +612,7 @@ export async function cancelQuote(auth, quoteId) {
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
     });
   } catch (err) {
-    console.error(`[cancelQuote] Notification dispatch failed: ${err.message}`);
+    log.error(`[cancelQuote] Notification dispatch failed: ${err.message}`);
   }
 
   return toQuoteDetailDto(updated, quoteContext(updated));
@@ -751,6 +753,19 @@ export async function createConsultation(auth, body) {
     throw badRequest("cannotEngageWithSelf");
   }
 
+  // Guard: a block in either direction closes the call. Mirrors the guard on
+  // the video-token endpoint so a blocked pair is stopped at request time
+  // rather than after the consultation row is created.
+  const block = await db.userBlock.findFirst({
+    where: {
+      OR: [
+        { blockerUserId: auth.userId, blockedUserId: expert.userId },
+        { blockerUserId: expert.userId, blockedUserId: auth.userId },
+      ],
+    },
+  });
+  if (block) throw forbidden("userBlockedCannotCall");
+
   // Guard: only allow consultations with verified, available experts
   if (expert.verificationStatus !== "approved") {
     throw badRequest("expertNotVerified", "EXPERT_NOT_VERIFIED");
@@ -807,7 +822,7 @@ export async function createConsultation(auth, body) {
       data: { consultationId: consultation.id },
     });
   } catch (err) {
-    console.error(`[createConsultation] Notification dispatch failed: ${err.message}`);
+    log.error(`[createConsultation] Notification dispatch failed: ${err.message}`);
   }
   */
 
@@ -946,7 +961,7 @@ export async function acceptConsultation(auth, consultationId) {
       data: { consultationId: updated.id },
     });
   } catch (err) {
-    console.error(`[acceptConsultation] Notification dispatch failed: ${err.message}`);
+    log.error(`[acceptConsultation] Notification dispatch failed: ${err.message}`);
   }
 
   return toConsultationDetailDto(updated, consultationContext(updated));
@@ -984,7 +999,7 @@ export async function declineConsultation(auth, consultationId) {
       data: { consultationId: updated.id },
     });
   } catch (err) {
-    console.error(`[declineConsultation] Notification dispatch failed: ${err.message}`);
+    log.error(`[declineConsultation] Notification dispatch failed: ${err.message}`);
   }
 
   return toConsultationDetailDto(updated, consultationContext(updated));
@@ -1037,7 +1052,7 @@ export async function endConsultation(auth, consultationId) {
       );
     } catch (err) {
       // Non-fatal — consultation is already marked completed; billing can be retried
-      console.error(`[endConsultation] Billing capture failed: ${err.message}`);
+      log.error(`[endConsultation] Billing capture failed: ${err.message}`);
     }
   }
 
@@ -1066,7 +1081,7 @@ export async function endConsultation(auth, consultationId) {
       });
     }
   } catch (err) {
-    console.error(`[endConsultation] Notification dispatch failed: ${err.message}`);
+    log.error(`[endConsultation] Notification dispatch failed: ${err.message}`);
   }
 
   return toConsultationDetailDto(updated, consultationContext(updated));
@@ -1216,10 +1231,10 @@ export async function submitReview(auth, consultationId, body) {
             title: "Expert Alert: Consecutive Poor Reviews",
             body: `${expertName} has received back-to-back reviews of 3 stars or below.`,
             data: { expertId: consultation.expertId },
-          }).catch(err => console.error(`[submitReview] Admin alert dispatch failed: ${err.message}`));
+          }).catch(err => log.error(`[submitReview] Admin alert dispatch failed: ${err.message}`));
           
           // Trigger email logic here if email service is connected
-          console.log(`[MAIL_MOCK] Triggering alert email to admins regarding poor reviews for expert ${consultation.expertId}`);
+          log.info(`[MAIL_MOCK] Triggering alert email to admins regarding poor reviews for expert ${consultation.expertId}`);
         }
       }
     }
@@ -1236,7 +1251,7 @@ export async function submitReview(auth, consultationId, body) {
       });
     }
   } catch (err) {
-    console.error(`[submitReview] Notification dispatch failed: ${err.message}`);
+    log.error(`[submitReview] Notification dispatch failed: ${err.message}`);
   }
 
   return toReviewDto(review);

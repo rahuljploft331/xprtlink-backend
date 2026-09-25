@@ -1,5 +1,8 @@
 import { Prisma } from "../generated/prisma/index.js";
 import { getMessage } from "../utils/messages.js";
+import { logger } from "../lib/logger.js";
+
+const log = logger.child({ module: "errorHandler" });
 
 export function notFoundHandler(_req, res) {
   res.status(404).json({
@@ -40,7 +43,7 @@ export function errorHandler(err, _req, res, _next) {
       }
 
       // Always log constraint violations server-side for debugging
-      console.error(`[db] Unique constraint violation on '${targetStr}':`, err.message);
+      log.warn({ target: targetStr, err: err.message }, `[db] Unique constraint violation on '${targetStr}'`);
       return res.status(409).json({
         success: false,
         message: getMessage(messageKey),
@@ -65,7 +68,7 @@ export function errorHandler(err, _req, res, _next) {
       });
     }
     // All other known Prisma errors → 500 with generic message
-    console.error("[db] Prisma error:", err.code, err.message);
+    log.error({ code: err.code, err: err.message }, "[db] Prisma error");
     return res.status(500).json({
       success: false,
       message: getMessage("internalServerError"),
@@ -74,7 +77,7 @@ export function errorHandler(err, _req, res, _next) {
   }
 
   if (err instanceof Prisma.PrismaClientValidationError) {
-    console.error("[db] Prisma validation error:", err.message);
+    log.error({ err: err.message }, "[db] Prisma validation error");
     return res.status(400).json({
       success: false,
       message: getMessage("invalidQueryParameters"),
@@ -89,9 +92,9 @@ export function errorHandler(err, _req, res, _next) {
   // ── H5: ALWAYS log 5xx errors server-side (was previously inverted — only logged in dev) ──
   if (statusCode >= 500) {
     try {
-      console.error(`[error] ${statusCode}:`, err);
+      log.error({ statusCode, err }, `[error] ${statusCode}`);
     } catch {
-      console.error(`[error] ${statusCode}:`, String(err));
+      log.error({ statusCode, err: String(err) }, `[error] ${statusCode}`);
     }
     
     // Sanitize the response for 500s so we don't leak raw 3rd-party error strings/codes (Rule 15)

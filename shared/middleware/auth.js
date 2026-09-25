@@ -1,6 +1,8 @@
 import { verifyAccessToken } from "../auth/jwt.js";
 import { forbidden, unauthorized } from "../utils/errors.js";
 import { getDb } from "../db/index.js";
+import { logger } from "../lib/logger.js";
+const log = logger.child({ module: "auth" });
 
 /**
  * Extract a Bearer token from the request.
@@ -31,7 +33,7 @@ async function checkUserStatus(userId, role) {
   let status = null;
 
   if (role === 'super_admin' || role === 'subadmin') {
-    console.log('ADMIN DB FIND', userId, process.env.DATABASE_URL);
+    log.debug({ userId }, "admin status lookup");
     const admin = await db.adminUser.findUnique({ where: { id: userId }, select: { status: true } });
     status = admin ? admin.status : null;
   } else {
@@ -39,7 +41,7 @@ async function checkUserStatus(userId, role) {
     status = user ? user.status : null;
   }
   
-  console.log('CHECKED STATUS FOR', userId, role, 'RESULT:', status);
+  log.debug({ userId, role, status }, "checked account status");
   userStatusCache.set(userId, { status, timestamp: now });
   return status;
 }
@@ -69,7 +71,7 @@ export async function authenticate(req, _res, next) {
     if (err?.statusCode === 401) {
       return next(err);
     }
-    console.error("[Auth] Unexpected error during authentication:", err);
+    log.error({ err: err }, "[Auth] Unexpected error during authentication:");
     next(err);
   }
 }

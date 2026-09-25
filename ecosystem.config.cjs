@@ -50,26 +50,78 @@ const services = Object.keys(portMap).map((name) => ({
   port: portMap[name],
 }));
 
+// ── Scheduled jobs (PM2 cron_restart) ────────────────────────────────────────
+// Each runs a short-lived script that hits an internal endpoint and exits.
+// autorestart:false + cron_restart makes PM2 re-launch the process on schedule
+// only. Cron expressions can be overridden via env. Times are UTC.
+const cronJobs = [
+  {
+    name: "billing-retry-captures",
+    service: "billing-service",
+    script: "scripts/run-retry-captures.js",
+    cron: process.env.RETRY_CAPTURES_CRON || "*/10 * * * *", // every 10 min
+  },
+  {
+    name: "billing-payout-run",
+    service: "billing-service",
+    script: "scripts/run-payouts.js",
+    cron: process.env.PAYOUT_RUN_CRON || "15 2 * * *", // 02:15 daily (job self-sizes window from payoutSchedule)
+  },
+  {
+    name: "billing-expire-subscriptions",
+    service: "billing-service",
+    script: "scripts/run-expire-subscriptions.js",
+    cron: process.env.EXPIRE_SUBSCRIPTIONS_CRON || "30 2 * * *", // 02:30 daily
+  },
+  {
+    name: "engagement-expire-quotes",
+    service: "engagement-service",
+    script: "scripts/run-expire-quotes.js",
+    cron: process.env.EXPIRE_QUOTES_CRON || "*/15 * * * *", // every 15 min
+  },
+];
+
 module.exports = {
-  apps: services.map((svc) => ({
-    name: svc.name,
-    script: "server.js",
-    namespace: "xpertlink-workspace",
-    interpreter: "node",
-    cwd: `./services/${svc.name}`,
-    instances: 1,
-    exec_mode: "fork",
-    env: {
-      ...baseEnv,
-      PORT: svc.port,
-      SERVICE_NAME: svc.name,
-    },
-    error_file: `../../logs/${svc.name}-error.log`,
-    out_file: `../../logs/${svc.name}-out.log`,
-    log_date_format: "YYYY-MM-DD HH:mm:ss Z",
-    merge_logs: true,
-    autorestart: true,
-    watch: baseEnv.NODE_ENV === "development",
-    max_memory_restart: "500M",
-  })),
+  apps: [
+    ...services.map((svc) => ({
+      name: svc.name,
+      script: "server.js",
+      namespace: "xpertlink-workspace",
+      interpreter: "node",
+      cwd: `./services/${svc.name}`,
+      instances: 1,
+      exec_mode: "fork",
+      env: {
+        ...baseEnv,
+        PORT: svc.port,
+        SERVICE_NAME: svc.name,
+      },
+      error_file: `../../logs/${svc.name}-error.log`,
+      out_file: `../../logs/${svc.name}-out.log`,
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
+      merge_logs: true,
+      autorestart: true,
+      watch: baseEnv.NODE_ENV === "development",
+      max_memory_restart: "500M",
+    })),
+    ...cronJobs.map((job) => ({
+      name: job.name,
+      script: job.script,
+      namespace: "xpertlink-workspace",
+      interpreter: "node",
+      cwd: `./services/${job.service}`,
+      instances: 1,
+      exec_mode: "fork",
+      env: { ...baseEnv, SERVICE_NAME: job.name },
+      error_file: `../../logs/${job.name}-error.log`,
+      out_file: `../../logs/${job.name}-out.log`,
+      log_date_format: "YYYY-MM-DD HH:mm:ss Z",
+      merge_logs: true,
+      // Cron-only lifecycle: don't keep restarting after the script exits;
+      // PM2 relaunches it on the cron schedule.
+      autorestart: false,
+      cron_restart: job.cron,
+      watch: false,
+    })),
+  ],
 };

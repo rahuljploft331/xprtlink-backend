@@ -32,6 +32,15 @@ function normalize(key, value) {
     const num = Number(value);
     return Number.isFinite(num) ? num : PLATFORM_SETTING_DEFAULTS[key];
   }
+  if (key === "payoutSchedule") {
+    // Now an integer number of days. Legacy rows may hold the old enum
+    // strings ("weekly" etc.) — map those forward, else parse the number,
+    // else fall back to the default cadence.
+    const legacyDays = { daily: 1, weekly: 7, monthly: 30 };
+    if (typeof value === "string" && value in legacyDays) return legacyDays[value];
+    const num = Number(value);
+    return Number.isInteger(num) && num >= 1 ? num : PLATFORM_SETTING_DEFAULTS[key];
+  }
   if (key === "maintenanceMode") {
     if (typeof value === "boolean") return value;
     return value === "true" || value === 1;

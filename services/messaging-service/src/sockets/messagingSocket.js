@@ -1,6 +1,8 @@
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { verifyAccessToken } from "@xprtlink/shared/auth/jwt.js";
 import { getDb } from "@xprtlink/shared/db";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "messagingSocket" });
 import {
   createConversationRequestSchema,
   sendMessageRequestSchema,
@@ -87,7 +89,7 @@ export function registerMessagingSockets(io) {
     if (auth.customerProfileId) socket.join(`customer:${auth.customerProfileId}`);
     if (auth.expertProfileId) socket.join(`expert:${auth.expertProfileId}`);
 
-    console.log(
+    log.info(
       `[messaging-service] User connected: ${auth.userId} (${auth.role}) -> socket ${socket.id}`
     );
 
@@ -99,7 +101,7 @@ export function registerMessagingSockets(io) {
           callback({ success: true, data });
         }
       } catch (err) {
-        console.error("[messaging-service] conversation:list error:", err.message);
+        log.error({ err: err.message }, "[messaging-service] conversation:list error:");
         if (typeof callback === "function") {
           callback({
             success: false,
@@ -128,7 +130,7 @@ export function registerMessagingSockets(io) {
           callback({ success: true, data });
         }
       } catch (err) {
-        console.error("[messaging-service] conversation:create error:", err.message);
+        log.error({ err: err.message }, "[messaging-service] conversation:create error:");
         if (typeof callback === "function") {
           callback({
             success: false,
@@ -150,7 +152,7 @@ export function registerMessagingSockets(io) {
           callback({ success: true, data });
         }
       } catch (err) {
-        console.error("[messaging-service] conversation:join error:", err.message);
+        log.error({ err: err.message }, "[messaging-service] conversation:join error:");
         if (typeof callback === "function") {
           callback({
             success: false,
@@ -182,7 +184,7 @@ export function registerMessagingSockets(io) {
           callback({ success: true, data });
         }
       } catch (err) {
-        console.error("[messaging-service] message:history error:", err.message);
+        log.error({ err: err.message }, "[messaging-service] message:history error:");
         if (typeof callback === "function") {
           callback({
             success: false,
@@ -195,7 +197,7 @@ export function registerMessagingSockets(io) {
 
     // 6. Send message
     socket.on("message:send", async (payload = {}, callback) => {
-      console.log(`[messaging-service] message:send received for conversation: ${payload.conversationId}`);
+      log.info(`[messaging-service] message:send received for conversation: ${payload.conversationId}`);
       try {
         // Enforce per-user sliding-window rate limit before any DB work
         checkMessageRateLimit(auth.userId);
@@ -204,7 +206,7 @@ export function registerMessagingSockets(io) {
         if (!conversationId) throw new Error(getMessage("conversationIdRequired"));
         const validated = sendMessageRequestSchema.parse(body);
         const message = await svc.sendMessage(auth, conversationId, validated);
-        console.log(`[messaging-service] message:send - Message created in DB: ${message.id}`);
+        log.info(`[messaging-service] message:send - Message created in DB: ${message.id}`);
 
         // Broadcast to conversation room (realtime chat inside thread)
         io.to(`conversation:${conversationId}`).emit("message:new", {
@@ -214,9 +216,9 @@ export function registerMessagingSockets(io) {
 
         // Notify peer's user room for badge/inbox preview updates
         const peerUserId = await svc.getConversationPeerUserId(conversationId, auth.userId);
-        console.log(`[messaging-service] message:send - Resolved peerUserId: ${peerUserId}`);
+        log.info(`[messaging-service] message:send - Resolved peerUserId: ${peerUserId}`);
         if (peerUserId) {
-          console.log(`[messaging-service] message:send - Emitting inbox:updated to user:${peerUserId}`);
+          log.info(`[messaging-service] message:send - Emitting inbox:updated to user:${peerUserId}`);
           io.to(`user:${peerUserId}`).emit("inbox:updated", {
             conversationId,
             lastMessage: message,
@@ -227,10 +229,10 @@ export function registerMessagingSockets(io) {
           try {
             // Fetch all sockets currently in this specific conversation room
             const roomSockets = await io.in(`conversation:${conversationId}`).fetchSockets();
-            console.log(`[messaging-service] message:send - Sockets in room: ${roomSockets.length}. Details:`, JSON.stringify(roomSockets.map(s => ({ id: s.id, auth: s.data.auth }))));
+            log.info(`[messaging-service] message:send - Sockets in room: ${roomSockets.length}. Details:`, JSON.stringify(roomSockets.map(s => ({ id: s.id, auth: s.data.auth }))));
             // Check if the peer has any socket actively in this room
             const peerIsActiveInRoom = roomSockets.some(s => s.data.auth?.userId === peerUserId);
-            console.log(`[messaging-service] message:send - Is peer active in room? ${peerIsActiveInRoom} (Target peerUserId: ${peerUserId})`);
+            log.info(`[messaging-service] message:send - Is peer active in room? ${peerIsActiveInRoom} (Target peerUserId: ${peerUserId})`);
 
             // If they are not actively looking at this conversation room, dispatch a notification
             if (!peerIsActiveInRoom) {
@@ -246,10 +248,10 @@ export function registerMessagingSockets(io) {
                 senderName = info.name;
                 senderAvatarUrl = info.avatarUrl;
               } catch (e) {
-                console.warn(`[messaging-service] Failed to get sender info for push:`, e.message);
+                log.warn(`[messaging-service] Failed to get sender info for push:`, e.message);
               }
 
-              console.log(`[messaging-service] message:send - Dispatching push notification via ${notifUrl}...`);
+              log.info(`[messaging-service] message:send - Dispatching push notification via ${notifUrl}...`);
               await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
                 userIds: [peerUserId],
                 type: "new_message",
@@ -257,10 +259,10 @@ export function registerMessagingSockets(io) {
                 body: preview,
                 data: { conversationId, messageId: message.id, senderUserId: auth.userId, senderName, senderAvatarUrl },
               });
-              console.log(`[messaging-service] message:send - Push notification dispatched successfully.`);
+              log.info(`[messaging-service] message:send - Push notification dispatched successfully.`);
             }
           } catch (err) {
-            console.error(`[messaging:message:send] Notification dispatch failed: ${err.message}`);
+            log.error(`[messaging:message:send] Notification dispatch failed: ${err.message}`);
           }
         }
 
@@ -268,7 +270,7 @@ export function registerMessagingSockets(io) {
           callback({ success: true, data: message });
         }
       } catch (err) {
-        console.error("[messaging-service] message:send error:", err.message);
+        log.error({ err: err.message }, "[messaging-service] message:send error:");
         if (typeof callback === "function") {
           callback({
             success: false,
@@ -296,7 +298,7 @@ export function registerMessagingSockets(io) {
           callback({ success: true, data: result });
         }
       } catch (err) {
-        console.error("[messaging-service] message:read error:", err.message);
+        log.error({ err: err.message }, "[messaging-service] message:read error:");
         if (typeof callback === "function") {
           callback({
             success: false,
@@ -327,7 +329,7 @@ export function registerMessagingSockets(io) {
           callback({ success: true });
         }
       } catch (err) {
-        console.error("[messaging-service] signal error:", err.message);
+        log.error({ err: err.message }, "[messaging-service] signal error:");
         if (typeof callback === "function") {
           callback({ success: false, message: err.message });
         }
@@ -368,7 +370,7 @@ export function registerMessagingSockets(io) {
           callback({ success: true, data });
         }
       } catch (err) {
-        console.error("[messaging-service] user:block error:", err.message);
+        log.error({ err: err.message }, "[messaging-service] user:block error:");
         if (typeof callback === "function") {
           callback({ success: false, message: err.message, code: err.code || "INTERNAL_ERROR" });
         }
@@ -387,7 +389,7 @@ export function registerMessagingSockets(io) {
           callback({ success: true, data });
         }
       } catch (err) {
-        console.error("[messaging-service] user:unblock error:", err.message);
+        log.error({ err: err.message }, "[messaging-service] user:unblock error:");
         if (typeof callback === "function") {
           callback({ success: false, message: err.message, code: err.code || "INTERNAL_ERROR" });
         }
@@ -406,7 +408,7 @@ export function registerMessagingSockets(io) {
           callback({ success: true, data });
         }
       } catch (err) {
-        console.error("[messaging-service] conversation:report error:", err.message);
+        log.error({ err: err.message }, "[messaging-service] conversation:report error:");
         if (typeof callback === "function") {
           callback({ success: false, message: err.message, code: err.code || "INTERNAL_ERROR" });
         }
@@ -414,7 +416,7 @@ export function registerMessagingSockets(io) {
     });
 
     socket.on("disconnect", (reason) => {
-      console.log(
+      log.info(
         `[messaging-service] User disconnected: ${auth.userId} (${socket.id}) - reason: ${reason}`
       );
     });

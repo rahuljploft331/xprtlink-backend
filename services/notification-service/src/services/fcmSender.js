@@ -10,6 +10,8 @@
  */
 
 import admin from "firebase-admin";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "fcmSender" });
 
 let app = null;
 
@@ -18,7 +20,7 @@ function getApp() {
 
   const raw = process.env.SERVICE_ACCOUNT_JSON;
   if (!raw) {
-    console.warn("[fcmSender] SERVICE_ACCOUNT_JSON not set — push disabled");
+    log.warn("[fcmSender] SERVICE_ACCOUNT_JSON not set — push disabled");
     return null;
   }
 
@@ -27,10 +29,10 @@ function getApp() {
     app = admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
-    console.info("[fcmSender] Firebase Admin initialised for project:", serviceAccount.project_id);
+    log.info("[fcmSender] Firebase Admin initialised for project:", serviceAccount.project_id);
     return app;
   } catch (err) {
-    console.error("[fcmSender] Failed to initialise Firebase Admin:", err.message);
+    log.error({ err: err.message }, "[fcmSender] Failed to initialise Firebase Admin:");
     return null;
   }
 }
@@ -75,10 +77,10 @@ export async function sendPushToToken(token, title, body, data = {}) {
 
   try {
     const response = await admin.messaging().send(message);
-    console.info(`[fcmSender] Push sent → ${response}`);
+    log.info(`[fcmSender] Push sent → ${response}`);
     return { ok: true, isStale: false };
   } catch (err) {
-    console.warn(`[fcmSender] Push failed for token ${token.slice(0, 20)}…: ${err.message}`);
+    log.warn(`[fcmSender] Push failed for token ${token.slice(0, 20)}…: ${err.message}`);
     const isStale = err.code === 'messaging/invalid-registration-token' || err.code === 'messaging/registration-token-not-registered';
     return { ok: false, isStale };
   }
@@ -127,7 +129,7 @@ export async function sendPushToUsers(db, userIds, title, body, data = {}) {
   const deadIds = results.filter((r) => r.isStale).map((r) => r.id);
   if (deadIds.length) {
     await db.deviceToken.deleteMany({ where: { id: { in: deadIds } } }).catch(() => {});
-    console.info(`[fcmSender] Pruned ${deadIds.length} stale device token(s)`);
+    log.info(`[fcmSender] Pruned ${deadIds.length} stale device token(s)`);
   }
 }
 
@@ -158,7 +160,7 @@ export async function resetBadgeForUser(db, userId) {
         });
       } catch (err) {
         // Token may be dead — non-fatal
-        console.warn(`[fcmSender] Badge reset failed for token ${token.slice(0, 20)}…: ${err.message}`);
+        log.warn(`[fcmSender] Badge reset failed for token ${token.slice(0, 20)}…: ${err.message}`);
       }
     })
   );

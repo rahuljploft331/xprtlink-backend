@@ -3,6 +3,8 @@ import cors from "cors";
 import helmet from "helmet";
 import { disconnectDb, getDb } from "../db/getClient.js";
 import { loadSecret } from "./secrets.js";
+import { logger } from "../lib/logger.js";
+import { httpLogger } from "../middleware/httpLogger.js";
 
 
 /**
@@ -40,6 +42,10 @@ function getCorsOriginValidator() {
 export function createApp() {
   const app = express();
   app.set("trust proxy", 1);
+
+  // Structured request logging — one line per request, attaches req.log.
+  app.use(httpLogger);
+
   app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
   app.use(
     cors({
@@ -85,9 +91,9 @@ export async function startService(app, port, label = "Service", { useDatabase =
 
   return new Promise((resolve) => {
     const server = app.listen(port, () => {
-      console.log(`[${label}] listening on :${port}`);
+      logger.info({ port }, `[${label}] listening on :${port}`);
       if (useDatabase && process.env.DATABASE_URL) {
-        console.log(`[${label}] database pool ready`);
+        logger.info(`[${label}] database pool ready`);
       }
       resolve(server);
     });

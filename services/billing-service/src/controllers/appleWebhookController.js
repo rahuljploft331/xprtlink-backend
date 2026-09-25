@@ -1,4 +1,6 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "appleWebhookController" });
 import {
   SignedDataVerifier,
   Environment,
@@ -84,7 +86,7 @@ export const handleNotification = async (req, res, next) => {
     // Apple expects a 200 OK
     res.status(200).send("OK");
   } catch (error) {
-    console.error("[appleWebhookController] Error handling webhook", error);
+    log.error({ err: error }, "[appleWebhookController] Error handling webhook");
     res.status(500).send("Error");
   }
 };

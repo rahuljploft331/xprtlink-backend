@@ -3,6 +3,8 @@ import { getDb } from "@xprtlink/shared/db";
 import { moveS3Object } from "@xprtlink/shared/utils/s3.js";
 import { customerDisplayName, resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "messagingService" });
 import {
   toConversationSummaryDto,
   toConversationJoinDto,
@@ -390,10 +392,7 @@ export async function sendMessage(auth, conversationId, body) {
           asset.storageKey = permanentKey;
           asset.status = "ready";
         } catch (err) {
-          console.error(
-            `[messagingService] Could not relocate S3 object (${asset.storageKey} -> ${permanentKey}):`,
-            err.message
-          );
+          log.error({ err: err.message }, `[messagingService] Could not relocate S3 object (${asset.storageKey} -> ${permanentKey}):`);
         }
       }
     }

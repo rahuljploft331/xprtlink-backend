@@ -1,4 +1,6 @@
 import { subscribe, clientCount } from "#utils/sseHub.js";
+import { logger } from "@xprtlink/shared/lib/logger.js";
+const log = logger.child({ module: "events.controller" });
 
 /**
  * GET /api/v1/admin/events
@@ -13,7 +15,7 @@ import { subscribe, clientCount } from "#utils/sseHub.js";
  *   const es = new EventSource('/api/v1/admin/events', {
  *     headers: { Authorization: `Bearer ${adminToken}` }
  *   });
- *   es.addEventListener('ticket:created', e => console.log(JSON.parse(e.data)));
+ *   es.addEventListener('ticket:created', e => log.info(JSON.parse(e.data)));
  *   es.addEventListener('verification:submitted', e => ...);
  */
 export function stream(req, res) {
