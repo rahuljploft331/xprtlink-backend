@@ -143,11 +143,11 @@ export function registerMessagingSockets(io) {
     socket.on("conversation:join", async ({ conversationId } = {}, callback) => {
       try {
         if (!conversationId) throw new Error(getMessage("conversationIdRequired"));
-        await svc.loadConversation(auth, conversationId);
+        const data = await svc.getConversationJoinState(auth, conversationId);
         socket.join(`conversation:${conversationId}`);
 
         if (typeof callback === "function") {
-          callback({ success: true, data: { conversationId, joined: true } });
+          callback({ success: true, data });
         }
       } catch (err) {
         console.error("[messaging-service] conversation:join error:", err.message);

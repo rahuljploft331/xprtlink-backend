@@ -19,6 +19,26 @@ export function toConversationSummaryDto(
   };
 }
 
+/**
+ * The `conversation:join` ack. Carries the block state and the peer's details
+ * so a thread opened from a shortcut (which passes only a conversation id, no
+ * block flags and no peer profile) can lock its composer and render the peer
+ * header without a second round-trip.
+ */
+export function toConversationJoinDto(
+  conversation,
+  { isBlocked, blockedByMe, peer }
+) {
+  return {
+    conversationId: conversation.id,
+    joined: true,
+    isBlocked: isBlocked ?? false,
+    blockedByMe: blockedByMe ?? false,
+    isBlockedByPeer: (isBlocked ?? false) && !(blockedByMe ?? false),
+    peer: peer ?? null,
+  };
+}
+
 export async function toMessageDto(message, attachments = []) {
   const mappedAttachments = await Promise.all(
     attachments.map(async (a) => {

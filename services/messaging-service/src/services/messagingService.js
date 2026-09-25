@@ -5,6 +5,7 @@ import { customerDisplayName, resolveMediaUrl } from "@xprtlink/shared/mappers/c
 import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
 import {
   toConversationSummaryDto,
+  toConversationJoinDto,
   toMessageDto,
 } from "@xprtlink/shared/mappers/messaging.mapper.js";
 import { isChatMediaAllowed } from "@xprtlink/shared/config/attachmentConfig.js";
@@ -25,12 +26,84 @@ export async function loadConversation(auth, conversationId) {
   const conversation = await getDb().conversation.findFirst({
     where: { id: conversationId, ...conversationWhere(auth) },
     include: {
-      customer: { include: { user: true } },
-      expert: true,
+      customer: { include: { user: true, avatarMedia: true } },
+      expert: { include: { avatarMedia: true } },
     },
   });
   if (!conversation) throw notFound("conversationNotFound");
   return conversation;
+}
+
+/**
+ * The other side's user id on a loaded conversation, relative to [auth].
+ */
+function otherUserIdOf(conversation, auth) {
+  return auth.role === "customer"
+    ? conversation.expert?.userId ?? null
+    : conversation.customer?.userId ?? null;
+}
+
+/**
+ * Block state for a single conversation, from the perspective of [auth].
+ * Mirrors the map built in [listConversations]: a row either direction means
+ * the thread is blocked, and `blockedByMe` is true only when the signed-in
+ * user is the blocker.
+ */
+async function getConversationBlockState(auth, conversation) {
+  const otherUserId = otherUserIdOf(conversation, auth);
+  if (!otherUserId) return { isBlocked: false, blockedByMe: false };
+
+  const block = await getDb().userBlock.findFirst({
+    where: {
+      OR: [
+        { blockerUserId: auth.userId, blockedUserId: otherUserId },
+        { blockerUserId: otherUserId, blockedUserId: auth.userId },
+      ],
+    },
+  });
+  if (!block) return { isBlocked: false, blockedByMe: false };
+  return { isBlocked: true, blockedByMe: block.blockerUserId === auth.userId };
+}
+
+/**
+ * The peer's profile details for the chat header — resolved from whichever
+ * side of the conversation is not [auth].
+ */
+function peerDetails(conversation, auth) {
+  if (auth.role === "customer") {
+    const expert = conversation.expert;
+    return {
+      role: "expert",
+      userId: expert?.userId ?? null,
+      expertId: conversation.expertId,
+      customerId: null,
+      name: expertDisplayName(expert),
+      avatarUrl: resolveMediaUrl(expert?.avatarMedia?.storageKey),
+    };
+  }
+  const customer = conversation.customer;
+  return {
+    role: "customer",
+    userId: customer?.userId ?? null,
+    expertId: null,
+    customerId: conversation.customerId,
+    name: customerDisplayName(customer?.user, customer),
+    avatarUrl: resolveMediaUrl(customer?.avatarMedia?.storageKey),
+  };
+}
+
+/**
+ * Assembles the `conversation:join` ack: the block state plus the peer's
+ * details, so a thread opened from a shortcut can lock its composer and paint
+ * the header without a follow-up request.
+ */
+export async function getConversationJoinState(auth, conversationId) {
+  const conversation = await loadConversation(auth, conversationId);
+  const blockState = await getConversationBlockState(auth, conversation);
+  return toConversationJoinDto(conversation, {
+    ...blockState,
+    peer: peerDetails(conversation, auth),
+  });
 }
 
 export async function getConversationPeerUserId(conversationId, currentUserId) {
