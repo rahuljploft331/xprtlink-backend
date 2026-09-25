@@ -36,10 +36,15 @@ export function createSocketProxy() {
  * changes whitespace. createApp's JSON parser stashes the bytes on req.rawBody.
  */
 function forwardRequestBody(proxyReq, req) {
-  // changeOrigin rewrites Host to the service's address; keep the public host
-  // and scheme so a service can build public URLs (e.g. Stripe return pages).
-  proxyReq.setHeader("x-forwarded-host", req.headers["x-forwarded-host"] || req.headers.host || "");
-  proxyReq.setHeader("x-forwarded-proto", req.headers["x-forwarded-proto"] || req.protocol || "http");
+  // changeOrigin rewrites Host to the service's address. Billing builds Stripe
+  // return URLs from the public host, so pass it on — for billing only, taken
+  // from the Host that reached the gateway (never a client-supplied
+  // X-Forwarded-Host), with the scheme limited to http/https.
+  if (req.originalUrl?.startsWith("/api/v1/billing")) {
+    const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "").split(",")[0].trim();
+    proxyReq.setHeader("x-forwarded-host", req.headers.host || "");
+    proxyReq.setHeader("x-forwarded-proto", proto === "http" ? "http" : "https");
+  }
 
   if (req.rawBody) {
     proxyReq.setHeader("Content-Length", req.rawBody.length);

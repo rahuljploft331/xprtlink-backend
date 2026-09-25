@@ -372,8 +372,9 @@ router.get(
 );
 
 /**
- * Public origin for Stripe's return/refresh URLs: CONNECT_RETURN_BASE_URL if
- * set, else the public host the gateway forwards (x-forwarded-host/proto).
+ * Public origin for Stripe's return/refresh URLs. Set CONNECT_RETURN_BASE_URL
+ * on servers (live mode requires https); the host the gateway forwards is only
+ * a fallback for local/dev.
  */
 function connectReturnBaseUrl(req) {
   if (process.env.CONNECT_RETURN_BASE_URL) return process.env.CONNECT_RETURN_BASE_URL;
