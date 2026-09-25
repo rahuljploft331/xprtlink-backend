@@ -146,6 +146,8 @@ export async function searchExperts(query, auth) {
       { headline: { contains: query.q, mode: "insensitive" } },
       { bio: { contains: query.q, mode: "insensitive" } },
       { title: { contains: query.q, mode: "insensitive" } },
+      // Match experts by their linked category/organisation name (e.g. "Legal").
+      { categories: { some: { name: { contains: query.q, mode: "insensitive" } } } },
     ];
   }
 
