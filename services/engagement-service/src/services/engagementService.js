@@ -1074,6 +1074,26 @@ export async function endConsultation(auth, consultationId) {
 export async function getVideoToken(auth, consultationId) {
   const consultation = await loadConsultation(consultationId);
   assertConsultationParticipant(auth, consultation);
+
+  // Either party having blocked the other closes the call at the source:
+  // both customer and expert fetch this token before joining the Zego room,
+  // so guarding token issuance prevents a call from starting from a chat
+  // thread that is (or has become) blocked. Mirrors the sendMessage /
+  // createQuote block guards.
+  const customerUserId = consultation.customer?.user?.id;
+  const expertUserId = consultation.expert?.userId;
+  if (customerUserId && expertUserId) {
+    const block = await getDb().userBlock.findFirst({
+      where: {
+        OR: [
+          { blockerUserId: customerUserId, blockedUserId: expertUserId },
+          { blockerUserId: expertUserId, blockedUserId: customerUserId },
+        ],
+      },
+    });
+    if (block) throw forbidden("userBlockedCannotCall");
+  }
+
   if (!["accepted", "in_progress", "ringing"].includes(consultation.status)) {
     throw badRequest("videoNotAvailable", "INVALID_STATUS");
   }

@@ -257,6 +257,7 @@
   "quoteExpiredCustomer": "Your quote request has expired",
   "quoteExpiredExpert": "A quote request has expired",
   "userBlockedCannotEngage": "You cannot engage with this user due to a block.",
+  "userBlockedCannotCall": "You cannot start a call with this user due to a block.",
   "expertNoEmail": "Expert has no email address associated with their account.",
   "emailSentSuccessfully": "Email sent successfully.",
   "faqsFetched": "FAQs fetched successfully",
