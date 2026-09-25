@@ -351,6 +351,22 @@ export async function login(body) {
 
   if (user.status !== "active") throw unauthorized("invalidCredentials");
 
+  // Gate on the requested role BEFORE sending an OTP / issuing tokens.
+  // The User row is shared across roles, so a phone/email match alone does not
+  // mean the account can log in as the requested role. Without this check an
+  // expert-only user requesting role=customer would still receive a login OTP
+  // and only fail after entering it (at issueTokens → resolveRoleContext).
+  const hasRequestedRole =
+    role === "customer" ? Boolean(user.customerProfile) : Boolean(user.expertProfile);
+  if (!hasRequestedRole) {
+    throw forbidden(
+      role === "customer" ? "notRegisteredAsCustomer" : "notRegisteredAsExpert",
+      "PROFILE_MISSING",
+      null,
+      { role }
+    );
+  }
+
   if (phone) {
     const otpResult = await createAndDeliverOtp({
       phone,

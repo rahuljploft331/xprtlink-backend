@@ -143,6 +143,8 @@
   "invalidSocialAuthToken": "Invalid social authentication token",
   "profileCompletionSessionExpired": "Profile completion session expired. Please sign in again.",
   "noProfileForRole": "No {role} profile on this account",
+  "notRegisteredAsCustomer": "This number isn't registered as a customer. Please sign up as a customer to continue.",
+  "notRegisteredAsExpert": "This number isn't registered as an expert. Please sign up as an expert to continue.",
   "emailRegisteredProvidePassword": "Email is already registered. Please provide your existing account password to add this profile.",
   "emailRegisteredWithPassword": "This email is already registered with a password. Please log in using your email and password.",
   "emailRegisteredWithDifferentPhone": "This email is already registered with a different phone number. Please use your existing phone number to add this profile.",
@@ -261,5 +263,9 @@
   "faqCreated": "FAQ created successfully",
   "faqUpdated": "FAQ updated successfully",
   "faqDeleted": "FAQ deleted successfully",
-  "faqNotFound": "FAQ not found"
+  "faqNotFound": "FAQ not found",
+  "reportReasonRequired": "A reason is required to report a conversation.",
+  "attachmentMessagePreview": "Sent an attachment",
+  "chatAttachmentInvalidFormat": "File format '{mimeType}' is not supported for {category} attachments. Allowed formats: {allowedFormats}",
+  "chatAttachmentTooLarge": "File size ({sizeMb} MB) exceeds the maximum allowed limit of {maxSizeMb} MB for {category} attachments"
 }

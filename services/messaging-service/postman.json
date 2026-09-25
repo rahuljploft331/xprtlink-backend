@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "6b50cd2e-d7e3-4cc7-9fc6-d4332f826d4c",
     "name": "Messaging Service",
-    "description": "Messaging Service (WebSocket-Only Architecture). All chat messaging operations are handled exclusively via Socket.IO at `/socket.io`. HTTP endpoints are limited to service health checks.\n\n**Connect**: `ws://localhost:4000/socket.io` (gateway) or `ws://localhost:4005/socket.io` (direct)\n**Auth**: `auth: { token: \"<accessToken>\" }` on socket init, or `Authorization: Bearer <jwt>` header.",
+    "description": "Messaging Service (WebSocket-Only Architecture). All chat messaging operations are handled exclusively via Socket.IO at `/socket.io`. HTTP endpoints are limited to service health checks and internal events.\n\n**Connect**: `ws://localhost:4000/socket.io` (gateway) or `ws://localhost:4005/socket.io` (direct)\n**Auth**: `auth: { token: \"<accessToken>\" }` on socket init, or `Authorization: Bearer <jwt>` header.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -15,11 +15,7 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{base_url}}/api",
-              "host": ["{{base_url}}"],
-              "path": ["api"]
-            },
+            "url": { "raw": "{{base_url}}/api", "host": ["{{base_url}}"], "path": ["api"] },
             "description": "Returns service status — confirms Messaging Service runs on Socket.IO only."
           }
         },
@@ -29,169 +25,178 @@
           "request": {
             "method": "GET",
             "header": [],
-            "url": {
-              "raw": "{{base_url}}/health",
-              "host": ["{{base_url}}"],
-              "path": ["health"]
-            },
+            "url": { "raw": "{{base_url}}/health", "host": ["{{base_url}}"], "path": ["health"] },
             "description": "Health probe for PM2 / load balancer."
           }
         }
       ]
     },
     {
+      "name": "Internal HTTP Events (Service-to-Service only)",
+      "description": "Internal-only HTTP endpoints called by other backend services. All require the `x-internal-service` header matching `SERVICE_SECRET`. Never call these from the client app.",
+      "item": [
+        {
+          "id": "int-001",
+          "name": "[INTERNAL] POST /api/internal/events/user-blocked",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-internal-service", "value": "{{SERVICE_SECRET}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"blockerUserId\": \"<uuid>\",\n  \"blockedUserId\": \"<uuid>\",\n  \"blockerProfileIds\": [],\n  \"blockedProfileIds\": []\n}" },
+            "url": { "raw": "{{messaging_url}}/api/internal/events/user-blocked", "host": ["{{messaging_url}}"], "path": ["api","internal","events","user-blocked"] },
+            "description": "Called by user-service on block. Broadcasts `user:blocked` to both user rooms."
+          }
+        },
+        {
+          "id": "int-002",
+          "name": "[INTERNAL] POST /api/internal/events/user-unblocked",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-internal-service", "value": "{{SERVICE_SECRET}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"blockerUserId\": \"<uuid>\",\n  \"blockedUserId\": \"<uuid>\",\n  \"blockerProfileIds\": [],\n  \"blockedProfileIds\": []\n}" },
+            "url": { "raw": "{{messaging_url}}/api/internal/events/user-unblocked", "host": ["{{messaging_url}}"], "path": ["api","internal","events","user-unblocked"] },
+            "description": "Called by user-service on unblock. Broadcasts `user:unblocked` to both user rooms."
+          }
+        },
+        {
+          "id": "int-003",
+          "name": "[INTERNAL] POST /api/internal/events/account-disabled",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-internal-service", "value": "{{SERVICE_SECRET}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": \"<uuid>\"\n}" },
+            "url": { "raw": "{{messaging_url}}/api/internal/events/account-disabled", "host": ["{{messaging_url}}"], "path": ["api","internal","events","account-disabled"] },
+            "description": "Called by admin-service on account disable. Emits `account:disabled` then force-disconnects all user sockets after 1s."
+          }
+        }
+      ]
+    },
+    {
       "name": "Socket.IO Events (Reference)",
-      "description": "All chat operations run over Socket.IO. Each item below documents one event: its emit payload, expected acknowledgement shape, and any server-broadcast side effects.\n\nThese requests use GET as a placeholder — they are non-runnable documentation items. Use a Socket.IO client (e.g. Postman WebSocket tab, socket.io-client, or the Flutter app) to test them.\n\n**Connection URL**: `ws://{{host}}/socket.io/?EIO=4&transport=websocket`\n**Auth**: `socket = io(url, { auth: { token: accessToken } })`",
+      "description": "All chat operations run over Socket.IO. Non-runnable documentation — use a Socket.IO client to test.\n\n**Connection URL**: `ws://{{host}}/socket.io/?EIO=4&transport=websocket`\n**Auth**: `socket = io(url, { auth: { token: accessToken } })`",
       "item": [
         {
           "id": "f3c2a006-5e88-4ef0-af77-9f601d9d8623",
           "name": "[CONNECT] Socket.IO Handshake",
           "request": {
             "method": "GET",
-            "header": [
-              { "key": "Authorization", "value": "Bearer {{accessToken}}", "description": "JWT access token" }
-            ],
-            "url": {
-              "raw": "{{base_url}}/socket.io/?EIO=4&transport=websocket",
-              "host": ["{{base_url}}"],
-              "path": ["socket.io", ""],
-              "query": [
-                { "key": "EIO", "value": "4" },
-                { "key": "transport", "value": "websocket" }
-              ]
-            },
-            "description": "Establish the Socket.IO connection.\n\n**Figma screens**: XprtLink Chat List, XprtLink Conversation\n\n**Client init** (Flutter / JS):\n```js\nconst socket = io('ws://localhost:4000', {\n  auth: { token: accessToken },\n  transports: ['websocket']\n});\n```\n\nOn success, client is placed in a personal room `user:<userId>` for inbox-level broadcasts."
+            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
+            "url": { "raw": "{{base_url}}/socket.io/?EIO=4&transport=websocket", "host": ["{{base_url}}"], "path": ["socket.io",""], "query": [{"key":"EIO","value":"4"},{"key":"transport","value":"websocket"}] },
+            "description": "Establish Socket.IO connection. On success client joins `user:<userId>` room. Rate limit: message:send max 10/10s."
           }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000001",
           "name": "[EVENT] conversation:list",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Fetch paginated conversation list with unread count and last message preview.\n\n**Direction**: Client → Server (with ack)\n\n**Emit payload**:\n```json\n{ \"page\": 1, \"limit\": 20 }\n```\n\n**Ack response**:\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"<conversationId>\",\n        \"peer\": { \"id\": \"<userId>\", \"firstName\": \"Jane\", \"lastName\": \"Doe\", \"avatarUrl\": null },\n        \"lastMessage\": { \"body\": \"Hello!\", \"createdAt\": \"2026-08-19T...\" },\n        \"unreadCount\": 2,\n        \"updatedAt\": \"2026-08-19T...\"\n      }\n    ],\n    \"pagination\": { \"page\": 1, \"limit\": 20, \"total\": 5 }\n  }\n}\n```\n\n**Figma screens**: XprtLink Chat List - Main View, XprtLink Chat List - Empty State"
-          }
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{page,limit}`. Returns paginated conversations with peerName, peerAvatarUrl, lastMessagePreview, unreadCount, isBlocked, blockedByMe." }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000002",
           "name": "[EVENT] conversation:create",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Start or retrieve an existing conversation between a customer and an expert.\n\n**Direction**: Client → Server (with ack)\n\n**Emit payload** (one of):\n```json\n{ \"expertId\": \"<expertProfileId>\" }    // customer initiating\n{ \"customerId\": \"<customerProfileId>\" } // expert initiating\n```\n\n**Ack response**:\n```json\n{ \"success\": true, \"data\": { \"id\": \"<conversationId>\", \"peer\": {...}, \"createdAt\": \"...\" } }\n```\n\n**Side effect**: Emits `conversation:new` to peer's user room `user:<peerUserId>` when a new conversation is created.\n\n**Figma screens**: Expert Profile (Message button), XprtLink Chat List"
-          }
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{expertId}` or `{customerId}`. Upserts conversation. Side effect: emits `conversation:new` to peer's user room." }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000003",
           "name": "[EVENT] conversation:join",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Join a conversation room to receive real-time messages. Must be called before sending or receiving messages in a specific thread.\n\n**Direction**: Client → Server (with ack)\n\n**Emit payload**:\n```json\n{ \"conversationId\": \"<uuid>\" }\n```\n\n**Ack response**:\n```json\n{ \"success\": true, \"data\": { \"conversationId\": \"<uuid>\", \"joined\": true } }\n```\n\nClient is added to Socket.IO room `conversation:<conversationId>`.\n\n**Figma screens**: XprtLink Conversation - Media & Context"
-          }
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{conversationId}`. Joins room `conversation:<id>`." }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000004",
           "name": "[EVENT] conversation:leave",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Leave a conversation room. Call when navigating away from a chat thread.\n\n**Direction**: Client → Server (with ack)\n\n**Emit payload**:\n```json\n{ \"conversationId\": \"<uuid>\" }\n```\n\n**Ack response**:\n```json\n{ \"success\": true, \"data\": { \"conversationId\": \"<uuid>\", \"left\": true } }\n```\n\nClient is removed from Socket.IO room `conversation:<conversationId>`."
-          }
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{conversationId}`. Leaves conversation room." }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000005",
           "name": "[EVENT] message:history",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Fetch paginated message history for a conversation. Oldest-first or newest-first depending on `page`.\n\n**Direction**: Client → Server (with ack)\n\n**Emit payload**:\n```json\n{ \"conversationId\": \"<uuid>\", \"page\": 1, \"limit\": 50 }\n```\n\n**Ack response**:\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"items\": [\n      {\n        \"id\": \"<msgId>\",\n        \"conversationId\": \"<uuid>\",\n        \"senderUserId\": \"<uuid>\",\n        \"body\": \"Hello there!\",\n        \"type\": \"text\",\n        \"mediaUrls\": [],\n        \"deliveryStatus\": \"read\",\n        \"createdAt\": \"2026-08-19T09:00:00.000Z\"\n      }\n    ],\n    \"pagination\": { \"page\": 1, \"limit\": 50, \"total\": 124 }\n  }\n}\n```\n\n**Figma screens**: XprtLink Conversation - Media & Context, XprtLink Chat List"
-          }
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{conversationId, page, limit}`. Returns newest-first items array + pagination `{page,limit,total,hasNext}`. Client must reverse items for display." }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000006",
           "name": "[EVENT] message:send",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Send a text or media message to a conversation. At least one of `body` or `mediaIds` is required.\n\n**Direction**: Client → Server (with ack)\n\n**Emit payload**:\n```json\n{\n  \"conversationId\": \"<uuid>\",\n  \"body\": \"Hello!\",\n  \"mediaIds\": []\n}\n```\n\n**Ack response**:\n```json\n{\n  \"success\": true,\n  \"data\": {\n    \"id\": \"<msgId>\",\n    \"conversationId\": \"<uuid>\",\n    \"senderUserId\": \"<uuid>\",\n    \"body\": \"Hello!\",\n    \"type\": \"text\",\n    \"mediaUrls\": [],\n    \"deliveryStatus\": \"sent\",\n    \"createdAt\": \"2026-08-19T09:00:00.000Z\"\n  }\n}\n```\n\n**Side effects**:\n- Broadcasts `message:new` to room `conversation:<conversationId>` (all joined members)\n- Broadcasts `conversation:updated` to peer's user room `user:<peerUserId>` (inbox update)\n\n**Figma screens**: XprtLink Conversation - Media & Context (send button)"
-          }
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{conversationId, body, mediaIds:[]}`. Chat is TEXT-ONLY (Aug 31 2026); image/video mediaIds rejected. Rate limit: 10 msg/10s (code RATE_LIMITED). Side effects: broadcasts `message:new` to conversation room, emits `inbox:updated` to peer's user room, sends push notification if peer is not in room." }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000007",
           "name": "[BROADCAST] message:new",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Server-to-client broadcast when a new message arrives in a joined thread.\n\n**Direction**: Server → Room Broadcast (`conversation:<conversationId>`)\n\n**Payload received by client**:\n```json\n{\n  \"conversationId\": \"<uuid>\",\n  \"message\": {\n    \"id\": \"<msgId>\",\n    \"senderUserId\": \"<uuid>\",\n    \"body\": \"Hello!\",\n    \"type\": \"text\",\n    \"mediaUrls\": [],\n    \"createdAt\": \"2026-08-19T09:00:00.000Z\"\n  }\n}\n```\n\n**Figma screens**: XprtLink Conversation - real-time incoming message bubble"
-          }
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Server→Room (`conversation:<id>`). Payload: `{conversationId, message:{id,senderUserId,body,type,attachments,createdAt}}`." }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000008",
-          "name": "[BROADCAST] conversation:updated",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Server-to-client broadcast to update the conversation inbox list when a peer sends a new message.\n\n**Direction**: Server → Peer User Room (`user:<peerUserId>`)\n\n**Payload received by client**:\n```json\n{\n  \"conversationId\": \"<uuid>\",\n  \"lastMessage\": {\n    \"body\": \"Hello!\",\n    \"createdAt\": \"2026-08-19T09:00:00.000Z\"\n  },\n  \"senderUserId\": \"<uuid>\"\n}\n```\n\n**Figma screens**: XprtLink Chat List - unread badge update, last message preview"
-          }
+          "name": "[BROADCAST] inbox:updated",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Server→Peer User Room (`user:<peerUserId>`). Payload: `{conversationId, lastMessage:{body,createdAt}, senderUserId}`. NOTE: Previously incorrectly documented as `conversation:updated`. The correct event name is `inbox:updated`." }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000009",
           "name": "[EVENT] message:read",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Mark all messages in a conversation as read. Resets the unread counter for this user.\n\n**Direction**: Client → Server (with ack)\n\n**Emit payload**:\n```json\n{ \"conversationId\": \"<uuid>\" }\n```\n\n**Ack response**:\n```json\n{ \"success\": true, \"data\": { \"read\": true, \"unreadCount\": 0 } }\n```\n\n**Side effect**: Broadcasts `conversation:read` to room `conversation:<conversationId>` so the peer sees the read receipt.\n\n**Figma screens**: XprtLink Conversation (open chat = mark read)"
-          }
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{conversationId}`. Updates ConversationReadState and sets deliveryStatus to 'read' for all peer messages. Side effect: broadcasts `conversation:read` to conversation room." }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000010",
           "name": "[BROADCAST] conversation:read",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Read receipt broadcast to active thread participants.\n\n**Direction**: Server → Room Broadcast (`conversation:<conversationId>`)\n\n**Payload received by client**:\n```json\n{\n  \"conversationId\": \"<uuid>\",\n  \"userId\": \"<uuid>\",\n  \"readAt\": \"2026-08-19T09:00:00.000Z\"\n}\n```\n\n**Figma screens**: XprtLink Conversation - double-tick read indicator"
-          }
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Server→Room (`conversation:<id>`). Payload: `{conversationId, userId, readAt}`." }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000011",
           "name": "[EVENT] typing:start",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Signal that this user has started typing. Triggers `typing:status` broadcast to other thread members.\n\n**Direction**: Client → Server (fire-and-forget, no ack)\n\n**Emit payload**:\n```json\n{ \"conversationId\": \"<uuid>\" }\n```\n\n**Side effect**: Broadcasts `typing:status` `{ conversationId, userId, isTyping: true }` to `conversation:<id>`.\n\n**Figma screens**: XprtLink Conversation - typing indicator bubble"
-          }
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (fire-and-forget). Payload: `{conversationId}`. Broadcasts `typing:status {isTyping:true}` to conversation room." }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000012",
           "name": "[EVENT] typing:stop",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Signal that this user has stopped typing (cleared input or sent message). Triggers `typing:status` broadcast.\n\n**Direction**: Client → Server (fire-and-forget, no ack)\n\n**Emit payload**:\n```json\n{ \"conversationId\": \"<uuid>\" }\n```\n\n**Side effect**: Broadcasts `typing:status` `{ conversationId, userId, isTyping: false }` to `conversation:<id>`.\n\n**Figma screens**: XprtLink Conversation - typing indicator disappears"
-          }
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (fire-and-forget). Payload: `{conversationId}`. Broadcasts `typing:status {isTyping:false}` to conversation room." }
         },
         {
           "id": "a1b2c3d4-0001-0000-0000-000000000013",
           "name": "[BROADCAST] typing:status",
-          "request": {
-            "method": "GET",
-            "header": [{ "key": "Authorization", "value": "Bearer {{accessToken}}" }],
-            "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io", ""] },
-            "description": "Server-to-client broadcast indicating a peer's typing state changed.\n\n**Direction**: Server → Room Broadcast (`conversation:<conversationId>`)\n\n**Payload received by client**:\n```json\n{\n  \"conversationId\": \"<uuid>\",\n  \"userId\": \"<uuid>\",\n  \"isTyping\": true\n}\n```\n\n**Figma screens**: XprtLink Conversation - animated typing dots"
-          }
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Server→Room (`conversation:<id>`). Payload: `{conversationId, userId, isTyping}`." }
+        },
+        {
+          "id": "a1b2c3d4-0001-0000-0000-000000000014",
+          "name": "[EVENT] user:block",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{targetUserId}`. Creates UserBlock. Side effect: broadcasts `user:blocked` to both user rooms." }
+        },
+        {
+          "id": "a1b2c3d4-0001-0000-0000-000000000015",
+          "name": "[EVENT] user:unblock",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{targetUserId}`. Removes UserBlock. Side effect: broadcasts `user:unblocked` to both user rooms." }
+        },
+        {
+          "id": "a1b2c3d4-0001-0000-0000-000000000016",
+          "name": "[EVENT] conversation:report",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{conversationId, reason}`. reason is required (non-empty string). Returns `{id, reported:true}`." }
+        },
+        {
+          "id": "a1b2c3d4-0001-0000-0000-000000000017",
+          "name": "[EVENT] signal",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{targetUserId, type, data}`. Server relays to target's user/customer/expert rooms. Received payload: `{type, data, senderUserId}`." }
+        },
+        {
+          "id": "a1b2c3d4-0001-0000-0000-000000000018",
+          "name": "[BROADCAST] conversation:new",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Server→Peer User Room. Emitted when a new conversation is created. Payload: `{conversation:{id,peerName,...}}`." }
+        },
+        {
+          "id": "a1b2c3d4-0001-0000-0000-000000000019",
+          "name": "[BROADCAST] user:blocked",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Server→both user rooms. Emitted on block (via socket or internal HTTP). Payload: `{blockerUserId,blockedUserId,blockerProfileIds,blockedProfileIds}`." }
+        },
+        {
+          "id": "a1b2c3d4-0001-0000-0000-000000000020",
+          "name": "[BROADCAST] user:unblocked",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Server→both user rooms. Emitted on unblock. Payload: `{blockerUserId,blockedUserId,blockerProfileIds,blockedProfileIds}`." }
+        },
+        {
+          "id": "a1b2c3d4-0001-0000-0000-000000000021",
+          "name": "[BROADCAST] account:disabled",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Server→`user:<userId>` room. Emitted when admin disables account. Client must treat as forced logout. Server disconnects all user sockets 1s after emitting. Payload: `{userId}`." }
         }
       ]
     }

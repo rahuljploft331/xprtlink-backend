@@ -62,17 +62,6 @@ export async function getConversationSenderInfo(conversationId, auth) {
   };
 }
 
-async function countUnreadMessages(conversationId, userId, lastReadMessage) {
-  return getDb().message.count({
-    where: {
-      conversationId,
-      senderUserId: { not: userId },
-      ...(lastReadMessage
-        ? { createdAt: { gt: lastReadMessage.createdAt } }
-        : {}),
-    },
-  });
-}
 
 function peerInfo(conversation, auth) {
   if (auth.role === "customer") {
@@ -382,24 +371,36 @@ export async function markConversationRead(auth, conversationId) {
     return { read: true, unreadCount: 0 };
   }
 
-  await db.conversationReadState.upsert({
-    where: {
-      conversationId_userId: {
+  await db.$transaction([
+    // Upsert the read-state cursor
+    db.conversationReadState.upsert({
+      where: {
+        conversationId_userId: {
+          conversationId,
+          userId: auth.userId,
+        },
+      },
+      create: {
         conversationId,
         userId: auth.userId,
+        lastReadMessageId: lastMessage.id,
+        readAt: new Date(),
       },
-    },
-    create: {
-      conversationId,
-      userId: auth.userId,
-      lastReadMessageId: lastMessage.id,
-      readAt: new Date(),
-    },
-    update: {
-      lastReadMessageId: lastMessage.id,
-      readAt: new Date(),
-    },
-  });
+      update: {
+        lastReadMessageId: lastMessage.id,
+        readAt: new Date(),
+      },
+    }),
+    // Mark all peer messages in this conversation as 'read' in the DB
+    db.message.updateMany({
+      where: {
+        conversationId,
+        senderUserId: { not: auth.userId },
+        deliveryStatus: { in: ["sent", "delivered"] },
+      },
+      data: { deliveryStatus: "read" },
+    }),
+  ]);
 
   return { read: true, unreadCount: 0 };
 }

@@ -699,9 +699,12 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status is 400 or 200', () => pm.expect([200, 400]).to.include(pm.response.code));",
-                  "pm.test('NOT_IMPLEMENTED when Firebase not configured', () => {",
+                  "// Accepts either dev-without-Firebase (400 NOT_IMPLEMENTED) or Firebase-configured",
+                  "// rejecting the fake token (401 UNAUTHORIZED). 200 only if a real token ever slipped in.",
+                  "pm.test('status is 200, 400 or 401', () => pm.expect([200, 400, 401]).to.include(pm.response.code));",
+                  "pm.test('correct error code for status', () => {",
                   "  if (pm.response.code === 400) pm.expect(pm.response.json().code).to.eql('NOT_IMPLEMENTED');",
+                  "  if (pm.response.code === 401) pm.expect(pm.response.json().code).to.eql('UNAUTHORIZED');",
                   "});"
                 ]
               }
@@ -724,7 +727,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "social"]
             },
-            "description": "Google or Apple sign-in via Firebase ID token.\n\nReturns auth tokens on success, or `{ needsProfileCompletion: true, missing: ['phone'], completionToken }` when phone is required.\n\n_In dev without Firebase configured this returns 400 NOT_IMPLEMENTED (negative test)._"
+            "description": "Google or Apple sign-in via Firebase ID token.\n\nReturns auth tokens on success, or `{ needsProfileCompletion: true, missing: ['phone'], completionToken }` when phone is required.\n\n_Negative test. In dev without Firebase configured this returns 400 NOT_IMPLEMENTED. When Firebase IS configured, an invalid/fake idToken returns 401 UNAUTHORIZED (invalidSocialAuthToken)._"
           }
         },
         {

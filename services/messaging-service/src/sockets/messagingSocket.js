@@ -8,6 +8,29 @@ import {
 import * as svc from "../services/messagingService.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 
+// ── Per-user sliding-window rate limit for message:send ──────────────────────
+// Max 10 messages per 10 seconds per authenticated user.
+const MESSAGE_RATE_LIMIT = 10;
+const MESSAGE_RATE_WINDOW_MS = 10_000;
+/** @type {Map<string, number[]>} userId → sorted timestamps of recent sends */
+const _messageSendTimestamps = new Map();
+
+function checkMessageRateLimit(userId) {
+  const now = Date.now();
+  const cutoff = now - MESSAGE_RATE_WINDOW_MS;
+  const timestamps = (_messageSendTimestamps.get(userId) ?? []).filter((t) => t > cutoff);
+  if (timestamps.length >= MESSAGE_RATE_LIMIT) {
+    const retryAfterMs = MESSAGE_RATE_WINDOW_MS - (now - timestamps[0]);
+    const err = new Error(getMessage("failedToSendMessage"));
+    err.code = "RATE_LIMITED";
+    err.retryAfterMs = retryAfterMs;
+    throw err;
+  }
+  timestamps.push(now);
+  _messageSendTimestamps.set(userId, timestamps);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
  * Register Socket.IO authentication and event listeners for real-time messaging.
  * @param {import("socket.io").Server} io
@@ -174,6 +197,9 @@ export function registerMessagingSockets(io) {
     socket.on("message:send", async (payload = {}, callback) => {
       console.log(`[messaging-service] message:send received for conversation: ${payload.conversationId}`);
       try {
+        // Enforce per-user sliding-window rate limit before any DB work
+        checkMessageRateLimit(auth.userId);
+
         const { conversationId, ...body } = payload;
         if (!conversationId) throw new Error(getMessage("conversationIdRequired"));
         const validated = sendMessageRequestSchema.parse(body);
@@ -211,7 +237,7 @@ export function registerMessagingSockets(io) {
               const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
               const preview = message.body
                 ? message.body.slice(0, 80) + (message.body.length > 80 ? "..." : "")
-                : "Sent an attachment";
+                : getMessage("attachmentMessagePreview");
               
               let senderName = "New Message";
               let senderAvatarUrl = null;
@@ -373,7 +399,7 @@ export function registerMessagingSockets(io) {
       try {
         if (!conversationId) throw new Error(getMessage("conversationIdRequired"));
         if (!reason || typeof reason !== "string" || !reason.trim()) {
-          throw new Error("Reason is required");
+          throw new Error(getMessage("reportReasonRequired"));
         }
         const data = await svc.reportConversation(auth, conversationId, reason.trim());
         if (typeof callback === "function") {

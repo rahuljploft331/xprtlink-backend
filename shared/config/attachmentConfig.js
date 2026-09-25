@@ -108,7 +108,10 @@ export function validateChatAttachment(mimeType, sizeBytes) {
   // Check allowed format
   if (!catConfig.mimes.includes(normalizedMime)) {
     throw badRequest(
-      `File format '${mimeType}' is not supported for ${category} attachments. Allowed formats: ${catConfig.mimes.join(", ")}`,
+      getMessage("chatAttachmentInvalidFormat")
+        .replace("{mimeType}", mimeType)
+        .replace("{category}", category)
+        .replace("{allowedFormats}", catConfig.mimes.join(", ")),
       "UNSUPPORTED_MEDIA_TYPE"
     );
   }
@@ -116,7 +119,10 @@ export function validateChatAttachment(mimeType, sizeBytes) {
   // Check file size limit
   if (sizeBytes != null && sizeBytes > catConfig.maxSizeBytes) {
     throw badRequest(
-      `File size (${(sizeBytes / (1024 * 1024)).toFixed(2)} MB) exceeds maximum allowed limit of ${catConfig.maxSizeMb} MB for ${category} attachments`,
+      getMessage("chatAttachmentTooLarge")
+        .replace("{sizeMb}", (sizeBytes / (1024 * 1024)).toFixed(2))
+        .replace("{maxSizeMb}", catConfig.maxSizeMb)
+        .replace("{category}", category),
       "FILE_TOO_LARGE"
     );
   }
