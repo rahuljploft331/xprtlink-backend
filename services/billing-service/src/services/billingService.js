@@ -729,9 +729,63 @@ export async function handleStripeWebhook(payload, signature) {
       // Expert Connect KYC status update — handle KYC approval/rejection here later
       break;
 
-    case "transfer.created":
-      // Expert payout transfer created
+    case "transfer.created": {
+      // Payout transfer created on Stripe. runPayouts already sets the payout to
+      // `paid` and stamps stripeTransferId optimistically; this reconciles the id
+      // in case it was missing (e.g. the DB update after transfers.create failed).
+      const transfer = event.data.object;
+      const updated = await db.expertPayout.updateMany({
+        where: { stripeTransferId: transfer.id, status: { not: "paid" } },
+        data: { status: "paid" },
+      });
+      if (updated.count > 0) {
+        log.info(`[billing-webhook] transfer.created reconciled payout for transfer=${transfer.id}`);
+      }
       break;
+    }
+
+    case "transfer.reversed": {
+      // A previously-created transfer was reversed (claw-back / destination could
+      // not receive). The money has returned to the platform balance, so the payout
+      // is no longer paid: mark it failed AND return its earnings to the unpaid pool
+      // (unstamp payoutId) so the next runPayouts re-pays the expert. Keyed on the
+      // Stripe transfer id.
+      const transfer = event.data.object;
+      const payout = await db.expertPayout.findFirst({
+        where: { stripeTransferId: transfer.id },
+      });
+      if (!payout) {
+        log.warn(`[billing-webhook] transfer.reversed for unknown transfer=${transfer.id} — no matching payout`);
+        break;
+      }
+      if (payout.status === "failed") {
+        log.info(`[billing-webhook] transfer.reversed payout=${payout.id} already failed — skipping`);
+        break;
+      }
+      await db.$transaction(async (tx) => {
+        await tx.expertPayout.update({
+          where: { id: payout.id },
+          data: { status: "failed" },
+        });
+        // Return the settled earnings to the unpaid pool for the next run.
+        await tx.expertEarningsLedger.updateMany({
+          where: { payoutId: payout.id },
+          data: { payoutId: null },
+        });
+      });
+      log.warn(`[billing-webhook] transfer.reversed payout=${payout.id} transfer=${transfer.id} — earnings returned to unpaid pool`);
+      break;
+    }
+
+    case "payout.failed": {
+      // A Connect account's own bank payout (Stripe → expert's bank) failed. This is
+      // downstream of our transfer (funds already left the platform balance) and
+      // Stripe retries it, so we do not unstamp earnings here — we only record it for
+      // operator visibility. No payout row is keyed to this object; log and move on.
+      const payout = event.data.object;
+      log.error(`[billing-webhook] payout.failed stripePayoutId=${payout.id} amount=${payout.amount} — expert bank payout failed on Stripe`);
+      break;
+    }
 
     default:
       break;
@@ -1357,8 +1411,18 @@ export async function reattemptFailedPayouts({
   const db = getDb();
   const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
 
+  // Only retry payouts that STILL OWN their ledger rows. A payout whose transfer
+  // merely failed at creation keeps its rows stamped (payoutId set) — safe to retry.
+  // A payout that was later REVERSED (transfer.reversed webhook) has had its rows
+  // returned to the unpaid pool (payoutId: null); those earnings are re-paid via a
+  // fresh payout on the next runPayouts, so retrying this row here would double-pay.
+  // The presence of ledgerEntries is the discriminator.
   const failed = await db.expertPayout.findMany({
-    where: { status: "failed", createdAt: { gte: cutoff } },
+    where: {
+      status: "failed",
+      createdAt: { gte: cutoff },
+      ledgerEntries: { some: {} },
+    },
     orderBy: { createdAt: "asc" },
     take: limit,
   });
