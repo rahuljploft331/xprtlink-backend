@@ -60,7 +60,9 @@ router.post(
   asyncHandler(async (req, res) => {
     log.info(`[Billing Service Webhook] ${new Date().toISOString()} Incoming Stripe Webhook event`);
     const signature = req.headers["stripe-signature"];
-    const result = await svc.handleStripeWebhook(req.body, signature);
+    // The app-wide JSON parser runs first; it stashes the raw bytes on req.rawBody.
+    const payload = req.rawBody ?? req.body;
+    const result = await svc.handleStripeWebhook(payload, signature);
     log.info(`[Billing Service Webhook] Handled event: ${result.eventType || "ok"}`);
     return res.status(200).json(result);
   })

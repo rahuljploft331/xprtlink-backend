@@ -58,7 +58,17 @@ export function createApp() {
 
   // 1MB default — sufficient for all JSON API payloads.
   // media-service directUpload route overrides with 100mb locally for base64 uploads.
-  app.use(express.json({ limit: "1mb" }));
+  // `verify` keeps the untouched bytes for webhook routes: Stripe signature
+  // checks need the raw body, and this parser consumes the stream before any
+  // route-level `raw()` parser can see it.
+  app.use(
+    express.json({
+      limit: "1mb",
+      verify: (req, _res, buf) => {
+        if (req.originalUrl?.includes("/webhook")) req.rawBody = buf;
+      },
+    })
+  );
   app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
   app.get("/health", (_req, res) => {

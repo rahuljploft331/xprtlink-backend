@@ -31,6 +31,20 @@ export function createSocketProxy() {
 }
 
 /**
+ * Webhook routes must reach the service byte-for-byte: signature checks (Stripe)
+ * hash the raw body, and `fixRequestBody` re-serialises the parsed JSON, which
+ * changes whitespace. createApp's JSON parser stashes the bytes on req.rawBody.
+ */
+function forwardRequestBody(proxyReq, req) {
+  if (req.rawBody) {
+    proxyReq.setHeader("Content-Length", req.rawBody.length);
+    proxyReq.write(req.rawBody);
+    return;
+  }
+  fixRequestBody(proxyReq, req);
+}
+
+/**
  * Proxy /api/v1/<domain>/* to downstream microservices.
  * Each service mounts the same path prefix internally.
  */
@@ -57,7 +71,7 @@ export function createGatewayProxies() {
       changeOrigin: true,
       pathFilter: path,
       on: {
-        proxyReq: fixRequestBody,
+        proxyReq: forwardRequestBody,
         error(err, _req, res) {
           log.error({ err: err.message }, `[gateway] proxy error ${path}:`);
           res.writeHead(502, { "Content-Type": "application/json" });
