@@ -231,30 +231,61 @@ export async function uploadIdentityDocument({ fileBuffer, mimeType, fileName = 
  * The `verification.document` block is omitted when no document file IDs are provided
  * to avoid sending an empty object that Stripe rejects.
  */
-export async function createCustomConnectAccount({
+/** Business profile the platform supplies for every expert account. */
+function expertBusinessProfile() {
+  return {
+    // 7392 = Management, Consulting & Public Relations Services. Override per env if needed.
+    mcc: process.env.STRIPE_CONNECT_MCC || "7392",
+    product_description: "Paid one-to-one video consultations delivered through the XprtLink app.",
+  };
+}
+
+/** `individual` block for an expert, sent on create and on re-submission. */
+function expertIndividual({
   expertEmail,
+  phone,
   firstName,
   lastName,
   dob,
   address,
   ssnLast4,
+  idNumber,
   frontDocumentFileId,
   backDocumentFileId,
-  userIpAddress = "127.0.0.1",
 }) {
-  const sdk = requireStripe();
-
-  // Only include document verification if at least a front doc ID was provided.
-  const verificationBlock = frontDocumentFileId
-    ? {
-        verification: {
-          document: {
-            front: frontDocumentFileId,
-            ...(backDocumentFileId ? { back: backDocumentFileId } : {}),
+  return {
+    first_name: firstName,
+    last_name: lastName,
+    ...(expertEmail ? { email: expertEmail } : {}),
+    ...(phone ? { phone } : {}),
+    dob: { day: dob.day, month: dob.month, year: dob.year },
+    address: {
+      line1: address.line1,
+      city: address.city,
+      state: address.state,
+      postal_code: address.postalCode,
+      country: address.country || "US",
+    },
+    ssn_last_4: ssnLast4,
+    ...(idNumber ? { id_number: idNumber } : {}),
+    // Only include document verification if at least a front doc ID was provided
+    // (Stripe rejects an empty verification object).
+    ...(frontDocumentFileId
+      ? {
+          verification: {
+            document: {
+              front: frontDocumentFileId,
+              ...(backDocumentFileId ? { back: backDocumentFileId } : {}),
+            },
           },
-        },
-      }
-    : {};
+        }
+      : {}),
+  };
+}
+
+export async function createCustomConnectAccount(details) {
+  const sdk = requireStripe();
+  const { expertEmail, address, userIpAddress = "127.0.0.1" } = details;
 
   return await sdk.accounts.create({
     type: "custom",
@@ -265,28 +296,25 @@ export async function createCustomConnectAccount({
       card_payments: { requested: true },
     },
     business_type: "individual",
-    individual: {
-      first_name: firstName,
-      last_name: lastName,
-      dob: {
-        day: dob.day,
-        month: dob.month,
-        year: dob.year,
-      },
-      address: {
-        line1: address.line1,
-        city: address.city,
-        state: address.state,
-        postal_code: address.postalCode,
-        country: address.country || "US",
-      },
-      ssn_last_4: ssnLast4,
-      ...verificationBlock,
-    },
+    business_profile: expertBusinessProfile(),
+    individual: expertIndividual(details),
     tos_acceptance: {
       date: Math.floor(Date.now() / 1000),
       ip: userIpAddress,
     },
+  });
+}
+
+/**
+ * KYC re-submission for an expert who already has a Connect account: update it
+ * in place (creating another would orphan the first and lose its bank account).
+ */
+export async function updateCustomConnectAccount(stripeAccountId, details) {
+  const sdk = requireStripe();
+  return await sdk.accounts.update(stripeAccountId, {
+    email: details.expertEmail,
+    business_profile: expertBusinessProfile(),
+    individual: expertIndividual(details),
   });
 }
 

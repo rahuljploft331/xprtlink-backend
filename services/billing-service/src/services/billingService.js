@@ -959,29 +959,41 @@ export async function submitCustomConnectKyc(auth, body) {
 
   if (!expert) throw notFound("expertProfileNotFound");
 
-  // Call Stripe Custom Account creation API
-  const account = await stripeSvc.createCustomConnectAccount({
+  const userPhone = expert.user.phone?.startsWith("+") ? expert.user.phone : undefined;
+  const details = {
     expertEmail: expert.user.email,
+    phone: body.phone ?? userPhone,
     firstName: body.firstName,
     lastName: body.lastName,
     dob: body.dob,
     address: body.address,
     ssnLast4: body.ssnLast4,
+    idNumber: body.idNumber,
     frontDocumentFileId: body.frontDocumentFileId,
     backDocumentFileId: body.backDocumentFileId,
     userIpAddress: body.userIpAddress,
-  });
+  };
 
-  // Persist the Stripe Connect account ID so attachBankAccount can reference it
-  await db.expertProfile.update({
-    where: { id: auth.expertProfileId },
-    data: { stripeAccountId: account.id },
-  });
+  // Re-submission updates the existing account (keeps its bank account);
+  // only a first submission creates one.
+  const account = expert.stripeAccountId
+    ? await stripeSvc.updateCustomConnectAccount(expert.stripeAccountId, details)
+    : await stripeSvc.createCustomConnectAccount(details);
+
+  if (!expert.stripeAccountId) {
+    // Persist the Stripe Connect account ID so attachBankAccount can reference it
+    await db.expertProfile.update({
+      where: { id: auth.expertProfileId },
+      data: { stripeAccountId: account.id },
+    });
+  }
 
   return {
     expertProfileId: auth.expertProfileId,
     stripeAccountId: account.id,
     kycStatus: "submitted",
+    transfersActive: account.capabilities?.transfers === "active",
+    requirementsDue: account.requirements?.currently_due ?? [],
   };
 }
 
