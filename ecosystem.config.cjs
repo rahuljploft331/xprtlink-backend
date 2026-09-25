@@ -68,6 +68,12 @@ const cronJobs = [
     cron: process.env.PAYOUT_RUN_CRON || "15 2 * * *", // 02:15 daily (job self-sizes window from payoutSchedule)
   },
   {
+    name: "billing-retry-payouts",
+    service: "billing-service",
+    script: "scripts/run-retry-payouts.js",
+    cron: process.env.RETRY_PAYOUTS_CRON || "45 3 * * *", // 03:45 daily (recover failed transfers from prior runs)
+  },
+  {
     name: "billing-expire-subscriptions",
     service: "billing-service",
     script: "scripts/run-expire-subscriptions.js",

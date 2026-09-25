@@ -657,10 +657,7 @@ export async function attachBankAccount(auth, body) {
 
   // Expert must have completed KYC (Stripe Custom Connect account) before adding a bank account
   if (!expert.stripeAccountId) {
-    throw badRequest(
-      "Please complete identity verification (KYC) before adding a bank account.",
-      "KYC_REQUIRED"
-    );
+    throw badRequest("kycRequiredBeforeBankAccount", "KYC_REQUIRED");
   }
 
   const externalAccount = await stripeSvc.attachExternalBankAccount({
@@ -1421,8 +1418,9 @@ export async function runPayouts({ now = new Date() } = {}) {
       }
     } catch (err) {
       // Transfer failed. Mark payout failed; ledger rows stay stamped so we never
-      // double the amount. A later run re-attempts transfer for failed payouts by id
-      // (see reattemptFailedPayouts). Do NOT unstamp here.
+      // double the amount. `reattemptFailedPayouts()` re-attempts the transfer for
+      // failed payouts by id — the Stripe idempotencyKey (`payout_<id>`) makes the
+      // retry safe even if the original transfer actually succeeded. Do NOT unstamp here.
       summary.transfersFailed += 1;
       await db.expertPayout.update({
         where: { id: payout.id },
@@ -1434,6 +1432,93 @@ export async function runPayouts({ now = new Date() } = {}) {
 
   log.info(
     `[runPayouts] window=${summary.periodStart}..${summary.periodEnd} created=${summary.payoutsCreated} paid=${summary.transfersSucceeded} failed=${summary.transfersFailed} noAcct=${summary.skippedNoStripeAccount}`
+  );
+  return summary;
+}
+
+/**
+ * Re-attempt the Stripe transfer for payouts left in `failed` status by a prior
+ * `runPayouts()` (transient Stripe/network errors). Without this, a failed transfer
+ * strands the expert's earnings permanently: the payout row is `failed` and its
+ * ledger rows are already stamped with `payoutId`, so `runPayouts()` (which only
+ * scans `payoutId: null`) never revisits them.
+ *
+ * Safety: the transfer uses the payout-scoped idempotencyKey `payout_<id>`, so if the
+ * original transfer actually went through, Stripe returns that same transfer rather
+ * than sending a second one — this can never double-pay. Ledger rows are left stamped
+ * throughout; only the payout row's status (and stripeTransferId) changes.
+ *
+ * Idempotent and safe to run on a schedule.
+ *
+ * @param {{ maxAgeDays?: number, limit?: number }} [opts]
+ * @returns {Promise<{scanned:number, recovered:number, stillFailed:number, skippedNoStripeAccount:number}>}
+ */
+export async function reattemptFailedPayouts({
+  maxAgeDays = Number(process.env.PAYOUT_RETRY_MAX_AGE_DAYS || 14),
+  limit = Number(process.env.PAYOUT_RETRY_BATCH || 100),
+} = {}) {
+  const db = getDb();
+  const cutoff = new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000);
+
+  const failed = await db.expertPayout.findMany({
+    where: { status: "failed", createdAt: { gte: cutoff } },
+    orderBy: { createdAt: "asc" },
+    take: limit,
+  });
+
+  const summary = {
+    scanned: failed.length,
+    recovered: 0,
+    stillFailed: 0,
+    skippedNoStripeAccount: 0,
+  };
+
+  for (const payout of failed) {
+    const expert = await db.expertProfile.findUnique({
+      where: { id: payout.expertProfileId },
+      select: { stripeAccountId: true, currency: true, userId: true },
+    });
+
+    if (!expert?.stripeAccountId) {
+      // Still no Connect account — cannot transfer. Leave failed for a later run.
+      summary.skippedNoStripeAccount += 1;
+      log.warn(`[reattemptFailedPayouts] payout ${payout.id} expert ${payout.expertProfileId} has no stripeAccountId — skipping`);
+      continue;
+    }
+
+    try {
+      const transfer = await stripeSvc.transferEarningsToExpertPayout({
+        amountCents: payout.amountCents,
+        currency: expert.currency || payout.currency || "usd",
+        destinationStripeAccountId: expert.stripeAccountId,
+        payoutId: payout.id,
+      });
+      await db.expertPayout.update({
+        where: { id: payout.id },
+        data: { status: "paid", stripeTransferId: transfer.id },
+      });
+      summary.recovered += 1;
+      log.info(`[reattemptFailedPayouts] recovered payout ${payout.id} → transfer ${transfer.id} $${(payout.amountCents / 100).toFixed(2)}`);
+
+      // Notify the expert their payout was sent — non-fatal.
+      if (expert.userId) {
+        const amountFormatted = `$${(payout.amountCents / 100).toFixed(2)}`;
+        internalPost(process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007", "/api/v1/notifications/dispatch", {
+          userIds: [expert.userId],
+          type: "payout_sent",
+          title: "Payout Sent",
+          body: `Your earnings payout of ${amountFormatted} is on its way to your bank.`,
+          data: { payoutId: payout.id, amountCents: payout.amountCents },
+        }).catch((e) => log.error(`[reattemptFailedPayouts] payout notify failed: ${e.message}`));
+      }
+    } catch (err) {
+      summary.stillFailed += 1;
+      log.error(`[reattemptFailedPayouts] retry failed for payout ${payout.id}: ${err.message}`);
+    }
+  }
+
+  log.info(
+    `[reattemptFailedPayouts] scanned=${summary.scanned} recovered=${summary.recovered} stillFailed=${summary.stillFailed} noAcct=${summary.skippedNoStripeAccount}`
   );
   return summary;
 }

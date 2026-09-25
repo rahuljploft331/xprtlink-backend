@@ -101,6 +101,64 @@ router.get(
   })
 );
 
+// ── Internal cron endpoints ──────────────────────────────────────────────────
+// These are called by the PM2 cron runners (scripts/run-*.js) via internalPost
+// with the x-internal-service secret. They MUST be registered BEFORE
+// router.use(authenticate) below — otherwise the JWT `authenticate` middleware
+// rejects the cron's internal call with 401 before internalServiceGuard runs.
+
+// Expire subscriptions past their period end.
+router.post(
+  "/subscriptions/expire",
+  internalServiceGuard,
+  asyncHandler(async (_req, res) => {
+    const data = await svc.expireSubscriptions();
+    return ResponseFormatter.success(res, { message: `Expired ${data.expired} subscription(s)`, data });
+  })
+);
+
+// Retry consultations that completed but were never charged
+// (room_close → capture handoff failed). Idempotent.
+router.post(
+  "/consultations/retry-captures",
+  internalServiceGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.retryFailedCaptures(req.body ?? {});
+    return ResponseFormatter.success(res, {
+      message: getMessage("retryCapturesProcessed", { count: data.charged }),
+      data,
+    });
+  })
+);
+
+// Run the payout job: aggregate unpaid earnings into ExpertPayouts and initiate
+// Stripe Connect transfers. Idempotent per window.
+router.post(
+  "/payouts/run",
+  internalServiceGuard,
+  asyncHandler(async (_req, res) => {
+    const data = await svc.runPayouts();
+    return ResponseFormatter.success(res, {
+      message: getMessage("payoutRunComplete", { count: data.payoutsCreated }),
+      data,
+    });
+  })
+);
+
+// Re-attempt transfers for payouts left in `failed` status by a prior run.
+// Idempotent (payout-scoped Stripe idempotencyKey).
+router.post(
+  "/payouts/retry-failed",
+  internalServiceGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.reattemptFailedPayouts(req.body ?? {});
+    return ResponseFormatter.success(res, {
+      message: getMessage("payoutRetryComplete", { count: data.recovered }),
+      data,
+    });
+  })
+);
+
 
 
 router.use(authenticate);
@@ -262,45 +320,6 @@ router.get(
   asyncHandler(async (req, res) => {
     const data = await svc.getEarnings(req.auth, req.query);
     return ResponseFormatter.paginated(res, { message: getMessage("earnings"), ...data });
-  })
-);
-
-// ── Internal cron endpoint — expire subscriptions past their period end ──────
-// Protected by SERVICE_SECRET header (same guard as other internal endpoints).
-router.post(
-  "/subscriptions/expire",
-  internalServiceGuard,
-  asyncHandler(async (_req, res) => {
-    const data = await svc.expireSubscriptions();
-    return ResponseFormatter.success(res, { message: `Expired ${data.expired} subscription(s)`, data });
-  })
-);
-
-// ── Internal cron endpoint — retry consultations that completed but were never
-// charged (room_close → capture handoff failed). Idempotent. ─────────────────
-router.post(
-  "/consultations/retry-captures",
-  internalServiceGuard,
-  asyncHandler(async (req, res) => {
-    const data = await svc.retryFailedCaptures(req.body ?? {});
-    return ResponseFormatter.success(res, {
-      message: getMessage("retryCapturesProcessed", { count: data.charged }),
-      data,
-    });
-  })
-);
-
-// ── Internal cron endpoint — run the payout job: aggregate unpaid earnings into
-// ExpertPayouts and initiate Stripe Connect transfers. Idempotent per window. ─
-router.post(
-  "/payouts/run",
-  internalServiceGuard,
-  asyncHandler(async (_req, res) => {
-    const data = await svc.runPayouts();
-    return ResponseFormatter.success(res, {
-      message: getMessage("payoutRunComplete", { count: data.payoutsCreated }),
-      data,
-    });
   })
 );
 

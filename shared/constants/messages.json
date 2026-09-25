@@ -307,5 +307,7 @@
   "broadcastSent": "Notification sent to {count} user(s).",
   "ticketForwardedToSupport": "Ticket forwarded to support",
   "retryCapturesProcessed": "Retried {count} pending consultation capture(s)",
-  "payoutRunComplete": "Payout run complete: created {count} payout(s)"
+  "payoutRunComplete": "Payout run complete: created {count} payout(s)",
+  "payoutRetryComplete": "Payout retry complete: {count} transfer(s) recovered",
+  "kycRequiredBeforeBankAccount": "Please complete identity verification (KYC) before adding a bank account."
 }
