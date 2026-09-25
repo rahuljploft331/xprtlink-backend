@@ -553,6 +553,113 @@ export async function submitVerificationDocuments(auth, body) {
   };
 }
 
+/**
+ * Resubmit verification documents after a rejection.
+ *
+ * Only allowed when verificationStatus is "rejected" or "resubmit_required".
+ * In a single transaction:
+ *   1. Resets the existing ExpertVerification row back to "pending".
+ *   2. Deletes the old ExpertVerificationDocument rows.
+ *   3. Creates fresh ExpertVerificationDocument rows from the new media IDs.
+ *   4. Flips ExpertProfile.verificationStatus → "pending".
+ */
+export async function resubmitVerificationDocuments(auth, body) {
+  const db = getDb();
+  const expert = await db.expertProfile.findFirst({ where: { userId: auth.userId } });
+  if (!expert) throw notFound("expertProfileNotFound");
+
+  const ALLOWED_STATUSES = ["rejected", "resubmit_required"];
+  if (!ALLOWED_STATUSES.includes(expert.verificationStatus)) {
+    throw badRequest("resubmitNotAllowed");
+  }
+
+  // Validate submitted media IDs — must exist, belong to this user, and be ready.
+  const docIds = [];
+  if (body.primaryId) docIds.push(body.primaryId);
+  if (body.secondaryId) docIds.push(body.secondaryId);
+
+  if (docIds.length === 0) {
+    throw badRequest("atLeastOneDocumentRequired", "VALIDATION_ERROR", "primaryId");
+  }
+
+  const mediaAssets = await db.mediaAsset.findMany({
+    where: { id: { in: docIds }, ownerUserId: auth.userId, status: "ready" },
+  });
+
+  if (mediaAssets.length !== docIds.length) {
+    const foundIds = new Set(mediaAssets.map((m) => m.id));
+    const missing = docIds.filter((id) => !foundIds.has(id));
+    throw badRequest(
+      `Document media asset(s) not found or not ready: ${missing.join(", ")}`,
+      "INVALID_MEDIA",
+      "primaryId"
+    );
+  }
+
+  await db.$transaction(async (tx) => {
+    // Find the latest verification row.
+    const verification = await tx.expertVerification.findFirst({
+      where: { expertProfileId: expert.id },
+      orderBy: { submittedAt: "desc" },
+    });
+
+    if (!verification) {
+      // Edge case: no verification row yet — create one fresh.
+      const created = await tx.expertVerification.create({
+        data: { expertProfileId: expert.id, status: "pending", submittedAt: new Date() },
+      });
+      for (const media of mediaAssets) {
+        await tx.expertVerificationDocument.create({
+          data: {
+            verificationId: created.id,
+            mediaId: media.id,
+            docType: body.docType || "government_id",
+          },
+        });
+      }
+    } else {
+      // Reset the verification row.
+      await tx.expertVerification.update({
+        where: { id: verification.id },
+        data: {
+          status: "pending",
+          submittedAt: new Date(),
+          reviewedAt: null,
+          reviewNotes: null,
+        },
+      });
+
+      // Remove old documents so admin only sees the fresh set.
+      await tx.expertVerificationDocument.deleteMany({
+        where: { verificationId: verification.id },
+      });
+
+      // Insert the new documents.
+      for (const media of mediaAssets) {
+        await tx.expertVerificationDocument.create({
+          data: {
+            verificationId: verification.id,
+            mediaId: media.id,
+            docType: body.docType || "government_id",
+          },
+        });
+      }
+    }
+
+    // Flip the profile status so the login gate re-routes correctly.
+    await tx.expertProfile.update({
+      where: { id: expert.id },
+      data: { verificationStatus: "pending" },
+    });
+  });
+
+  return {
+    submitted: true,
+    documentCount: docIds.length,
+    primaryId: docIds[0],
+    secondaryId: docIds[1] || null,
+  };
+}
 
 export async function getDashboard(auth) {
   const { expert, subscriptionActive } = await getExpertProfileOrThrow(auth);

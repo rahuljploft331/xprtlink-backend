@@ -94,6 +94,17 @@ router.post(
   })
 );
 
+router.post(
+  "/me/verification/resubmit",
+  authenticate,
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const body = expertVerificationDocumentsRequestSchema.parse(req.body);
+    const data = await svc.resubmitVerificationDocuments(req.auth, body);
+    return ResponseFormatter.success(res, { message: getMessage("resubmitSubmitted"), data });
+  })
+);
+
 router.get(
   "/me/dashboard",
   authenticate,
