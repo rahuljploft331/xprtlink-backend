@@ -17,6 +17,11 @@ import {
   CONSULTATION_COMMISSION_RATE,
   consultationHoldMinimumCents,
 } from "@xprtlink/shared/lib/consultationBilling.js";
+import { sendEmail } from "@xprtlink/shared/lib/email.js";
+import { buildConsultationInvoiceEmail } from "@xprtlink/shared/lib/consultationInvoice.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { customerDisplayName } from "@xprtlink/shared/mappers/common.js";
+import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
 
 export {
   computeConsultationChargeCents,
@@ -491,7 +496,8 @@ export async function captureConsultation(consultationId, durationSeconds) {
 
   console.log(`[billing] captureConsultation: ${consultationId} → charged $${(amountCents / 100).toFixed(2)}`);
 
-  // Notify customer (charge confirmation) and expert (earnings credit) — non-fatal
+  // Notify customer (charge confirmation) and expert (earnings credit) — non-fatal.
+  // Also email a soft-copy invoice to each party (customer=debit, expert=credit).
   try {
     const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
     const db2 = getDb();
@@ -499,7 +505,7 @@ export async function captureConsultation(consultationId, durationSeconds) {
       where: { id: consultationId },
       include: {
         customer: { include: { user: true } },
-        expert: { select: { userId: true } },
+        expert: { include: { user: true } },
       },
     });
     const notifUserIds = [
@@ -516,11 +522,111 @@ export async function captureConsultation(consultationId, durationSeconds) {
         data: { consultationId, amountCents, transactionId: result.id },
       });
     }
+
+    // Fire invoice emails off the response path — SendGrid latency must never
+    // block or roll back a successful capture (no queue infra in this codebase,
+    // so this follows the established fire-and-forget + .catch() pattern).
+    sendConsultationInvoices({
+      consultation: consultationForNotif,
+      amountCents,
+      commissionCents,
+      expertShareCents,
+      currency,
+      notifUrl,
+    }).catch((err) => {
+      console.error(`[captureConsultation] Invoice email dispatch failed: ${err.message}`);
+    });
   } catch (err) {
     console.error(`[captureConsultation] Payment notification failed: ${err.message}`);
   }
 
   return { captured: true, transactionId: result.id, amountCents, commissionCents, expertShareCents };
+}
+
+/**
+ * Emails a soft-copy invoice to both parties after a consultation is charged:
+ *   - Customer → receipt showing the debit (amount charged).
+ *   - Expert   → earnings statement showing the credit (net after commission).
+ * Also dispatches an in-app/push "Invoice Available" notification to each.
+ *
+ * Every step is best-effort and independent — one failed email must not stop
+ * the other, and none of this is on the billing capture response path.
+ */
+async function sendConsultationInvoices({
+  consultation,
+  amountCents,
+  commissionCents,
+  expertShareCents,
+  currency,
+  notifUrl,
+}) {
+  if (!consultation) return;
+
+  const customerEmail = consultation.customer?.user?.email;
+  const expertEmail = consultation.expert?.user?.email;
+  const customerUserId = consultation.customer?.user?.id;
+  const expertUserId = consultation.expert?.userId;
+  const customerName = customerDisplayName(consultation.customer?.user, consultation.customer);
+  const expertName = expertDisplayName(consultation.expert);
+
+  const recipients = [
+    {
+      audience: "customer",
+      email: customerEmail,
+      userId: customerUserId,
+      notifBody: getMessage("invoiceIssuedNotifBodyCustomer", { expertName }),
+    },
+    {
+      audience: "expert",
+      email: expertEmail,
+      userId: expertUserId,
+      notifBody: getMessage("invoiceIssuedNotifBodyExpert", { customerName }),
+    },
+  ];
+
+  for (const recipient of recipients) {
+    if (!recipient.email) {
+      console.warn(
+        `[captureConsultation] No email for ${recipient.audience} on consultation ${consultation.id} — skipping invoice`
+      );
+      continue;
+    }
+    try {
+      const { subject, html } = await buildConsultationInvoiceEmail({
+        audience: recipient.audience,
+        consultation,
+        amountCents,
+        commissionCents,
+        expertShareCents,
+        currency,
+        expertName,
+        customerName,
+      });
+      await sendEmail({ to: recipient.email, subject, html });
+      console.log(
+        `[captureConsultation] Invoice emailed to ${recipient.audience} (${recipient.email}) for consultation ${consultation.id}`
+      );
+
+      // In-app / push heads-up that the invoice was emailed — non-fatal.
+      if (recipient.userId) {
+        await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+          userIds: [recipient.userId],
+          type: "invoice_issued",
+          title: getMessage("invoiceIssuedNotifTitle"),
+          body: recipient.notifBody,
+          data: { consultationId: consultation.id },
+        }).catch((err) => {
+          console.error(
+            `[captureConsultation] invoice_issued notification failed for ${recipient.audience}: ${err.message}`
+          );
+        });
+      }
+    } catch (err) {
+      console.error(
+        `[captureConsultation] Failed to send invoice to ${recipient.audience} (${recipient.email}): ${err.message}`
+      );
+    }
+  }
 }
 
 export async function submitCustomConnectKyc(auth, body) {

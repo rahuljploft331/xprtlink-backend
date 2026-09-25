@@ -268,5 +268,17 @@
   "reportReasonRequired": "A reason is required to report a conversation.",
   "attachmentMessagePreview": "Sent an attachment",
   "chatAttachmentInvalidFormat": "File format '{mimeType}' is not supported for {category} attachments. Allowed formats: {allowedFormats}",
-  "chatAttachmentTooLarge": "File size ({sizeMb} MB) exceeds the maximum allowed limit of {maxSizeMb} MB for {category} attachments"
+  "chatAttachmentTooLarge": "File size ({sizeMb} MB) exceeds the maximum allowed limit of {maxSizeMb} MB for {category} attachments",
+  "invoiceEmailSubjectCustomer": "Your XprtLink consultation receipt ({reference})",
+  "invoiceEmailSubjectExpert": "Your XprtLink earnings statement ({reference})",
+  "invoiceCustomerIntro": "Thanks for using XprtLink. Here is the receipt for your recent consultation with {expertName}. The amount below was charged to your payment method on file.",
+  "invoiceExpertIntro": "Here is the earnings statement for your recent consultation with {customerName}. The net amount below has been credited to your XprtLink earnings balance.",
+  "invoiceBadgeCustomer": "Payment Receipt",
+  "invoiceBadgeExpert": "Earnings Statement",
+  "invoiceTitleCustomer": "Consultation Receipt",
+  "invoiceTitleExpert": "Earnings Statement",
+  "invoiceFooterNote": "This is an automated statement for your records. Amounts are shown in {currency}. Questions? Reply to this email and our support team will help.",
+  "invoiceIssuedNotifTitle": "Invoice Available",
+  "invoiceIssuedNotifBodyCustomer": "Your receipt for the consultation with {expertName} has been emailed to you.",
+  "invoiceIssuedNotifBodyExpert": "Your earnings statement for the consultation with {customerName} has been emailed to you."
 }
