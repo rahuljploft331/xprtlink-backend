@@ -558,10 +558,10 @@ export async function submitVerificationDocuments(auth, body) {
  *
  * Only allowed when verificationStatus is "rejected" or "resubmit_required".
  * In a single transaction:
- *   1. Resets the existing ExpertVerification row back to "pending".
+ *   1. Resets the existing ExpertVerification row back to "in_progress".
  *   2. Deletes the old ExpertVerificationDocument rows.
  *   3. Creates fresh ExpertVerificationDocument rows from the new media IDs.
- *   4. Flips ExpertProfile.verificationStatus → "pending".
+ *   4. Flips ExpertProfile.verificationStatus → "in_progress".
  */
 export async function resubmitVerificationDocuments(auth, body) {
   const db = getDb();
@@ -606,7 +606,7 @@ export async function resubmitVerificationDocuments(auth, body) {
     if (!verification) {
       // Edge case: no verification row yet — create one fresh.
       const created = await tx.expertVerification.create({
-        data: { expertProfileId: expert.id, status: "pending", submittedAt: new Date() },
+        data: { expertProfileId: expert.id, status: "in_progress", submittedAt: new Date() },
       });
       for (const media of mediaAssets) {
         await tx.expertVerificationDocument.create({
@@ -622,7 +622,7 @@ export async function resubmitVerificationDocuments(auth, body) {
       await tx.expertVerification.update({
         where: { id: verification.id },
         data: {
-          status: "pending",
+          status: "in_progress",
           submittedAt: new Date(),
           reviewedAt: null,
           reviewNotes: null,
@@ -649,7 +649,7 @@ export async function resubmitVerificationDocuments(auth, body) {
     // Flip the profile status so the login gate re-routes correctly.
     await tx.expertProfile.update({
       where: { id: expert.id },
-      data: { verificationStatus: "pending" },
+      data: { verificationStatus: "in_progress" },
     });
   });
 

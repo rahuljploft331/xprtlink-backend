@@ -24,6 +24,8 @@
   "verificationNotFound": "Verification not found",
   "verificationApproved": "Verification approved",
   "verificationRejected": "Verification rejected",
+  "verificationRejectedEmailSubject": "Your XprtLink Verification Was Not Approved",
+  "verificationRejectedEmailDefaultReason": "Your documents did not meet our verification requirements. Please re-upload clear, valid government-issued ID documents.",
   "permissionsUpdated": "Permissions updated",
   "reviewHidden": "Review hidden",
   "reviewPublished": "Review published",

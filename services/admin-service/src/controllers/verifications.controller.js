@@ -6,6 +6,7 @@ import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
+import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 const log = logger.child({ module: "verifications.controller" });
 
 
@@ -151,12 +152,14 @@ export async function approve(req, res, next) {
 export async function reject(req, res, next) {
   try {
     const db = getDb();
+    const rejectionNotes = req.body?.notes ?? "Rejected by admin";
+
     const v = await db.expertVerification.update({
       where: { id: req.params.id },
       data: {
         status: "rejected",
         reviewedAt: new Date(),
-        reviewNotes: req.body?.notes ?? "Rejected by admin",
+        reviewNotes: rejectionNotes,
       },
     });
     await db.expertProfile.update({
@@ -164,27 +167,71 @@ export async function reject(req, res, next) {
       data: { verificationStatus: "rejected" },
     });
     await logAdminAction(req, "verification.reject", "ExpertVerification", v.id, {
-      notes: req.body?.notes ?? null,
+      notes: rejectionNotes,
     });
 
-    // Notify the expert that their profile was rejected (non-fatal)
+    // Fetch expert profile + user email for notifications (non-fatal block)
+    let expertProfile = null;
+    let expertEmail = null;
+    try {
+      expertProfile = await db.expertProfile.findUnique({
+        where: { id: v.expertProfileId },
+        select: {
+          userId: true,
+          firstName: true,
+          user: { select: { email: true } },
+        },
+      });
+      expertEmail = expertProfile?.user?.email ?? null;
+    } catch (err) {
+      log.error(`[verifications.reject] Failed to fetch expert profile for notifications: ${err.message}`);
+    }
+
+    // Push notification (non-fatal)
     try {
       const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
-      const expertProfile = await db.expertProfile.findUnique({
-        where: { id: v.expertProfileId },
-        select: { userId: true, firstName: true },
-      });
       if (expertProfile?.userId) {
         await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
           userIds: [expertProfile.userId],
           type: "verification_rejected",
           title: "Verification Update",
           body: `Your expert profile verification was not approved. Please review the admin notes and resubmit your documents.`,
-          data: { verificationId: v.id, notes: req.body?.notes ?? null },
+          data: { verificationId: v.id, notes: rejectionNotes },
         });
       }
     } catch (err) {
       log.error(`[verifications.reject] Notification dispatch failed: ${err.message}`);
+    }
+
+    // Email notification with rejection reason (non-fatal)
+    try {
+      if (expertEmail) {
+        const firstName = expertProfile?.firstName ?? "Expert";
+        const reasonHtml = `<p style="margin:0 0 12px">${rejectionNotes.replace(/\n/g, "<br>")}</p>`;
+        const bodyHtml = `
+          <p style="margin:0 0 12px">Hi ${firstName},</p>
+          <p style="margin:0 0 12px">Thank you for submitting your verification documents on XprtLink. Unfortunately, we were unable to verify your identity at this time.</p>
+          <p style="margin:0 0 6px"><strong>Reason provided by the reviewer:</strong></p>
+          <div style="background:#fff1f2;border-left:4px solid #e11d48;padding:12px 16px;border-radius:4px;margin:0 0 16px">${reasonHtml}</div>
+          <p style="margin:0 0 12px">Please re-open the XprtLink app, upload fresh, high-quality copies of your government-issued ID, and resubmit for review. Our team will process your new submission promptly.</p>
+          <p style="margin:0">If you believe this decision was made in error, please contact our support team.</p>
+        `;
+        const html = await renderEmailTemplate({
+          title: "Verification Not Approved",
+          bodyHtml,
+          badgeText: "Action Required",
+          ctaText: "Re-upload Documents",
+          ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com",
+        });
+        await sendEmail({
+          to: expertEmail,
+          subject: getMessage("verificationRejectedEmailSubject"),
+          text: `Hi ${firstName},\n\nYour XprtLink verification was not approved.\n\nReason: ${rejectionNotes}\n\nPlease re-open the app and re-upload your documents.`,
+          html,
+        });
+      }
+    } catch (err) {
+      log.error(`[verifications.reject] Email dispatch failed: ${err.message}`);
     }
 
     return ResponseFormatter.success(res, { message: getMessage("verificationRejected"), data: v });
