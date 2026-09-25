@@ -236,6 +236,7 @@ export async function holdConsultationFunds(auth, consultationId, body) {
       amountCents: estimatedCents,
       currency: consultation.expert?.currency || "USD",
       metadata: { consultationId, customerProfileId: auth.customerProfileId },
+      consultationId,
     });
 
     // Persist the PaymentIntent ID on the consultation so room_close can capture it
@@ -302,6 +303,7 @@ export async function payConsultation(auth, consultationId, body) {
         amountCents,
         currency,
         metadata: { consultationId },
+        consultationId,
       });
     }
   } catch (err) {

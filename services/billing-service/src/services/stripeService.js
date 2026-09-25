@@ -63,18 +63,26 @@ export async function createPreAuthHold({
   amountCents,
   currency = "usd",
   metadata = {},
+  consultationId,
 }) {
   const sdk = requireStripe();
-  return await sdk.paymentIntents.create({
-    amount: amountCents,
-    currency: currency.toLowerCase(),
-    customer: customerStripeId,
-    payment_method: stripePaymentMethodId,
-    off_session: true,
-    confirm: true,
-    capture_method: "manual",
-    metadata,
-  });
+  // Idempotency: a retried hold for the same consultation reuses this key, so a
+  // dropped response / client retry can never place a second authorization hold
+  // on the customer's card. Keyed on the consultation (one hold per session).
+  const options = consultationId ? { idempotencyKey: `hold_${consultationId}` } : {};
+  return await sdk.paymentIntents.create(
+    {
+      amount: amountCents,
+      currency: currency.toLowerCase(),
+      customer: customerStripeId,
+      payment_method: stripePaymentMethodId,
+      off_session: true,
+      confirm: true,
+      capture_method: "manual",
+      metadata,
+    },
+    options
+  );
 }
 
 /**
@@ -82,9 +90,16 @@ export async function createPreAuthHold({
  */
 export async function capturePaymentIntent({ paymentIntentId, amountToCaptureCents }) {
   const sdk = requireStripe();
-  return await sdk.paymentIntents.capture(paymentIntentId, {
-    ...(amountToCaptureCents ? { amount_to_capture: amountToCaptureCents } : {}),
-  });
+  // Idempotency: keyed on the PaymentIntent id, so a retried capture collapses to
+  // a single capture rather than erroring or double-processing.
+  const options = paymentIntentId ? { idempotencyKey: `capture_${paymentIntentId}` } : {};
+  return await sdk.paymentIntents.capture(
+    paymentIntentId,
+    {
+      ...(amountToCaptureCents ? { amount_to_capture: amountToCaptureCents } : {}),
+    },
+    options
+  );
 }
 
 /**
@@ -96,17 +111,24 @@ export async function createAndConfirmPaymentIntent({
   amountCents,
   currency = "usd",
   metadata = {},
+  consultationId,
 }) {
   const sdk = requireStripe();
-  return await sdk.paymentIntents.create({
-    amount: amountCents,
-    currency: currency.toLowerCase(),
-    customer: customerStripeId,
-    payment_method: stripePaymentMethodId,
-    off_session: true,
-    confirm: true,
-    metadata,
-  });
+  // Idempotency: a retried direct charge for the same consultation reuses this key,
+  // so a dropped response / client retry can never charge the customer twice.
+  const options = consultationId ? { idempotencyKey: `charge_${consultationId}` } : {};
+  return await sdk.paymentIntents.create(
+    {
+      amount: amountCents,
+      currency: currency.toLowerCase(),
+      customer: customerStripeId,
+      payment_method: stripePaymentMethodId,
+      off_session: true,
+      confirm: true,
+      metadata,
+    },
+    options
+  );
 }
 
 /**
