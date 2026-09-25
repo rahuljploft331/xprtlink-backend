@@ -26,6 +26,50 @@ export function customerConsultationReview(consultation) {
   return review;
 }
 
+const stripDashes = (id) => String(id ?? "").replace(/-/g, "");
+
+/**
+ * True when both the customer and the expert actually joined the Zego room for
+ * this consultation. `joinedParticipantIds` may contain either the account/user
+ * UUID or the profile UUID, so we accept either for each party.
+ */
+export function consultationWasConnected(consultation) {
+  if (!consultation) return false;
+  // startedAt is the authoritative "the call actually connected" marker — it is
+  // only set once both parties have joined the room.
+  if (consultation.startedAt) return true;
+
+  const joined = (consultation.joinedParticipantIds ?? []).map(stripDashes);
+  if (joined.length === 0) return false;
+
+  const customerAccountId = stripDashes(consultation.customer?.user?.id);
+  const customerProfileId = stripDashes(consultation.customer?.id ?? consultation.customerId);
+  const expertAccountId = stripDashes(consultation.expert?.userId);
+  const expertProfileId = stripDashes(consultation.expert?.id ?? consultation.expertId);
+
+  const customerJoined = joined.some(
+    (id) => (customerAccountId && id === customerAccountId) || (customerProfileId && id === customerProfileId)
+  );
+  const expertJoined = joined.some(
+    (id) => (expertAccountId && id === expertAccountId) || (expertProfileId && id === expertProfileId)
+  );
+  return customerJoined && expertJoined;
+}
+
+/**
+ * Display status for reporting surfaces (admin portal). A consultation stored as
+ * "completed" but which never actually connected is surfaced as "failed" — a call
+ * is only "Completed" when it was at least connected. New rows are already written
+ * correctly at the source; this also corrects historical rows on read.
+ */
+export function consultationDisplayStatus(consultation) {
+  const status = consultation?.status;
+  if (status === "completed" && !consultationWasConnected(consultation)) {
+    return "failed";
+  }
+  return status;
+}
+
 export function toConsultationSummaryDto(
   consultation,
   { customerUser, customerProfile, expertProfile, currency = "USD" }
