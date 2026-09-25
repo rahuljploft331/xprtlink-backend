@@ -86,7 +86,7 @@ export async function reply(req, res) {
   const { id } = req.params;
   const { message, action } = req.body;
 
-  if (!message) {
+  if (!message && action !== "close") {
     throw badRequest("replyMessageRequired");
   }
 
@@ -104,31 +104,33 @@ export async function reply(req, res) {
     where: { id },
     data: {
       status: isClosing ? "closed" : "in_progress",
-      resolutionNote: message,
+      ...(message ? { resolutionNote: message } : {}),
       ...(isClosing ? { resolvedAt: new Date() } : {})
     }
   });
 
-  // Send email to the user
-  const user = ticket.user;
-  const profile = user?.customerProfile || user?.expertProfile || {};
-  const userName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'User';
-  
-  const textBody = `Hi ${userName},\n\nYour support ticket regarding "${ticket.subject || ticket.category}" has been updated.\n\nReply from Admin:\n${message}\n\nBest regards,\nXprtLink Support Team`;
+  if (message) {
+    // Send email to the user
+    const user = ticket.user;
+    const profile = user?.customerProfile || user?.expertProfile || {};
+    const userName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'User';
+    
+    const textBody = `Hi ${userName},\n\nYour support ticket regarding "${ticket.subject || ticket.category}" has been updated.\n\nReply from Admin:\n${message}\n\nBest regards,\nXprtLink Support Team`;
 
-  try {
-    await sendEmail({
-      to: user.email,
-      subject: `Re: [Support] ${ticket.subject || ticket.category}`,
-      text: textBody,
-      html: textBody.replace(/\n/g, "<br>")
-    });
-  } catch (err) {
-    log.error({ err: err.message }, "[supportTickets.controller] Failed to send email:");
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: `Re: [Support] ${ticket.subject || ticket.category}`,
+        text: textBody,
+        html: textBody.replace(/\n/g, "<br>")
+      });
+    } catch (err) {
+      log.error({ err: err.message }, "[supportTickets.controller] Failed to send email:");
+    }
   }
 
   return ResponseFormatter.success(res, {
-    message: getMessage("replySent"),
+    message: getMessage("updatedSuccessfully"),
     data: updatedTicket
   });
 }
@@ -144,7 +146,7 @@ export async function getById(req, res) {
     where: { id },
     include: {
       user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true } }, expertProfile: { select: { firstName: true, lastName: true } } } },
-      attachment: { select: { id: true, storageKey: true } }
+      attachment: { select: { id: true, storageKey: true, mimeType: true } }
     }
   });
 
@@ -172,7 +174,7 @@ export async function getById(req, res) {
   };
   
   if (ticket.attachment) {
-    mappedTicket.attachment = { id: ticket.attachment.id, url };
+    mappedTicket.attachment = { id: ticket.attachment.id, url, mimeType: ticket.attachment.mimeType };
   }
   
   return ResponseFormatter.success(res, { data: mappedTicket });
