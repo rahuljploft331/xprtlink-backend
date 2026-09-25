@@ -1041,10 +1041,13 @@ export async function endConsultation(auth, consultationId) {
     }
   }
 
-  // Notify both parties that the consultation ended via API (non-fatal)
+  // Notify both parties that the consultation ended via API (non-fatal) — ONLY
+  // when the call actually connected (a real consultation happened). A call that
+  // never connected ends as "failed", not "completed", so we do not push a
+  // "consultation ended" notification for it.
   // Note: the ZegoCloud room_close webhook handles this for calls ended via Zego.
   // This covers the manual end-via-API path only.
-  try {
+  if (wasConnected) try {
     const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
     const minutes = Math.floor(durationSeconds / 60);
     const seconds = durationSeconds % 60;
@@ -1058,9 +1061,7 @@ export async function endConsultation(auth, consultationId) {
         userIds,
         type: "call_ended",
         title: "Consultation Ended",
-        body: wasConnected
-          ? `Your consultation has ended. Duration: ${durationLabel}.`
-          : "Your consultation has ended.",
+        body: `Your consultation has ended. Duration: ${durationLabel}.`,
         data: { consultationId: updated.id },
       });
     }

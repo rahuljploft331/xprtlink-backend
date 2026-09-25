@@ -278,8 +278,11 @@ async function handleRoomClose(payload) {
     console.log(`[zego-callback] Consultation ${consultation.id} — no charge (wasConnected=${wasConnected}, duration=${durationSeconds}s)`);
   }
 
-  // Notify both participants that the call has ended
-  try {
+  // Notify both participants that the call has ended — ONLY when the call
+  // actually connected (a real consultation happened). A call that was never
+  // connected (expert never picked up) is a "failed" attempt, not an ended
+  // consultation, so we do not push a "call ended" notification for it.
+  if (wasConnected) try {
     const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
     const minutes = Math.floor(durationSeconds / 60);
     const seconds = durationSeconds % 60;
@@ -296,9 +299,7 @@ async function handleRoomClose(payload) {
         userIds,
         type: "call_ended",
         title: "Call Ended",
-        body: wasConnected
-          ? `Your consultation has ended. Duration: ${durationLabel}.`
-          : "Your consultation has ended.",
+        body: `Your consultation has ended. Duration: ${durationLabel}.`,
         data: { consultationId: consultation.id },
       });
     }
