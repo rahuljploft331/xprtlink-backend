@@ -1,6 +1,7 @@
 export const ResponseFormatter = {
-  success(res, { message = "Success", data = null, code, status = 200 } = {}) {
+  success(res, { message = "Success", data = null, code, status = 200, meta } = {}) {
     const body = { success: true, message, data };
+    if (meta !== undefined) body.meta = meta;
     if (code) body.code = code;
     return res.status(status).json(body);
   },
@@ -10,21 +11,28 @@ export const ResponseFormatter = {
     {
       message = "Success",
       items = [],
-      page = 1,
-      limit = 20,
-      total = 0,
+      page,
+      limit,
+      total,
+      pagination,
       stats,
       code,
+      meta,
       status = 200,
     } = {}
   ) {
-    const data = { items, page, limit, total };
+    const pPage = page ?? pagination?.page ?? 1;
+    const pLimit = limit ?? pagination?.limit ?? 20;
+    const pTotal = total ?? pagination?.total ?? 0;
+
+    const data = { items, page: pPage, limit: pLimit, total: pTotal };
     if (stats !== undefined) data.stats = stats;
     const body = {
       success: true,
       message,
       data,
     };
+    if (meta !== undefined) body.meta = meta;
     if (code) body.code = code;
     return res.status(status).json(body);
   },

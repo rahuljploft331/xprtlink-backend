@@ -410,7 +410,27 @@ export async function listQuotes(auth, query) {
   ]);
 
   const items = rows.map((q) => toQuoteSummaryDto(q, quoteContext(q)));
-  return paginatedResult(items, { page, limit, total });
+  
+  const meta = {
+    filters: role === "expert"
+      ? [
+          { label: "Submitted", value: "submitted" },
+          { label: "Pending Review", value: "pending_expert_review" },
+          { label: "Reviewed", value: "expert_reviewed" },
+          { label: "Quoted", value: "quoted" },
+          { label: "Accepted", value: "accepted" },
+          { label: "Rejected", value: "rejected" },
+          { label: "Canceled", value: "canceled" },
+          { label: "Expired", value: "expired" },
+        ]
+      : [
+          { label: "Pending", value: "pending" },
+          { label: "Quote Received", value: "quoteReceived" },
+          { label: "Canceled", value: "cancelled" },
+        ]
+  };
+
+  return { ...paginatedResult(items, { page, limit, total }), meta };
 }
 
 export async function getQuote(auth, quoteId) {
