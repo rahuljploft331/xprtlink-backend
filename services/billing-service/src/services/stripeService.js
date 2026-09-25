@@ -366,6 +366,17 @@ export async function transferEarningsToExpertPayout({
 }
 
 /**
+ * The transfer already sent for a payout, if any (matched on transfer_group).
+ * Used before re-sending: Stripe's idempotency key only lasts 24h, so a retry
+ * after that would otherwise pay the expert twice.
+ */
+export async function findTransferForPayout(payoutId) {
+  const sdk = requireStripe();
+  const list = await sdk.transfers.list({ transfer_group: `PAYOUT_${payoutId}`, limit: 1 });
+  return list.data[0] ?? null;
+}
+
+/**
  * Constructs and verifies incoming Stripe Webhook events.
  */
 export function constructWebhookEvent(payload, signature) {

@@ -298,7 +298,9 @@ export async function holdConsultationFunds(auth, consultationId, body) {
       consultationId,
     });
   } catch (err) {
-    throw { statusCode: 502, code: "HOLD_FAILED", message: err.message };
+    // 402, not 5xx: the error handler hides 5xx messages, and the customer needs
+    // Stripe's reason (e.g. "Your card was declined.") to pick another card.
+    throw new AppError(err.message, { statusCode: 402, code: "HOLD_FAILED" });
   }
 
   // Persist the PaymentIntent ID on the consultation so room_close can capture it
@@ -1084,9 +1086,20 @@ export async function handleStripeWebhook(payload, signature) {
       // `paid` and stamps stripeTransferId optimistically; this reconciles the id
       // in case it was missing (e.g. the DB update after transfers.create failed).
       const transfer = event.data.object;
+      // Match on the stored transfer id, or — when the DB write after the
+      // transfer failed and no id was stored — on transfer_group PAYOUT_<id>.
+      const payoutId = transfer.transfer_group?.startsWith("PAYOUT_")
+        ? transfer.transfer_group.slice("PAYOUT_".length)
+        : null;
       const updated = await db.expertPayout.updateMany({
-        where: { stripeTransferId: transfer.id, status: { not: "paid" } },
-        data: { status: "paid" },
+        where: {
+          status: { not: "paid" },
+          OR: [
+            { stripeTransferId: transfer.id },
+            ...(payoutId ? [{ id: payoutId, stripeTransferId: null }] : []),
+          ],
+        },
+        data: { status: "paid", stripeTransferId: transfer.id },
       });
       if (updated.count > 0) {
         log.info(`[billing-webhook] transfer.created reconciled payout for transfer=${transfer.id}`);
@@ -1630,6 +1643,25 @@ async function createPayoutForLedgerRows({ expertProfileId, currency, rows, peri
 }
 
 /**
+ * Before re-sending a failed payout: if its transfer actually went out (the DB
+ * write after it failed), mark it paid instead. Stripe's idempotency key only
+ * lasts 24h, so without this a later retry would pay the expert twice.
+ * Runs before readiness/balance checks — the balance that transfer used is gone.
+ *
+ * @returns {Promise<object|null>} the reconciled payout, or null to proceed
+ */
+async function reconcileSentTransfer(payout, logTag) {
+  const existing = await stripeSvc.findTransferForPayout(payout.id);
+  if (!existing || existing.reversed) return null;
+  const updated = await getDb().expertPayout.update({
+    where: { id: payout.id },
+    data: { status: "paid", stripeTransferId: existing.id },
+  });
+  log.warn(`[${logTag}] payout ${payout.id} already transferred as ${existing.id} — reconciled, not re-sent`);
+  return updated;
+}
+
+/**
  * Send (or re-send) the Stripe transfer for a payout. The idempotencyKey
  * `payout_<id>` makes a re-send return the original transfer instead of paying
  * twice. Flips the payout to `paid` or `failed` and notifies the expert.
@@ -1855,6 +1887,17 @@ export async function reattemptFailedPayouts({
   const balance = createBalanceTracker();
 
   for (const payout of failed) {
+    try {
+      if (await reconcileSentTransfer(payout, "reattemptFailedPayouts")) {
+        summary.recovered += 1;
+        continue;
+      }
+    } catch (err) {
+      log.error(`[reattemptFailedPayouts] reconcile lookup for ${payout.id} failed: ${err.message}`);
+      summary.stillFailed += 1;
+      continue;
+    }
+
     const expert = await db.expertProfile.findUnique({
       where: { id: payout.expertProfileId },
       select: { stripeAccountId: true, currency: true, userId: true },
@@ -2018,6 +2061,9 @@ export async function retryPayout(payoutId, { adminUserId } = {}) {
   if (!payout) throw notFound("payoutNotFound");
   if (payout.status !== "failed") throw badRequest("payoutNotRetryable", "INVALID_STATUS");
   if (payout._count.ledgerEntries === 0) throw badRequest("payoutReversedNotRetryable", "PAYOUT_REVERSED");
+
+  const reconciled = await reconcileSentTransfer(payout, "retryPayout");
+  if (reconciled) return { payout: toExpertPayoutDto(reconciled), transferred: true, error: null };
 
   const expert = await db.expertProfile.findUnique({
     where: { id: payout.expertProfileId },

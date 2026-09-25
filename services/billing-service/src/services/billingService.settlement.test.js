@@ -18,10 +18,11 @@ vi.mock("./stripeService.js", () => ({
   getConnectAccountStatus: vi.fn(),
   getAvailableBalanceCents: vi.fn(),
   transferEarningsToExpertPayout: vi.fn(),
+  findTransferForPayout: vi.fn(() => Promise.resolve(null)),
 }));
 
 const stripe = await import("./stripeService.js");
-const { captureConsultation, releaseConsultationHold, runPayouts, isPayoutDue, payExpertNow } = await import(
+const { captureConsultation, releaseConsultationHold, runPayouts, isPayoutDue, payExpertNow, retryPayout } = await import(
   "./billingService.js"
 );
 
@@ -317,5 +318,31 @@ describe("payExpertNow — admin manual payout", () => {
     db.expertProfile.findUnique.mockResolvedValue({ stripeAccountId: "acct_1", currency: "USD" });
     db.expertEarningsLedger.findMany.mockResolvedValue([]);
     await expect(payExpertNow("exp1")).rejects.toMatchObject({ code: "NOTHING_TO_PAY" });
+  });
+});
+
+describe("retryPayout — reconciliation", () => {
+  it("adopts a transfer that already went out instead of sending a second one", async () => {
+    db.expertPayout.findUnique = vi.fn().mockResolvedValue({
+      id: "payout_1",
+      expertProfileId: "exp1",
+      amountCents: 500,
+      currency: "USD",
+      status: "failed",
+      _count: { ledgerEntries: 2 },
+    });
+    db.expertProfile.findUnique.mockResolvedValue({ stripeAccountId: "acct_1", currency: "USD", userId: "u1" });
+    // The transfer that went out drained the balance — reconciliation must not need it.
+    stripe.getAvailableBalanceCents.mockResolvedValue({ availableCents: 0, pendingCents: 0 });
+    stripe.findTransferForPayout.mockResolvedValue({ id: "tr_existing", reversed: false });
+
+    const result = await retryPayout("payout_1");
+
+    expect(stripe.transferEarningsToExpertPayout).not.toHaveBeenCalled();
+    expect(db.expertPayout.update).toHaveBeenCalledWith({
+      where: { id: "payout_1" },
+      data: { status: "paid", stripeTransferId: "tr_existing" },
+    });
+    expect(result.transferred).toBe(true);
   });
 });
