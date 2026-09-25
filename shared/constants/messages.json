@@ -138,7 +138,6 @@
   "emailOrPhoneRequired": "Email or phone is required",
   "refreshTokenRequired": "Refresh token required",
   "invalidRefreshToken": "Invalid refresh token",
-  "otpExpiredOrNotFound": "OTP expired or not found",
   "socialLoginNotConfigured": "Social login not configured",
   "invalidSocialAuthToken": "Invalid social authentication token",
   "profileCompletionSessionExpired": "Profile completion session expired. Please sign in again.",
