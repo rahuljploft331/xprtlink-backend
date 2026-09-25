@@ -24,8 +24,15 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/payment-methods",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "payment-methods"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "payment-methods"
+              ]
             },
             "description": "List all saved payment methods of the customer. Does NOT require Stripe to be configured."
           }
@@ -51,8 +58,15 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/payment-methods",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "payment-methods"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "payment-methods"
+              ]
             },
             "description": "Associate a new Stripe payment method with the customer. Creates a Stripe Customer object on first call (stores stripeCustomerId on profile). Attaches the PaymentMethod to the Stripe Customer.\n\nProtected by stripeGuard: returns HTTP 503 STRIPE_UNAVAILABLE if STRIPE_SECRET_KEY is not configured.\n\nPossible errors:\n- 503 STRIPE_UNAVAILABLE: Stripe not configured\n- 502 STRIPE_CUSTOMER_CREATION_FAILED: Stripe Customer creation failed"
           }
@@ -70,8 +84,16 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/payment-methods/:id",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "payment-methods", ":id"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "payment-methods",
+                ":id"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -95,8 +117,17 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/payment-methods/:id/default",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "payment-methods", ":id", "default"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "payment-methods",
+                ":id",
+                "default"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -135,8 +166,17 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/consultations/:id/hold",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "consultations", ":id", "hold"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "consultations",
+                ":id",
+                "hold"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -168,8 +208,17 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/consultations/:id/pay",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "consultations", ":id", "pay"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "consultations",
+                ":id",
+                "pay"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -193,8 +242,16 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/transactions/:id",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "transactions", ":id"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "transactions",
+                ":id"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -232,8 +289,16 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/experts/kyc",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "experts", "kyc"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "experts",
+                "kyc"
+              ]
             },
             "description": "Create Stripe Custom Connect account natively with Expert KYC details."
           }
@@ -259,8 +324,16 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/experts/bank-account",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "experts", "bank-account"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "experts",
+                "bank-account"
+              ]
             },
             "description": "Link bank account to Expert Custom Connect account for payouts."
           }
@@ -292,8 +365,15 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/webhook",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "webhook"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "webhook"
+              ]
             },
             "description": "Stripe Webhook endpoint for processing async payment & account events. Not protected by stripeGuard or authentication."
           }
@@ -317,8 +397,16 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/subscriptions/plans",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "subscriptions", "plans"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "subscriptions",
+                "plans"
+              ]
             },
             "description": "List subscription plans available for experts. Response includes id, code, name, tagline, priceMonthly, currency, visibilityBoost, isMostPopular, and keyFeatures array."
           }
@@ -344,8 +432,15 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/subscriptions",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "subscriptions"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "subscriptions"
+              ]
             },
             "description": "Subscribe the expert to a membership plan."
           }
@@ -363,8 +458,16 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/subscriptions/me",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "subscriptions", "me"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "subscriptions",
+                "me"
+              ]
             },
             "description": "Retrieve current plan info and active subscription state of the expert."
           }
@@ -386,13 +489,24 @@
             ],
             "body": {
               "mode": "raw",
-              "options": { "raw": { "language": "json" } },
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              },
               "raw": "{\n  \"planCode\": \"elite\",\n  \"store\": \"apple\",\n  \"receiptData\": \"receipt_upgrade_token\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/subscriptions",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "subscriptions"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "subscriptions"
+              ]
             },
             "description": "Upgrade or downgrade to a different plan. Cancels current active subscription and activates the new plan immediately. Will return 409 ALREADY_SUBSCRIBED if same plan is requested."
           }
@@ -410,8 +524,16 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/subscriptions/me",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "subscriptions", "me"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "subscriptions",
+                "me"
+              ]
             },
             "description": "Cancels the expert's active subscription immediately. Sets status to 'canceled'. Returns 404 if no active subscription exists."
           }
@@ -435,8 +557,15 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/earnings?page=1&limit=20",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "earnings"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "earnings"
+              ],
               "query": [
                 {
                   "key": "page",
@@ -449,6 +578,41 @@
               ]
             },
             "description": "Get expert consultation earnings transaction log history."
+          }
+        },
+        {
+          "name": "List My Payouts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/payouts?page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "payouts"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            },
+            "description": "Expert — payouts actually sent to the expert's bank via Stripe Connect (status processing | paid | failed). Earnings entries also carry payoutStatus: UNPAID | PROCESSING | PAID_OUT | FAILED."
           }
         }
       ]
@@ -470,8 +634,16 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/subscriptions/expire",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "subscriptions", "expire"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "subscriptions",
+                "expire"
+              ]
             },
             "description": "Internal cron endpoint to expire subscriptions past their period end. Should be protected with internal secret header or restricted to localhost in production."
           }
@@ -498,8 +670,16 @@
             },
             "url": {
               "raw": "{{base_url}}/api/v1/billing/consultations/retry-captures",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "consultations", "retry-captures"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "consultations",
+                "retry-captures"
+              ]
             },
             "description": "Internal cron endpoint. Finds consultations that completed but were never charged (room_close → capture handoff failed or left billingStatus=failed) and re-invokes the idempotent capture path. Body params are optional overrides: graceMinutes (skip calls that just ended), maxAgeDays (stop retrying uncollectible calls), limit (batch size). Returns { scanned, charged, stillFailed, skipped }."
           }
@@ -522,8 +702,16 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/payouts/run",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "payouts", "run"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "payouts",
+                "run"
+              ]
             },
             "description": "Internal cron endpoint. Aggregates unpaid ExpertEarningsLedger rows in the current settlement window into one ExpertPayout per expert and initiates a Stripe Connect transfer (Stripe is the source of truth). The window size is the admin-configured `payoutSchedule` (integer days, default 7). Idempotent per (expert, period) — safe to re-run. Experts without a stripeAccountId are skipped and roll into the next run. Returns a run summary."
           }
@@ -542,8 +730,17 @@
             ],
             "url": {
               "raw": "{{base_url}}/api/v1/billing/consultations/:id/charge",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "billing", "consultations", ":id", "charge"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "consultations",
+                ":id",
+                "charge"
+              ],
               "variable": [
                 {
                   "key": "id",
@@ -553,6 +750,303 @@
               ]
             },
             "description": "Internal-only endpoint — called by engagement-service to retrieve the ConsultationCharge breakdown (commissionCents, expertShareCents) for a completed consultation.\n\nRequires the x-internal-service: true header. Returns 403 if called without it.\n\nReturns null data if no charge record exists yet (pre-billing state).\n\nThis endpoint was introduced to remove engagement-service's direct cross-boundary access to the billing DB."
+          }
+        },
+        {
+          "name": "Release Stale Holds (Cron)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-service",
+                "value": "{{serviceSecret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/consultations/release-holds",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "consultations",
+                "release-holds"
+              ]
+            },
+            "description": "Internal cron (every 10 min). Cancels the Stripe pre-auth hold of consultations that ended without a billable call (declined / failed / canceled) and fails requests nobody answered within HOLD_ABANDON_MINUTES (default 60). Idempotent.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Retry Failed Payouts (Cron)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-service",
+                "value": "{{serviceSecret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/payouts/retry-failed",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "payouts",
+                "retry-failed"
+              ]
+            },
+            "description": "Internal cron (03:45 UTC). Re-sends the Stripe transfer of failed payouts that still own ledger rows. Skips experts whose Connect account cannot receive transfers or when the platform balance is insufficient.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Release Consultation Hold (Internal)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-service",
+                "value": "{{serviceSecret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/consultations/:id/release-hold",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "consultations",
+                ":id",
+                "release-hold"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "consultation-uuid"
+                }
+              ]
+            },
+            "description": "Internal — called by engagement-service when a consultation is declined, never connects, or is abandoned. Cancels the pre-auth PaymentIntent and stamps holdReleasedAt. Idempotent.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Expert Payout Summary (Internal, admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-internal-service",
+                "value": "{{serviceSecret}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/payouts/experts/:expertProfileId/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "payouts",
+                "experts",
+                ":expertProfileId",
+                "summary"
+              ],
+              "variable": [
+                {
+                  "key": "expertProfileId",
+                  "value": "expert-profile-uuid"
+                }
+              ]
+            },
+            "description": "Internal — used by admin-service. Unpaid earnings, last payout, cadence, and live Stripe readiness (transfers capability, requirements due, platform available balance)."
+          }
+        },
+        {
+          "name": "Pay Expert Now (Internal, admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-service",
+                "value": "{{serviceSecret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/payouts/experts/:expertProfileId/pay-now",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "payouts",
+                "experts",
+                ":expertProfileId",
+                "pay-now"
+              ],
+              "variable": [
+                {
+                  "key": "expertProfileId",
+                  "value": "expert-profile-uuid"
+                }
+              ]
+            },
+            "description": "Internal — used by admin-service. Aggregates ALL unpaid earnings of the expert into one payout and sends the Stripe Connect transfer. 400 with a reason when the Connect account is not ready or the available balance is insufficient.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"adminUserId\": \"admin-uuid\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Retry Payout (Internal, admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-service",
+                "value": "{{serviceSecret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/payouts/:id/retry",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "payouts",
+                ":id",
+                "retry"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "payout-uuid"
+                }
+              ]
+            },
+            "description": "Internal — used by admin-service. Re-sends the transfer of one failed payout (idempotency key payout_<id>). Refused for reversed payouts.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"adminUserId\": \"admin-uuid\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Refund Consultation (Internal, admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-internal-service",
+                "value": "{{serviceSecret}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/consultations/:id/refund",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "consultations",
+                ":id",
+                "refund"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "consultation-uuid"
+                }
+              ]
+            },
+            "description": "Internal — used by admin-service. Full Stripe refund of every charge of the consultation (hold capture + overage), creates refund transactions, removes the expert's unpaid earning, sets billingStatus=refunded. Refused once the earning is part of a payout.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Expert did not show up\",\n  \"adminUserId\": \"admin-uuid\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           }
         }
       ]

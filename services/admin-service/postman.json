@@ -859,6 +859,10 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
               }
             ],
             "url": {
@@ -881,7 +885,16 @@
                 }
               ]
             },
-            "description": "Mark a payout request status as paid."
+            "description": "Record a FAILED payout as settled outside Stripe (e.g. manual bank transfer). Moves no money. Requires a note (min 5 chars); refused for any other status.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"note\": \"Paid by bank transfer, ref 12345\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           }
         },
         {
@@ -1017,6 +1030,153 @@
               ]
             },
             "description": "Broadcast a notification to users."
+          }
+        },
+        {
+          "name": "Retry Failed Payout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/payouts/:id/retry",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "payouts",
+                ":id",
+                "retry"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "payout-uuid-here"
+                }
+              ]
+            },
+            "description": "Re-send the Stripe transfer of a failed payout (payouts: edit). Returns { payout, transferred, error }."
+          }
+        },
+        {
+          "name": "Expert Payout Summary",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/payouts/experts/:expertProfileId/summary",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "payouts",
+                "experts",
+                ":expertProfileId",
+                "summary"
+              ],
+              "variable": [
+                {
+                  "key": "expertProfileId",
+                  "value": "expert-profile-uuid"
+                }
+              ]
+            },
+            "description": "Unpaid earnings + Stripe payout readiness for one expert (payouts: view). canPayNow tells the portal whether Pay out now can succeed."
+          }
+        },
+        {
+          "name": "Pay Expert Now",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/payouts/experts/:expertProfileId/pay",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "payouts",
+                "experts",
+                ":expertProfileId",
+                "pay"
+              ],
+              "variable": [
+                {
+                  "key": "expertProfileId",
+                  "value": "expert-profile-uuid"
+                }
+              ]
+            },
+            "description": "Transfer ALL of the expert's unpaid earnings now, outside the schedule (payouts: edit). 400 with the Stripe reason if the account or balance is not ready."
+          }
+        },
+        {
+          "name": "Refund Payment",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/payments/:id/refund",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "payments",
+                ":id",
+                "refund"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "transaction-uuid-here"
+                }
+              ]
+            },
+            "description": "Full refund of the consultation this charge belongs to (payments: edit). Refused once the expert's earning is part of a payout. Detail responses include refundable: boolean.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"Expert did not show up\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           }
         }
       ]
