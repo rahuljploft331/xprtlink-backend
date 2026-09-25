@@ -280,33 +280,6 @@ async function handleRoomClose(payload) {
     log.info(`[zego-callback] Consultation ${consultation.id} — no charge (wasConnected=${wasConnected}, duration=${durationSeconds}s)`);
   }
 
-  // Notify both participants that the call has ended — ONLY when the call
-  // actually connected (a real consultation happened). A call that was never
-  // connected (expert never picked up) is a "failed" attempt, not an ended
-  // consultation, so we do not push a "call ended" notification for it.
-  if (wasConnected) try {
-    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
-    const minutes = Math.floor(durationSeconds / 60);
-    const seconds = durationSeconds % 60;
-    const durationLabel = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-
-    // Collect both participant userIds
-    const userIds = [
-      consultation.customer?.user?.id,
-      consultation.expert?.userId,
-    ].filter(Boolean);
-
-    if (userIds.length > 0) {
-      await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
-        userIds,
-        type: "call_ended",
-        title: "Call Ended",
-        body: `Your consultation has ended. Duration: ${durationLabel}.`,
-        data: { consultationId: consultation.id },
-      });
-    }
-  } catch (err) {
-    // Non-fatal — consultation is already marked completed
-    log.error(`[zego-callback] Post-call notification failed: ${err.message}`);
-  }
+  // No "Consultation Ended" push here — the Payment Successful notification
+  // that follows the billing capture already signals the session is complete.
 }

@@ -949,20 +949,8 @@ export async function acceptConsultation(auth, consultationId) {
     });
   });
 
-  // Notify customer that the expert accepted their consultation (non-fatal)
-  try {
-    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
-    const expertName = `${updated.expert.firstName ?? ""} ${updated.expert.lastName ?? ""}`.trim() || "Your expert";
-    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
-      userIds: [updated.customer.user.id],
-      type: "consultation_accepted",
-      title: "Consultation Accepted",
-      body: `${expertName} accepted your consultation request`,
-      data: { consultationId: updated.id },
-    });
-  } catch (err) {
-    log.error(`[acceptConsultation] Notification dispatch failed: ${err.message}`);
-  }
+  // No push on accept — the customer is actively waiting and joins the call
+  // directly; a "Consultation Accepted" push was redundant notification noise.
 
   return toConsultationDetailDto(updated, consultationContext(updated));
 }
@@ -1056,33 +1044,8 @@ export async function endConsultation(auth, consultationId) {
     }
   }
 
-  // Notify both parties that the consultation ended via API (non-fatal) — ONLY
-  // when the call actually connected (a real consultation happened). A call that
-  // never connected ends as "failed", not "completed", so we do not push a
-  // "consultation ended" notification for it.
-  // Note: the ZegoCloud room_close webhook handles this for calls ended via Zego.
-  // This covers the manual end-via-API path only.
-  if (wasConnected) try {
-    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
-    const minutes = Math.floor(durationSeconds / 60);
-    const seconds = durationSeconds % 60;
-    const durationLabel = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
-    const userIds = [
-      updated.customer?.user?.id,
-      updated.expert?.userId,
-    ].filter(Boolean);
-    if (userIds.length > 0) {
-      await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
-        userIds,
-        type: "call_ended",
-        title: "Consultation Ended",
-        body: `Your consultation has ended. Duration: ${durationLabel}.`,
-        data: { consultationId: updated.id },
-      });
-    }
-  } catch (err) {
-    log.error(`[endConsultation] Notification dispatch failed: ${err.message}`);
-  }
+  // No "Consultation Ended" push — the Payment Successful notification that
+  // follows the billing capture already tells the customer the session is done.
 
   return toConsultationDetailDto(updated, consultationContext(updated));
 }

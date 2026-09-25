@@ -535,7 +535,6 @@ export async function captureConsultation(consultationId, durationSeconds) {
       commissionCents,
       expertShareCents,
       currency,
-      notifUrl,
     }).catch((err) => {
       log.error(`[captureConsultation] Invoice email dispatch failed: ${err.message}`);
     });
@@ -550,7 +549,7 @@ export async function captureConsultation(consultationId, durationSeconds) {
  * Emails a soft-copy invoice to both parties after a consultation is charged:
  *   - Customer → receipt showing the debit (amount charged).
  *   - Expert   → earnings statement showing the credit (net after commission).
- * Also dispatches an in-app/push "Invoice Available" notification to each.
+ * No push is sent — the Payment Successful notification already covers the charge.
  *
  * Every step is best-effort and independent — one failed email must not stop
  * the other, and none of this is on the billing capture response path.
@@ -561,14 +560,11 @@ async function sendConsultationInvoices({
   commissionCents,
   expertShareCents,
   currency,
-  notifUrl,
 }) {
   if (!consultation) return;
 
   const customerEmail = consultation.customer?.user?.email;
   const expertEmail = consultation.expert?.user?.email;
-  const customerUserId = consultation.customer?.user?.id;
-  const expertUserId = consultation.expert?.userId;
   const customerName = customerDisplayName(consultation.customer?.user, consultation.customer);
   const expertName = expertDisplayName(consultation.expert);
 
@@ -576,14 +572,10 @@ async function sendConsultationInvoices({
     {
       audience: "customer",
       email: customerEmail,
-      userId: customerUserId,
-      notifBody: getMessage("invoiceIssuedNotifBodyCustomer", { expertName }),
     },
     {
       audience: "expert",
       email: expertEmail,
-      userId: expertUserId,
-      notifBody: getMessage("invoiceIssuedNotifBodyExpert", { customerName }),
     },
   ];
 
@@ -610,20 +602,8 @@ async function sendConsultationInvoices({
         `[captureConsultation] Invoice emailed to ${recipient.audience} (${recipient.email}) for consultation ${consultation.id}`
       );
 
-      // In-app / push heads-up that the invoice was emailed — non-fatal.
-      if (recipient.userId) {
-        await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
-          userIds: [recipient.userId],
-          type: "invoice_issued",
-          title: getMessage("invoiceIssuedNotifTitle"),
-          body: recipient.notifBody,
-          data: { consultationId: consultation.id },
-        }).catch((err) => {
-          log.error(
-            `[captureConsultation] invoice_issued notification failed for ${recipient.audience}: ${err.message}`
-          );
-        });
-      }
+      // No "Invoice Available" push — the Payment Successful notification already
+      // covers the charge, and the receipt is delivered by email above.
     } catch (err) {
       log.error(
         `[captureConsultation] Failed to send invoice to ${recipient.audience} (${recipient.email}): ${err.message}`
