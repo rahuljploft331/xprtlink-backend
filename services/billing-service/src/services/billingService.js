@@ -86,16 +86,46 @@ export async function addPaymentMethod(auth, body) {
     });
   }
 
-  // Check if this stripe PM already exists for this customer (idempotency)
+  // Attempt to fetch real card metadata from Stripe (falls back to client-supplied values).
+  // Fetched up front so the fingerprint is available for card-level dedup below.
+  let brand = body.brand;
+  let last4 = body.last4;
+  let expMonth = body.expMonth;
+  let expYear = body.expYear;
+  let fingerprint = null;
+  try {
+    const pmDetails = await stripeSvc.retrievePaymentMethod({ stripePaymentMethodId: body.stripePaymentMethodId });
+    if (pmDetails?.card) {
+      brand = pmDetails.card.brand || brand;
+      last4 = pmDetails.card.last4 || last4;
+      expMonth = pmDetails.card.exp_month || expMonth;
+      expYear = pmDetails.card.exp_year || expYear;
+      fingerprint = pmDetails.card.fingerprint || null;
+    }
+  } catch (err) {
+    // Non-fatal — use client-supplied values (test mode pm_card_* may not be retrievable)
+    log.warn(`[billing] Stripe retrieve PM metadata failed (non-fatal): ${err.message}`);
+  }
+
+  // Dedup: match on the same Stripe token (idempotent retries) OR the same card
+  // fingerprint (same physical card re-tokenized into a different pm_... token).
   const existing = await db.paymentMethod.findFirst({
     where: {
       customerProfileId: auth.customerProfileId,
-      stripePaymentMethodId: body.stripePaymentMethodId,
+      OR: [
+        { stripePaymentMethodId: body.stripePaymentMethodId },
+        ...(fingerprint ? [{ fingerprint }] : []),
+      ],
     },
   });
 
   if (existing) {
-    // Already stored — update default flag if needed and return it
+    // If this is the exact same Stripe token, treat as idempotent and return it
+    // (optionally promoting it to default). A fingerprint-only match means the
+    // customer is trying to add a card they already saved — reject it.
+    if (existing.stripePaymentMethodId !== body.stripePaymentMethodId) {
+      throw conflict("paymentMethodDuplicateCard");
+    }
     if (body.setDefault && !existing.isDefault) {
       const updated = await db.paymentMethod.update({
         where: { id: existing.id },
@@ -108,28 +138,11 @@ export async function addPaymentMethod(auth, body) {
 
   const isFirst = (await db.paymentMethod.count({ where: { customerProfileId: auth.customerProfileId } })) === 0;
 
-  // Attempt to fetch real card metadata from Stripe (falls back to client-supplied values)
-  let brand = body.brand;
-  let last4 = body.last4;
-  let expMonth = body.expMonth;
-  let expYear = body.expYear;
-  try {
-    const pmDetails = await stripeSvc.retrievePaymentMethod({ stripePaymentMethodId: body.stripePaymentMethodId });
-    if (pmDetails?.card) {
-      brand = pmDetails.card.brand || brand;
-      last4 = pmDetails.card.last4 || last4;
-      expMonth = pmDetails.card.exp_month || expMonth;
-      expYear = pmDetails.card.exp_year || expYear;
-    }
-  } catch (err) {
-    // Non-fatal — use client-supplied values (test mode pm_card_* may not be retrievable)
-    log.warn(`[billing] Stripe retrieve PM metadata failed (non-fatal): ${err.message}`);
-  }
-
   const method = await db.paymentMethod.create({
     data: {
       customerProfileId: auth.customerProfileId,
       stripePaymentMethodId: body.stripePaymentMethodId,
+      fingerprint,
       brand,
       last4,
       expMonth,

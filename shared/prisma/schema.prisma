@@ -927,6 +927,7 @@ model PaymentMethod {
   id                    String   @id @default(uuid()) @db.Uuid
   customerProfileId     String   @map("customer_profile_id") @db.Uuid
   stripePaymentMethodId String   @unique @map("stripe_payment_method_id") @db.VarChar(128)
+  fingerprint           String?  @map("fingerprint") @db.VarChar(128)
   brand                 String   @db.VarChar(32)
   last4                 String   @db.Char(4)
   expMonth              Int      @map("exp_month")
@@ -936,6 +937,7 @@ model PaymentMethod {
 
   customer CustomerProfile @relation(fields: [customerProfileId], references: [id], onDelete: Cascade)
 
+  @@unique([customerProfileId, fingerprint])
   @@index([customerProfileId])
   @@map("payment_methods")
 }
