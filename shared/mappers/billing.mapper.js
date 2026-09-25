@@ -80,10 +80,44 @@ export function toEarningsEntryDto(entry, currency = "USD") {
     customerAvatarUrl,
     durationMinutes: consultation?.durationSeconds ? Math.round(consultation.durationSeconds / 60) : 0,
     status: consultation?.billingStatus === "charged" ? "PAID" : "PENDING",
+    // `status` is about the customer's charge. Payout status is whether the
+    // expert's share has actually been sent to their bank:
+    //   UNPAID (not in a payout yet) | PROCESSING | PAID_OUT | FAILED
+    payoutStatus: earningsPayoutStatus(entry),
+    payoutId: entry.payoutId ?? null,
     grossAmount: centsToAmount(entry.grossCents),
     commissionAmount: centsToAmount(entry.commissionCents),
     netAmount: centsToAmount(entry.netCents),
     currency,
     createdAt: toIso(entry.createdAt),
+  };
+}
+
+function earningsPayoutStatus(entry) {
+  if (!entry.payoutId) return "UNPAID";
+  switch (entry.payout?.status) {
+    case "paid":
+      return "PAID_OUT";
+    case "failed":
+      return "FAILED";
+    default:
+      return "PROCESSING";
+  }
+}
+
+/** Expert payout — an aggregated Stripe Connect transfer of settled earnings. */
+export function toExpertPayoutDto(payout) {
+  return {
+    id: payout.id,
+    expertProfileId: payout.expertProfileId,
+    amountCents: payout.amountCents,
+    amount: centsToAmount(payout.amountCents),
+    currency: payout.currency,
+    status: payout.status,
+    periodStart: toIso(payout.periodStart),
+    periodEnd: toIso(payout.periodEnd),
+    stripeTransferId: payout.stripeTransferId ?? null,
+    createdAt: toIso(payout.createdAt),
+    updatedAt: toIso(payout.updatedAt),
   };
 }

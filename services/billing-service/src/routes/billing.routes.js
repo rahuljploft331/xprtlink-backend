@@ -21,6 +21,21 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
 
 const router = Router();
 
+// Validate UUID route params. Param handlers only apply to routes defined on
+// the router that declares them, so this must live here, not in routes/index.js.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-7][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+for (const name of ["id", "expertProfileId"]) {
+  router.param(name, (req, _res, next, value) => {
+    if (!UUID_RE.test(value)) {
+      const err = new Error(`Invalid UUID for parameter "${name}": ${value}`);
+      err.statusCode = 400;
+      err.code = "INVALID_UUID";
+      return next(err);
+    }
+    next();
+  });
+}
+
 /**
  * Guard for internal service-to-service endpoints.
  * Validates that x-internal-service header matches SERVICE_SECRET env var.
@@ -102,6 +117,20 @@ router.get(
   })
 );
 
+/**
+ * POST /api/v1/billing/consultations/:id/release-hold
+ * Internal-only — called by engagement-service when a consultation ends without
+ * a billable call (declined / never connected / abandoned). Idempotent.
+ */
+router.post(
+  "/consultations/:id/release-hold",
+  internalServiceGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.releaseConsultationHold(req.params.id);
+    return ResponseFormatter.success(res, { message: getMessage("holdReleaseProcessed"), data });
+  })
+);
+
 // ── Internal cron endpoints ──────────────────────────────────────────────────
 // These are called by the PM2 cron runners (scripts/run-*.js) via internalPost
 // with the x-internal-service secret. They MUST be registered BEFORE
@@ -132,6 +161,20 @@ router.post(
   })
 );
 
+// Release card holds of consultations that ended without a billable call, and
+// expire abandoned requests. Idempotent.
+router.post(
+  "/consultations/release-holds",
+  internalServiceGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.releaseStaleHolds(req.body ?? {});
+    return ResponseFormatter.success(res, {
+      message: getMessage("holdReleaseSweepComplete", { count: data.released }),
+      data,
+    });
+  })
+);
+
 // Run the payout job: aggregate unpaid earnings into ExpertPayouts and initiate
 // Stripe Connect transfers. Idempotent per window.
 router.post(
@@ -157,6 +200,58 @@ router.post(
       message: getMessage("payoutRetryComplete", { count: data.recovered }),
       data,
     });
+  })
+);
+
+
+// ── Internal admin endpoints (called by admin-service, never by clients) ─────
+
+// Unpaid balance + Stripe payout readiness for one expert.
+router.get(
+  "/payouts/experts/:expertProfileId/summary",
+  internalServiceGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.getExpertPayoutSummary(req.params.expertProfileId);
+    return ResponseFormatter.success(res, { message: getMessage("payoutSummaryLoaded"), data });
+  })
+);
+
+// Admin "Pay out now": transfer all of an expert's unpaid earnings immediately.
+router.post(
+  "/payouts/experts/:expertProfileId/pay-now",
+  internalServiceGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.payExpertNow(req.params.expertProfileId, { adminUserId: req.body?.adminUserId });
+    return ResponseFormatter.success(res, {
+      message: getMessage(data.transferred ? "payoutSent" : "payoutTransferFailed"),
+      data,
+    });
+  })
+);
+
+// Admin "Retry transfer" for one failed payout.
+router.post(
+  "/payouts/:id/retry",
+  internalServiceGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.retryPayout(req.params.id, { adminUserId: req.body?.adminUserId });
+    return ResponseFormatter.success(res, {
+      message: getMessage(data.transferred ? "payoutSent" : "payoutTransferFailed"),
+      data,
+    });
+  })
+);
+
+// Admin refund of a charged consultation (full refund to the customer's card).
+router.post(
+  "/consultations/:id/refund",
+  internalServiceGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.refundConsultation(req.params.id, {
+      reason: req.body?.reason,
+      adminUserId: req.body?.adminUserId,
+    });
+    return ResponseFormatter.success(res, { message: getMessage("consultationRefunded"), data });
   })
 );
 
@@ -317,6 +412,17 @@ router.delete(
   })
 );
 
+
+// Payouts actually sent to the signed-in expert's bank (vs. /earnings, which
+// lists per-consultation earnings whether or not they have been paid out).
+router.get(
+  "/payouts",
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const data = await svc.listMyPayouts(req.auth, req.query);
+    return ResponseFormatter.paginated(res, { message: getMessage("payoutsLoaded"), ...data });
+  })
+);
 
 router.get(
   "/earnings",

@@ -66,10 +66,13 @@ export async function createPreAuthHold({
   consultationId,
 }) {
   const sdk = requireStripe();
-  // Idempotency: a retried hold for the same consultation reuses this key, so a
-  // dropped response / client retry can never place a second authorization hold
-  // on the customer's card. Keyed on the consultation (one hold per session).
-  const options = consultationId ? { idempotencyKey: `hold_${consultationId}` } : {};
+  // Idempotency: a retried hold for the same consultation + card + amount reuses
+  // this key, so a dropped response / client retry can never place a second hold.
+  // The card and amount are part of the key so a declined card can be retried
+  // with a different one (Stripe caches the decline against the key for 24h).
+  const options = consultationId
+    ? { idempotencyKey: `hold_${consultationId}_${stripePaymentMethodId}_${amountCents}` }
+    : {};
   return await sdk.paymentIntents.create(
     {
       amount: amountCents,
@@ -90,9 +93,13 @@ export async function createPreAuthHold({
  */
 export async function capturePaymentIntent({ paymentIntentId, amountToCaptureCents }) {
   const sdk = requireStripe();
-  // Idempotency: keyed on the PaymentIntent id, so a retried capture collapses to
-  // a single capture rather than erroring or double-processing.
-  const options = paymentIntentId ? { idempotencyKey: `capture_${paymentIntentId}` } : {};
+  // Idempotency: keyed on the PaymentIntent id + amount, so a retried capture
+  // collapses to a single capture rather than erroring or double-processing.
+  // (A second capture with another amount is rejected by Stripe anyway — a PI
+  // can only be captured once.)
+  const options = paymentIntentId
+    ? { idempotencyKey: `capture_${paymentIntentId}_${amountToCaptureCents ?? "full"}` }
+    : {};
   return await sdk.paymentIntents.capture(
     paymentIntentId,
     {
@@ -112,11 +119,13 @@ export async function createAndConfirmPaymentIntent({
   currency = "usd",
   metadata = {},
   consultationId,
+  idempotencyKey,
 }) {
   const sdk = requireStripe();
   // Idempotency: a retried direct charge for the same consultation reuses this key,
   // so a dropped response / client retry can never charge the customer twice.
-  const options = consultationId ? { idempotencyKey: `charge_${consultationId}` } : {};
+  const key = idempotencyKey ?? (consultationId ? `charge_${consultationId}` : null);
+  const options = key ? { idempotencyKey: key } : {};
   return await sdk.paymentIntents.create(
     {
       amount: amountCents,
@@ -129,6 +138,70 @@ export async function createAndConfirmPaymentIntent({
     },
     options
   );
+}
+
+/**
+ * Retrieves a PaymentIntent (status, amount_capturable, amount_received, ...).
+ */
+export async function retrievePaymentIntent(paymentIntentId) {
+  const sdk = requireStripe();
+  return await sdk.paymentIntents.retrieve(paymentIntentId);
+}
+
+/**
+ * Cancels an uncaptured PaymentIntent, releasing the authorization hold on the
+ * customer's card. Safe to call repeatedly: a PI that is already canceled (or was
+ * captured) is returned as-is instead of throwing.
+ */
+export async function cancelPaymentIntent(paymentIntentId, { reason = "abandoned" } = {}) {
+  const sdk = requireStripe();
+  const pi = await sdk.paymentIntents.retrieve(paymentIntentId);
+  if (pi.status === "canceled" || pi.status === "succeeded") return pi;
+  return await sdk.paymentIntents.cancel(
+    paymentIntentId,
+    { cancellation_reason: reason },
+    { idempotencyKey: `cancel_${paymentIntentId}` }
+  );
+}
+
+/**
+ * Refunds a captured PaymentIntent in full. Idempotent per PaymentIntent.
+ */
+export async function refundPaymentIntent({ paymentIntentId, metadata = {} }) {
+  const sdk = requireStripe();
+  return await sdk.refunds.create(
+    { payment_intent: paymentIntentId, reason: "requested_by_customer", metadata },
+    { idempotencyKey: `refund_${paymentIntentId}` }
+  );
+}
+
+/**
+ * Platform balance available for transfers right now, in cents, per currency.
+ * Card funds sit in `pending` until they settle (~2 days) and cannot be
+ * transferred to Connect accounts before then.
+ */
+export async function getAvailableBalanceCents(currency = "usd") {
+  const sdk = requireStripe();
+  const balance = await sdk.balance.retrieve();
+  const cur = currency.toLowerCase();
+  const sum = (list) =>
+    (list ?? []).filter((b) => b.currency === cur).reduce((acc, b) => acc + b.amount, 0);
+  return { availableCents: sum(balance.available), pendingCents: sum(balance.pending) };
+}
+
+/**
+ * Whether a Connect account can receive transfers, and what Stripe still needs.
+ */
+export async function getConnectAccountStatus(stripeAccountId) {
+  const sdk = requireStripe();
+  const account = await sdk.accounts.retrieve(stripeAccountId);
+  return {
+    transfersActive: account.capabilities?.transfers === "active",
+    transfersCapability: account.capabilities?.transfers ?? null,
+    payoutsEnabled: Boolean(account.payouts_enabled),
+    requirementsDue: account.requirements?.currently_due ?? [],
+    disabledReason: account.requirements?.disabled_reason ?? null,
+  };
 }
 
 /**

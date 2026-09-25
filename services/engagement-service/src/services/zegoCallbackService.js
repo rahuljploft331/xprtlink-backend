@@ -278,6 +278,14 @@ async function handleRoomClose(payload) {
     }
   } else {
     log.info(`[zego-callback] Consultation ${consultation.id} — no charge (wasConnected=${wasConnected}, duration=${durationSeconds}s)`);
+    // Nothing to capture — release the customer's pre-auth hold. Non-fatal:
+    // billing's release sweep retries anything this misses.
+    try {
+      const billingUrl = process.env.BILLING_SERVICE_URL ?? "http://localhost:4006";
+      await internalPost(billingUrl, `/api/v1/billing/consultations/${consultation.id}/release-hold`, {});
+    } catch (err) {
+      log.error(`[zego-callback] Hold release call failed: ${err.message}`);
+    }
   }
 
   // No "Consultation Ended" push here — the Payment Successful notification

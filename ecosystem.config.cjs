@@ -62,6 +62,12 @@ const cronJobs = [
     cron: process.env.RETRY_CAPTURES_CRON || "*/10 * * * *", // every 10 min
   },
   {
+    name: "billing-release-holds",
+    service: "billing-service",
+    script: "scripts/run-release-holds.js",
+    cron: process.env.RELEASE_HOLDS_CRON || "5-59/10 * * * *", // every 10 min, offset from retry-captures
+  },
+  {
     name: "billing-payout-run",
     service: "billing-service",
     script: "scripts/run-payouts.js",

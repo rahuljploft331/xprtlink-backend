@@ -201,6 +201,27 @@ async function recordQuoteTransition(tx, { quoteId, fromStatus, toStatus, actorU
 
 // ─── Quotes ──────────────────────────────────────────────────────────────────
 
+/**
+ * Ask billing to cancel the pre-auth hold of a consultation that ended without
+ * a billable call. Fire-and-forget: billing's release sweep retries anything
+ * this misses, so a failure here only delays the release.
+ */
+function releaseConsultationHold(consultationId) {
+  const billingUrl = process.env.BILLING_SERVICE_URL ?? "http://localhost:4006";
+  internalPost(billingUrl, `/api/v1/billing/consultations/${consultationId}/release-hold`, {}).catch((err) =>
+    log.error(`[releaseConsultationHold] ${consultationId}: ${err.message}`)
+  );
+}
+
+/** Admin "Maintenance Mode" (platform setting) pauses new consultation bookings. */
+async function assertNotInMaintenance(db) {
+  const row = await db.platformSetting.findUnique({ where: { key: "maintenanceMode" } });
+  if (row?.value === true || row?.value === "true") {
+    // 4xx on purpose: the error handler replaces every 5xx message with a generic one.
+    throw forbidden("maintenanceModeBookingsPaused", "MAINTENANCE_MODE");
+  }
+}
+
 export async function createQuote(auth, body) {
   assertCustomer(auth);
   const db = getDb();
@@ -780,6 +801,7 @@ async function loadPaymentMethodForConsultation(consultation, charge) {
 export async function createConsultation(auth, body) {
   assertCustomer(auth);
   const db = getDb();
+  await assertNotInMaintenance(db);
   const expert = await db.expertProfile.findUnique({ where: { id: body.expertId } });
   if (!expert) throw notFound("expertNotFound");
 
@@ -824,6 +846,7 @@ export async function createConsultation(auth, body) {
         where: { id: active.id },
         data: { status: "failed" },
       });
+      releaseConsultationHold(active.id);
     } else {
       throw conflict("activeConsultationExists", "ACTIVE_CONSULTATION_EXISTS");
     }
@@ -956,7 +979,8 @@ export async function acceptConsultation(auth, consultationId) {
   assertConsultationParticipant(auth, consultation);
 
   // Enforce payment hold: Expert cannot accept if customer hasn't secured funds
-  if (!consultation.stripePaymentIntentId) {
+  // (a released hold no longer secures anything)
+  if (!consultation.stripePaymentIntentId || consultation.holdReleasedAt) {
     throw badRequest(
       "A payment hold has not been secured for this consultation.",
       "PAYMENT_HOLD_REQUIRED"
@@ -1008,6 +1032,8 @@ export async function declineConsultation(auth, consultationId) {
       include: CONSULTATION_INCLUDE,
     });
   });
+
+  releaseConsultationHold(consultationId);
 
   // Notify customer that the expert declined their consultation (non-fatal)
   try {
@@ -1076,6 +1102,8 @@ export async function endConsultation(auth, consultationId) {
       // Non-fatal — consultation is already marked completed; billing can be retried
       log.error(`[endConsultation] Billing capture failed: ${err.message}`);
     }
+  } else {
+    releaseConsultationHold(consultationId);
   }
 
   // No "Consultation Ended" push — the Payment Successful notification that

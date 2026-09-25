@@ -7,6 +7,26 @@
  * can distinguish internal calls from public traffic.
  */
 
+/**
+ * Build an Error for a non-2xx internal response that keeps the downstream
+ * status, code and message, so a caller can surface the real reason (e.g. an
+ * admin action proxied to billing) instead of a bare "failed: 400".
+ */
+async function internalError(method, url, res) {
+  let body = null;
+  try {
+    body = await res.json();
+  } catch {
+    // Non-JSON error body — fall back to the status line.
+  }
+  const reason = body?.message ?? body?.error?.message ?? res.statusText;
+  const err = new Error(`[internalFetch] ${method} ${url} failed: ${res.status} ${reason}`);
+  err.statusCode = res.status;
+  err.code = body?.code ?? body?.error?.code ?? "INTERNAL_REQUEST_FAILED";
+  err.downstreamMessage = reason;
+  return err;
+}
+
 function getInternalHeaders() {
   const secret = process.env.SERVICE_SECRET;
   if (!secret) {
@@ -27,11 +47,7 @@ function getInternalHeaders() {
 export async function internalGet(serviceUrl, path) {
   const url = `${serviceUrl}${path}`;
   const res = await fetch(url, { headers: getInternalHeaders() });
-  if (!res.ok) {
-    throw new Error(
-      `[internalFetch] GET ${url} failed: ${res.status} ${res.statusText}`
-    );
-  }
+  if (!res.ok) throw await internalError("GET", url, res);
   const json = await res.json();
   // Unwrap the standard { success, data } envelope if present
   return json?.data ?? json;
@@ -52,11 +68,7 @@ export async function internalPost(serviceUrl, path, body = {}) {
     headers: { ...getInternalHeaders(), "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) {
-    throw new Error(
-      `[internalFetch] POST ${url} failed: ${res.status} ${res.statusText}`
-    );
-  }
+  if (!res.ok) throw await internalError("POST", url, res);
   const json = await res.json();
   return json?.data ?? json;
 }

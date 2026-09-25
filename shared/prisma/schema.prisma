@@ -743,6 +743,9 @@ model Consultation {
   joinedParticipantIds  String[]                  @default([]) @map("joined_participant_ids")
   stripePaymentIntentId String?                   @unique @map("stripe_payment_intent_id") @db.VarChar(128)
   billingStatus         ConsultationBillingStatus @default(pending) @map("billing_status")
+  // Set once the pre-auth hold is cancelled on Stripe (declined / never
+  // connected / abandoned) so the release sweep never re-processes the row.
+  holdReleasedAt        DateTime?                 @map("hold_released_at") @db.Timestamptz(6)
   createdAt             DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
