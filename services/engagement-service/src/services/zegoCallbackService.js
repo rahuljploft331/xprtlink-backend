@@ -239,22 +239,25 @@ async function handleRoomClose(payload) {
   const rawDurationSeconds = Math.max(0, Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000));
   const durationSeconds = Math.ceil(rawDurationSeconds / 60) * 60;
 
-  // If the call was never actually connected (no startedAt), duration is 0 → no charge
+  // If the call was never actually connected (no startedAt), the expert never
+  // picked up / both parties never joined the room → it is NOT a completed
+  // consultation. Mark it "failed" so it is never reported as "Completed".
   const wasConnected = Boolean(consultation.startedAt);
+  const finalStatus = wasConnected ? "completed" : "failed";
 
   await db.consultation.update({
     where: { id: consultation.id },
     data: {
-      status: "completed",
+      status: finalStatus,
       endedAt,
-      durationSeconds,
-      ...(consultation.startedAt ? {} : { startedAt }),
+      // Only record a real duration for connected calls; unconnected calls stay at 0.
+      durationSeconds: wasConnected ? durationSeconds : 0,
     },
   });
 
   console.log(
-    `[zego-callback] Consultation ${consultation.id} → completed ` +
-    `(duration=${durationSeconds}s, connected=${wasConnected})`
+    `[zego-callback] Consultation ${consultation.id} → ${finalStatus} ` +
+    `(duration=${wasConnected ? durationSeconds : 0}s, connected=${wasConnected})`
   );
 
   // Trigger real Stripe capture via billing-service (internal call, no JWT needed)

@@ -998,7 +998,11 @@ export async function endConsultation(auth, consultationId) {
   const startedAt = consultation.startedAt ?? consultation.acceptedAt ?? consultation.requestedAt;
   const rawDurationSeconds = Math.max(0, Math.floor((now.getTime() - startedAt.getTime()) / 1000));
   const durationSeconds = Math.ceil(rawDurationSeconds / 60) * 60;
+  // A call that never actually connected (no startedAt → expert never joined the
+  // room) is not a completed consultation. End it as "failed" instead so it is
+  // never reported as "Completed" anywhere (admin portal, history, etc.).
   const wasConnected = Boolean(consultation.startedAt);
+  const finalStatus = wasConnected ? "completed" : "failed";
 
   const db = getDb();
   const updated = await db.$transaction(async (tx) => {
@@ -1008,10 +1012,9 @@ export async function endConsultation(auth, consultationId) {
         status: { in: [...ACTIVE_CONSULTATION_STATUSES] },
       },
       data: {
-        status: "completed",
+        status: finalStatus,
         endedAt: now,
-        durationSeconds,
-        ...(consultation.startedAt ? {} : { startedAt }),
+        durationSeconds: wasConnected ? durationSeconds : 0,
       },
     });
     if (result.count === 0) {
