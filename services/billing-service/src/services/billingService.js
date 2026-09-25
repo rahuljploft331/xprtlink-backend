@@ -51,18 +51,35 @@ export async function addPaymentMethod(auth, body) {
   // 2. Create Stripe Customer if not already created
   let stripeCustomerId = customerProfile.stripeCustomerId;
   if (!stripeCustomerId) {
+    let newStripeCustomerId;
     try {
       const stripeCustomer = await stripeSvc.getOrCreateStripeCustomer({
         email: customerProfile.user.email,
         name: `${customerProfile.firstName} ${customerProfile.lastName}`,
       });
-      stripeCustomerId = stripeCustomer.id;
-      await db.customerProfile.update({
-        where: { id: auth.customerProfileId },
-        data: { stripeCustomerId },
-      });
+      newStripeCustomerId = stripeCustomer.id;
     } catch (err) {
       throw { statusCode: 502, code: "STRIPE_CUSTOMER_CREATION_FAILED", message: err.message };
+    }
+
+    try {
+      await db.customerProfile.update({
+        where: { id: auth.customerProfileId },
+        data: { stripeCustomerId: newStripeCustomerId },
+      });
+      stripeCustomerId = newStripeCustomerId;
+    } catch (dbErr) {
+      // Concurrent request already wrote a stripeCustomerId — read it back instead of crashing.
+      if (dbErr.code === "P2002") {
+        const refreshed = await db.customerProfile.findUnique({
+          where: { id: auth.customerProfileId },
+          select: { stripeCustomerId: true },
+        });
+        stripeCustomerId = refreshed.stripeCustomerId;
+        log.warn(`[billing] Concurrent Stripe customer creation race resolved — using existing ${stripeCustomerId}`);
+      } else {
+        throw { statusCode: 502, code: "STRIPE_CUSTOMER_CREATION_FAILED", message: dbErr.message };
+      }
     }
   }
 
