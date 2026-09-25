@@ -300,7 +300,7 @@
                 "kyc"
               ]
             },
-            "description": "Create Stripe Custom Connect account natively with Expert KYC details."
+            "description": "LEGACY — older app builds and legacy Custom accounts only. Accounts from hosted onboarding get 409 UPDATE_APP_FOR_PAYOUT_SETUP. Create Stripe Custom Connect account natively with Expert KYC details."
           }
         },
         {
@@ -335,7 +335,156 @@
                 "bank-account"
               ]
             },
-            "description": "Link bank account to Expert Custom Connect account for payouts."
+            "description": "LEGACY — older app builds and legacy Custom accounts only. Accounts from hosted onboarding get 409 UPDATE_APP_FOR_PAYOUT_SETUP. Link bank account to Expert Custom Connect account for payouts."
+          }
+        },
+        {
+          "name": "Get Payout Onboarding Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/experts/connect/onboarding-link",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "experts",
+                "connect",
+                "onboarding-link"
+              ]
+            },
+            "description": "Expert. Returns { url, expiresAt } — a single-use link (expires in minutes) to Stripe-hosted payout onboarding. Creates the expert's Stripe account (Accounts v2 recipient, Express dashboard) on first use; never a second one. Open in an in-app browser (not a WebView). Request a new link on every tap.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Get Payout Onboarding Status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/experts/connect/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "experts",
+                "connect",
+                "status"
+              ]
+            },
+            "description": "Expert. Live Stripe status: { hasAccount, onboardingStatus: not_started|action_required|under_review|active, payoutsActive, requirementsDue[], bankLast4, bankName, canOpenDashboard }. Call when the app returns from the onboarding browser."
+          }
+        },
+        {
+          "name": "Get Payout Dashboard Link",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/experts/connect/dashboard-link",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "experts",
+                "connect",
+                "dashboard-link"
+              ]
+            },
+            "description": "Expert. Single-use login URL to the expert's Stripe Express Dashboard (payout history, bank details). Only once payouts are active; 400 DASHBOARD_UNAVAILABLE otherwise.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Onboarding Return Page (public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/connect/return",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "connect",
+                "return"
+              ]
+            },
+            "description": "Static HTML page Stripe redirects the browser to after onboarding. No auth."
+          }
+        },
+        {
+          "name": "Onboarding Refresh Page (public)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/connect/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "connect",
+                "refresh"
+              ]
+            },
+            "description": "Static HTML page Stripe redirects to when a link expired. No auth — the app requests a new link."
           }
         }
       ]

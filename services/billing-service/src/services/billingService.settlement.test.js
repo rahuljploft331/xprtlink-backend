@@ -19,10 +19,23 @@ vi.mock("./stripeService.js", () => ({
   getAvailableBalanceCents: vi.fn(),
   transferEarningsToExpertPayout: vi.fn(),
   findTransferForPayout: vi.fn(() => Promise.resolve(null)),
+  createRecipientAccount: vi.fn(),
+  createOnboardingLink: vi.fn(),
+  createDashboardLoginLink: vi.fn(),
 }));
 
 const stripe = await import("./stripeService.js");
-const { captureConsultation, releaseConsultationHold, runPayouts, isPayoutDue, payExpertNow, retryPayout } = await import(
+const {
+  captureConsultation,
+  releaseConsultationHold,
+  runPayouts,
+  isPayoutDue,
+  payExpertNow,
+  retryPayout,
+  getConnectOnboardingLink,
+  getConnectStatus,
+  submitCustomConnectKyc,
+} = await import(
   "./billingService.js"
 );
 
@@ -36,7 +49,7 @@ function resetDb() {
     transaction: { create: vi.fn(({ data }) => ({ id: `txn_${data.stripePaymentIntentId}`, ...data })) },
     consultationCharge: { create: vi.fn() },
     expertEarningsLedger: { create: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
-    expertProfile: { findUnique: vi.fn() },
+    expertProfile: { findUnique: vi.fn(), updateMany: vi.fn() },
     expertPayout: {
       findFirst: vi.fn(() => null),
       create: vi.fn(({ data }) => ({ id: "payout_1", ...data })),
@@ -344,5 +357,90 @@ describe("retryPayout — reconciliation", () => {
       data: { status: "paid", stripeTransferId: "tr_existing" },
     });
     expect(result.transferred).toBe(true);
+  });
+});
+
+// ── Stripe-hosted payout onboarding ─────────────────────────────────────────
+
+describe("getConnectOnboardingLink", () => {
+  const auth = { expertProfileId: "exp1" };
+  const base = { returnBaseUrl: "https://api.example.com/" };
+
+  it("creates one v2 recipient account on first use and links to it", async () => {
+    db.expertProfile.findUnique
+      .mockResolvedValueOnce({ id: "exp1", firstName: "Ana", lastName: "Lee", stripeAccountId: null, user: { email: "ana@x.com" } })
+      .mockResolvedValueOnce({ stripeAccountId: "acct_new" });
+    stripe.createRecipientAccount.mockResolvedValue({ id: "acct_new" });
+    stripe.createOnboardingLink.mockResolvedValue({ url: "https://connect.stripe.com/x", expiresAt: "t" });
+
+    const link = await getConnectOnboardingLink(auth, base);
+
+    expect(stripe.createRecipientAccount).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "ana@x.com", expertProfileId: "exp1" })
+    );
+    // Guarded write: a concurrent tap can't overwrite a stored account id.
+    expect(db.expertProfile.updateMany).toHaveBeenCalledWith({
+      where: { id: "exp1", stripeAccountId: null },
+      data: { stripeAccountId: "acct_new", stripeTransfersActive: false },
+    });
+    expect(stripe.createOnboardingLink).toHaveBeenCalledWith({
+      stripeAccountId: "acct_new",
+      legacyCustom: false,
+      returnUrl: "https://api.example.com/api/v1/billing/connect/return",
+      refreshUrl: "https://api.example.com/api/v1/billing/connect/refresh",
+    });
+    expect(link.url).toBe("https://connect.stripe.com/x");
+  });
+
+  it("never creates a second account; legacy Custom accounts get the v1 hosted form", async () => {
+    db.expertProfile.findUnique.mockResolvedValueOnce({ id: "exp1", stripeAccountId: "acct_old", user: {} });
+    stripe.getConnectAccountStatus.mockResolvedValue({ legacyCustom: true, transfersActive: false, requirementsDue: [] });
+    stripe.createOnboardingLink.mockResolvedValue({ url: "u", expiresAt: "t" });
+
+    await getConnectOnboardingLink(auth, base);
+
+    expect(stripe.createRecipientAccount).not.toHaveBeenCalled();
+    expect(stripe.createOnboardingLink).toHaveBeenCalledWith(
+      expect.objectContaining({ stripeAccountId: "acct_old", legacyCustom: true })
+    );
+  });
+});
+
+describe("getConnectStatus", () => {
+  const auth = { expertProfileId: "exp1" };
+
+  it("reports not_started when the expert has no Stripe account", async () => {
+    db.expertProfile.findUnique.mockResolvedValue({ id: "exp1", stripeAccountId: null });
+    const status = await getConnectStatus(auth);
+    expect(status).toMatchObject({ hasAccount: false, onboardingStatus: "not_started", payoutsActive: false });
+  });
+
+  it.each([
+    [{ transfersActive: true, requirementsDue: [] }, "active"],
+    [{ transfersActive: false, requirementsDue: ["external_account"] }, "action_required"],
+    [{ transfersActive: false, requirementsDue: [] }, "under_review"],
+  ])("maps Stripe state %j to %s and caches readiness", async (stripeState, expected) => {
+    db.expertProfile.findUnique.mockResolvedValue({ id: "exp1", stripeAccountId: "acct_1" });
+    stripe.getConnectAccountStatus.mockResolvedValue({ legacyCustom: false, bankLast4: "6789", ...stripeState });
+
+    const status = await getConnectStatus(auth);
+
+    expect(status.onboardingStatus).toBe(expected);
+    expect(db.expertProfile.updateMany).toHaveBeenCalledWith({
+      where: { stripeAccountId: "acct_1" },
+      data: { stripeTransfersActive: stripeState.transfersActive, stripeStatusCheckedAt: expect.any(Date) },
+    });
+  });
+});
+
+describe("legacy in-app KYC form", () => {
+  it("tells an old app build to update when the account came from hosted onboarding", async () => {
+    db.expertProfile.findUnique.mockResolvedValue({ id: "exp1", stripeAccountId: "acct_v2", user: { email: "a@x.com" } });
+    stripe.getConnectAccountStatus.mockResolvedValue({ legacyCustom: false });
+
+    await expect(submitCustomConnectKyc({ expertProfileId: "exp1" }, {})).rejects.toMatchObject({
+      statusCode: 409,
+      code: "UPDATE_APP_FOR_PAYOUT_SETUP",
+    });
   });
 });

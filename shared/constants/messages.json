@@ -335,5 +335,10 @@
   "consultationNotCharged": "This consultation has no successful charge to refund",
   "refundBlockedEarningsPaidOut": "The expert's earnings for this consultation are already part of a payout, so it cannot be refunded automatically",
   "transactionNotLinkedToConsultation": "This transaction is not linked to a consultation",
-  "invalidId": "Invalid id"
+  "invalidId": "Invalid id",
+  "connectOnboardingLinkCreated": "Payout setup link created",
+  "connectStatusLoaded": "Payout setup status loaded",
+  "connectDashboardLinkCreated": "Payout dashboard link created",
+  "connectDashboardUnavailable": "The payout dashboard is available once payout setup is complete",
+  "connectUseHostedOnboarding": "Please update the XprtLink app to finish payout setup"
 }

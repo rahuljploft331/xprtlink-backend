@@ -950,6 +950,147 @@ async function sendConsultationInvoices({
   }
 }
 
+// ── Expert payout onboarding (Stripe-hosted) ────────────────────────────────
+
+/**
+ * Cache the expert's payout readiness so profile reads (`payoutsActive`) need
+ * no Stripe call. Keyed on the Stripe account id — callers such as the payout
+ * readiness check only have that.
+ */
+async function cachePayoutReadiness(stripeAccountId, transfersActive) {
+  await getDb().expertProfile.updateMany({
+    where: { stripeAccountId },
+    data: { stripeTransfersActive: Boolean(transfersActive), stripeStatusCheckedAt: new Date() },
+  });
+}
+
+/**
+ * One-time URL to Stripe's hosted onboarding form. Creates the expert's
+ * connected account (Accounts v2 recipient) on first use; an expert who already
+ * has an account — including a legacy Custom one — is sent to finish that same
+ * account, never given a second one. Links expire within minutes, so the app
+ * requests a fresh one on every tap.
+ *
+ * @param {string} returnBaseUrl public origin serving /api/v1/billing/connect/*
+ */
+export async function getConnectOnboardingLink(auth, { returnBaseUrl }) {
+  const db = getDb();
+  const expert = await db.expertProfile.findUnique({
+    where: { id: auth.expertProfileId },
+    include: { user: { select: { email: true } } },
+  });
+  if (!expert) throw notFound("expertProfileNotFound");
+
+  let stripeAccountId = expert.stripeAccountId;
+  let legacyCustom = false;
+
+  if (!stripeAccountId) {
+    // Idempotency-keyed on the expert, so a double tap returns the same account.
+    const account = await stripeSvc.createRecipientAccount({
+      email: expert.user?.email,
+      displayName: expertDisplayName(expert),
+      expertProfileId: expert.id,
+    });
+    await db.expertProfile.updateMany({
+      where: { id: expert.id, stripeAccountId: null },
+      data: { stripeAccountId: account.id, stripeTransfersActive: false },
+    });
+    const saved = await db.expertProfile.findUnique({
+      where: { id: expert.id },
+      select: { stripeAccountId: true },
+    });
+    stripeAccountId = saved.stripeAccountId;
+    log.info(`[connect] created recipient account ${stripeAccountId} for expert ${expert.id}`);
+  } else {
+    ({ legacyCustom } = await stripeSvc.getConnectAccountStatus(stripeAccountId));
+  }
+
+  const base = returnBaseUrl.replace(/\/+$/, "");
+  return stripeSvc.createOnboardingLink({
+    stripeAccountId,
+    legacyCustom,
+    returnUrl: `${base}/api/v1/billing/connect/return`,
+    refreshUrl: `${base}/api/v1/billing/connect/refresh`,
+  });
+}
+
+/**
+ * Where the expert stands with Stripe, read live (the app calls this when it
+ * returns from the onboarding browser). Also refreshes the cached flag.
+ *
+ * onboardingStatus:
+ *   not_started      — no Stripe account yet
+ *   action_required  — Stripe needs more information (send them to onboarding)
+ *   under_review     — nothing to provide; Stripe is verifying
+ *   active           — can receive payouts
+ */
+export async function getConnectStatus(auth) {
+  const db = getDb();
+  const expert = await db.expertProfile.findUnique({
+    where: { id: auth.expertProfileId },
+    select: { id: true, stripeAccountId: true },
+  });
+  if (!expert) throw notFound("expertProfileNotFound");
+
+  if (!expert.stripeAccountId) {
+    return {
+      hasAccount: false,
+      onboardingStatus: "not_started",
+      payoutsActive: false,
+      requirementsDue: [],
+      bankLast4: null,
+      bankName: null,
+      canOpenDashboard: false,
+    };
+  }
+
+  const status = await stripeSvc.getConnectAccountStatus(expert.stripeAccountId);
+  await cachePayoutReadiness(expert.stripeAccountId, status.transfersActive);
+
+  const onboardingStatus = status.transfersActive
+    ? "active"
+    : status.requirementsDue.length > 0
+      ? "action_required"
+      : "under_review";
+
+  return {
+    hasAccount: true,
+    onboardingStatus,
+    payoutsActive: status.transfersActive,
+    requirementsDue: status.requirementsDue,
+    bankLast4: status.bankLast4,
+    bankName: status.bankName,
+    // The Express Dashboard exists only for Stripe-collected accounts.
+    canOpenDashboard: !status.legacyCustom && status.transfersActive,
+  };
+}
+
+/** One-time login URL to the expert's Stripe Express Dashboard. */
+export async function getConnectDashboardLink(auth) {
+  const db = getDb();
+  const expert = await db.expertProfile.findUnique({
+    where: { id: auth.expertProfileId },
+    select: { stripeAccountId: true },
+  });
+  if (!expert?.stripeAccountId) throw badRequest("expertPayoutAccountMissing", "NO_CONNECT_ACCOUNT");
+  const status = await stripeSvc.getConnectAccountStatus(expert.stripeAccountId);
+  if (status.legacyCustom || !status.transfersActive) {
+    throw badRequest("connectDashboardUnavailable", "DASHBOARD_UNAVAILABLE");
+  }
+  return stripeSvc.createDashboardLoginLink(expert.stripeAccountId);
+}
+
+/**
+ * The legacy in-app KYC / bank forms only work for legacy Custom accounts,
+ * where the platform collects requirements. Accounts created by hosted
+ * onboarding are Stripe-collected, so tell an old app build to update.
+ */
+async function assertLegacyFormsAllowed(stripeAccountId) {
+  if (!stripeAccountId) return;
+  const { legacyCustom } = await stripeSvc.getConnectAccountStatus(stripeAccountId);
+  if (!legacyCustom) throw conflict("connectUseHostedOnboarding", "UPDATE_APP_FOR_PAYOUT_SETUP");
+}
+
 export async function submitCustomConnectKyc(auth, body) {
   const db = getDb();
   const expert = await db.expertProfile.findUnique({
@@ -958,6 +1099,7 @@ export async function submitCustomConnectKyc(auth, body) {
   });
 
   if (!expert) throw notFound("expertProfileNotFound");
+  await assertLegacyFormsAllowed(expert.stripeAccountId);
 
   const userPhone = expert.user.phone?.startsWith("+") ? expert.user.phone : undefined;
   const details = {
@@ -1009,6 +1151,7 @@ export async function attachBankAccount(auth, body) {
   if (!expert.stripeAccountId) {
     throw badRequest("kycRequiredBeforeBankAccount", "KYC_REQUIRED");
   }
+  await assertLegacyFormsAllowed(expert.stripeAccountId);
 
   const externalAccount = await stripeSvc.attachExternalBankAccount({
     stripeAccountId: expert.stripeAccountId,
@@ -1087,6 +1230,7 @@ export async function handleStripeWebhook(payload, signature) {
       // Expert Connect status. Payout readiness is checked live against Stripe
       // before every transfer; this log gives ops the history.
       const account = event.data.object;
+      await cachePayoutReadiness(account.id, account.capabilities?.transfers === "active");
       log.info(
         `[billing-webhook] account.updated ${account.id} transfers=${account.capabilities?.transfers ?? "-"} payouts_enabled=${account.payouts_enabled} due=${JSON.stringify(account.requirements?.currently_due ?? [])}`
       );
@@ -1625,6 +1769,7 @@ async function checkTransferReadiness(stripeAccountId) {
   if (!stripeAccountId) return { ready: false, reason: "no_connect_account", account: null };
   try {
     const account = await stripeSvc.getConnectAccountStatus(stripeAccountId);
+    await cachePayoutReadiness(stripeAccountId, account.transfersActive);
     if (!account.transfersActive) return { ready: false, reason: "transfers_inactive", account };
     return { ready: true, reason: null, account };
   } catch (err) {

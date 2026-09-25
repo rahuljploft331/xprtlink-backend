@@ -83,6 +83,38 @@ router.post(
   })
 );
 
+// Stripe-hosted onboarding sends the expert's browser back here. These pages
+// are static on purpose: the browser is not signed in to XprtLink, so it can't
+// mint a new link — the app re-reads status (or asks for a fresh link) itself.
+function connectReturnPage(title, body) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
+<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f8fafc;color:#0f172a;padding:24px}
+main{max-width:420px;text-align:center}h1{font-size:22px;margin:0 0 12px}p{font-size:16px;line-height:1.5;color:#475569;margin:0}
+@media (prefers-color-scheme:dark){body{background:#020617;color:#f1f5f9}p{color:#94a3b8}}</style></head>
+<body><main><h1>${title}</h1><p>${body}</p></main></body></html>`;
+}
+
+router.get("/connect/return", (_req, res) => {
+  res
+    .status(200)
+    .type("html")
+    .send(connectReturnPage("You're all set", "Close this window and go back to the XprtLink app to see your payout status."));
+});
+
+router.get("/connect/refresh", (_req, res) => {
+  res
+    .status(200)
+    .type("html")
+    .send(
+      connectReturnPage(
+        "This link has expired",
+        "Close this window, go back to the XprtLink app and tap “Continue setup” to get a new secure link."
+      )
+    );
+});
+
 // Unauthenticated Webhook Listeners for IAP
 router.post("/webhooks/apple", appleWebhookController.handleNotification);
 router.post("/webhooks/google", googlePlayWebhookController.handleNotification);
@@ -339,6 +371,50 @@ router.get(
   })
 );
 
+/**
+ * Public origin for Stripe's return/refresh URLs: CONNECT_RETURN_BASE_URL if
+ * set, else the public host the gateway forwards (x-forwarded-host/proto).
+ */
+function connectReturnBaseUrl(req) {
+  if (process.env.CONNECT_RETURN_BASE_URL) return process.env.CONNECT_RETURN_BASE_URL;
+  const host = String(req.headers["x-forwarded-host"] || req.get("host") || "").split(",")[0].trim();
+  const proto = String(req.headers["x-forwarded-proto"] || req.protocol || "https").split(",")[0].trim();
+  return `${proto}://${host}`;
+}
+
+// Stripe-hosted payout onboarding (replaces the in-app KYC + bank forms).
+router.post(
+  "/experts/connect/onboarding-link",
+  requireRole("expert"),
+  stripeGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.getConnectOnboardingLink(req.auth, { returnBaseUrl: connectReturnBaseUrl(req) });
+    return ResponseFormatter.success(res, { message: getMessage("connectOnboardingLinkCreated"), data });
+  })
+);
+
+router.get(
+  "/experts/connect/status",
+  requireRole("expert"),
+  stripeGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.getConnectStatus(req.auth);
+    return ResponseFormatter.success(res, { message: getMessage("connectStatusLoaded"), data });
+  })
+);
+
+router.post(
+  "/experts/connect/dashboard-link",
+  requireRole("expert"),
+  stripeGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.getConnectDashboardLink(req.auth);
+    return ResponseFormatter.success(res, { message: getMessage("connectDashboardLinkCreated"), data });
+  })
+);
+
+// Legacy in-app KYC / bank forms — kept for older app builds and legacy Custom
+// accounts only; accounts from hosted onboarding get UPDATE_APP_FOR_PAYOUT_SETUP.
 router.post(
   "/experts/kyc",
   requireRole("expert"),

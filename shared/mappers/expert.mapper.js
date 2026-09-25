@@ -46,10 +46,12 @@ export function toExpertMeDto(expert, { user, categories, subscriptionActive = f
     searchEligible: expert.searchEligible,
     subscriptionActive,
     // Stripe Connect payout setup flags — used by the Flutter Payment & Payouts screen.
-    // kycComplete: true once the expert has submitted KYC and stripeAccountId is saved.
-    // bankLinked is not tracked in this service — the Flutter app should derive it
-    // from a successful POST /billing/experts/bank-account response.
+    // kycComplete: legacy flag for older app builds (in-app KYC form) — true once a
+    //   Stripe account exists. Unchanged so those builds still reach the bank step.
+    // payoutsActive: Stripe can send this expert transfers (cached from Stripe; the
+    //   live answer is GET /billing/experts/connect/status). Use this in new builds.
     kycComplete: Boolean(expert.stripeAccountId),
+    payoutsActive: Boolean(expert.stripeTransfersActive),
   };
 }
 

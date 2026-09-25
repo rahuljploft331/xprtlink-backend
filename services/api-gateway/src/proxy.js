@@ -36,6 +36,11 @@ export function createSocketProxy() {
  * changes whitespace. createApp's JSON parser stashes the bytes on req.rawBody.
  */
 function forwardRequestBody(proxyReq, req) {
+  // changeOrigin rewrites Host to the service's address; keep the public host
+  // and scheme so a service can build public URLs (e.g. Stripe return pages).
+  proxyReq.setHeader("x-forwarded-host", req.headers["x-forwarded-host"] || req.headers.host || "");
+  proxyReq.setHeader("x-forwarded-proto", req.headers["x-forwarded-proto"] || req.protocol || "http");
+
   if (req.rawBody) {
     proxyReq.setHeader("Content-Length", req.rawBody.length);
     proxyReq.write(req.rawBody);

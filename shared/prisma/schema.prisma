@@ -554,6 +554,11 @@ model ExpertProfile {
   featuredRank          Int?               @map("featured_rank")
   featuredUntil         DateTime?          @map("featured_until") @db.Timestamptz(6)
   stripeAccountId       String?            @map("stripe_account_id") @db.VarChar(128)
+  // Cached Stripe payout readiness (capabilities.transfers === "active"), refreshed
+  // by the Connect status endpoint and every payout readiness check. Drives
+  // `payoutsActive` on the expert profile without a Stripe call per read.
+  stripeTransfersActive Boolean            @default(false) @map("stripe_transfers_active")
+  stripeStatusCheckedAt DateTime?          @map("stripe_status_checked_at") @db.Timestamptz(6)
   poorReviewsAlert      Boolean            @default(false) @map("poor_reviews_alert")
   createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)

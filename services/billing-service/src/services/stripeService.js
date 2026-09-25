@@ -191,17 +191,104 @@ export async function getAvailableBalanceCents(currency = "usd") {
 
 /**
  * Whether a Connect account can receive transfers, and what Stripe still needs.
+ * Works for legacy Custom accounts and Accounts v2 recipients alike: a v2
+ * account read through the v1 endpoint still reports `capabilities.transfers`.
  */
 export async function getConnectAccountStatus(stripeAccountId) {
   const sdk = requireStripe();
   const account = await sdk.accounts.retrieve(stripeAccountId);
+  const bank = (account.external_accounts?.data ?? []).find((a) => a.default_for_currency) ??
+    account.external_accounts?.data?.[0] ??
+    null;
   return {
     transfersActive: account.capabilities?.transfers === "active",
     transfersCapability: account.capabilities?.transfers ?? null,
     payoutsEnabled: Boolean(account.payouts_enabled),
     requirementsDue: account.requirements?.currently_due ?? [],
+    pendingVerification: account.requirements?.pending_verification ?? [],
     disabledReason: account.requirements?.disabled_reason ?? null,
+    // Legacy Custom accounts (platform-collected KYC) vs. Stripe-collected ones.
+    legacyCustom: account.type === "custom",
+    bankLast4: bank?.last4 ?? null,
+    bankName: bank?.bank_name ?? null,
   };
+}
+
+// ── Accounts v2 (Stripe-hosted onboarding) ──────────────────────────────────
+// stripe-node 17 has no typed v2 namespace; rawRequest reaches the v2 endpoints
+// with their own API version, leaving every v1 call on the pinned version.
+const V2_API_VERSION = process.env.STRIPE_V2_API_VERSION || "2026-08-26.dahlia";
+
+/**
+ * Create an expert's connected account: an Accounts v2 `recipient` (receives
+ * transfers only). Stripe collects KYC and bank details through hosted
+ * onboarding; the platform stays liable for losses and pays Stripe fees, which
+ * is what separate charges and transfers require. `dashboard: express` is the
+ * only dashboard that lets Stripe own requirement collection in that setup.
+ */
+export async function createRecipientAccount({ email, displayName, expertProfileId }) {
+  const sdk = requireStripe();
+  return await sdk.rawRequest(
+    "POST",
+    "/v2/core/accounts",
+    {
+      ...(email ? { contact_email: email } : {}),
+      ...(displayName ? { display_name: displayName } : {}),
+      dashboard: "express",
+      identity: { country: "us", entity_type: "individual" },
+      configuration: {
+        recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } },
+      },
+      defaults: {
+        currency: "usd",
+        responsibilities: { fees_collector: "application", losses_collector: "application" },
+      },
+      metadata: { expertProfileId },
+    },
+    { apiVersion: V2_API_VERSION, idempotencyKey: `recipient_account_${expertProfileId}` }
+  );
+}
+
+/**
+ * Single-use URL (expires in minutes) to Stripe's hosted onboarding form.
+ * v2 recipients use a v2 Account Link; legacy Custom accounts use the v1
+ * hosted onboarding for Custom accounts, which asks only for what is missing.
+ */
+export async function createOnboardingLink({ stripeAccountId, legacyCustom, returnUrl, refreshUrl }) {
+  const sdk = requireStripe();
+  if (legacyCustom) {
+    const link = await sdk.accountLinks.create({
+      account: stripeAccountId,
+      type: "account_onboarding",
+      collection_options: { fields: "eventually_due" },
+      return_url: returnUrl,
+      refresh_url: refreshUrl,
+    });
+    return { url: link.url, expiresAt: new Date(link.expires_at * 1000).toISOString() };
+  }
+  const link = await sdk.rawRequest(
+    "POST",
+    "/v2/core/account_links",
+    {
+      account: stripeAccountId,
+      use_case: {
+        type: "account_onboarding",
+        account_onboarding: { configurations: ["recipient"], return_url: returnUrl, refresh_url: refreshUrl },
+      },
+    },
+    { apiVersion: V2_API_VERSION }
+  );
+  return { url: link.url, expiresAt: link.expires_at };
+}
+
+/**
+ * Single-use login link to the expert's Stripe Express Dashboard (payout
+ * history, bank details). Only for Stripe-collected (non-Custom) accounts.
+ */
+export async function createDashboardLoginLink(stripeAccountId) {
+  const sdk = requireStripe();
+  const link = await sdk.accounts.createLoginLink(stripeAccountId);
+  return { url: link.url };
 }
 
 /**
