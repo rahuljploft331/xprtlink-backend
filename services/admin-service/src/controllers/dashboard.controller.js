@@ -2,6 +2,38 @@ import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 
+/** Commission + subscription revenue rows (amountCents, createdAt) in a date range. */
+async function platformRevenueEntries(db, createdAt) {
+  const [commissions, subscriptions] = await Promise.all([
+    db.consultationCharge.findMany({
+      where: { createdAt, consultation: { billingStatus: "charged" } },
+      select: { commissionCents: true, createdAt: true },
+    }),
+    db.transaction.findMany({
+      where: { status: "succeeded", type: "subscription", createdAt },
+      select: { amountCents: true, createdAt: true },
+    }),
+  ]);
+  return [
+    ...commissions.map((c) => ({ amountCents: c.commissionCents, createdAt: c.createdAt })),
+    ...subscriptions,
+  ];
+}
+
+async function platformRevenueCents(db, createdAt) {
+  const [commission, subscriptions] = await Promise.all([
+    db.consultationCharge.aggregate({
+      _sum: { commissionCents: true },
+      where: { createdAt, consultation: { billingStatus: "charged" } },
+    }),
+    db.transaction.aggregate({
+      _sum: { amountCents: true },
+      where: { status: "succeeded", type: "subscription", createdAt },
+    }),
+  ]);
+  return (commission._sum.commissionCents || 0) + (subscriptions._sum.amountCents || 0);
+}
+
 /** GET /api/dashboard/stats */
 export async function getStats(_req, res, next) {
   try {
@@ -65,28 +97,13 @@ export async function getStats(_req, res, next) {
       db.expertSubscription.count({ where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } } }),
     ]);
 
-    // Platform Revenue last 30d (sum of succeeded consultation_charge + subscription transactions)
-    const [revenueResult, revenuePrevResult] = await Promise.all([
-      db.transaction.aggregate({
-        _sum: { amountCents: true },
-        where: {
-          status: "succeeded",
-          type: { in: ["consultation_charge", "subscription"] },
-          createdAt: { gte: thirtyDaysAgo },
-        },
-      }),
-      db.transaction.aggregate({
-        _sum: { amountCents: true },
-        where: {
-          status: "succeeded",
-          type: { in: ["consultation_charge", "subscription"] },
-          createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo },
-        },
-      }),
+    // Platform Revenue = what the platform keeps: consultation commission (on
+    // calls that were not refunded) + expert subscriptions. Not GMV — the
+    // expert's share of a consultation charge is owed to the expert.
+    const [revenueCents, revenuePrevCents] = await Promise.all([
+      platformRevenueCents(db, { gte: thirtyDaysAgo }),
+      platformRevenueCents(db, { gte: sixtyDaysAgo, lt: thirtyDaysAgo }),
     ]);
-
-    const revenueCents = revenueResult._sum.amountCents || 0;
-    const revenuePrevCents = revenuePrevResult._sum.amountCents || 0;
     const revenue30d = `$${(revenueCents / 100).toLocaleString("en-US", {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
@@ -208,14 +225,7 @@ export async function getTrends(req, res, next) {
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
     const [transactions, customers, experts, consultations] = await Promise.all([
-      db.transaction.findMany({
-        where: {
-          status: "succeeded",
-          type: { in: ["consultation_charge", "subscription"] },
-          createdAt: { gte: thirtyDaysAgo },
-        },
-        select: { amountCents: true, createdAt: true },
-      }),
+      platformRevenueEntries(db, { gte: thirtyDaysAgo }),
       db.customerProfile.findMany({
         where: { createdAt: { gte: thirtyDaysAgo } },
         select: { createdAt: true },
