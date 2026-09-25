@@ -39,12 +39,21 @@ export const updatePlatformSettingsSchema = z.object({
     .optional(),
   maintenanceMode: z.boolean().optional(),
   supportEmail: z.string().email("supportEmail must be a valid email address").optional(),
-  payoutSchedule: z
+  // Older portal builds sent the legacy enum strings — map them (and numeric
+  // strings) to days so a stale client can't make the whole settings save fail.
+  payoutSchedule: z.preprocess(
+    (value) => {
+      const legacyDays = { daily: 1, weekly: 7, monthly: 30 };
+      if (typeof value === "string" && value in legacyDays) return legacyDays[value];
+      if (typeof value === "string" && value.trim() !== "" && !Number.isNaN(Number(value))) return Number(value);
+      return value;
+    },
+    z
     .number()
     .int("payoutSchedule must be a whole number of days")
     .min(PAYOUT_SCHEDULE_MIN_DAYS, `payoutSchedule must be between ${PAYOUT_SCHEDULE_MIN_DAYS} and ${PAYOUT_SCHEDULE_MAX_DAYS} days`)
     .max(PAYOUT_SCHEDULE_MAX_DAYS, `payoutSchedule must be between ${PAYOUT_SCHEDULE_MIN_DAYS} and ${PAYOUT_SCHEDULE_MAX_DAYS} days`)
-    .optional(),
+  ).optional(),
 });
 
 /**
