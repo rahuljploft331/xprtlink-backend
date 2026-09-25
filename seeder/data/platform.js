@@ -8,11 +8,36 @@ export const platformConfig = {
 };
 
 export const cmsPages = [
-  { slug: "home", title: "Homepage", status: "published" },
-  { slug: "privacy", title: "Privacy Policy", status: "published" },
-  { slug: "terms", title: "Terms of Service", status: "published" },
-  { slug: "contact", title: "Contact", status: "published" },
-  { slug: "expert-standards", title: "Expert Standards Agreement", status: "published" },
+  { 
+    slug: "home", 
+    title: "Homepage", 
+    status: "published",
+    bodyHtml: `<h1>Welcome to XprtLink</h1><p>The premier two-sided expert consultation marketplace.</p>`
+  },
+  { 
+    slug: "privacy", 
+    title: "Privacy Policy", 
+    status: "published",
+    bodyHtml: `<h1>Privacy Policy</h1><p>Your privacy is important to XprtLink. This document outlines how we handle customer and expert data, including messaging, video calls, and payment information.</p>`
+  },
+  { 
+    slug: "terms", 
+    title: "Terms of Service", 
+    status: "published",
+    bodyHtml: `<h1>Terms of Service</h1><p>By using the XprtLink platform as a Customer or Expert, you agree to our per-minute billing policies, manual call acceptance, and consultation terms.</p>`
+  },
+  { 
+    slug: "contact", 
+    title: "Contact", 
+    status: "published",
+    bodyHtml: `<h1>Contact Us</h1><p>Reach out to XprtLink support at support@xpertlink.com for help with your expert profile or consultation inquiries.</p>`
+  },
+  { 
+    slug: "expert-standards", 
+    title: "Expert Standards Agreement", 
+    status: "published",
+    bodyHtml: `<h1>Expert Standards Agreement</h1><p>All experts on XprtLink must abide by our professional standards. This includes maintaining accurate availability, professional conduct during UIKit video calls, and prompt response to Quote Requests.</p>`
+  },
 ];
 
 export const subscriptionPlans = [

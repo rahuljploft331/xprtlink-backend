@@ -220,7 +220,7 @@ export async function seedPlatformEssentials(payload) {
       data: {
         slug: page.slug,
         title: page.title,
-        bodyHtml: `<p>${page.title} content placeholder.</p>`,
+        bodyHtml: page.bodyHtml || `<p>${page.title} content placeholder.</p>`,
         status: page.status === "published" ? "published" : "draft",
         publishedAt: page.status === "published" ? new Date() : null,
       },
