@@ -974,6 +974,15 @@ model ConsultationCharge {
   transactionId    String   @unique @map("transaction_id") @db.Uuid
   commissionCents  Int      @map("commission_cents")
   expertShareCents Int      @map("expert_share_cents")
+  // Card dispute (chargeback) on this charge: open | won | lost. Set by the
+  // charge.dispute.* webhooks; while open, the expert's earning is on hold.
+  disputeStatus    String?   @map("dispute_status") @db.VarChar(16)
+  stripeDisputeId  String?   @map("stripe_dispute_id") @db.VarChar(128)
+  disputedAt       DateTime? @map("disputed_at") @db.Timestamptz(6)
+  // Money event an admin must look at (dispute/refund after the expert was
+  // paid, partial refund made in the Stripe Dashboard). Shown as a to-do.
+  needsReview      Boolean   @default(false) @map("needs_review")
+  reviewNote       String?   @map("review_note") @db.VarChar(500)
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Restrict)
@@ -1038,6 +1047,8 @@ model ExpertEarningsLedger {
   // (the "owed" queue the payout-run job aggregates). onDelete:SetNull returns
   // earnings to the unpaid pool if a failed payout row is deleted.
   payoutId        String?  @map("payout_id") @db.Uuid
+  // Non-null = excluded from payouts (e.g. "dispute" while a chargeback is open).
+  holdReason      String?  @map("hold_reason") @db.VarChar(32)
   createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
   expert       ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)

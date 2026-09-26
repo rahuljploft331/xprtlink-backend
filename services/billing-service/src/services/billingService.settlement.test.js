@@ -22,6 +22,8 @@ vi.mock("./stripeService.js", () => ({
   createRecipientAccount: vi.fn(),
   createOnboardingLink: vi.fn(),
   createDashboardLoginLink: vi.fn(),
+  constructWebhookEvent: vi.fn(),
+  listRefundsForCharge: vi.fn(),
 }));
 
 const stripe = await import("./stripeService.js");
@@ -35,6 +37,7 @@ const {
   getConnectOnboardingLink,
   getConnectStatus,
   submitCustomConnectKyc,
+  handleStripeWebhook,
 } = await import(
   "./billingService.js"
 );
@@ -276,7 +279,7 @@ describe("runPayouts", () => {
     const summary = await runPayouts({ now });
 
     const query = db.expertEarningsLedger.findMany.mock.calls[0][0];
-    expect(query.where).toEqual({ payoutId: null, createdAt: { lt: new Date("2026-10-02T00:00:00Z") } });
+    expect(query.where).toEqual({ payoutId: null, holdReason: null, createdAt: { lt: new Date("2026-10-02T00:00:00Z") } });
     expect(stripe.transferEarningsToExpertPayout).toHaveBeenCalledWith(
       expect.objectContaining({ amountCents: 800, destinationStripeAccountId: "acct_1", payoutId: "payout_1" })
     );
@@ -442,5 +445,137 @@ describe("legacy in-app KYC form", () => {
       statusCode: 409,
       code: "UPDATE_APP_FOR_PAYOUT_SETUP",
     });
+  });
+});
+
+// ── Chargebacks and Stripe-Dashboard refunds (webhooks) ─────────────────────
+
+describe("webhooks — disputes and refunds", () => {
+  const deliver = (type, object) => {
+    stripe.constructWebhookEvent.mockReturnValue({ id: `evt_${type}`, type, data: { object } });
+    return handleStripeWebhook("raw", "sig");
+  };
+
+  beforeEach(() => {
+    Object.assign(db, {
+      processedWebhookEvent: { findUnique: vi.fn(() => null), create: vi.fn(() => Promise.resolve()) },
+      consultationCharge: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
+      expertEarningsLedger: { ...db.expertEarningsLedger, findFirst: vi.fn(), deleteMany: vi.fn() },
+      transaction: {
+        ...db.transaction,
+        findUnique: vi.fn(() => ({ id: "txn1", currency: "USD", metadata: { consultationId: "c1", customerProfileId: "cust1" } })),
+        findMany: vi.fn(() => []),
+        update: vi.fn(),
+      },
+    });
+    db.consultationCharge.findUnique.mockResolvedValue({ consultationId: "c1", transactionId: "txn1" });
+  });
+
+  it("dispute opened: holds the expert's unpaid earning", async () => {
+    db.expertEarningsLedger.findFirst.mockResolvedValue({ id: "l1", payoutId: null });
+
+    await deliver("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1", amount: 4000, reason: "fraudulent" });
+
+    expect(db.consultationCharge.update).toHaveBeenCalledWith({
+      where: { consultationId: "c1" },
+      data: expect.objectContaining({ disputeStatus: "open", stripeDisputeId: "dp_1" }),
+    });
+    expect(db.expertEarningsLedger.updateMany).toHaveBeenCalledWith({
+      where: { consultationId: "c1", payoutId: null },
+      data: { holdReason: "dispute" },
+    });
+  });
+
+  it("dispute opened after payout: flags the charge for admin review", async () => {
+    db.expertEarningsLedger.findFirst.mockResolvedValue({ id: "l1", payoutId: "payout_9" });
+
+    await deliver("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1", amount: 4000, reason: "fraudulent" });
+
+    expect(db.consultationCharge.update).toHaveBeenCalledWith({
+      where: { consultationId: "c1" },
+      data: expect.objectContaining({ disputeStatus: "open", needsReview: true }),
+    });
+  });
+
+  it("dispute won: releases the hold", async () => {
+    db.expertEarningsLedger.findFirst.mockResolvedValue({ id: "l1", payoutId: null });
+
+    await deliver("charge.dispute.closed", { id: "dp_1", payment_intent: "pi_1", amount: 4000, status: "won" });
+
+    expect(db.expertEarningsLedger.updateMany).toHaveBeenCalledWith({
+      where: { consultationId: "c1", holdReason: "dispute" },
+      data: { holdReason: null },
+    });
+    expect(db.expertEarningsLedger.deleteMany).not.toHaveBeenCalled();
+  });
+
+  it("dispute lost: platform absorbs it — the expert's unpaid earning is cancelled", async () => {
+    db.expertEarningsLedger.findFirst.mockResolvedValue({ id: "l1", payoutId: null });
+
+    await deliver("charge.dispute.closed", { id: "dp_1", payment_intent: "pi_1", amount: 4000, status: "lost" });
+
+    expect(db.consultationCharge.update).toHaveBeenCalledWith({
+      where: { consultationId: "c1" },
+      data: { disputeStatus: "lost" },
+    });
+    expect(db.expertEarningsLedger.deleteMany).toHaveBeenCalledWith({ where: { consultationId: "c1", payoutId: null } });
+  });
+
+  it("refund made in the admin portal is ignored (already recorded)", async () => {
+    stripe.listRefundsForCharge.mockResolvedValue([{ id: "re_1", amount: 4000, status: "succeeded", metadata: { source: "xprtlink_admin" } }]);
+
+    await deliver("charge.refunded", { id: "ch_1", payment_intent: "pi_1", amount: 4000, amount_refunded: 4000, refunded: true });
+
+    expect(db.transaction.create).not.toHaveBeenCalled();
+    expect(db.consultation.update).not.toHaveBeenCalled();
+  });
+
+  it("full refund made in the Stripe Dashboard: records it and cancels the unpaid earning", async () => {
+    db.expertEarningsLedger.findFirst.mockResolvedValue({ id: "l1", payoutId: null });
+    stripe.listRefundsForCharge.mockResolvedValue([{ id: "re_2", amount: 4000, status: "succeeded", metadata: {} }]);
+    db.transaction.findMany
+      .mockResolvedValueOnce([]) // no refund recorded yet
+      .mockResolvedValueOnce([{ status: "refunded" }]); // every charge of the call now refunded
+
+    await deliver("charge.refunded", { id: "ch_1", payment_intent: "pi_1", amount: 4000, amount_refunded: 4000, refunded: true });
+
+    expect(db.transaction.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ type: "refund", amountCents: 4000, metadata: expect.objectContaining({ stripeRefundId: "re_2", source: "stripe_dashboard" }) }),
+    });
+    expect(db.transaction.update).toHaveBeenCalledWith({ where: { id: "txn1" }, data: { status: "refunded" } });
+    expect(db.expertEarningsLedger.deleteMany).toHaveBeenCalledWith({ where: { consultationId: "c1", payoutId: null } });
+    expect(db.consultation.update).toHaveBeenCalledWith({ where: { id: "c1" }, data: { billingStatus: "refunded" } });
+  });
+
+  it("partial Dashboard refund: recorded and flagged for review, earning untouched", async () => {
+    db.expertEarningsLedger.findFirst.mockResolvedValue({ id: "l1", payoutId: null });
+    stripe.listRefundsForCharge.mockResolvedValue([{ id: "re_3", amount: 1000, status: "succeeded", metadata: {} }]);
+    db.transaction.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ status: "succeeded" }]);
+
+    await deliver("charge.refunded", { id: "ch_1", payment_intent: "pi_1", amount: 4000, amount_refunded: 1000, refunded: false });
+
+    expect(db.transaction.create).toHaveBeenCalledWith({ data: expect.objectContaining({ type: "refund", amountCents: 1000 }) });
+    expect(db.expertEarningsLedger.deleteMany).not.toHaveBeenCalled();
+    expect(db.consultationCharge.update).toHaveBeenCalledWith({
+      where: { consultationId: "c1" },
+      data: expect.objectContaining({ needsReview: true }),
+    });
+  });
+
+  it("the same Dashboard refund delivered twice is recorded once", async () => {
+    stripe.listRefundsForCharge.mockResolvedValue([{ id: "re_2", amount: 4000, status: "succeeded", metadata: {} }]);
+    db.transaction.findMany.mockResolvedValueOnce([{ metadata: { stripeRefundId: "re_2" } }]);
+
+    await deliver("charge.refunded", { id: "ch_1", payment_intent: "pi_1", amount: 4000, amount_refunded: 4000, refunded: true });
+
+    expect(db.transaction.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("payouts skip held earnings", () => {
+  it("runPayouts only picks earnings with no hold", async () => {
+    db.expertEarningsLedger.findMany.mockResolvedValue([]);
+    await runPayouts({ now: new Date("2026-10-02T02:15:00Z") });
+    expect(db.expertEarningsLedger.findMany.mock.calls[0][0].where).toMatchObject({ payoutId: null, holdReason: null });
   });
 });

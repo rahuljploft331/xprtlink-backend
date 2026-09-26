@@ -805,6 +805,11 @@ export async function refundConsultation(consultationId, { reason, adminUserId }
   if (consultation.earningsLedger.some((row) => row.payoutId)) {
     throw badRequest("refundBlockedEarningsPaidOut", "EARNINGS_PAID_OUT");
   }
+  if (consultation.charge.disputeStatus === "open") {
+    // The customer's bank already pulled the money back; Stripe refuses refunds
+    // on a disputed charge. Respond to the dispute in the Stripe Dashboard.
+    throw badRequest("refundBlockedDisputeOpen", "DISPUTE_OPEN");
+  }
 
   const charges = await db.transaction.findMany({
     where: {
@@ -1167,6 +1172,230 @@ export async function attachBankAccount(auth, body) {
   };
 }
 
+// ── Chargebacks and refunds made outside the admin portal ────────────────────
+// Policy: when a dispute is LOST the platform absorbs it — the expert's unpaid
+// earning for that call is cancelled and nothing is clawed back from them.
+
+const usd = (cents) => `$${((cents ?? 0) / 100).toFixed(2)}`;
+
+/**
+ * Email the platform support address (Settings → Support email) about a money
+ * event that needs a human. Best-effort: never blocks the webhook.
+ */
+function alertAdmins(subject, lines) {
+  (async () => {
+    const row = await getDb().platformSetting.findUnique({ where: { key: "supportEmail" } });
+    const to = typeof row?.value === "string" && row.value.includes("@") ? row.value : "support@xpertlink.com";
+    const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">${lines
+      .map((l) => `<p style="margin:0 0 8px">${String(l).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c])}</p>`)
+      .join("")}</div>`;
+    await sendEmail({ to, subject, html });
+  })().catch((err) => log.error(`[billing-alert] "${subject}" email failed: ${err.message}`));
+}
+
+/** The consultation a Stripe PaymentIntent was charged for, via our transaction row. */
+async function findChargeContext(paymentIntentId) {
+  if (!paymentIntentId) return null;
+  const db = getDb();
+  const txn = await db.transaction.findUnique({ where: { stripePaymentIntentId: paymentIntentId } });
+  const consultationId = txn?.metadata?.consultationId;
+  if (!txn || !consultationId) return null;
+  const [charge, ledger] = await Promise.all([
+    db.consultationCharge.findUnique({ where: { consultationId } }),
+    db.expertEarningsLedger.findFirst({ where: { consultationId } }),
+  ]);
+  return { txn, consultationId, charge, ledger };
+}
+
+/**
+ * charge.dispute.created — the customer's bank has already taken the money
+ * back (plus Stripe's dispute fee). Hold the expert's unpaid earning so the
+ * payout run skips it, and alert admins: evidence must be submitted in the
+ * Stripe Dashboard before the deadline.
+ */
+async function handleDisputeCreated(dispute) {
+  const ctx = await findChargeContext(stripeId(dispute.payment_intent));
+  const dueBy = dispute.evidence_details?.due_by
+    ? new Date(dispute.evidence_details.due_by * 1000).toISOString().slice(0, 10)
+    : "see Stripe Dashboard";
+
+  if (!ctx?.charge) {
+    log.warn(`[billing-webhook] dispute ${dispute.id} on unknown payment ${stripeId(dispute.payment_intent)}`);
+    alertAdmins(getMessage("disputeAlertSubject"), [
+      `A card dispute (${dispute.id}) of ${usd(dispute.amount)} was opened on a payment XprtLink has no consultation for.`,
+      `Reason: ${dispute.reason}. Respond in the Stripe Dashboard by ${dueBy}.`,
+    ]);
+    return;
+  }
+
+  const alreadyPaidOut = Boolean(ctx.ledger?.payoutId);
+  await getDb().$transaction(async (tx) => {
+    await tx.consultationCharge.update({
+      where: { consultationId: ctx.consultationId },
+      data: {
+        disputeStatus: "open",
+        stripeDisputeId: dispute.id,
+        disputedAt: new Date(),
+        ...(alreadyPaidOut
+          ? { needsReview: true, reviewNote: "Card dispute opened after the expert was already paid for this call." }
+          : {}),
+      },
+    });
+    await tx.expertEarningsLedger.updateMany({
+      where: { consultationId: ctx.consultationId, payoutId: null },
+      data: { holdReason: "dispute" },
+    });
+  });
+
+  log.warn(`[billing-webhook] dispute ${dispute.id} opened on consultation ${ctx.consultationId} (${usd(dispute.amount)}, ${dispute.reason})`);
+  alertAdmins(getMessage("disputeAlertSubject"), [
+    `A customer disputed a consultation charge of ${usd(dispute.amount)} (reason: ${dispute.reason}).`,
+    `Consultation: ${ctx.consultationId}. Stripe dispute: ${dispute.id}.`,
+    alreadyPaidOut
+      ? "The expert had already been paid for this call — review it in the admin portal."
+      : "The expert's earning for this call is on hold and won't be paid out until the dispute closes.",
+    `Submit evidence in the Stripe Dashboard before ${dueBy}.`,
+  ]);
+}
+
+/**
+ * charge.dispute.closed — won: release the hold, the expert is paid in the
+ * next run. Lost: the platform absorbs it; the held earning is cancelled.
+ */
+async function handleDisputeClosed(dispute) {
+  const ctx = await findChargeContext(stripeId(dispute.payment_intent));
+  if (!ctx?.charge) {
+    log.warn(`[billing-webhook] dispute ${dispute.id} closed (${dispute.status}) on unknown payment`);
+    return;
+  }
+
+  const lost = dispute.status === "lost";
+  const alreadyPaidOut = Boolean(ctx.ledger?.payoutId);
+  await getDb().$transaction(async (tx) => {
+    await tx.consultationCharge.update({
+      where: { consultationId: ctx.consultationId },
+      data: {
+        disputeStatus: lost ? "lost" : "won",
+        ...(lost && alreadyPaidOut
+          ? { needsReview: true, reviewNote: "Dispute lost after the expert was paid; the platform absorbed the loss." }
+          : {}),
+      },
+    });
+    if (lost) {
+      await tx.expertEarningsLedger.deleteMany({ where: { consultationId: ctx.consultationId, payoutId: null } });
+    } else {
+      await tx.expertEarningsLedger.updateMany({
+        where: { consultationId: ctx.consultationId, holdReason: "dispute" },
+        data: { holdReason: null },
+      });
+    }
+  });
+
+  log.info(`[billing-webhook] dispute ${dispute.id} closed: ${dispute.status} (consultation ${ctx.consultationId})`);
+  alertAdmins(getMessage(lost ? "disputeLostAlertSubject" : "disputeWonAlertSubject"), [
+    `The card dispute ${dispute.id} on consultation ${ctx.consultationId} closed as "${dispute.status}".`,
+    lost
+      ? `The platform keeps the loss of ${usd(dispute.amount)}; the expert's unpaid earning for this call was cancelled.`
+      : "The funds were returned and the expert's earning is released for the next payout.",
+  ]);
+}
+
+/**
+ * charge.refunded — only acts on refunds made OUTSIDE the admin portal (the
+ * portal tags its refunds source=xprtlink_admin and records them itself).
+ * Full refund of every charge of the call → same outcome as a portal refund.
+ * Partial refund → recorded and flagged for an admin; the expert's earning is
+ * left alone (how much they lose is a policy call).
+ */
+async function handleChargeRefunded(stripeCharge) {
+  const ctx = await findChargeContext(stripeId(stripeCharge.payment_intent));
+  if (!ctx) {
+    log.info(`[billing-webhook] charge.refunded for ${stripeCharge.id} — no consultation, ignoring`);
+    return;
+  }
+
+  const refunds = await stripeSvc.listRefundsForCharge(stripeCharge.id);
+  const external = refunds.filter(
+    (r) => r.metadata?.source !== "xprtlink_admin" && ["succeeded", "pending"].includes(r.status)
+  );
+  if (external.length === 0) return; // portal refund — already recorded
+
+  const db = getDb();
+  const recorded = await db.transaction.findMany({
+    where: { type: "refund", metadata: { path: ["consultationId"], equals: ctx.consultationId } },
+    select: { metadata: true },
+  });
+  const recordedIds = new Set(recorded.map((t) => t.metadata?.stripeRefundId).filter(Boolean));
+  const fresh = external.filter((r) => !recordedIds.has(r.id));
+  if (fresh.length === 0) return;
+
+  const fullyRefunded = stripeCharge.refunded === true;
+  const outcome = await db.$transaction(async (tx) => {
+    for (const r of fresh) {
+      await tx.transaction.create({
+        data: {
+          type: "refund",
+          amountCents: r.amount,
+          currency: ctx.txn.currency,
+          status: r.status === "succeeded" ? "succeeded" : "pending",
+          metadata: {
+            consultationId: ctx.consultationId,
+            customerProfileId: ctx.txn.metadata?.customerProfileId ?? null,
+            refundedTransactionId: ctx.txn.id,
+            stripeRefundId: r.id,
+            source: "stripe_dashboard",
+          },
+        },
+      });
+    }
+    if (fullyRefunded) {
+      await tx.transaction.update({ where: { id: ctx.txn.id }, data: { status: "refunded" } });
+    }
+
+    // Every charge of the call refunded (hold capture + any overage)?
+    const charges = await tx.transaction.findMany({
+      where: {
+        type: "consultation_charge",
+        OR: [
+          ...(ctx.charge ? [{ id: ctx.charge.transactionId }] : []),
+          { metadata: { path: ["consultationId"], equals: ctx.consultationId } },
+        ],
+      },
+      select: { status: true },
+    });
+    const allRefunded = charges.length > 0 && charges.every((c) => c.status === "refunded");
+    const alreadyPaidOut = Boolean(ctx.ledger?.payoutId);
+
+    if (allRefunded) {
+      await tx.expertEarningsLedger.deleteMany({ where: { consultationId: ctx.consultationId, payoutId: null } });
+      await tx.consultation.update({ where: { id: ctx.consultationId }, data: { billingStatus: "refunded" } });
+    }
+    const note = allRefunded
+      ? alreadyPaidOut
+        ? "Refunded in the Stripe Dashboard after the expert was already paid for this call."
+        : null
+      : `Partial refund of ${usd(fresh.reduce((sum, r) => sum + r.amount, 0))} made in the Stripe Dashboard; the expert's earning was not changed.`;
+    if (note && ctx.charge) {
+      await tx.consultationCharge.update({
+        where: { consultationId: ctx.consultationId },
+        data: { needsReview: true, reviewNote: note },
+      });
+    }
+    return { allRefunded, note };
+  });
+
+  log.info(
+    `[billing-webhook] Stripe Dashboard refund on consultation ${ctx.consultationId}: ${fresh.length} refund(s), fullyRefunded=${outcome.allRefunded}`
+  );
+  if (outcome.note) {
+    alertAdmins(getMessage("refundReviewAlertSubject"), [
+      `A refund was made directly in the Stripe Dashboard for consultation ${ctx.consultationId}.`,
+      outcome.note,
+      "Review it under Payments in the admin portal.",
+    ]);
+  }
+}
+
 export async function handleStripeWebhook(payload, signature) {
   const event = stripeSvc.constructWebhookEvent(payload, signature);
   const db = getDb();
@@ -1295,6 +1524,18 @@ export async function handleStripeWebhook(payload, signature) {
       log.warn(`[billing-webhook] transfer.reversed payout=${payout.id} transfer=${transfer.id} — earnings returned to unpaid pool`);
       break;
     }
+
+    case "charge.dispute.created":
+      await handleDisputeCreated(event.data.object);
+      break;
+
+    case "charge.dispute.closed":
+      await handleDisputeClosed(event.data.object);
+      break;
+
+    case "charge.refunded":
+      await handleChargeRefunded(event.data.object);
+      break;
 
     case "payout.failed": {
       // A Connect account's own bank payout (Stripe → expert's bank) failed. This is
@@ -1791,7 +2032,7 @@ async function createPayoutForLedgerRows({ expertProfileId, currency, rows, peri
       data: { expertProfileId, amountCents, currency, periodStart, periodEnd, status: "processing" },
     });
     const claimed = await tx.expertEarningsLedger.updateMany({
-      where: { id: { in: rows.map((r) => r.id) }, payoutId: null },
+      where: { id: { in: rows.map((r) => r.id) }, payoutId: null, holdReason: null },
       data: { payoutId: created.id },
     });
     if (claimed.count !== rows.length) throw conflict("payoutEarningsAlreadyClaimed", "PAYOUT_CONFLICT");
@@ -1899,7 +2140,8 @@ export async function runPayouts({ now = new Date() } = {}) {
   const cutoff = startOfUtcDay(now);
 
   const unpaid = await db.expertEarningsLedger.findMany({
-    where: { payoutId: null, createdAt: { lt: cutoff } },
+    // Held earnings (open chargeback) are skipped until the hold is released.
+    where: { payoutId: null, holdReason: null, createdAt: { lt: cutoff } },
     select: { id: true, expertProfileId: true, netCents: true, createdAt: true },
   });
 
@@ -2126,12 +2368,16 @@ export async function getExpertPayoutSummary(expertProfileId) {
   });
   if (!expert) throw notFound("expertProfileNotFound");
 
-  const [unpaid, lastPayout, days] = await Promise.all([
+  const [unpaid, held, lastPayout, days] = await Promise.all([
     db.expertEarningsLedger.aggregate({
-      where: { expertProfileId, payoutId: null },
+      where: { expertProfileId, payoutId: null, holdReason: null },
       _sum: { netCents: true },
       _count: { _all: true },
       _min: { createdAt: true },
+    }),
+    db.expertEarningsLedger.aggregate({
+      where: { expertProfileId, payoutId: null, holdReason: { not: null } },
+      _sum: { netCents: true },
     }),
     db.expertPayout.findFirst({ where: { expertProfileId }, orderBy: { createdAt: "desc" } }),
     getPayoutScheduleDays(),
@@ -2151,6 +2397,8 @@ export async function getExpertPayoutSummary(expertProfileId) {
     currency: expert.currency || "USD",
     unpaidCents,
     unpaidEntries: unpaid._count._all,
+    // Earnings on hold (open chargeback) — not payable until released.
+    heldCents: held._sum.netCents ?? 0,
     oldestUnpaidAt: unpaid._min.createdAt,
     lastPayout: lastPayout ? toExpertPayoutDto(lastPayout) : null,
     scheduleDays: days,
@@ -2177,7 +2425,7 @@ export async function payExpertNow(expertProfileId, { adminUserId } = {}) {
   if (!expert) throw notFound("expertProfileNotFound");
 
   const rows = await db.expertEarningsLedger.findMany({
-    where: { expertProfileId, payoutId: null },
+    where: { expertProfileId, payoutId: null, holdReason: null },
     select: { id: true, netCents: true, createdAt: true },
   });
   const amountCents = rows.reduce((sum, r) => sum + r.netCents, 0);
