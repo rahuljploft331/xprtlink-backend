@@ -469,10 +469,11 @@ describe("webhooks — disputes and refunds", () => {
       },
     });
     db.consultationCharge.findUnique.mockResolvedValue({ consultationId: "c1", transactionId: "txn1" });
+    db.expertEarningsLedger.findMany.mockResolvedValue([]); // Prisma always returns an array
   });
 
   it("dispute opened: holds the expert's unpaid earning", async () => {
-    db.expertEarningsLedger.findFirst.mockResolvedValue({ id: "l1", payoutId: null });
+    db.expertEarningsLedger.findMany.mockResolvedValue([{ payoutId: null }]);
 
     await deliver("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1", amount: 4000, reason: "fraudulent" });
 
@@ -487,7 +488,7 @@ describe("webhooks — disputes and refunds", () => {
   });
 
   it("dispute opened after payout: flags the charge for admin review", async () => {
-    db.expertEarningsLedger.findFirst.mockResolvedValue({ id: "l1", payoutId: "payout_9" });
+    db.expertEarningsLedger.findMany.mockResolvedValue([{ payoutId: "payout_9" }]);
 
     await deliver("charge.dispute.created", { id: "dp_1", payment_intent: "pi_1", amount: 4000, reason: "fraudulent" });
 
@@ -498,7 +499,7 @@ describe("webhooks — disputes and refunds", () => {
   });
 
   it("dispute won: releases the hold", async () => {
-    db.expertEarningsLedger.findFirst.mockResolvedValue({ id: "l1", payoutId: null });
+    db.expertEarningsLedger.findMany.mockResolvedValue([{ payoutId: null }]);
 
     await deliver("charge.dispute.closed", { id: "dp_1", payment_intent: "pi_1", amount: 4000, status: "won" });
 
@@ -510,7 +511,7 @@ describe("webhooks — disputes and refunds", () => {
   });
 
   it("dispute lost: platform absorbs it — the expert's unpaid earning is cancelled", async () => {
-    db.expertEarningsLedger.findFirst.mockResolvedValue({ id: "l1", payoutId: null });
+    db.expertEarningsLedger.findMany.mockResolvedValue([{ payoutId: null }]);
 
     await deliver("charge.dispute.closed", { id: "dp_1", payment_intent: "pi_1", amount: 4000, status: "lost" });
 
@@ -531,7 +532,7 @@ describe("webhooks — disputes and refunds", () => {
   });
 
   it("full refund made in the Stripe Dashboard: records it and cancels the unpaid earning", async () => {
-    db.expertEarningsLedger.findFirst.mockResolvedValue({ id: "l1", payoutId: null });
+    db.expertEarningsLedger.findMany.mockResolvedValue([{ payoutId: null }]);
     stripe.listRefundsForCharge.mockResolvedValue([{ id: "re_2", amount: 4000, status: "succeeded", metadata: {} }]);
     db.transaction.findMany
       .mockResolvedValueOnce([]) // no refund recorded yet
@@ -548,7 +549,7 @@ describe("webhooks — disputes and refunds", () => {
   });
 
   it("partial Dashboard refund: recorded and flagged for review, earning untouched", async () => {
-    db.expertEarningsLedger.findFirst.mockResolvedValue({ id: "l1", payoutId: null });
+    db.expertEarningsLedger.findMany.mockResolvedValue([{ payoutId: null }]);
     stripe.listRefundsForCharge.mockResolvedValue([{ id: "re_3", amount: 1000, status: "succeeded", metadata: {} }]);
     db.transaction.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([{ status: "succeeded" }]);
 
@@ -577,5 +578,75 @@ describe("payouts skip held earnings", () => {
     db.expertEarningsLedger.findMany.mockResolvedValue([]);
     await runPayouts({ now: new Date("2026-10-02T02:15:00Z") });
     expect(db.expertEarningsLedger.findMany.mock.calls[0][0].where).toMatchObject({ payoutId: null, holdReason: null });
+  });
+});
+
+// ── Admin "Pay out now": all, or an exact amount (may split a call) ────────
+
+describe("payExpertNow — exact amount", () => {
+  const rows = () => [
+    { id: "l1", expertProfileId: "exp1", consultationId: "c1", grossCents: 2353, commissionCents: 353, netCents: 2000, createdAt: new Date("2026-09-01") },
+    { id: "l2", expertProfileId: "exp1", consultationId: "c2", grossCents: 1824, commissionCents: 274, netCents: 1550, createdAt: new Date("2026-09-02") },
+    { id: "l3", expertProfileId: "exp1", consultationId: "c3", grossCents: 3530, commissionCents: 530, netCents: 3000, createdAt: new Date("2026-09-03") },
+  ];
+
+  beforeEach(() => {
+    db.expertProfile.findUnique.mockResolvedValue({ stripeAccountId: "acct_1", currency: "USD", userId: "u1" });
+    db.expertEarningsLedger.findMany.mockResolvedValue(rows());
+    db.expertEarningsLedger.updateMany.mockImplementation(({ where }) => ({ count: where.id?.in ? where.id.in.length : 1 }));
+    db.expertEarningsLedger.create = vi.fn(({ data }) => ({ id: "l3_part", netCents: data.netCents, createdAt: data.createdAt }));
+    db.expertPayout.update.mockImplementation(({ data }) => ({ id: "payout_1", amountCents: 4000, ...data }));
+    stripe.getConnectAccountStatus.mockResolvedValue({ transfersActive: true, requirementsDue: [] });
+    stripe.getAvailableBalanceCents.mockResolvedValue({ availableCents: 100000, pendingCents: 0 });
+    stripe.transferEarningsToExpertPayout.mockResolvedValue({ id: "tr_1" });
+  });
+
+  it("pays exactly $40 of $65.50: two whole calls + $4.50 split from the third", async () => {
+    const result = await payExpertNow("exp1", { amountCents: 4000 });
+
+    // Third call shrinks to its unpaid remainder; gross − commission = net still holds.
+    expect(db.expertEarningsLedger.updateMany).toHaveBeenCalledWith({
+      where: { id: "l3", payoutId: null, holdReason: null, netCents: 3000 },
+      data: { netCents: 2550, grossCents: 3000, commissionCents: 450 },
+    });
+    expect(db.expertEarningsLedger.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ consultationId: "c3", netCents: 450, grossCents: 530, commissionCents: 80 }) })
+    );
+    // Payout claims l1 + l2 + the $4.50 part, for exactly $40.
+    expect(db.expertPayout.create).toHaveBeenCalledWith({ data: expect.objectContaining({ amountCents: 4000 }) });
+    expect(db.expertEarningsLedger.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["l1", "l2", "l3_part"] }, payoutId: null, holdReason: null },
+      data: { payoutId: "payout_1" },
+    });
+    expect(stripe.transferEarningsToExpertPayout).toHaveBeenCalledWith(expect.objectContaining({ amountCents: 4000 }));
+    expect(result.remainingUnpaidCents).toBe(2550);
+  });
+
+  it("no amount → clears the whole balance without splitting", async () => {
+    await payExpertNow("exp1");
+    expect(db.expertEarningsLedger.create).not.toHaveBeenCalled();
+    expect(db.expertPayout.create).toHaveBeenCalledWith({ data: expect.objectContaining({ amountCents: 6550 }) });
+  });
+
+  it("an amount that lands exactly on whole calls does not split", async () => {
+    await payExpertNow("exp1", { amountCents: 3550 });
+    expect(db.expertEarningsLedger.create).not.toHaveBeenCalled();
+    expect(db.expertPayout.create).toHaveBeenCalledWith({ data: expect.objectContaining({ amountCents: 3550 }) });
+  });
+
+  it("refuses more than the payable balance", async () => {
+    await expect(payExpertNow("exp1", { amountCents: 7000 })).rejects.toMatchObject({ code: "AMOUNT_EXCEEDS_BALANCE" });
+    expect(db.expertPayout.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses zero, negative or fractional amounts", async () => {
+    for (const bad of [0, -100, 10.5]) {
+      await expect(payExpertNow("exp1", { amountCents: bad })).rejects.toMatchObject({ code: "INVALID_AMOUNT" });
+    }
+  });
+
+  it("never includes earnings on hold (disputed)", async () => {
+    await payExpertNow("exp1", { amountCents: 1000 });
+    expect(db.expertEarningsLedger.findMany.mock.calls[0][0].where).toEqual({ expertProfileId: "exp1", payoutId: null, holdReason: null });
   });
 });

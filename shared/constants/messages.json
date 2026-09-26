@@ -347,5 +347,7 @@
   "disputeWonAlertSubject": "Card dispute closed in XprtLink's favour",
   "disputeLostAlertSubject": "Card dispute lost",
   "refundReviewAlertSubject": "Review needed: refund made in the Stripe Dashboard",
-  "refundBlockedDisputeOpen": "This charge has an open card dispute, so it can't be refunded. Respond to the dispute in the Stripe Dashboard."
+  "refundBlockedDisputeOpen": "This charge has an open card dispute, so it can't be refunded. Respond to the dispute in the Stripe Dashboard.",
+  "payoutAmountInvalid": "Enter a payout amount greater than zero",
+  "payoutAmountExceedsBalance": "The amount is more than the expert's payable balance of {balance}"
 }

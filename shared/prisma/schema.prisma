@@ -1055,7 +1055,10 @@ model ExpertEarningsLedger {
   consultation Consultation  @relation(fields: [consultationId], references: [id], onDelete: Restrict)
   payout       ExpertPayout? @relation(fields: [payoutId], references: [id], onDelete: SetNull)
 
-  @@unique([consultationId])
+  // Not unique: an admin custom-amount payout can split one consultation's
+  // earning into a paid part and an unpaid remainder. Duplicate settlement is
+  // still prevented by the unique consultation_charges.consultation_id.
+  @@index([consultationId])
   @@index([expertProfileId, createdAt(sort: Desc)])
   @@index([expertProfileId, payoutId])
   @@map("expert_earnings_ledger")

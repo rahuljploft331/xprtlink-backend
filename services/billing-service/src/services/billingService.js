@@ -1200,11 +1200,13 @@ async function findChargeContext(paymentIntentId) {
   const txn = await db.transaction.findUnique({ where: { stripePaymentIntentId: paymentIntentId } });
   const consultationId = txn?.metadata?.consultationId;
   if (!txn || !consultationId) return null;
-  const [charge, ledger] = await Promise.all([
+  const [charge, ledgerRows] = await Promise.all([
     db.consultationCharge.findUnique({ where: { consultationId } }),
-    db.expertEarningsLedger.findFirst({ where: { consultationId } }),
+    db.expertEarningsLedger.findMany({ where: { consultationId }, select: { payoutId: true } }),
   ]);
-  return { txn, consultationId, charge, ledger };
+  // An earning can be split by a custom-amount payout; any paid part counts.
+  const anyPaidOut = ledgerRows.some((r) => r.payoutId);
+  return { txn, consultationId, charge, anyPaidOut };
 }
 
 /**
@@ -1228,7 +1230,7 @@ async function handleDisputeCreated(dispute) {
     return;
   }
 
-  const alreadyPaidOut = Boolean(ctx.ledger?.payoutId);
+  const alreadyPaidOut = ctx.anyPaidOut;
   await getDb().$transaction(async (tx) => {
     await tx.consultationCharge.update({
       where: { consultationId: ctx.consultationId },
@@ -1270,7 +1272,7 @@ async function handleDisputeClosed(dispute) {
   }
 
   const lost = dispute.status === "lost";
-  const alreadyPaidOut = Boolean(ctx.ledger?.payoutId);
+  const alreadyPaidOut = ctx.anyPaidOut;
   await getDb().$transaction(async (tx) => {
     await tx.consultationCharge.update({
       where: { consultationId: ctx.consultationId },
@@ -1364,7 +1366,7 @@ async function handleChargeRefunded(stripeCharge) {
       select: { status: true },
     });
     const allRefunded = charges.length > 0 && charges.every((c) => c.status === "refunded");
-    const alreadyPaidOut = Boolean(ctx.ledger?.payoutId);
+    const alreadyPaidOut = ctx.anyPaidOut;
 
     if (allRefunded) {
       await tx.expertEarningsLedger.deleteMany({ where: { consultationId: ctx.consultationId, payoutId: null } });
@@ -2025,18 +2027,59 @@ async function checkTransferReadiness(stripeAccountId) {
  * so the payout amount always equals the rows it owns.
  */
 async function createPayoutForLedgerRows({ expertProfileId, currency, rows, periodEnd }) {
+  return getDb().$transaction((tx) => claimRowsIntoPayout(tx, { expertProfileId, currency, rows, periodEnd }));
+}
+
+/** Same as createPayoutForLedgerRows, inside a caller's transaction. */
+async function claimRowsIntoPayout(tx, { expertProfileId, currency, rows, periodEnd }) {
   const amountCents = rows.reduce((sum, r) => sum + r.netCents, 0);
   const periodStart = rows.reduce((min, r) => (r.createdAt < min ? r.createdAt : min), rows[0].createdAt);
-  return getDb().$transaction(async (tx) => {
-    const created = await tx.expertPayout.create({
-      data: { expertProfileId, amountCents, currency, periodStart, periodEnd, status: "processing" },
-    });
-    const claimed = await tx.expertEarningsLedger.updateMany({
-      where: { id: { in: rows.map((r) => r.id) }, payoutId: null, holdReason: null },
-      data: { payoutId: created.id },
-    });
-    if (claimed.count !== rows.length) throw conflict("payoutEarningsAlreadyClaimed", "PAYOUT_CONFLICT");
-    return created;
+  const created = await tx.expertPayout.create({
+    data: { expertProfileId, amountCents, currency, periodStart, periodEnd, status: "processing" },
+  });
+  const claimed = await tx.expertEarningsLedger.updateMany({
+    where: { id: { in: rows.map((r) => r.id) }, payoutId: null, holdReason: null },
+    data: { payoutId: created.id },
+  });
+  if (claimed.count !== rows.length) throw conflict("payoutEarningsAlreadyClaimed", "PAYOUT_CONFLICT");
+  return created;
+}
+
+/**
+ * Split an unpaid earning so exactly `partCents` of it can be paid now: the
+ * row keeps the remainder (still unpaid) and a new row with the same
+ * consultation carries `partCents`. Gross and commission are split in
+ * proportion, so gross − commission = net holds for both rows and the totals
+ * are unchanged. Guarded on the row still being unpaid, unheld and unchanged.
+ *
+ * @returns the new row (id, netCents, createdAt) for the caller to claim
+ */
+async function splitLedgerRow(tx, row, partCents) {
+  let partCommission = Math.round((row.grossCents * partCents) / row.netCents) - partCents;
+  partCommission = Math.min(Math.max(partCommission, 0), row.commissionCents);
+  const partGross = partCents + partCommission;
+
+  const shrunk = await tx.expertEarningsLedger.updateMany({
+    where: { id: row.id, payoutId: null, holdReason: null, netCents: row.netCents },
+    data: {
+      netCents: row.netCents - partCents,
+      grossCents: row.grossCents - partGross,
+      commissionCents: row.commissionCents - partCommission,
+    },
+  });
+  if (shrunk.count !== 1) throw conflict("payoutEarningsAlreadyClaimed", "PAYOUT_CONFLICT");
+
+  return tx.expertEarningsLedger.create({
+    data: {
+      expertProfileId: row.expertProfileId,
+      consultationId: row.consultationId,
+      grossCents: partGross,
+      commissionCents: partCommission,
+      netCents: partCents,
+      // Same timestamp as the original, so it sorts and reports with it.
+      createdAt: row.createdAt,
+    },
+    select: { id: true, netCents: true, createdAt: true },
   });
 }
 
@@ -2413,10 +2456,14 @@ export async function getExpertPayoutSummary(expertProfileId) {
 }
 
 /**
- * Admin "Pay out now": settle ALL of an expert's unpaid earnings immediately,
- * outside the schedule. Same claim + transfer path as the scheduled run.
+ * Admin "Pay out now": pay an expert immediately, outside the schedule.
+ *   - no amountCents → ALL unpaid earnings (clear the balance)
+ *   - amountCents    → exactly that amount, oldest earnings first; if it ends
+ *                      part-way through a call, that call's earning is split
+ *                      and the remainder stays unpaid for a later payout.
+ * Earnings on hold (open card dispute) are never included.
  */
-export async function payExpertNow(expertProfileId, { adminUserId } = {}) {
+export async function payExpertNow(expertProfileId, { adminUserId, amountCents } = {}) {
   const db = getDb();
   const expert = await db.expertProfile.findUnique({
     where: { id: expertProfileId },
@@ -2426,20 +2473,56 @@ export async function payExpertNow(expertProfileId, { adminUserId } = {}) {
 
   const rows = await db.expertEarningsLedger.findMany({
     where: { expertProfileId, payoutId: null, holdReason: null },
-    select: { id: true, netCents: true, createdAt: true },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: {
+      id: true,
+      expertProfileId: true,
+      consultationId: true,
+      grossCents: true,
+      commissionCents: true,
+      netCents: true,
+      createdAt: true,
+    },
   });
-  const amountCents = rows.reduce((sum, r) => sum + r.netCents, 0);
-  if (rows.length === 0 || amountCents <= 0) throw badRequest("noUnpaidEarnings", "NOTHING_TO_PAY");
+  const balanceCents = rows.reduce((sum, r) => sum + r.netCents, 0);
+  if (rows.length === 0 || balanceCents <= 0) throw badRequest("noUnpaidEarnings", "NOTHING_TO_PAY");
 
-  await assertPayable(expert, amountCents);
+  const custom = amountCents !== undefined && amountCents !== null;
+  if (custom && (!Number.isInteger(amountCents) || amountCents <= 0)) {
+    throw badRequest("payoutAmountInvalid", "INVALID_AMOUNT");
+  }
+  if (custom && amountCents > balanceCents) {
+    throw badRequest("payoutAmountExceedsBalance", "AMOUNT_EXCEEDS_BALANCE", undefined, {
+      balance: `$${(balanceCents / 100).toFixed(2)}`,
+    });
+  }
+  const targetCents = custom ? amountCents : balanceCents;
+
+  await assertPayable(expert, targetCents);
 
   let payout;
   try {
-    payout = await createPayoutForLedgerRows({
-      expertProfileId,
-      currency: expert.currency || "USD",
-      rows,
-      periodEnd: new Date(),
+    payout = await db.$transaction(async (tx) => {
+      // Oldest earnings first, whole calls while they fit; split the next one.
+      const take = [];
+      let total = 0;
+      for (const row of rows) {
+        if (total === targetCents) break;
+        const room = targetCents - total;
+        if (row.netCents <= room) {
+          take.push(row);
+          total += row.netCents;
+        } else {
+          take.push(await splitLedgerRow(tx, row, room));
+          total += room;
+        }
+      }
+      return claimRowsIntoPayout(tx, {
+        expertProfileId,
+        currency: expert.currency || "USD",
+        rows: take,
+        periodEnd: new Date(),
+      });
     });
   } catch (err) {
     if (err?.code === "P2002" || err?.code === "PAYOUT_CONFLICT") {
@@ -2448,9 +2531,16 @@ export async function payExpertNow(expertProfileId, { adminUserId } = {}) {
     throw err;
   }
 
-  log.info(`[payExpertNow] admin ${adminUserId ?? "-"} paying expert ${expertProfileId} ${amountCents}¢ (payout ${payout.id})`);
+  log.info(
+    `[payExpertNow] admin ${adminUserId ?? "-"} paying expert ${expertProfileId} ${targetCents}¢ of ${balanceCents}¢ (payout ${payout.id})`
+  );
   const result = await sendPayoutTransfer(payout, expert, "payExpertNow");
-  return { payout: toExpertPayoutDto(result.payout), transferred: result.ok, error: result.error };
+  return {
+    payout: toExpertPayoutDto(result.payout),
+    transferred: result.ok,
+    error: result.error,
+    remainingUnpaidCents: balanceCents - targetCents,
+  };
 }
 
 /**

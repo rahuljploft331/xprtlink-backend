@@ -253,7 +253,10 @@ router.post(
   "/payouts/experts/:expertProfileId/pay-now",
   internalServiceGuard,
   asyncHandler(async (req, res) => {
-    const data = await svc.payExpertNow(req.params.expertProfileId, { adminUserId: req.body?.adminUserId });
+    const data = await svc.payExpertNow(req.params.expertProfileId, {
+      adminUserId: req.body?.adminUserId,
+      amountCents: req.body?.amountCents ?? undefined,
+    });
     return ResponseFormatter.success(res, {
       message: getMessage(data.transferred ? "payoutSent" : "payoutTransferFailed"),
       data,

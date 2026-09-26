@@ -1107,6 +1107,10 @@
               {
                 "key": "Authorization",
                 "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
               }
             ],
             "url": {
@@ -1130,7 +1134,16 @@
                 }
               ]
             },
-            "description": "Transfer ALL of the expert's unpaid earnings now, outside the schedule (payouts: edit). 400 with the Stripe reason if the account or balance is not ready."
+            "description": "Pay the expert now, outside the schedule (payouts: edit). Omit amountCents (or send {}) to clear the whole unpaid balance; send amountCents to pay exactly that amount — oldest earnings first, splitting one call's earning if needed (the rest stays unpaid). Earnings on hold (open card dispute) are never included. 400 INVALID_AMOUNT / AMOUNT_EXCEEDS_BALANCE / CONNECT_NOT_READY / INSUFFICIENT_BALANCE. Response adds remainingUnpaidCents.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amountCents\": 4000\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           }
         },
         {

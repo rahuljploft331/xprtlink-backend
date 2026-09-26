@@ -1094,10 +1094,10 @@
                 }
               ]
             },
-            "description": "Internal — used by admin-service. Aggregates ALL unpaid earnings of the expert into one payout and sends the Stripe Connect transfer. 400 with a reason when the Connect account is not ready or the available balance is insufficient.",
+            "description": "Internal — used by admin-service. amountCents optional: omit to pay the full unpaid balance; otherwise pays exactly that amount (oldest first, may split one earning). Never includes held (disputed) earnings. Returns { payout, transferred, error, remainingUnpaidCents }.",
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"adminUserId\": \"admin-uuid\"\n}",
+              "raw": "{\n  \"adminUserId\": \"admin-uuid\",\n  \"amountCents\": 4000\n}",
               "options": {
                 "raw": {
                   "language": "json"

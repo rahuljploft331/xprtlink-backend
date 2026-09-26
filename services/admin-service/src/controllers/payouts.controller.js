@@ -70,17 +70,27 @@ export async function expertSummary(req, res, next) {
 }
 
 /**
- * POST /admin/payouts/experts/:expertProfileId/pay
- * Transfer all of the expert's unpaid earnings now, outside the schedule.
+ * POST /admin/payouts/experts/:expertProfileId/pay   { amountCents? }
+ * Pay the expert now, outside the schedule: the whole unpaid balance, or an
+ * exact amount (oldest earnings first; billing splits a call if needed).
  */
 export async function payExpertNow(req, res, next) {
   try {
+    const raw = req.body?.amountCents;
+    const amountCents = raw === undefined || raw === null || raw === "" ? undefined : Number(raw);
+    if (amountCents !== undefined && (!Number.isInteger(amountCents) || amountCents <= 0)) {
+      throw badRequest("payoutAmountInvalid", "INVALID_AMOUNT", "amountCents");
+    }
     const data = await billingPost(`/payouts/experts/${assertUuid(req.params.expertProfileId, "expertProfileId")}/pay-now`, {
       adminUserId: req.adminUser.id,
+      amountCents,
     });
     await logAdminAction(req, "payout.payNow", "ExpertPayout", data.payout?.id, {
       expertProfileId: req.params.expertProfileId,
+      mode: amountCents === undefined ? "full_balance" : "custom_amount",
+      requestedCents: amountCents ?? null,
       amountCents: data.payout?.amountCents,
+      remainingUnpaidCents: data.remainingUnpaidCents,
       transferred: data.transferred,
       error: data.error,
     });
