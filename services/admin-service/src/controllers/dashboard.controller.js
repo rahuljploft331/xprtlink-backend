@@ -2,11 +2,14 @@ import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 
+/** A lost chargeback means the platform kept none of that charge. */
+const NOT_LOST_DISPUTE = { OR: [{ disputeStatus: null }, { disputeStatus: { not: "lost" } }] };
+
 /** Commission + subscription revenue rows (amountCents, createdAt) in a date range. */
 async function platformRevenueEntries(db, createdAt) {
   const [commissions, subscriptions] = await Promise.all([
     db.consultationCharge.findMany({
-      where: { createdAt, consultation: { billingStatus: "charged" } },
+      where: { createdAt, consultation: { billingStatus: "charged" }, ...NOT_LOST_DISPUTE },
       select: { commissionCents: true, createdAt: true },
     }),
     db.transaction.findMany({
@@ -24,7 +27,7 @@ async function platformRevenueCents(db, createdAt) {
   const [commission, subscriptions] = await Promise.all([
     db.consultationCharge.aggregate({
       _sum: { commissionCents: true },
-      where: { createdAt, consultation: { billingStatus: "charged" } },
+      where: { createdAt, consultation: { billingStatus: "charged" }, ...NOT_LOST_DISPUTE },
     }),
     db.transaction.aggregate({
       _sum: { amountCents: true },
@@ -109,8 +112,13 @@ export async function getStats(_req, res, next) {
       maximumFractionDigits: 0,
     })}`;
 
+    // Card disputes to answer + money events flagged by billing webhooks.
+    const paymentsNeedingAttention = await db.consultationCharge.count({
+      where: { OR: [{ disputeStatus: "open" }, { needsReview: true }] },
+    });
+
     const pendingAdminActions =
-      pendingVerifications + pendingReviews + pendingPaymentsInvestigating + pendingPayouts;
+      pendingVerifications + pendingReviews + pendingPaymentsInvestigating + pendingPayouts + paymentsNeedingAttention;
 
     const custDelta = calculateDelta(customers30d, customersPrev30d);
     const expDelta = calculateDelta(experts30d, expertsPrev30d);
@@ -182,6 +190,7 @@ export async function getStats(_req, res, next) {
 
     // Pending actions
     const pendingActions = [
+      { id: "d", label: "Resolve card disputes & payment reviews", module: "Payments", count: paymentsNeedingAttention, href: "/payments" },
       { id: "v", label: "Review expert ID documents", module: "Verifications", count: pendingVerifications, href: "/verifications" },
       { id: "r", label: "Moderate flagged reviews", module: "Reviews", count: pendingReviews, href: "/reviews" },
       { id: "p", label: "Investigate refund requests", module: "Payments", count: pendingPaymentsInvestigating, href: "/payments" },
