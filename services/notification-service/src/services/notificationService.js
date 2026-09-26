@@ -164,7 +164,7 @@ async function getOrCreatePreferences(userId, role) {
 
 export async function getPreferences(auth) {
   const pref = await getOrCreatePreferences(auth.userId, auth.role);
-  return toNotificationPreferencesDto(pref);
+  return toNotificationPreferencesDto(pref, auth.role);
 }
 
 export async function updatePreferences(auth, body) {
@@ -177,7 +177,7 @@ export async function updatePreferences(auth, body) {
     data: { preferences: merged },
   });
 
-  return toNotificationPreferencesDto(pref);
+  return toNotificationPreferencesDto(pref, auth.role);
 }
 
 /**

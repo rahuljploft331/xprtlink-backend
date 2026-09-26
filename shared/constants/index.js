@@ -65,13 +65,13 @@ export const DEFAULT_NOTIFICATION_PREFERENCES = {
     quoteRequestUpdates: true,
     pushNotifications: true,
     subscriptionNotifications: true,
-    marketingCommunications: false,
+    marketingCommunications: true,
   },
   customer: {
     pushNotifications: true,
     consultationReminders: true,
     emailNotifications: true,
-    marketingNotifications: false,
+    marketingNotifications: true,
   },
 };
 

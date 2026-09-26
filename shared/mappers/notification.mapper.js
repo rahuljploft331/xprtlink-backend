@@ -27,8 +27,13 @@ export function toUnreadCountDto(count) {
   return { count };
 }
 
-export function toNotificationPreferencesDto(pref) {
+import { DEFAULT_NOTIFICATION_PREFERENCES } from "../constants/index.js";
+
+export function toNotificationPreferencesDto(pref, role) {
   return {
     preferences: pref?.preferences ?? {},
+    meta: {
+      defaultPreferences: DEFAULT_NOTIFICATION_PREFERENCES[role] ?? {},
+    },
   };
 }
