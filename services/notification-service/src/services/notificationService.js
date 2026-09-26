@@ -208,20 +208,33 @@ export async function dispatchNotification({ userIds, type, title, body: bodyTex
 
   const prefsMap = new Map(prefs.map((p) => [p.userId, p.preferences]));
 
-  const filteredUserIds = userIds.filter((userId) => {
+  const inAppUserIds = userIds.filter((userId) => {
     const userPrefs = prefsMap.get(userId) ?? {};
-    // Default to true if the preference is undefined
-    const optIn = userPrefs[resolvedType] ?? true;
+    
+    // Map raw notification types to app preference categories
+    let optIn = true;
+    if (resolvedType.startsWith("quote_")) {
+      optIn = userPrefs.quoteRequestUpdates ?? true;
+    } else if (resolvedType.startsWith("consultation_")) {
+      // Covers both Expert (consultationAlerts) and Customer (consultationReminders)
+      optIn = userPrefs.consultationAlerts ?? userPrefs.consultationReminders ?? true;
+    } else if (resolvedType.startsWith("subscription_")) {
+      optIn = userPrefs.subscriptionNotifications ?? true;
+    } else if (resolvedType === "marketing") {
+      optIn = userPrefs.marketingCommunications ?? userPrefs.marketingNotifications ?? false;
+    }
+    // Other types (e.g., system, payment) default to true for the in-app feed
+
     return optIn === true;
   });
 
-  if (filteredUserIds.length === 0) return { dispatched: 0 };
+  if (inAppUserIds.length === 0) return { dispatched: 0 };
 
   // 1. Write in-app notification rows
   const created = await db.notification.createMany({
     // NOTE: the column is `payload`, not `data`. The wire contract keeps the name
     // `data` for callers; it is mapped here.
-    data: filteredUserIds.map((userId) => ({
+    data: inAppUserIds.map((userId) => ({
       userId,
       type: resolvedType,
       title: title ?? "Notification",
@@ -232,12 +245,20 @@ export async function dispatchNotification({ userIds, type, title, body: bodyTex
   });
 
   // 2. Send FCM push to device tokens (non-fatal — never blocks the response)
-  sendPushToUsers(db, filteredUserIds, title ?? "Notification", bodyText ?? "", {
-    type: resolvedType,
-    ...data,
-  }).catch((err) => {
-    log.error({ err: err.message }, "[dispatchNotification] FCM push error:");
+  const pushUserIds = inAppUserIds.filter((userId) => {
+    const userPrefs = prefsMap.get(userId) ?? {};
+    // pushNotifications is the master toggle for mobile push alerts
+    return userPrefs.pushNotifications ?? userPrefs.push ?? true;
   });
+
+  if (pushUserIds.length > 0) {
+    sendPushToUsers(db, pushUserIds, title ?? "Notification", bodyText ?? "", {
+      type: resolvedType,
+      ...data,
+    }).catch((err) => {
+      log.error({ err: err.message }, "[dispatchNotification] FCM push error:");
+    });
+  }
 
   return { dispatched: created.count };
 }
