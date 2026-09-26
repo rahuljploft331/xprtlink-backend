@@ -169,10 +169,19 @@ export async function cancelPaymentIntent(paymentIntentId, { reason = "abandoned
  */
 export async function refundPaymentIntent({ paymentIntentId, metadata = {} }) {
   const sdk = requireStripe();
+  // source=xprtlink_admin lets the charge.refunded webhook tell portal refunds
+  // (already recorded) from ones made directly in the Stripe Dashboard.
   return await sdk.refunds.create(
-    { payment_intent: paymentIntentId, reason: "requested_by_customer", metadata },
+    { payment_intent: paymentIntentId, reason: "requested_by_customer", metadata: { ...metadata, source: "xprtlink_admin" } },
     { idempotencyKey: `refund_${paymentIntentId}` }
   );
+}
+
+/** All refunds on a charge (portal and Stripe Dashboard ones). */
+export async function listRefundsForCharge(chargeId) {
+  const sdk = requireStripe();
+  const list = await sdk.refunds.list({ charge: chargeId, limit: 100 });
+  return list.data;
 }
 
 /**

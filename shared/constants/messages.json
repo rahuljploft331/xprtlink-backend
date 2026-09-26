@@ -342,5 +342,10 @@
   "connectStatusLoaded": "Payout setup status loaded",
   "connectDashboardLinkCreated": "Payout dashboard link created",
   "connectDashboardUnavailable": "The payout dashboard is available once payout setup is complete",
-  "connectUseHostedOnboarding": "Please update the XprtLink app to finish payout setup"
+  "connectUseHostedOnboarding": "Please update the XprtLink app to finish payout setup",
+  "disputeAlertSubject": "Action needed: a customer disputed a consultation charge",
+  "disputeWonAlertSubject": "Card dispute closed in XprtLink's favour",
+  "disputeLostAlertSubject": "Card dispute lost",
+  "refundReviewAlertSubject": "Review needed: refund made in the Stripe Dashboard",
+  "refundBlockedDisputeOpen": "This charge has an open card dispute, so it can't be refunded. Respond to the dispute in the Stripe Dashboard."
 }
