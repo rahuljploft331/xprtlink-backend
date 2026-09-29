@@ -9,7 +9,10 @@ vi.mock("@xprtlink/shared/lib/internalFetch.js", () => ({
   internalPost: vi.fn(() => Promise.resolve({})),
   internalGet: vi.fn(() => Promise.resolve({})),
 }));
-vi.mock("@xprtlink/shared/lib/email.js", () => ({ sendEmail: vi.fn(() => Promise.resolve()) }));
+vi.mock("@xprtlink/shared/lib/email.js", () => ({
+  sendEmail: vi.fn(() => Promise.resolve()),
+  renderEmailTemplate: vi.fn(async ({ title, bodyHtml }) => `<h1>${title}</h1>${bodyHtml}`),
+}));
 vi.mock("./stripeService.js", () => ({
   retrievePaymentIntent: vi.fn(),
   capturePaymentIntent: vi.fn(),
@@ -27,6 +30,8 @@ vi.mock("./stripeService.js", () => ({
 }));
 
 const stripe = await import("./stripeService.js");
+const email = await import("@xprtlink/shared/lib/email.js");
+const flush = () => new Promise((r) => setTimeout(r, 0));
 const {
   captureConsultation,
   releaseConsultationHold,
@@ -648,5 +653,60 @@ describe("payExpertNow — exact amount", () => {
   it("never includes earnings on hold (disputed)", async () => {
     await payExpertNow("exp1", { amountCents: 1000 });
     expect(db.expertEarningsLedger.findMany.mock.calls[0][0].where).toEqual({ expertProfileId: "exp1", payoutId: null, holdReason: null });
+  });
+});
+
+// ── Payout emails ───────────────────────────────────────────────────────────
+
+describe("payout emails", () => {
+  beforeEach(() => {
+    db.expertProfile.findUnique.mockResolvedValue({ stripeAccountId: "acct_1", currency: "USD", userId: "u1", firstName: "Ana", lastName: "Lee" });
+    db.user = { findUnique: vi.fn(async () => ({ email: "ana@x.com" })) };
+    db.platformSetting.findUnique.mockResolvedValue({ key: "supportEmail", value: "ops@xprtlink.com" });
+    db.expertEarningsLedger.findMany.mockImplementation(async ({ where }) =>
+      where.payoutId
+        ? [{ netCents: 2000, createdAt: new Date("2026-09-20"), consultation: { customer: { firstName: "Sam", lastName: "Roe" } } }]
+        : [{ id: "l1", expertProfileId: "exp1", consultationId: "c1", grossCents: 2353, commissionCents: 353, netCents: 2000, createdAt: new Date("2026-09-20") }]
+    );
+    db.expertEarningsLedger.updateMany.mockImplementation(({ where }) => ({ count: where.id?.in ? where.id.in.length : 1 }));
+    stripe.getConnectAccountStatus.mockResolvedValue({ transfersActive: true, requirementsDue: [] });
+    stripe.getAvailableBalanceCents.mockResolvedValue({ availableCents: 100000, pendingCents: 0 });
+  });
+
+  it("emails the expert when a payout is sent", async () => {
+    db.expertPayout.update.mockImplementation(async ({ data }) => ({ id: "payout_1", amountCents: 2000, updatedAt: new Date(), ...data }));
+    stripe.transferEarningsToExpertPayout.mockResolvedValue({ id: "tr_1" });
+
+    await payExpertNow("exp1");
+    await flush();
+
+    expect(email.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "ana@x.com", subject: expect.stringContaining("$20.00"), html: expect.stringContaining("Sam Roe") })
+    );
+  });
+
+  it("alerts the support address when a payout transfer fails for the first time", async () => {
+    db.expertPayout.update.mockImplementation(async ({ data }) => ({ id: "payout_1", expertProfileId: "exp1", amountCents: 2000, ...data }));
+    stripe.transferEarningsToExpertPayout.mockRejectedValue(new Error("No such destination"));
+
+    await payExpertNow("exp1");
+    await flush();
+    await flush();
+
+    expect(email.sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({ to: "ops@xprtlink.com", subject: expect.stringContaining("Payout failed"), html: expect.stringContaining("No such destination") })
+    );
+  });
+
+  it("does not re-alert when a payout that already failed fails again on retry", async () => {
+    db.expertPayout.findUnique = vi.fn(async () => ({ id: "payout_1", expertProfileId: "exp1", amountCents: 2000, currency: "USD", status: "failed", _count: { ledgerEntries: 1 } }));
+    db.expertPayout.update.mockImplementation(async ({ data }) => ({ id: "payout_1", expertProfileId: "exp1", amountCents: 2000, ...data }));
+    stripe.transferEarningsToExpertPayout.mockRejectedValue(new Error("No such destination"));
+
+    await retryPayout("payout_1");
+    await flush();
+    await flush();
+
+    expect(email.sendEmail).not.toHaveBeenCalled();
   });
 });
