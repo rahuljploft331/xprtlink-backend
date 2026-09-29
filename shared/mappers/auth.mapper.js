@@ -14,6 +14,7 @@ export function toAuthSessionDto({ user, role, customerProfile, expertProfile, g
       expertVerificationStatus: expertProfile?.verificationStatus ?? null,
       expertSubscriptionActive: gates?.expertSubscriptionActive ?? false,
       onboardingComplete: Boolean(expertProfile?.onboardingCompletedAt),
+      isPrimaryCallDevice: gates?.isPrimaryCallDevice ?? false,
     },
   };
 }

@@ -2,6 +2,7 @@ import { getDb } from "@xprtlink/shared/db/index.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
+import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 import { createBannerSchema } from "@xprtlink/shared/contracts/index.js";
 
 export const getMyBanners = async (auth) => {
@@ -40,6 +41,7 @@ export const createBanner = async (auth, inputData) => {
   const profile = await db.expertProfile.findUnique({
     where: { userId: auth.userId },
     include: {
+      user: true,
       subscriptions: {
         where: { status: "active" },
         include: { plan: true },
@@ -75,6 +77,24 @@ export const createBanner = async (auth, inputData) => {
       isActive,
     },
   });
+
+  // Send an email notification to the expert confirming upload
+  if (profile.user?.email) {
+    renderEmailTemplate({
+      title: "Banner Upload Received",
+      bodyHtml: "<p>We have successfully received your new promotional banner. It is currently in a <strong>pending</strong> state while our moderation team reviews it.</p><p>We will send you another update once it has been approved or if changes are required.</p>",
+      badgeText: "Under Review"
+    }).then(html => {
+      sendEmail({
+        to: profile.user.email,
+        subject: "Your Banner is Under Review",
+        text: "Your new promotional banner has been received and is currently pending review.",
+        html
+      });
+    }).catch(e => console.error("[BannerUpload] Email failed:", e));
+  }
+
+  // Optional: You could also trigger an email to an admin address here to notify them of a pending banner.
 
   return banner;
 };
@@ -138,6 +158,13 @@ export const getPublicBanners = async (categoryId, query = {}) => {
   // we can sort them in memory since the banner count won't be extremely huge in a single query,
   // or we can sort by the active subscription's price.
   
+  // Randomly shuffle the array first to ensure fair rotation
+  for (let i = banners.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [banners[i], banners[j]] = [banners[j], banners[i]];
+  }
+
+  // Then sort by subscription tier (stable sort based on random order)
   const sortedBanners = banners.sort((a, b) => {
     const priceA = a.expert.subscriptions[0]?.plan?.priceMonthlyCents || 0;
     const priceB = b.expert.subscriptions[0]?.plan?.priceMonthlyCents || 0;

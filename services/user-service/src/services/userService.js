@@ -27,12 +27,22 @@ export async function getSession(req) {
   const role = req.auth.role;
   const subscriptionActive = Boolean(user.expertProfile?.subscriptions?.length);
 
+  const db = getDb();
+  const latestToken = await db.refreshToken.findFirst({
+    where: { userId: user.id, role, revokedAt: null },
+    orderBy: { createdAt: "desc" }
+  });
+
+  const isPrimaryCallDevice = latestToken 
+    ? (req.auth.iat >= Math.floor(latestToken.createdAt.getTime() / 1000) - 5)
+    : true;
+
   return toAuthSessionDto({
     user,
     role,
     customerProfile: user.customerProfile,
     expertProfile: user.expertProfile,
-    gates: { expertSubscriptionActive: subscriptionActive },
+    gates: { expertSubscriptionActive: subscriptionActive, isPrimaryCallDevice },
   });
 }
 
