@@ -41,7 +41,6 @@ router.get(
   </style>
 </head>
 <body>
-  <h1>${data.title}</h1>
   ${data.bodyHtml || ""}
 </body>
 </html>`;
