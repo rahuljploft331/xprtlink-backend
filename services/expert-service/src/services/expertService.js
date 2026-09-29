@@ -93,10 +93,19 @@ export async function getFeatured(limit = 10, categoryId = null) {
       include,
     });
 
+    // Fetch configured weights
+    const weightsRow = await db.platformSetting.findUnique({ where: { key: "featuredExpertWeights" } });
+    const weights = weightsRow?.value || { tierWeight: 100, ratingWeight: 10 };
+
     backfill.sort((a, b) => {
-      const boostDiff = activeBoostRank(b) - activeBoostRank(a);
-      if (boostDiff !== 0) return boostDiff;
-      return Number(b.ratingAvg) - Number(a.ratingAvg);
+      const scoreA = (activeBoostRank(a) * weights.tierWeight) + (Number(a.ratingAvg || 0) * weights.ratingWeight);
+      const scoreB = (activeBoostRank(b) * weights.tierWeight) + (Number(b.ratingAvg || 0) * weights.ratingWeight);
+      
+      // If scores are equal, fallback to rating
+      if (scoreB === scoreA) {
+        return Number(b.ratingAvg) - Number(a.ratingAvg);
+      }
+      return scoreB - scoreA;
     });
 
     selected = [...pinned, ...backfill.slice(0, limit - pinned.length)];

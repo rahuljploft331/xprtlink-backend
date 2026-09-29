@@ -45,6 +45,9 @@ function normalize(key, value) {
     if (typeof value === "boolean") return value;
     return value === "true" || value === 1;
   }
+  if (key === "featuredExpertWeights") {
+    return typeof value === "object" ? value : PLATFORM_SETTING_DEFAULTS[key];
+  }
   return typeof value === "string" ? value : PLATFORM_SETTING_DEFAULTS[key];
 }
 

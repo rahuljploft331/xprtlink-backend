@@ -24,6 +24,10 @@ export const PLATFORM_SETTING_DEFAULTS = {
   maintenanceMode: false,
   supportEmail: "support@xpertlink.com",
   payoutSchedule: PAYOUT_SCHEDULE_DEFAULT_DAYS,
+  featuredExpertWeights: {
+    tierWeight: 100,
+    ratingWeight: 10,
+  },
 };
 
 /**
@@ -54,6 +58,10 @@ export const updatePlatformSettingsSchema = z.object({
     .min(PAYOUT_SCHEDULE_MIN_DAYS, `payoutSchedule must be between ${PAYOUT_SCHEDULE_MIN_DAYS} and ${PAYOUT_SCHEDULE_MAX_DAYS} days`)
     .max(PAYOUT_SCHEDULE_MAX_DAYS, `payoutSchedule must be between ${PAYOUT_SCHEDULE_MIN_DAYS} and ${PAYOUT_SCHEDULE_MAX_DAYS} days`)
   ).optional(),
+  featuredExpertWeights: z.object({
+    tierWeight: z.number().min(0),
+    ratingWeight: z.number().min(0),
+  }).optional(),
 });
 
 /**
