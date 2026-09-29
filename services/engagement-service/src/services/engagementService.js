@@ -911,33 +911,6 @@ export async function createConsultation(auth, body) {
     include: CONSULTATION_INCLUDE,
   });
 
-  // Notify expert of the incoming consultation request (non-fatal)
-  // DISABLED PER USER REQUEST for now
-  /*
-  try {
-    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
-    const customerName = `${consultation.customer.firstName ?? ""} ${consultation.customer.lastName ?? ""}`.trim() || "A customer";
-    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
-      userIds: [consultation.expert.userId],
-      type: "consultation_requested",
-      title: "Incoming Consultation Request",
-      body: `${customerName} is requesting a consultation with you`,
-      data: { consultationId: consultation.id },
-    });
-    if (consultation.expert?.user?.email) {
-      const emailHtml = await renderEmailTemplate({
-        title: "Incoming Consultation Request",
-        bodyHtml: `<p>${customerName} is requesting a consultation with you.</p>`,
-        ctaText: "View Request",
-        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com"}/consultations/${consultation.id}`,
-      });
-      await sendEmail({ to: consultation.expert.user.email, subject: "Incoming Consultation Request", html: emailHtml }).catch(e => log.error(e));
-    }
-  } catch (err) {
-    log.error(`[createConsultation] Notification dispatch failed: ${err.message}`);
-  }
-  */
-
   return toConsultationDetailDto(consultation, consultationContext(consultation));
 }
 
