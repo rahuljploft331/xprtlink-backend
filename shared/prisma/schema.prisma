@@ -663,6 +663,7 @@ model ExpertBanner {
   targetCategoryId String?              @map("target_category_id") @db.Uuid
   isActive         Boolean              @default(true) @map("is_active")
   approvalStatus   BannerApprovalStatus @default(pending) @map("approval_status")
+  rejectionReason  String?              @map("rejection_reason")
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
 

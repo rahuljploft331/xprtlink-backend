@@ -2,6 +2,7 @@ import { getDb } from "@xprtlink/shared/db";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { notFound, badRequest } from "@xprtlink/shared/utils/errors.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 
 export const listExpertReports = async (req, res) => {
   const db = getDb();
@@ -142,10 +143,27 @@ export const approveBanner = async (req, res) => {
 
   const banner = await db.expertBanner.update({
     where: { id },
-    data: { approvalStatus: "approved", isActive: true }
+    data: { approvalStatus: "approved", isActive: true },
+    include: { expert: { include: { user: true } } }
   }).catch(() => null);
 
   if (!banner) throw notFound("bannerNotFound");
+
+  if (banner.expert?.user?.email) {
+    renderEmailTemplate({
+      title: "Your Promotional Banner is Live!",
+      bodyHtml: "<p>Great news! Your promotional banner has been approved and is now live on the platform.</p>",
+      ctaText: "View My Banners",
+      ctaUrl: "https://xprtlink.com/expert/banners"
+    }).then(html => {
+      return sendEmail({
+        to: banner.expert.user.email,
+        subject: "Your Banner was Approved",
+        text: "Your promotional banner has been approved and is now live.",
+        html
+      });
+    }).catch(e => console.error("[BannerApprove] Email failed:", e));
+  }
 
   return ResponseFormatter.success(res, { data: banner, message: getMessage("updatedSuccessfully") });
 };
@@ -153,13 +171,32 @@ export const approveBanner = async (req, res) => {
 export const rejectBanner = async (req, res) => {
   const db = getDb();
   const { id } = req.params;
+  const { reason } = req.body;
+
+  if (!reason) throw badRequest("missingRequiredFields");
 
   const banner = await db.expertBanner.update({
     where: { id },
-    data: { approvalStatus: "rejected", isActive: false }
+    data: { approvalStatus: "rejected", isActive: false, rejectionReason: reason },
+    include: { expert: { include: { user: true } } }
   }).catch(() => null);
 
   if (!banner) throw notFound("bannerNotFound");
+
+  if (banner.expert?.user?.email) {
+    renderEmailTemplate({
+      title: "Banner Submission Update",
+      bodyHtml: "<p>We reviewed your recent banner submission, but unfortunately it was not approved.</p><p><strong>Reason:</strong> " + reason + "</p><p>Please review our guidelines and try submitting a new banner.</p>",
+      badgeText: "Requires Attention"
+    }).then(html => {
+      return sendEmail({
+        to: banner.expert.user.email,
+        subject: "Your Banner Needs Changes",
+        text: "Your banner was rejected for the following reason: " + reason,
+        html
+      });
+    }).catch(e => console.error("[BannerReject] Email failed:", e));
+  }
 
   return ResponseFormatter.success(res, { data: banner, message: getMessage("updatedSuccessfully") });
 };
