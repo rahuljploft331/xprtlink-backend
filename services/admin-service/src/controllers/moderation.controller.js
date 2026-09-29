@@ -119,7 +119,21 @@ export const listBanners = async (req, res) => {
     }
   });
 
-  return ResponseFormatter.success(res, { data: banners });
+  // Fetch all categories to map targetCategoryId to category name
+  const categories = await db.category.findMany({
+    select: { id: true, name: true }
+  });
+  const categoryMap = categories.reduce((acc, cat) => {
+    acc[cat.id] = cat.name;
+    return acc;
+  }, {});
+
+  const enrichedBanners = banners.map(banner => ({
+    ...banner,
+    categoryName: banner.targetCategoryId ? categoryMap[banner.targetCategoryId] || 'Unknown Category' : 'No tag'
+  }));
+
+  return ResponseFormatter.success(res, { data: enrichedBanners });
 };
 
 export const approveBanner = async (req, res) => {
