@@ -2177,6 +2177,7 @@ async function sendPayoutTransfer(payout, expert, logTag) {
         data: { payoutId: payout.id, amountCents: payout.amountCents },
       }).catch((e) => log.error(`[${logTag}] payout notify failed: ${e.message}`));
     }
+    emailPayoutSent(updated, expert).catch((e) => log.error(`[${logTag}] payout email failed: ${e.message}`));
     return { ok: true, payout: updated, error: null };
   } catch (err) {
     // Ledger rows stay stamped so the amount is never doubled; the retry job
@@ -2186,8 +2187,80 @@ async function sendPayoutTransfer(payout, expert, logTag) {
       data: { status: "failed" },
     });
     log.error(`[${logTag}] transfer failed for payout ${payout.id}: ${err.message}`);
+    // Alert admins on the first failure only — the daily retry job re-attempts
+    // failed payouts for 14 days and must not send an email every time.
+    if (payout.status !== "failed") {
+      alertPayoutFailed(updated, err.message).catch((e) => log.error(`[${logTag}] payout failure alert failed: ${e.message}`));
+    }
     return { ok: false, payout: updated, error: err.message };
   }
+}
+
+/**
+ * Email the expert that a payout was sent: amount, date, and the consultations
+ * it covers. Best-effort; the push notification is sent separately.
+ */
+async function emailPayoutSent(payout, expert) {
+  if (!expert.userId) return;
+  const db = getDb();
+  const [user, rows] = await Promise.all([
+    db.user.findUnique({ where: { id: expert.userId }, select: { email: true } }),
+    db.expertEarningsLedger.findMany({
+      where: { payoutId: payout.id },
+      orderBy: { createdAt: "asc" },
+      take: 50,
+      select: {
+        netCents: true,
+        createdAt: true,
+        consultation: { select: { customer: { select: { firstName: true, lastName: true } } } },
+      },
+    }),
+  ]);
+  if (!user?.email) return;
+
+  const dateFmt = (d) => new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const esc = (v) => String(v ?? "").replace(/[<>&"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]);
+  const itemRows = rows
+    .map((r) => {
+      const c = r.consultation?.customer;
+      const who = c ? `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() || "Consultation" : "Consultation";
+      return `<tr><td style="padding:6px 0;color:#475569">${esc(dateFmt(r.createdAt))} · ${esc(who)}</td><td style="padding:6px 0;text-align:right;color:#0f172a">${esc(usd(r.netCents))}</td></tr>`;
+    })
+    .join("");
+
+  const bodyHtml = `
+<p>Good news — we've sent <strong>${esc(usd(payout.amountCents))}</strong> of your XprtLink earnings to your payout account on ${esc(dateFmt(payout.updatedAt ?? new Date()))}.</p>
+${rows.length ? `<p style="margin-top:16px"><strong>Consultations included (${rows.length})</strong></p>
+<table role="presentation" width="100%" style="border-collapse:collapse;font-size:14px">${itemRows}
+<tr><td style="padding:8px 0;border-top:1px solid #e2e8f0"><strong>Total</strong></td><td style="padding:8px 0;border-top:1px solid #e2e8f0;text-align:right"><strong>${esc(usd(payout.amountCents))}</strong></td></tr></table>` : ""}`;
+
+  const html = await renderEmailTemplate({
+    title: "Payout Sent",
+    badgeText: "Payout",
+    bodyHtml,
+    bottomNoteHtml:
+      "<p>Funds usually reach your bank within a few business days, depending on your bank. You can track this payout in your Stripe payouts dashboard from the XprtLink app.</p>",
+  });
+  await sendEmail({
+    to: user.email,
+    subject: getMessage("payoutSentEmailSubject", { amount: usd(payout.amountCents) }),
+    html,
+  });
+}
+
+/** Tell the support address a payout transfer failed (first failure only). */
+async function alertPayoutFailed(payout, reason) {
+  const expert = await getDb().expertProfile.findUnique({
+    where: { id: payout.expertProfileId },
+    select: { firstName: true, lastName: true },
+  });
+  const name = expert ? `${expert.firstName ?? ""} ${expert.lastName ?? ""}`.trim() : payout.expertProfileId;
+  alertAdmins(getMessage("payoutFailedAlertSubject", { amount: usd(payout.amountCents) }), [
+    `A payout of ${usd(payout.amountCents)} to ${name || "an expert"} failed.`,
+    `Reason from Stripe: ${reason}`,
+    `Payout: ${payout.id}. The system retries failed payouts daily for 14 days.`,
+    "You can also retry it or mark it settled under Payouts in the admin portal.",
+  ]);
 }
 
 /** Per-run cache of available platform balance, decremented as payouts are sent. */
