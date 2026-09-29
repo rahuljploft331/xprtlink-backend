@@ -241,6 +241,14 @@ enum AdminPermissionLevel {
   @@map("admin_permission_level")
 }
 
+enum BannerApprovalStatus {
+  pending
+  approved
+  rejected
+
+  @@map("banner_approval_status")
+}
+
 enum SupportTicketStatus {
   open
   in_progress
@@ -647,15 +655,16 @@ model ExpertAvailabilityLog {
 }
 
 model ExpertBanner {
-  id               String   @id @default(uuid()) @db.Uuid
-  expertProfileId  String   @map("expert_profile_id") @db.Uuid
-  mediaUrl         String   @map("media_url")
-  linkUrl          String?  @map("link_url")
-  text             String?  @map("text")
-  targetCategoryId String?  @map("target_category_id") @db.Uuid
-  isActive         Boolean  @default(true) @map("is_active")
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String               @id @default(uuid()) @db.Uuid
+  expertProfileId  String               @map("expert_profile_id") @db.Uuid
+  mediaUrl         String               @map("media_url")
+  linkUrl          String?              @map("link_url")
+  text             String?              @map("text")
+  targetCategoryId String?              @map("target_category_id") @db.Uuid
+  isActive         Boolean              @default(true) @map("is_active")
+  approvalStatus   BannerApprovalStatus @default(pending) @map("approval_status")
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   expert ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
 
@@ -969,11 +978,11 @@ model Transaction {
 }
 
 model ConsultationCharge {
-  id               String   @id @default(uuid()) @db.Uuid
-  consultationId   String   @unique @map("consultation_id") @db.Uuid
-  transactionId    String   @unique @map("transaction_id") @db.Uuid
-  commissionCents  Int      @map("commission_cents")
-  expertShareCents Int      @map("expert_share_cents")
+  id               String    @id @default(uuid()) @db.Uuid
+  consultationId   String    @unique @map("consultation_id") @db.Uuid
+  transactionId    String    @unique @map("transaction_id") @db.Uuid
+  commissionCents  Int       @map("commission_cents")
+  expertShareCents Int       @map("expert_share_cents")
   // Card dispute (chargeback) on this charge: open | won | lost. Set by the
   // charge.dispute.* webhooks; while open, the expert's earning is on hold.
   disputeStatus    String?   @map("dispute_status") @db.VarChar(16)
@@ -983,7 +992,7 @@ model ConsultationCharge {
   // paid, partial refund made in the Stripe Dashboard). Shown as a to-do.
   needsReview      Boolean   @default(false) @map("needs_review")
   reviewNote       String?   @map("review_note") @db.VarChar(500)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   consultation Consultation @relation(fields: [consultationId], references: [id], onDelete: Restrict)
   transaction  Transaction  @relation(fields: [transactionId], references: [id], onDelete: Restrict)
@@ -1260,10 +1269,10 @@ model AdminBroadcast {
   body        String
   audience    String    @db.VarChar(64)
   type        String    @db.VarChar(64)
-  status      String    @db.VarChar(64) @default("draft") // draft, scheduled, sent, failed
+  status      String    @default("draft") @db.VarChar(64) // draft, scheduled, sent, failed
   scheduledAt DateTime? @map("scheduled_at") @db.Timestamptz(6)
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  
+
   @@map("admin_broadcasts")
 }

@@ -107,6 +107,7 @@ export const getPublicBanners = async (categoryId, query = {}) => {
   const banners = await db.expertBanner.findMany({
     where: {
       isActive: true,
+      approvalStatus: "approved",
       ...(categoryId ? { targetCategoryId: categoryId } : {}),
       expert: {
         verificationStatus: "approved",

@@ -104,3 +104,48 @@ export const deleteConversationReport = async (req, res) => {
 
   return ResponseFormatter.success(res, { message: getMessage("deletedSuccessfully") });
 };
+
+export const listBanners = async (req, res) => {
+  const db = getDb();
+  const { status } = req.query; // 'pending', 'approved', 'rejected'
+  
+  const banners = await db.expertBanner.findMany({
+    where: status ? { approvalStatus: status } : {},
+    orderBy: { createdAt: "desc" },
+    include: {
+      expert: {
+        select: { id: true, firstName: true, lastName: true }
+      }
+    }
+  });
+
+  return ResponseFormatter.success(res, { data: banners });
+};
+
+export const approveBanner = async (req, res) => {
+  const db = getDb();
+  const { id } = req.params;
+
+  const banner = await db.expertBanner.update({
+    where: { id },
+    data: { approvalStatus: "approved", isActive: true }
+  }).catch(() => null);
+
+  if (!banner) throw notFound("bannerNotFound");
+
+  return ResponseFormatter.success(res, { data: banner, message: getMessage("updatedSuccessfully") });
+};
+
+export const rejectBanner = async (req, res) => {
+  const db = getDb();
+  const { id } = req.params;
+
+  const banner = await db.expertBanner.update({
+    where: { id },
+    data: { approvalStatus: "rejected", isActive: false }
+  }).catch(() => null);
+
+  if (!banner) throw notFound("bannerNotFound");
+
+  return ResponseFormatter.success(res, { data: banner, message: getMessage("updatedSuccessfully") });
+};

@@ -79,7 +79,15 @@ export async function issueTokens(user, role) {
   const refreshHash = hashRefreshToken(refreshPlain);
   const expiresAt = getRefreshTokenExpiresAt();
 
-  await getDb().refreshToken.create({
+  const db = getDb();
+
+  // Enforce single session per role: revoke any existing active tokens for this role
+  await db.refreshToken.updateMany({
+    where: { userId: user.id, role: ctx.role, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+
+  await db.refreshToken.create({
     data: {
       userId: user.id,
       tokenHash: refreshHash,

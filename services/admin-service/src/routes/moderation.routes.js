@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
-import { listExpertReports, updateExpertReport, listConversationReports, deleteConversationReport } from "#controllers/moderation.controller.js";
+import { listExpertReports, updateExpertReport, listConversationReports, deleteConversationReport, listBanners, approveBanner, rejectBanner } from "#controllers/moderation.controller.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -11,5 +11,10 @@ router.patch("/expert-reports/:id", requirePermission("experts", "edit"), asyncH
 
 router.get("/conversation-reports", requirePermission("experts", "view"), asyncHandler(listConversationReports));
 router.delete("/conversation-reports/:id", requirePermission("experts", "edit"), asyncHandler(deleteConversationReport));
+
+router.get("/banners", requirePermission("experts", "view"), asyncHandler(listBanners));
+router.patch("/banners/:id/approve", requirePermission("experts", "edit"), asyncHandler(approveBanner));
+router.patch("/banners/:id/reject", requirePermission("experts", "edit"), asyncHandler(rejectBanner));
+
 
 export default router;
