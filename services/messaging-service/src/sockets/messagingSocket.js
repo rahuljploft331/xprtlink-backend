@@ -74,6 +74,7 @@ export function registerMessagingSockets(io) {
         role: payload.role,
         customerProfileId: payload.customerProfileId ?? null,
         expertProfileId: payload.expertProfileId ?? null,
+        iat: payload.iat,
       };
 
       next();

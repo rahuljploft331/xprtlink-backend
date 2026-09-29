@@ -4,6 +4,8 @@ import { getSecretSync } from "../config/secrets.js";
 import { getExpiresInSeconds, signAccessToken } from "../auth/jwt.js";
 import { hashToken, hashRefreshToken, verifyTokenHash } from "../auth/password.js";
 import { toAuthSessionDto, toAuthTokensDto } from "../mappers/auth.mapper.js";
+import { internalPost } from "../lib/internalFetch.js";
+import { getConfig } from "../config/loadEnv.js";
 
 export function getRefreshTokenExpiresAt() {
   const raw = String(getSecretSync("REFRESH_TOKEN_EXPIRES_IN", "30d")).trim().toLowerCase();
@@ -103,6 +105,20 @@ export async function issueTokens(user, role) {
     expertProfile: user.expertProfile,
     gates: { expertSubscriptionActive: ctx.subscriptionActive },
   });
+
+  try {
+    const { serviceUrls } = getConfig("user-service");
+    if (serviceUrls && serviceUrls.messaging) {
+      const newIat = Math.floor(Date.now() / 1000) - 2; // Allow small clock skew
+      internalPost(serviceUrls.messaging, '/api/internal/events/session-revoked', {
+        userId: user.id,
+        role: ctx.role,
+        newIat,
+      }).catch(() => {});
+    }
+  } catch (err) {
+    // Ignore config errors or network errors to not break login
+  }
 
   return toAuthTokensDto({
     accessToken,

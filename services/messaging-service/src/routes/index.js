@@ -83,4 +83,20 @@ router.post("/internal/events/account-disabled", internalServiceGuard, (req, res
   return res.json({ success: true });
 });
 
+router.post("/internal/events/session-revoked", internalServiceGuard, async (req, res) => {
+  const { userId, role, newIat } = req.body;
+  const io = getIo();
+  if (io) {
+    const sockets = await io.in(`user:${userId}`).fetchSockets();
+    for (const socket of sockets) {
+      if (socket.data.auth?.role === role && socket.data.auth?.iat < newIat) {
+        log.info("EMITTING session:revoked to old socket", { userId, role, socketId: socket.id });
+        socket.emit("session:revoked", { userId, role });
+        setTimeout(() => socket.disconnect(true), 1000);
+      }
+    }
+  }
+  return res.json({ success: true });
+});
+
 export default router;
