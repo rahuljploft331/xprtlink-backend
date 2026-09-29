@@ -331,7 +331,7 @@ async function getExpertProfileOrThrow(auth) {
     include: {
       categories: true,
       avatarMedia: true,
-      subscriptions: { where: { status: "active" }, take: 1 },
+      subscriptions: { where: { status: "active" }, take: 1, include: { plan: true } },
       settings: true,
     },
   });
@@ -340,13 +340,14 @@ async function getExpertProfileOrThrow(auth) {
   // subscriptionActive is true when expert has an active subscription,
   // including those scheduled to cancel at period end (access remains until currentPeriodEnd)
   const subscriptionActive = expert.subscriptions.length > 0;
-  return { expert, user, subscriptionActive };
+  const maxBanners = expert.subscriptions[0]?.plan?.maxBanners || 0;
+  return { expert, user, subscriptionActive, maxBanners };
 
 }
 
 export async function getExpertMe(auth) {
-  const { expert, user, subscriptionActive } = await getExpertProfileOrThrow(auth);
-  return toExpertMeDto(expert, { user, categories: expert.categories, subscriptionActive });
+  const { expert, user, subscriptionActive, maxBanners } = await getExpertProfileOrThrow(auth);
+  return toExpertMeDto(expert, { user, categories: expert.categories, subscriptionActive, maxBanners });
 }
 
 export async function updateExpertMe(auth, body) {
@@ -381,12 +382,13 @@ export async function updateExpertMe(auth, body) {
       ...(categoryConnect ? { categories: { set: categoryConnect } } : {}),
       ...(body.avatarMediaId !== undefined ? { avatarMediaId: body.avatarMediaId } : {}),
     },
-    include: { categories: true, avatarMedia: true, subscriptions: { where: { status: "active" }, take: 1 } },
+    include: { categories: true, avatarMedia: true, subscriptions: { where: { status: "active" }, take: 1, include: { plan: true } } },
   });
   return toExpertMeDto(updated, {
     user,
     categories: updated.categories,
     subscriptionActive,
+    maxBanners: updated.subscriptions[0]?.plan?.maxBanners || 0,
   });
 }
 

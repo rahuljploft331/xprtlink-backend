@@ -96,6 +96,21 @@ export const verifyPurchase = async (req, res, next) => {
         body: `Your ${subscription.plan.name} plan is now active via Google Play.`,
         data: { subscriptionId: subscription.id, planId: subscription.planId },
       });
+
+      const userEmail = (await getDb().user.findUnique({ where: { id: req.user.userId }, select: { email: true } }))?.email;
+      if (userEmail) {
+        const emailHtml = await renderEmailTemplate({
+          title: "Subscription Activated",
+          bodyHtml: `<p>Your ${subscription.plan.name} plan is now active via Google Play.</p>`,
+          ctaText: "View Subscription",
+          ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com",
+        });
+        await sendEmail({
+          to: userEmail,
+          subject: "Subscription Activated",
+          html: emailHtml,
+        });
+      }
     } catch (err) {
       log.error(`[googleIapController] Notification dispatch failed: ${err.message}`);
     }

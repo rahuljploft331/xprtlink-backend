@@ -35,7 +35,7 @@ export function toExpertPublicDto(expert, { categories, isSaved } = {}) {
   };
 }
 
-export function toExpertMeDto(expert, { user, categories, subscriptionActive = false }) {
+export function toExpertMeDto(expert, { user, categories, subscriptionActive = false, maxBanners = 0 }) {
   return {
     ...toExpertPublicDto(expert, { categories }),
     userId: user.id,
@@ -45,6 +45,7 @@ export function toExpertMeDto(expert, { user, categories, subscriptionActive = f
     onboardingComplete: Boolean(expert.onboardingCompletedAt),
     searchEligible: expert.searchEligible,
     subscriptionActive,
+    maxBanners,
     // Stripe Connect payout setup flags — used by the Flutter Payment & Payouts screen.
     // kycComplete: legacy flag for older app builds (in-app KYC form) — true once a
     //   Stripe account exists. Unchanged so those builds still reach the bank step.
@@ -142,6 +143,7 @@ function toDashboardSubscriptionDto(subscription) {
   if (!subscription) return null;
   return {
     planName: subscription.plan?.name ?? null,
+    maxBanners: subscription.plan?.maxBanners ?? 0,
     status: subscription.status,
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd,
     currentPeriodEnd: toIso(subscription.currentPeriodEnd),

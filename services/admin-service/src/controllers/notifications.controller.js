@@ -58,6 +58,7 @@ import { DEFAULT_NOTIFICATION_PREFERENCES } from "@xprtlink/shared/constants/ind
 
 import { logAdminAction } from "#utils/audit.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
+import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 
 export async function send(req, res) {
   let validated;
@@ -82,6 +83,7 @@ export async function send(req, res) {
     where: roleFilter,
     select: {
       id: true,
+      email: true,
       expertProfile: { select: { id: true } },
       customerProfile: { select: { id: true } },
       notificationPref: { select: { preferences: true } }
@@ -145,6 +147,22 @@ export async function send(req, res) {
         body: body,
         data: {}, // no extra payload needed for simple broadcast
       });
+
+      // Dispatch emails in background
+      const chunkUsers = users.filter(u => chunk.includes(u.id) && u.email);
+      if (chunkUsers.length > 0) {
+        const emailHtml = await renderEmailTemplate({
+          title: title,
+          bodyHtml: `<p>${body}</p>`,
+          ctaText: "Open App",
+          ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://app.xprtlink.com",
+        });
+        
+        Promise.allSettled(chunkUsers.map(u => 
+          sendEmail({ to: u.email, subject: title, html: emailHtml })
+        )).catch(e => log.error(e));
+      }
+
     } catch (err) {
       log.error(`[admin-service] Failed to dispatch broadcast chunk: ${err.message}`);
     }

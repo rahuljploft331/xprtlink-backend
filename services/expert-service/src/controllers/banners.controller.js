@@ -24,9 +24,18 @@ export const createBanner = async (auth, inputData) => {
   if (!parsed.success) {
     throw badRequest("validationFailed", "BAD_REQUEST", null, parsed.error.format());
   }
-  const { mediaUrl, linkUrl, isActive, targetCategoryId, text } = parsed.data;
+  let { mediaUrl, linkUrl, isActive, targetCategoryId, text } = parsed.data;
 
   const db = getDb();
+
+  // If mediaUrl is an asset UUID rather than a direct URL, resolve its permanent URL
+  if (!mediaUrl.startsWith("http")) {
+    const asset = await db.mediaAsset.findUnique({ where: { id: mediaUrl } });
+    if (!asset || asset.ownerUserId !== auth.userId) {
+      throw badRequest("mediaNotFound", "BAD_REQUEST", null, { mediaUrl });
+    }
+    mediaUrl = resolveMediaUrl(asset.storageKey);
+  }
 
   const profile = await db.expertProfile.findUnique({
     where: { userId: auth.userId },

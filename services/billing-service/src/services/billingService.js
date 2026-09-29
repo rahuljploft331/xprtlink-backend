@@ -19,7 +19,7 @@ import {
   CONSULTATION_COMMISSION_RATE,
   consultationHoldMinimumCents,
 } from "@xprtlink/shared/lib/consultationBilling.js";
-import { sendEmail } from "@xprtlink/shared/lib/email.js";
+import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 import { buildConsultationInvoiceEmail } from "@xprtlink/shared/lib/consultationInvoice.js";
 import { PAYOUT_SCHEDULE_DEFAULT_DAYS } from "@xprtlink/shared/contracts/settings.schema.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
@@ -588,6 +588,20 @@ function notifyPaymentFailed(consultationId) {
       body: "We were unable to process your consultation payment. Please check your payment method and try again.",
       data: { consultationId },
     });
+
+    if (consultation.customer.user.email) {
+      const emailHtml = await renderEmailTemplate({
+        title: "Payment Failed",
+        bodyHtml: "<p>We were unable to process your consultation payment. Please check your payment method and try again.</p>",
+        ctaText: "Update Payment Method",
+        ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://app.xprtlink.com",
+      });
+      await sendEmail({
+        to: consultation.customer.user.email,
+        subject: "Consultation Payment Failed",
+        html: emailHtml,
+      });
+    }
   })().catch((err) => log.error(`[settleConsultation] Failure notification failed: ${err.message}`));
 }
 
@@ -1817,6 +1831,21 @@ export async function cancelSubscription(auth) {
       body: `Your ${updated.plan.name} subscription will be cancelled on ${periodEnd}. You retain access until then.`,
       data: { subscriptionId: updated.id, planId: updated.planId },
     });
+
+    const userEmail = (await getDb().user.findUnique({ where: { id: auth.userId }, select: { email: true } }))?.email;
+    if (userEmail) {
+      const emailHtml = await renderEmailTemplate({
+        title: "Subscription Cancellation Scheduled",
+        bodyHtml: `<p>Your ${updated.plan.name} subscription will be cancelled on ${periodEnd}. You retain access until then.</p>`,
+        ctaText: "View Subscription",
+        ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com",
+      });
+      await sendEmail({
+        to: userEmail,
+        subject: "Subscription Cancellation Scheduled",
+        html: emailHtml,
+      });
+    }
   } catch (err) {
     log.error(`[cancelSubscription] Notification dispatch failed: ${err.message}`);
   }
@@ -1893,6 +1922,23 @@ export async function expireSubscriptions() {
           body: "Your expert subscription has expired. Renew now to stay discoverable on XpertLink.",
           data: {},
         });
+
+        const users = await db2.user.findMany({ where: { id: { in: userIds } }, select: { email: true } });
+        for (const u of users) {
+          if (u.email) {
+            const emailHtml = await renderEmailTemplate({
+              title: "Subscription Expired",
+              bodyHtml: "<p>Your expert subscription has expired. Renew now to stay discoverable on XpertLink.</p>",
+              ctaText: "Renew Subscription",
+              ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com",
+            });
+            await sendEmail({
+              to: u.email,
+              subject: "Subscription Expired",
+              html: emailHtml,
+            }).catch(e => log.error(e));
+          }
+        }
       }
     } catch (err) {
       log.error(`[expireSubscriptions] Notification dispatch failed: ${err.message}`);

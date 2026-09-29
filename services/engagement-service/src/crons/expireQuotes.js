@@ -1,6 +1,7 @@
 import { getDb } from "@xprtlink/shared/db";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 const log = logger.child({ module: "expireQuotes" });
 
@@ -45,6 +46,21 @@ export async function expireStaleQuotes() {
         body: getMessage("quoteExpiredCustomer"),
         data: {},
       }).catch((err) => log.error({ err: err.message }, "[cron] Failed to notify customers:"));
+
+      getDb().user.findMany({ where: { customerProfile: { id: { in: customerIds } } }, select: { email: true } })
+        .then(async (users) => {
+          for (const u of users) {
+            if (u.email) {
+              const html = await renderEmailTemplate({
+                title: "Quote Expired",
+                bodyHtml: `<p>${getMessage("quoteExpiredCustomer")}</p>`,
+                ctaText: "Open App",
+                ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://app.xprtlink.com",
+              });
+              await sendEmail({ to: u.email, subject: "Quote Expired", html }).catch(e => log.error(e));
+            }
+          }
+        });
     }
 
     if (expertIds.length > 0) {
@@ -55,6 +71,21 @@ export async function expireStaleQuotes() {
         body: getMessage("quoteExpiredExpert"),
         data: {},
       }).catch((err) => log.error({ err: err.message }, "[cron] Failed to notify experts:"));
+
+      getDb().user.findMany({ where: { expertProfile: { id: { in: expertIds } } }, select: { email: true } })
+        .then(async (users) => {
+          for (const u of users) {
+            if (u.email) {
+              const html = await renderEmailTemplate({
+                title: "Quote Expired",
+                bodyHtml: `<p>${getMessage("quoteExpiredExpert")}</p>`,
+                ctaText: "Open App",
+                ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com",
+              });
+              await sendEmail({ to: u.email, subject: "Quote Expired", html }).catch(e => log.error(e));
+            }
+          }
+        });
     }
   }
 

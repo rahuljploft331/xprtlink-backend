@@ -127,7 +127,7 @@ export async function approve(req, res, next) {
       const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
       const expertProfile = await db.expertProfile.findUnique({
         where: { id: result.expertProfileId },
-        select: { userId: true, firstName: true },
+        select: { userId: true, firstName: true, user: { select: { email: true } } },
       });
       if (expertProfile?.userId) {
         await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
@@ -137,6 +137,20 @@ export async function approve(req, res, next) {
           body: `Congratulations${expertProfile.firstName ? `, ${expertProfile.firstName}` : ""}! Your expert profile has been approved. You can now receive consultation requests.`,
           data: { verificationId: result.id },
         });
+
+        if (expertProfile.user?.email) {
+          const emailHtml = await renderEmailTemplate({
+            title: "Account Verified",
+            bodyHtml: `<p>Congratulations${expertProfile.firstName ? ` ${expertProfile.firstName}` : ""}! Your expert profile has been approved.</p><p>You can now receive consultation requests.</p>`,
+            ctaText: "View Profile",
+            ctaUrl: "https://app.xprtlink.com/expert/profile",
+          });
+          await sendEmail({
+            to: expertProfile.user.email,
+            subject: "Your Account has been successfully verified",
+            html: emailHtml,
+          });
+        }
       }
     } catch (err) {
       log.error(`[verifications.approve] Notification dispatch failed: ${err.message}`);
