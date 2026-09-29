@@ -34,6 +34,7 @@ export async function renderEmailTemplate({
     html = html.replace(/{{BADGE_TEXT}}/g, badgeText);
   } else {
     html = html.replace(/{{SHOW_BADGE}}/g, "none");
+    html = html.replace(/{{BADGE_TEXT}}/g, "");
   }
 
   if (ctaText && ctaUrl) {
@@ -41,7 +42,11 @@ export async function renderEmailTemplate({
     html = html.replace(/{{CTA_TEXT}}/g, ctaText);
     html = html.replace(/{{CTA_URL}}/g, ctaUrl);
   } else {
+    // Blank the hidden button too: some email clients ignore display:none and
+    // would otherwise show a literal "{{CTA_TEXT}}" button.
     html = html.replace(/{{SHOW_CTA}}/g, "none");
+    html = html.replace(/{{CTA_TEXT}}/g, "");
+    html = html.replace(/{{CTA_URL}}/g, "#");
   }
 
   if (bottomNoteHtml) {
@@ -49,6 +54,7 @@ export async function renderEmailTemplate({
     html = html.replace(/{{BOTTOM_NOTE_HTML}}/g, bottomNoteHtml);
   } else {
     html = html.replace(/{{SHOW_BOTTOM_NOTE}}/g, "none");
+    html = html.replace(/{{BOTTOM_NOTE_HTML}}/g, "");
   }
 
   return html;
