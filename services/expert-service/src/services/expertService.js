@@ -13,7 +13,7 @@ import { amountToCents } from "@xprtlink/shared/mappers/common.js";
 import { badRequest, notFound, unauthorized } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 
-const PUBLIC_WHERE = { searchEligible: true, verificationStatus: "approved" };
+const PUBLIC_WHERE = { searchEligible: true, verificationStatus: "approved", user: { status: "active" } };
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
