@@ -139,6 +139,7 @@
   "accountSuspendedContactSupport": "Your account has been suspended. Contact support.",
   "failedToCreateSession": "Failed to create session",
   "emailAlreadyExists": "An account with this email already exists.",
+  "accountCreatedViaSocialLogin": "This email is registered via social login. Please use Google/Apple to continue.",
   "phoneAlreadyInUse": "This mobile number is already in use.",
   "emailOrPhoneRequired": "Email or phone is required",
   "refreshTokenRequired": "Refresh token required",

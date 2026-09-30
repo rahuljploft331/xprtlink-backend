@@ -199,6 +199,10 @@ export async function register(body) {
       throw conflict("emailAlreadyExists", "EMAIL_TAKEN");
     }
 
+    if (!existingActiveUserWithEmail.passwordHash && existingActiveUserWithEmail.firebaseUid) {
+      throw conflict("accountCreatedViaSocialLogin", "USE_SOCIAL_LOGIN");
+    }
+
     if (!password) {
       throw badRequest("passwordRequiredForExistingAccount", "PASSWORD_REQUIRED");
     }
