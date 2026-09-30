@@ -2,7 +2,7 @@ import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
-
+import { recalculateExpertRating } from "@xprtlink/shared/utils/rating.js";
 
 export async function list(req, res, next) {
   try {
@@ -40,6 +40,7 @@ export async function hide(req, res, next) {
   try {
     const db = getDb();
     const r = await db.review.update({ where: { id: req.params.id }, data: { status: "hidden" } });
+    await recalculateExpertRating(r.expertId);
     return ResponseFormatter.success(res, { message: getMessage("reviewHidden"), data: r });
   } catch (err) { next(err); }
 }
@@ -48,6 +49,7 @@ export async function publish(req, res, next) {
   try {
     const db = getDb();
     const r = await db.review.update({ where: { id: req.params.id }, data: { status: "published" } });
+    await recalculateExpertRating(r.expertId);
     return ResponseFormatter.success(res, { message: getMessage("reviewPublished"), data: r });
   } catch (err) { next(err); }
 }

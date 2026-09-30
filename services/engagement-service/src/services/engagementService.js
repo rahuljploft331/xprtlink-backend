@@ -21,6 +21,7 @@ import {
 } from "@xprtlink/shared/mappers/consultation.mapper.js";
 import { badRequest, conflict, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
+import { recalculateExpertRating } from "@xprtlink/shared/utils/rating.js";
 
 const QUOTE_INCLUDE = {
   customer: { include: { user: true, avatarMedia: true } },
@@ -1249,12 +1250,7 @@ export async function submitReview(auth, consultationId, body) {
 
     // Atomically update rating using raw SQL — prevents the read-modify-write race
     // where two concurrent reviews both read the same ratingCount and overwrite each other.
-    await tx.$executeRaw`
-      UPDATE expert_profiles
-      SET rating_count = rating_count + 1,
-          rating_avg   = ROUND(((rating_avg * rating_count) + ${body.rating}::numeric) / (rating_count + 1), 2)
-      WHERE id = ${consultation.expertId}::uuid
-    `;
+    await recalculateExpertRating(consultation.expertId, tx);
 
     return created;
   });
