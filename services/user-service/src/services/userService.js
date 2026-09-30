@@ -1091,13 +1091,21 @@ export async function getRecentlyViewed(auth, query) {
   const db = getDb();
   const [rows, total] = await Promise.all([
     db.customerRecentlyViewed.findMany({
-      where: { customerProfileId: auth.customerProfileId },
+      where: { 
+        customerProfileId: auth.customerProfileId,
+        expert: { user: { status: "active" } }
+      },
       orderBy: { viewedAt: "desc" },
       skip,
       take: limit,
       include: { expert: { include: { categories: true, avatarMedia: true } } },
     }),
-    db.customerRecentlyViewed.count({ where: { customerProfileId: auth.customerProfileId } }),
+    db.customerRecentlyViewed.count({ 
+      where: { 
+        customerProfileId: auth.customerProfileId,
+        expert: { user: { status: "active" } }
+      } 
+    }),
   ]);
   const items = rows.map((r) => ({
     ...toExpertPublicDto(r.expert),
@@ -1125,13 +1133,21 @@ export async function getSavedExperts(auth, query) {
   const db = getDb();
   const [rows, total] = await Promise.all([
     db.customerSavedExpert.findMany({
-      where: { customerProfileId: auth.customerProfileId },
+      where: { 
+        customerProfileId: auth.customerProfileId,
+        expert: { user: { status: "active" } }
+      },
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
       include: { expert: { include: { categories: true, avatarMedia: true } } },
     }),
-    db.customerSavedExpert.count({ where: { customerProfileId: auth.customerProfileId } }),
+    db.customerSavedExpert.count({ 
+      where: { 
+        customerProfileId: auth.customerProfileId,
+        expert: { user: { status: "active" } }
+      } 
+    }),
   ]);
   const items = rows.map((r) => ({
     ...toExpertPublicDto(r.expert),

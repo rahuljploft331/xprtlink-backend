@@ -864,9 +864,22 @@ export async function updateSettings(auth, body) {
 }
 
 export async function deleteExpertAccount(auth) {
-  await getDb().user.update({
-    where: { id: auth.userId },
-    data: { status: "deleted", deletedAt: new Date(), firebaseUid: null },
+  const db = getDb();
+  await db.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: auth.userId },
+      data: { status: "deleted", deletedAt: new Date(), firebaseUid: null },
+    });
+    
+    await tx.expertProfile.updateMany({
+      where: { userId: auth.userId },
+      data: { 
+        availabilityStatus: "offline", 
+        searchEligible: false,
+        isFeatured: false
+      }
+    });
   });
+  
   return { deleted: true };
 }
