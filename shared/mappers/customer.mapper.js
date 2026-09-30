@@ -7,6 +7,7 @@ export function toCustomerMeDto({ profile, user, avatarUrl = null }) {
     userId: user.id,
     email: user.email,
     phone: user.phone,
+    hasPassword: Boolean(user.passwordHash),
     firstName: profile.firstName,
     lastName: profile.lastName,
     avatarUrl: finalAvatarUrl,

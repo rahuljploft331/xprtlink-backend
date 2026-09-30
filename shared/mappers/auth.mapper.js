@@ -6,6 +6,7 @@ export function toAuthSessionDto({ user, role, customerProfile, expertProfile, g
     role,
     email: user.email,
     phone: user.phone,
+    hasPassword: Boolean(user.passwordHash),
     hasCustomerProfile: Boolean(customerProfile),
     hasExpertProfile: Boolean(expertProfile),
     gates: {
