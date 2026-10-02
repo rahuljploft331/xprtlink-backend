@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { login, logout, me } from "#controllers/auth.controller.js";
+import { login, logout, me, refresh } from "#controllers/auth.controller.js";
 import { requireAdmin } from "#middlewares/adminAuth.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 
@@ -10,6 +10,9 @@ router.post("/login", asyncHandler(login));
 
 /** POST /api/auth/logout */
 router.post("/logout", requireAdmin, asyncHandler(logout));
+
+/** POST /api/auth/refresh */
+router.post("/refresh", asyncHandler(refresh));
 
 /** GET /api/auth/me */
 router.get("/me", requireAdmin, asyncHandler(me));

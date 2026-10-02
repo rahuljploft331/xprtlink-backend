@@ -90,6 +90,36 @@
             },
             "description": "Fetch info of the logged in administrator."
           }
+        },
+        {
+          "name": "Admin Refresh",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"string_value_here\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Refresh an administrator session using a refresh token."
+          }
         }
       ]
     },
