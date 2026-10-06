@@ -107,6 +107,11 @@ export async function getById(req, res, next) {
         reviews: { take: 10, orderBy: { createdAt: "desc" } },
         payouts: { take: 5, orderBy: { createdAt: "desc" } },
         user: { select: { email: true, phone: true, status: true, createdAt: true } },
+        reports: {
+          take: 10,
+          orderBy: { createdAt: "desc" },
+          include: { customer: { select: { firstName: true, lastName: true } } }
+        },
       },
     });
     if (!expert) {

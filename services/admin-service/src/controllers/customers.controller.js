@@ -95,6 +95,11 @@ export async function getById(req, res, next) {
               orderBy: { createdAt: "desc" },
               include: { expert: { select: { firstName: true, lastName: true } } },
             },
+            expertReports: {
+              take: 10,
+              orderBy: { createdAt: "desc" },
+              include: { expert: { select: { firstName: true, lastName: true } } }
+            }
           },
         },
       },
