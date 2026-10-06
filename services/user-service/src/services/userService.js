@@ -659,17 +659,21 @@ export async function forgotPassword(body) {
   });
 
   if (!user) {
-    // Prevent timing attacks by hashing a dummy password to simulate the time taken 
-    // by createAndDeliverOtp (which does DB inserts).
-    await hashPassword("dummy_for_timing_consistency_1234");
-    
-    // Return a plausible response without sending anything or revealing the email isn't registered.
-    // Use the real OTP TTL config so the response is indistinguishable from a genuine send.
     const { ttlMs } = getOtpConfig();
+    try {
+      await createAndDeliverOtp({
+        email,
+        phone,
+        purpose: "reset_password",
+        channel: email ? "email" : "phone",
+        skipDelivery: true,
+      });
+    } catch (err) {
+      log.error({ err: err.message }, "[forgotPassword] Dummy OTP delivery failed:");
+    }
     return { sent: true, expiresInSeconds: ttlMs / 1000, channel: email ? "email" : "phone" };
   }
 
-  await hashPassword("dummy_for_timing_consistency_1234");
   const { ttlMs } = getOtpConfig();
 
   // Await so the OTP challenge row is persisted before we respond. Previously this

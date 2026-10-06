@@ -140,6 +140,7 @@ export async function createAndDeliverOtp({
   channel,
   userId,
   registrationData,
+  skipDelivery = false,
 }) {
   const { ttlMs } = getOtpConfig();
 
@@ -150,7 +151,9 @@ export async function createAndDeliverOtp({
   let code = null;
   let codeHash = "TWILIO_VERIFY";
 
-  if (resolvedChannel === "phone") {
+  if (skipDelivery) {
+    codeHash = await hashToken("DUMMY_NEVER_MATCHES");
+  } else if (resolvedChannel === "phone") {
     await deliverOtp({ email, phone, code: null, purpose, channel: resolvedChannel });
   } else {
     code = generateOtpCode();
