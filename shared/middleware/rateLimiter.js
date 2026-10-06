@@ -60,7 +60,7 @@ export const authRateLimiter = createRateLimiter({
  * 5 requests per IP per hour.
  */
 export const otpRateLimiter = createRateLimiter({
-  windowMs: 60 * 60 * 1000, // 1 hour
+  windowMs: Number(process.env.RATE_LIMIT_OTP_WINDOW_MS || 60 * 60 * 1000), // 1 hour
   max: Number(process.env.RATE_LIMIT_OTP_MAX || 5),
   message: {
     success: false,
@@ -77,7 +77,7 @@ export const otpRateLimiter = createRateLimiter({
  * 5 requests per IP per 15 minutes.
  */
 export const passwordRateLimiter = createRateLimiter({
-  windowMs: 15 * 60 * 1000,
+  windowMs: Number(process.env.RATE_LIMIT_PASSWORD_WINDOW_MS || 15 * 60 * 1000),
   max: Number(process.env.RATE_LIMIT_PASSWORD_MAX || 5),
   message: {
     success: false,
@@ -85,6 +85,23 @@ export const passwordRateLimiter = createRateLimiter({
     error: {
       code: "PASSWORD_RATE_LIMIT_EXCEEDED",
       details: "Maximum password reset attempts reached.",
+    },
+  },
+});
+
+/**
+ * Limiter for check-availability to prevent enumeration.
+ * 10 requests per IP per hour.
+ */
+export const availabilityRateLimiter = createRateLimiter({
+  windowMs: Number(process.env.RATE_LIMIT_AVAILABILITY_WINDOW_MS || 60 * 60 * 1000),
+  max: Number(process.env.RATE_LIMIT_AVAILABILITY_MAX || 10),
+  message: {
+    success: false,
+    message: "Too many availability checks. Please try again later.",
+    error: {
+      code: "AVAILABILITY_RATE_LIMIT_EXCEEDED",
+      details: "Maximum check-availability attempts reached.",
     },
   },
 });

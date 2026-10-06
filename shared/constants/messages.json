@@ -43,6 +43,7 @@
   "otpSent": "OTP sent",
   "otpVerified": "OTP verified",
   "otpResent": "OTP resent",
+  "otpResendCooldown": "Please wait {waitSeconds} seconds before requesting a new code.",
   "resetCodeSent": "Reset code sent",
   "passwordReset": "Password reset",
   "passwordChanged": "Password changed",

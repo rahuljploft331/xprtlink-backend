@@ -50,9 +50,10 @@ export async function assertOtpResendAllowed({ email, phone, purpose }) {
   if (elapsed < resendCooldownMs) {
     const waitSeconds = Math.ceil((resendCooldownMs - elapsed) / 1000);
     throw badRequest(
-      `Please wait ${waitSeconds} seconds before requesting a new code.`,
+      "otpResendCooldown",
       "OTP_RESEND_COOLDOWN",
-      email ? "email" : "phone"
+      email ? "email" : "phone",
+      { waitSeconds }
     );
   }
 }

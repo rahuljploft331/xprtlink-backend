@@ -1,7 +1,7 @@
 import { getConfig } from "@xprtlink/shared/config/loadEnv.js";
 import { createApp, startService } from "@xprtlink/shared/config/serviceTemplate.js";
 import { errorHandler, notFoundHandler } from "@xprtlink/shared/middleware/errorHandler.js";
-import { defaultRateLimiter, authRateLimiter, otpRateLimiter, passwordRateLimiter } from "@xprtlink/shared/middleware/rateLimiter.js";
+import { defaultRateLimiter, authRateLimiter, otpRateLimiter, passwordRateLimiter, availabilityRateLimiter } from "@xprtlink/shared/middleware/rateLimiter.js";
 import routes, { mountGatewayProxies } from "./src/routes/index.js";
 import { createSocketProxy } from "./src/proxy.js";
 
@@ -14,6 +14,9 @@ app.use(socketProxy);
 
 // ── Rate Limiting ─────────────────────────────────────────────────────────────
 // Order matters: more specific paths first, generic paths last.
+
+// M6: check-availability is a public email/phone enumeration oracle — apply strict cap (10/hour/IP)
+app.use("/api/v1/auth/check-availability", availabilityRateLimiter);
 
 // OTP send / resend — triggers real emails/SMS: ultra-strict (5/hour/IP)
 app.use("/api/v1/auth/otp/send", otpRateLimiter);
@@ -28,9 +31,6 @@ app.use("/api/v1/auth", authRateLimiter);
 
 // H3: Admin login — same strict limit as user auth (was using weak defaultRateLimiter = 100/15min)
 app.use("/api/v1/admin/auth", authRateLimiter);
-
-// M6: check-availability is a public email/phone enumeration oracle — apply strict cap (10/hour/IP)
-app.use("/api/v1/auth/check-availability", otpRateLimiter);
 
 // Global fallback for all other API routes (100/15min/IP)
 app.use(defaultRateLimiter);
