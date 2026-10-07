@@ -1353,6 +1353,7 @@ export async function createReport(auth, body) {
       expertId: body.expertId,
       reason: body.reason,
       details: body.details ?? null,
+      evidence: body.evidence ?? [],
     },
   });
 

@@ -101,6 +101,7 @@ export const expertReportRequestSchema = z.object({
   expertId: z.string().uuid(),
   reason: z.string().min(1).max(120),
   details: z.string().max(2000).optional(),
+  evidence: z.array(z.string().url()).max(5).optional(),
 });
 
 export const expertReportDtoSchema = z.object({
@@ -108,6 +109,7 @@ export const expertReportDtoSchema = z.object({
   expertId: z.string().uuid(),
   reason: z.string(),
   details: z.string().nullable(),
+  evidence: z.array(z.string()).optional(),
   status: z.enum(["open", "reviewing", "resolved", "dismissed"]),
   createdAt: z.string().datetime(),
 });

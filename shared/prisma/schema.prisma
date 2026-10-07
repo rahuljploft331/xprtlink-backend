@@ -803,6 +803,7 @@ model ExpertReport {
   expertId   String             @map("expert_id") @db.Uuid
   reason     String             @db.VarChar(120)
   details    String?
+  evidence   Json               @default("[]")
   status     ExpertReportStatus @default(open)
   createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)

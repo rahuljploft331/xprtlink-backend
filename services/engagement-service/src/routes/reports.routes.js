@@ -10,7 +10,25 @@ import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 
 const router = Router();
 
+const REPORT_REASONS = [
+  "Inappropriate behavior",
+  "Offensive language",
+  "Spam or misleading",
+  "Harassment or abuse",
+  "Did not show up",
+  "Requested off-platform payment",
+  "Other"
+];
+
 router.use(authenticate);
+
+router.get("/reasons", (req, res) => {
+  return ResponseFormatter.success(res, {
+    message: "Report reasons fetched successfully",
+    data: REPORT_REASONS,
+    status: 200,
+  });
+});
 
 router.post(
   "/",
