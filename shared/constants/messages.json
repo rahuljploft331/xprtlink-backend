@@ -353,5 +353,6 @@
   "payoutAmountInvalid": "Enter a payout amount greater than zero",
   "payoutAmountExceedsBalance": "The amount is more than the expert's payable balance of {balance}",
   "payoutSentEmailSubject": "Your XprtLink payout of {amount} is on its way",
-  "payoutFailedAlertSubject": "Payout failed: {amount} — action may be needed"
+  "payoutFailedAlertSubject": "Payout failed: {amount} — action may be needed",
+  "reportsFetched": "Reports retrieved successfully"
 }

@@ -22,6 +22,18 @@ const REPORT_REASONS = [
 
 router.use(authenticate);
 
+router.get(
+  "/",
+  asyncHandler(async (req, res) => {
+    const data = await svc.getMyReports(req.auth);
+    return ResponseFormatter.success(res, {
+      message: getMessage("reportsFetched"),
+      data,
+      status: 200,
+    });
+  })
+);
+
 router.get("/reasons", (req, res) => {
   return ResponseFormatter.success(res, {
     message: "Report reasons fetched successfully",

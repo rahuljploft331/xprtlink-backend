@@ -731,6 +731,31 @@
             },
             "description": "Submit safety/misconduct report regarding an expert."
           }
+        },
+        {
+          "name": "Get Customer Reports",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/reports",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "reports"
+              ]
+            },
+            "description": "Fetch a list of experts that the current customer has reported."
+          }
         }
       ]
     },

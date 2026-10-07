@@ -19,6 +19,7 @@ import {
   toExpertReportDto,
   toVideoTokenDto,
 } from "@xprtlink/shared/mappers/consultation.mapper.js";
+import { toExpertPublicDto } from "@xprtlink/shared/mappers/expert.mapper.js";
 import { badRequest, conflict, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 import { recalculateExpertRating } from "@xprtlink/shared/utils/rating.js";
@@ -1340,6 +1341,28 @@ export async function getPendingReviews(auth, query) {
 }
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
+
+export async function getMyReports(auth) {
+  assertCustomer(auth);
+  const db = getDb();
+  const reports = await db.expertReport.findMany({
+    where: { customerId: auth.customerProfileId },
+    include: {
+      expert: {
+        include: { user: true, categories: true, avatarMedia: true }
+      }
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return reports.map((r) => {
+    const dto = toExpertReportDto(r);
+    if (r.expert) {
+      dto.expert = toExpertPublicDto(r.expert, { categories: r.expert.categories });
+    }
+    return dto;
+  });
+}
 
 export async function createReport(auth, body) {
   assertCustomer(auth);
