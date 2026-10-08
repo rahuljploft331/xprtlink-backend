@@ -814,11 +814,6 @@ export async function verifyPhoneChange(userId, body) {
         where: { id: userId },
         data: { phone, phoneVerifiedAt: new Date() },
       }),
-      // Security: invalidate all other sessions on a mobile number change
-      db.refreshToken.updateMany({
-        where: { userId, revokedAt: null },
-        data: { revokedAt: new Date() },
-      }),
     ]);
   } catch (err) {
     if (err?.code === "P2002") {
