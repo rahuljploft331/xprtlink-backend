@@ -30,6 +30,15 @@ router.get(
   optionalAuthenticate,
   asyncHandler(async (req, res) => {
     const data = await svc.getCmsPage(req.params.slug);
+    const content = data.bodyHtml || "";
+    
+    // If the CMS content is already a full HTML document (raw HTML mode), serve it directly
+    if (content.toLowerCase().includes("<html") || content.toLowerCase().includes("<!doctype")) {
+      res.setHeader("Content-Type", "text/html");
+      return res.send(content);
+    }
+
+    // Otherwise, wrap it in the default layout (for visual editor content)
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -42,7 +51,7 @@ router.get(
 </head>
 <body>
   <h1>${data.title}</h1>
-  ${data.bodyHtml || ""}
+  ${content}
 </body>
 </html>`;
     res.setHeader("Content-Type", "text/html");
