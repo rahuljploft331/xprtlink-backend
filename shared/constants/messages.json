@@ -295,7 +295,7 @@
   "emailRequiredForEmailOtp": "Email is required for email OTP",
   "otpExpiredOrNotFound": "OTP expired or not found",
   "otpTooManyAttempts": "Too many incorrect attempts. Please try again later.",
-  "otpIncorrect": "The verification code entered is incorrect.",
+  "otpIncorrect": "Incorrect code. Please try again.Incorrect code. Please try again.",
   "bannerDeleted": "Banner deleted successfully.",
   "callStatusLoaded": "Call status loaded",
   "subscriptionPlanUpdated": "Subscription Plan updated successfully",
