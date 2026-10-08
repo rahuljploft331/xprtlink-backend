@@ -158,6 +158,7 @@
   "passwordRequiredForExistingAccount": "Password is required to add a profile to an existing account.",
   "currentPasswordIncorrect": "Current password is incorrect",
   "samePhoneNumber": "This is already your current mobile number.",
+  "unregisteredUser": "This email or phone number is not registered.",
   "userNotFound": "User not found",
   "expertProfileNotFound": "Expert profile not found",
   "customerProfileNotFound": "Customer profile not found",

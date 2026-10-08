@@ -3,7 +3,7 @@ import { resolveMediaUrl, toIso } from "./common.js";
 
 export function toConversationSummaryDto(
   conversation,
-  { peerName, peerAvatarUrl, unreadCount, lastMessage, isBlocked, blockedByMe }
+  { peerName, peerAvatarUrl, unreadCount, lastMessage, isBlocked, blockedByMe, peerIsOnline }
 ) {
   return {
     id: conversation.id,
@@ -16,6 +16,7 @@ export function toConversationSummaryDto(
     unreadCount,
     isBlocked: isBlocked ?? false,
     blockedByMe: blockedByMe ?? false,
+    peerIsOnline: peerIsOnline ?? false,
   };
 }
 
@@ -27,7 +28,7 @@ export function toConversationSummaryDto(
  */
 export function toConversationJoinDto(
   conversation,
-  { isBlocked, blockedByMe, peer }
+  { isBlocked, blockedByMe, peer, peerIsOnline }
 ) {
   return {
     conversationId: conversation.id,
@@ -35,6 +36,7 @@ export function toConversationJoinDto(
     isBlocked: isBlocked ?? false,
     blockedByMe: blockedByMe ?? false,
     isBlockedByPeer: (isBlocked ?? false) && !(blockedByMe ?? false),
+    peerIsOnline: peerIsOnline ?? false,
     peer: peer ?? null,
   };
 }

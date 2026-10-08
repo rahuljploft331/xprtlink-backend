@@ -448,7 +448,7 @@ export async function listQuotes(auth, query) {
   const [rows, total] = await Promise.all([
     db.quoteRequest.findMany({
       where,
-      orderBy: { updatedAt: "desc" },
+      orderBy: { createdAt: "desc" },
       skip,
       take: limit,
       include: QUOTE_INCLUDE,
@@ -563,33 +563,7 @@ export async function submitQuotation(auth, quoteId, body) {
       body: `${expertName} has sent you a quote for "${updated.title}"`,
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
     });
-    if (updated.expert?.user?.email) {
-      const emailHtml = await renderEmailTemplate({
-        title: "Quote Cancelled",
-        bodyHtml: `<p>${customerName} cancelled their quote request: "${updated.title}"</p>`,
-        ctaText: "View Quote",
-        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com"}/quotes/${updated.id}`,
-      });
-      await sendEmail({ to: updated.expert.user.email, subject: "Quote Cancelled", html: emailHtml }).catch(e => log.error(e));
-    }
-    if (updated.expert?.user?.email) {
-      const emailHtml = await renderEmailTemplate({
-        title: "Quote Rejected",
-        bodyHtml: `<p>${customerName} rejected your quote for "${updated.title}"</p>`,
-        ctaText: "View Quote",
-        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com"}/quotes/${updated.id}`,
-      });
-      await sendEmail({ to: updated.expert.user.email, subject: "Quote Rejected", html: emailHtml }).catch(e => log.error(e));
-    }
-    if (updated.expert?.user?.email) {
-      const emailHtml = await renderEmailTemplate({
-        title: "Quote Accepted",
-        bodyHtml: `<p>${customerName} accepted your quote for "${updated.title}"</p>`,
-        ctaText: "View Quote",
-        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com"}/quotes/${updated.id}`,
-      });
-      await sendEmail({ to: updated.expert.user.email, subject: "Quote Accepted", html: emailHtml }).catch(e => log.error(e));
-    }
+
     if (updated.customer?.user?.email) {
       const emailHtml = await renderEmailTemplate({
         title: "Quote Ready",
@@ -632,12 +606,22 @@ export async function acceptQuote(auth, quoteId) {
     const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
     const customerName = `${updated.customer.firstName ?? ""} ${updated.customer.lastName ?? ""}`.trim() || "A customer";
     await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
-      userIds: [updated.expert.userId],
+      userIds: [updated.expert.user.id],
       type: "quote_accepted",
       title: "Quote Accepted",
       body: `${customerName} accepted your quote for "${updated.title}"`,
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
     });
+
+    if (updated.expert?.user?.email) {
+      const emailHtml = await renderEmailTemplate({
+        title: "Quote Accepted",
+        bodyHtml: `<p>${customerName} accepted your quote for "${updated.title}"</p>`,
+        ctaText: "View Quote",
+        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com"}/quotes/${updated.id}`,
+      });
+      await sendEmail({ to: updated.expert.user.email, subject: "Quote Accepted", html: emailHtml }).catch(e => log.error(e));
+    }
   } catch (err) {
     log.error(`[acceptQuote] Notification dispatch failed: ${err.message}`);
   }
@@ -670,12 +654,22 @@ export async function rejectQuote(auth, quoteId) {
     const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
     const customerName = `${updated.customer.firstName ?? ""} ${updated.customer.lastName ?? ""}`.trim() || "A customer";
     await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
-      userIds: [updated.expert.userId],
+      userIds: [updated.expert.user.id],
       type: "quote_rejected",
       title: "Quote Rejected",
       body: `${customerName} rejected your quote for "${updated.title}"`,
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
     });
+
+    if (updated.expert?.user?.email) {
+      const emailHtml = await renderEmailTemplate({
+        title: "Quote Rejected",
+        bodyHtml: `<p>${customerName} rejected your quote for "${updated.title}"</p>`,
+        ctaText: "View Quote",
+        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com"}/quotes/${updated.id}`,
+      });
+      await sendEmail({ to: updated.expert.user.email, subject: "Quote Rejected", html: emailHtml }).catch(e => log.error(e));
+    }
   } catch (err) {
     log.error(`[rejectQuote] Notification dispatch failed: ${err.message}`);
   }
@@ -708,12 +702,22 @@ export async function cancelQuote(auth, quoteId) {
     const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
     const customerName = `${updated.customer.firstName ?? ""} ${updated.customer.lastName ?? ""}`.trim() || "A customer";
     await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
-      userIds: [updated.expert.userId],
+      userIds: [updated.expert.user.id],
       type: "quote_cancelled",
       title: "Quote Request Cancelled",
       body: `${customerName} cancelled their quote request: "${updated.title}"`,
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
     });
+
+    if (updated.expert?.user?.email) {
+      const emailHtml = await renderEmailTemplate({
+        title: "Quote Cancelled",
+        bodyHtml: `<p>${customerName} cancelled their quote request: "${updated.title}"</p>`,
+        ctaText: "View Quote",
+        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com"}/quotes/${updated.id}`,
+      });
+      await sendEmail({ to: updated.expert.user.email, subject: "Quote Cancelled", html: emailHtml }).catch(e => log.error(e));
+    }
   } catch (err) {
     log.error(`[cancelQuote] Notification dispatch failed: ${err.message}`);
   }
@@ -1037,9 +1041,19 @@ export async function acceptConsultation(auth, consultationId) {
     });
   });
 
-  // No push on accept — the customer is actively waiting and joins the call
-  // directly; a "Consultation Accepted" push was redundant notification noise.
-
+  try {
+    const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+    const expertName = `${updated.expert.firstName ?? ""} ${updated.expert.lastName ?? ""}`.trim() || "Expert";
+    await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+      userIds: [updated.customer.user.id],
+      type: "consultation_accepted",
+      title: "Consultation Accepted",
+      body: `${expertName} has accepted your consultation request.`,
+      data: { consultationId: updated.id, zegoRoomId: updated.zegoRoomId },
+    });
+  } catch (err) {
+    log.error(`[acceptConsultation] Notification dispatch failed: ${err.message}`);
+  }
   return toConsultationDetailDto(updated, consultationContext(updated));
 }
 

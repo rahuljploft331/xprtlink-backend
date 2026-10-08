@@ -342,8 +342,7 @@ export async function login(body) {
     // M7: constant-time dummy compare to prevent timing-based email enumeration.
     // Without this, nonexistent emails return ~0ms while valid ones take ~100ms (bcrypt).
     await verifyPassword("__dummy_password_that_never_matches__", "$2b$10$abcdefghijklmnopqrstuvuXzGO7fMC7VYzWH4HmM0vXcB9tBr7bq");
-    if (phone) throw unauthorized("mobileNotRegistered");
-    throw unauthorized("invalidCredentials");
+    throw unauthorized("unregisteredUser");
   }
 
   if (phone) {
@@ -441,6 +440,14 @@ export async function sendOtp(body) {
       "Use the dedicated endpoints for registration and password resets.",
       "INVALID_PURPOSE"
     );
+  }
+
+  if (purpose === "login") {
+    const db = getDb();
+    const user = await db.user.findFirst({
+      where: email ? { email, deletedAt: null } : { phone, deletedAt: null },
+    });
+    if (!user) throw notFound("unregisteredUser");
   }
 
   const channel = phone ? "phone" : "email";
@@ -659,19 +666,9 @@ export async function forgotPassword(body) {
   });
 
   if (!user) {
-    const { ttlMs } = getOtpConfig();
-    try {
-      await createAndDeliverOtp({
-        email,
-        phone,
-        purpose: "reset_password",
-        channel: email ? "email" : "phone",
-        skipDelivery: true,
-      });
-    } catch (err) {
-      log.error({ err: err.message }, "[forgotPassword] Dummy OTP delivery failed:");
-    }
-    return { sent: true, expiresInSeconds: ttlMs / 1000, channel: email ? "email" : "phone" };
+    // M7: timing mitigation
+    await verifyPassword("__dummy_password_that_never_matches__", "$2b$10$abcdefghijklmnopqrstuvuXzGO7fMC7VYzWH4HmM0vXcB9tBr7bq");
+    throw notFound("unregisteredUser");
   }
 
   const { ttlMs } = getOtpConfig();

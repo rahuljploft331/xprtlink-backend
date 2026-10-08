@@ -62,6 +62,7 @@ export const authRateLimiter = createRateLimiter({
 export const otpRateLimiter = createRateLimiter({
   windowMs: Number(process.env.RATE_LIMIT_OTP_WINDOW_MS || 60 * 60 * 1000), // 1 hour
   max: Number(process.env.RATE_LIMIT_OTP_MAX || 5),
+  skipFailedRequests: true, // Prevent spam-clicking "Resend" (400 Bad Request) from consuming the 5 successful sends per hour quota.
   message: {
     success: false,
     message: "Too many OTP requests. Please wait before requesting a new code.",

@@ -54,6 +54,7 @@ export function toExpertMeDto(expert, { user, categories, subscriptionActive = f
     //   live answer is GET /billing/experts/connect/status). Use this in new builds.
     kycComplete: Boolean(expert.stripeAccountId),
     payoutsActive: Boolean(expert.stripeTransfersActive),
+    updatedAt: toIso(expert.updatedAt),
   };
 }
 
@@ -189,6 +190,7 @@ function toLastCompletedActivityDto(consultation) {
 export function toExpertSettingsDto(settings) {
   return {
     preferences: settings?.preferences ?? {},
+    updatedAt: settings?.updatedAt ? toIso(settings.updatedAt) : null,
   };
 }
 

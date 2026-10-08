@@ -13,6 +13,15 @@ import {
 import { isChatMediaAllowed } from "@xprtlink/shared/config/attachmentConfig.js";
 import { badRequest, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
+import { getIo } from "../sockets/messagingSocket.js";
+
+function isUserOnline(userId) {
+  if (!userId) return false;
+  const io = getIo();
+  if (!io) return false;
+  const room = io.sockets.adapter.rooms.get(`user:${userId}`);
+  return room && room.size > 0;
+}
 
 function conversationWhere(auth) {
   if (auth.role === "customer") {
@@ -102,9 +111,11 @@ function peerDetails(conversation, auth) {
 export async function getConversationJoinState(auth, conversationId) {
   const conversation = await loadConversation(auth, conversationId);
   const blockState = await getConversationBlockState(auth, conversation);
+  const peerUserId = await getConversationPeerUserId(conversationId, auth.userId);
   return toConversationJoinDto(conversation, {
     ...blockState,
     peer: peerDetails(conversation, auth),
+    peerIsOnline: isUserOnline(peerUserId),
   });
 }
 
@@ -156,9 +167,14 @@ export async function listConversations(auth, query) {
   const { page, limit, skip } = parsePagination(query);
   const db = getDb();
 
+  const where = {
+    ...conversationWhere(auth),
+    messages: { some: {} },
+  };
+
   const [rows, total] = await Promise.all([
     db.conversation.findMany({
-      where: conversationWhere(auth),
+      where,
       orderBy: { lastMessageAt: "desc" },
       skip,
       take: limit,
@@ -172,7 +188,7 @@ export async function listConversations(auth, query) {
         },
       },
     }),
-    db.conversation.count({ where: conversationWhere(auth) }),
+    db.conversation.count({ where }),
   ]);
 
   // Fetch block status
@@ -215,6 +231,7 @@ export async function listConversations(auth, query) {
       lastMessage,
       isBlocked: blockState.isBlocked,
       blockedByMe: blockState.blockedByMe,
+      peerIsOnline: isUserOnline(otherUserId),
     });
   }));
 

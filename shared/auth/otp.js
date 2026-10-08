@@ -73,12 +73,22 @@ export async function findValidOtpChallenge({ email, phone, purpose }) {
     throw badRequest("otpExpiredOrNotFound", "OTP_EXPIRED", email ? "email" : "phone");
   }
 
-  if (challenge.blockedUntil && challenge.blockedUntil > new Date()) {
-    throw badRequest(
-      "otpTooManyAttempts",
-      "OTP_MAX_ATTEMPTS",
-      email ? "email" : "phone"
-    );
+  if (challenge.blockedUntil) {
+    if (challenge.blockedUntil > new Date()) {
+      throw badRequest(
+        "otpTooManyAttempts",
+        "OTP_MAX_ATTEMPTS",
+        email ? "email" : "phone"
+      );
+    } else {
+      // Block has expired, reset attempt count to allow new guesses.
+      await getDb().otpChallenge.update({
+        where: { id: challenge.id },
+        data: { attemptCount: 0, blockedUntil: null },
+      });
+      challenge.attemptCount = 0;
+      challenge.blockedUntil = null;
+    }
   }
 
   return challenge;
