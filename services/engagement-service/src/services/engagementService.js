@@ -37,7 +37,7 @@ const CONSULTATION_INCLUDE = {
 };
 
 const EDITABLE_QUOTE_STATUSES = new Set(["draft", "submitted", "pending_expert_review", "expert_reviewed"]);
-const CANCELLABLE_QUOTE_STATUSES = new Set(["draft", "submitted", "pending_expert_review", "expert_reviewed"]);
+const CANCELLABLE_QUOTE_STATUSES = new Set(["draft", "submitted", "pending_expert_review", "expert_reviewed", "quoted"]);
 // Statuses from which an expert may submit a quotation.
 const QUOTABLE_QUOTE_STATUSES = new Set(["pending_expert_review", "expert_reviewed"]);
 // Statuses that make up the expert "inbox" (awaiting action from the expert).
@@ -630,8 +630,48 @@ export async function acceptQuote(auth, quoteId) {
 }
 
 export async function rejectQuote(auth, quoteId) {
-  assertCustomer(auth);
   const quote = await loadQuote(quoteId);
+
+  if (auth.userRole === "expert") {
+    assertQuoteExpert(auth, quote);
+    const EXPERT_REJECTABLE_STATUSES = new Set(["submitted", "pending_expert_review", "expert_reviewed", "quoted"]);
+    
+    const updated = await getDb().$transaction(async (tx) => {
+      const current = await tx.quoteRequest.findUnique({ where: { id: quoteId } });
+      if (!current || !EXPERT_REJECTABLE_STATUSES.has(current.status)) {
+        throw badRequest("quoteCannotBeRejectedByExpert", "INVALID_STATUS");
+      }
+      return recordQuoteTransition(tx, {
+        quoteId,
+        fromStatus: current.status,
+        toStatus: "rejected",
+        actorUserId: auth.userId,
+        note: "Expert rejected quote request",
+        data: { resolvedAt: new Date() },
+      });
+    });
+
+    // Notify customer that the expert rejected their request
+    try {
+      const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
+      const expertName = `${updated.expert.user.firstName ?? ""} ${updated.expert.user.lastName ?? ""}`.trim() || "An expert";
+      await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
+        userIds: [updated.customer.user.id],
+        type: "quote_rejected",
+        title: "Quote Rejected",
+        body: `${expertName} rejected your quote request for "${updated.title}"`,
+        emailHtml: `<p>${expertName} rejected your quote request for "${updated.title}"</p>`,
+        emailSubject: "Quote Request Rejected",
+      });
+    } catch (err) {
+      log.error(`[rejectQuote] Notification dispatch failed: ${err.message}`);
+    }
+
+    return updated;
+  }
+
+  // Customer logic
+  assertCustomer(auth);
   assertQuoteCustomer(auth, quote);
 
   const updated = await getDb().$transaction(async (tx) => {

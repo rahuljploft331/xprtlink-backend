@@ -355,5 +355,6 @@
   "payoutAmountExceedsBalance": "The amount is more than the expert's payable balance of {balance}",
   "payoutSentEmailSubject": "Your XprtLink payout of {amount} is on its way",
   "payoutFailedAlertSubject": "Payout failed: {amount} — action may be needed",
-  "reportsFetched": "Reports retrieved successfully"
+  "reportsFetched": "Reports retrieved successfully",
+  "quoteCannotBeRejectedByExpert": "Quote request cannot be rejected by the expert at this stage"
 }
