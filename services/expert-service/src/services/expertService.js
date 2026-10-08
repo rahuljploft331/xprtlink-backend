@@ -137,6 +137,9 @@ export async function searchExperts(query, auth) {
     where.consultationRateCents = { ...(where.consultationRateCents || {}), lte: amountToCents(Number(query.priceMax)) };
   }
   if (query.rating) where.ratingAvg = { gte: Number(query.rating) };
+  if (query.ratingMax) {
+    where.ratingAvg = { ...(where.ratingAvg || {}), lte: Number(query.ratingMax) };
+  }
   if (query.experience) where.experienceYears = { gte: Number(query.experience) };
   if (query.experienceMax) {
     where.experienceYears = { ...(where.experienceYears || {}), lte: Number(query.experienceMax) };
@@ -160,12 +163,11 @@ export async function searchExperts(query, auth) {
     ];
   }
 
-  // Location filter: lat, lng, radius (miles) — uses Haversine post-filter on serviceAreas Json
+  // Location filter: lat, lng, radius (km) — uses Haversine post-filter on serviceAreas Json
   const hasLocationFilter = query.lat && query.lng;
   const customerLat = hasLocationFilter ? Number(query.lat) : null;
   const customerLng = hasLocationFilter ? Number(query.lng) : null;
-  const radiusMiles = hasLocationFilter ? Number(query.radius || 50) : null; // default 50 miles
-  const radiusKm = hasLocationFilter ? radiusMiles * 1.60934 : null;
+  const radiusKm = hasLocationFilter ? Number(query.radius || 50) : null; // default 50 km
 
   const orderBy = buildSort(query.sort);
 
@@ -208,7 +210,7 @@ export async function searchExperts(query, auth) {
 
     const items = paged.map((e) => ({
       ...toExpertPublicDto(e, { categories: e.categories, isSaved: savedIds.has(e.id) }),
-      distance: Math.round((nearestDistance(customerLat, customerLng, e.serviceAreas) / 1.60934) * 10) / 10,
+      distance: Math.round(nearestDistance(customerLat, customerLng, e.serviceAreas) * 10) / 10,
     }));
     return paginatedResult(items, { page, limit, total });
   }

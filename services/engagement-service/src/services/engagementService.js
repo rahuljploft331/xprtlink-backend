@@ -465,7 +465,6 @@ export async function listQuotes(auth, query) {
           { label: "Pending Review", value: "pending_expert_review" },
           { label: "Reviewed", value: "expert_reviewed" },
           { label: "Quoted", value: "quoted" },
-          { label: "Accepted", value: "accepted" },
           { label: "Rejected", value: "rejected" },
           { label: "Canceled", value: "canceled" },
           { label: "Expired", value: "expired" },

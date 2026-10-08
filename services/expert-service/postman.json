@@ -162,7 +162,7 @@
                 }
               ]
             },
-            "description": "Search for experts in the marketplace.\n\nQuery parameters: q, category, priceMin, priceMax, rating, experience, online, verified, sort, page, limit.\n\nGeo-distance filter (optional): lat, lng, radius (km, default 50). When lat+lng are provided, results are filtered to experts with at least one serviceArea location within the radius, sorted by nearest distance. Response includes a `distance` field (km) per expert."
+            "description": "Search for experts in the marketplace.\n\nQuery parameters: q, category, priceMin, priceMax, rating, ratingMax, experience, online, verified, sort, page, limit.\n\nGeo-distance filter (optional): lat, lng, radius (km, default 50). When lat+lng are provided, results are filtered to experts with at least one serviceArea location within the radius, sorted by nearest distance. Response includes a `distance` field (km) per expert."
           }
         },
         {
