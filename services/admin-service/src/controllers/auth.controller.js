@@ -117,8 +117,16 @@ export async function refresh(req, res, next) {
     if (!refreshToken) return next(badRequest("refreshTokenRequired"));
 
     const tokenHash = hashRefreshToken(refreshToken);
+    const thirtySecondsAgo = new Date(Date.now() - 30 * 1000);
     const session = await getDb().adminSession.findFirst({
-      where: { tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
+      where: { 
+        tokenHash, 
+        OR: [
+          { revokedAt: null },
+          { revokedAt: { gt: thirtySecondsAgo } }
+        ],
+        expiresAt: { gt: new Date() } 
+      },
       include: { admin: { include: { permissions: true } } },
     });
 
