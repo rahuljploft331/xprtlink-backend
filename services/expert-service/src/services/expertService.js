@@ -804,7 +804,7 @@ export async function getDashboard(auth) {
     earningsTodayCents: earningsToday._sum.netCents ?? 0,
     earningsThisMonthCents: earningsMonth._sum.netCents ?? 0,
     lifetimeEarningsCents: lifetimeEarnings._sum.netCents ?? 0,
-    totalConsultationsCompleted,
+    totalConsultationsCompleted: totalConsultationsCompleted - consultationsThisMonth,
     consultationsThisMonth,
     satisfactionRate,
     earningsTrend,
