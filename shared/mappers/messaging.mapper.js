@@ -17,6 +17,8 @@ export function toConversationSummaryDto(
     isBlocked: isBlocked ?? false,
     blockedByMe: blockedByMe ?? false,
     peerIsOnline: peerIsOnline ?? false,
+    lastMessageStatus: lastMessage?.deliveryStatus ?? null,
+    lastMessageSenderId: lastMessage?.senderUserId ?? null,
   };
 }
 
