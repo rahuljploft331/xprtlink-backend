@@ -387,7 +387,10 @@ export async function updateExpertMe(auth, body) {
       ...(body.languages !== undefined ? { languages: body.languages } : {}),
       ...(body.serviceAreas !== undefined ? { serviceAreas: body.serviceAreas } : {}),
       ...(body.consultationRate !== undefined
-        ? { consultationRateCents: amountToCents(body.consultationRate) }
+        ? { 
+            consultationRateCents: amountToCents(body.consultationRate),
+            pricingUpdatedAt: new Date()
+          }
         : {}),
       ...(body.experienceYears !== undefined ? { experienceYears: body.experienceYears } : {}),
       ...(body.availabilityStatus ? { availabilityStatus: body.availabilityStatus } : {}),

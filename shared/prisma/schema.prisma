@@ -271,6 +271,7 @@ model User {
   termsAcceptedAt DateTime?  @map("terms_accepted_at") @db.Timestamptz(6)
   status          UserStatus @default(active)
   deletedAt       DateTime?  @map("deleted_at") @db.Timestamptz(6)
+  passwordUpdatedAt DateTime?  @map("password_updated_at") @db.Timestamptz(6)
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -568,6 +569,7 @@ model ExpertProfile {
   stripeTransfersActive Boolean            @default(false) @map("stripe_transfers_active")
   stripeStatusCheckedAt DateTime?          @map("stripe_status_checked_at") @db.Timestamptz(6)
   poorReviewsAlert      Boolean            @default(false) @map("poor_reviews_alert")
+  pricingUpdatedAt      DateTime?          @map("pricing_updated_at") @db.Timestamptz(6)
   createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 

@@ -42,6 +42,8 @@ export function toExpertMeDto(expert, { user, categories, subscriptionActive = f
     email: user.email,
     phone: user.phone,
     hasPassword: Boolean(user.passwordHash),
+    passwordUpdatedAt: user.passwordUpdatedAt ? toIso(user.passwordUpdatedAt) : null,
+    pricingUpdatedAt: expert.pricingUpdatedAt ? toIso(expert.pricingUpdatedAt) : null,
     onboardingStep: expert.onboardingStep,
     onboardingComplete: Boolean(expert.onboardingCompletedAt),
     searchEligible: expert.searchEligible,

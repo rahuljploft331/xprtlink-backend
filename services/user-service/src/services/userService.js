@@ -705,7 +705,7 @@ export async function resetPassword(body) {
   await db.$transaction([
     db.user.update({
       where: { id: user.id },
-      data: { passwordHash: await hashPassword(newPassword) },
+      data: { passwordHash: await hashPassword(newPassword), passwordUpdatedAt: new Date() },
     }),
     db.otpChallenge.update({
       where: { id: challenge.id },
@@ -731,7 +731,7 @@ export async function changePassword(userId, body) {
   await db.$transaction([
     db.user.update({
       where: { id: userId },
-      data: { passwordHash: await hashPassword(newPassword) },
+      data: { passwordHash: await hashPassword(newPassword), passwordUpdatedAt: new Date() },
     }),
     // C3: Revoke ALL existing sessions on password change
     db.refreshToken.updateMany({
