@@ -258,9 +258,16 @@ export function registerMessagingSockets(io) {
           message,
         });
 
-        // Notify peer's user room for badge/inbox preview updates
+        // Notify both users' rooms for badge/inbox preview updates
         const peerUserId = await svc.getConversationPeerUserId(conversationId, auth.userId);
         log.info(`[messaging-service] message:send - Resolved peerUserId: ${peerUserId}`);
+        
+        io.to(`user:${auth.userId}`).emit("inbox:updated", {
+          conversationId,
+          lastMessage: message,
+          senderUserId: auth.userId,
+        });
+
         if (peerUserId) {
           log.info(`[messaging-service] message:send - Emitting inbox:updated to user:${peerUserId}`);
           io.to(`user:${peerUserId}`).emit("inbox:updated", {
@@ -338,7 +345,13 @@ export function registerMessagingSockets(io) {
           readAt: new Date().toISOString(),
         });
 
-        // Notify peer's user room for inbox updates (live double-ticks)
+        // Notify both users' rooms for inbox updates (live double-ticks)
+        io.to(`user:${auth.userId}`).emit("conversation:read", {
+          conversationId,
+          userId: auth.userId,
+          readAt: new Date().toISOString(),
+        });
+
         const peerUserId = await svc.getConversationPeerUserId(conversationId, auth.userId);
         if (peerUserId) {
           io.to(`user:${peerUserId}`).emit("conversation:read", {
