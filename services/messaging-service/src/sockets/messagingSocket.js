@@ -338,6 +338,16 @@ export function registerMessagingSockets(io) {
           readAt: new Date().toISOString(),
         });
 
+        // Notify peer's user room for inbox updates (live double-ticks)
+        const peerUserId = await svc.getConversationPeerUserId(conversationId, auth.userId);
+        if (peerUserId) {
+          io.to(`user:${peerUserId}`).emit("conversation:read", {
+            conversationId,
+            userId: auth.userId,
+            readAt: new Date().toISOString(),
+          });
+        }
+
         if (typeof callback === "function") {
           callback({ success: true, data: result });
         }
