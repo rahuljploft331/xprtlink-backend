@@ -94,6 +94,49 @@ export function registerMessagingSockets(io) {
       `[messaging-service] User connected: ${auth.userId} (${auth.role}) -> socket ${socket.id}`
     );
 
+    async function broadcastPresence(isOnline) {
+      try {
+        const db = getDb();
+        const conversations = await db.conversation.findMany({
+          where: {
+            OR: [
+              { customer: { userId: auth.userId } },
+              { expert: { userId: auth.userId } }
+            ]
+          },
+          include: {
+            customer: { select: { userId: true } },
+            expert: { select: { userId: true } }
+          }
+        });
+        const peerIds = new Set();
+        for (const conv of conversations) {
+          if (conv.customer?.userId && conv.customer.userId !== auth.userId) peerIds.add(conv.customer.userId);
+          if (conv.expert?.userId && conv.expert.userId !== auth.userId) peerIds.add(conv.expert.userId);
+        }
+        for (const peerId of peerIds) {
+          io.to(`user:${peerId}`).emit("user:presence", {
+            userId: auth.userId,
+            customerProfileId: auth.customerProfileId,
+            expertProfileId: auth.expertProfileId,
+            isOnline,
+          });
+        }
+      } catch (e) {
+        log.error(`[messaging-service] Failed to broadcast presence: ${e.message}`);
+      }
+    }
+
+    // Broadcast online status to peers on connection
+    // Small delay to allow the current socket to fully join rooms
+    setTimeout(() => {
+      const room = io.sockets.adapter.rooms.get(`user:${auth.userId}`);
+      if (room && room.size === 1) {
+        // First connection for this user
+        broadcastPresence(true);
+      }
+    }, 500);
+
     // 1. List conversations
     socket.on("conversation:list", async (payload = {}, callback) => {
       try {
@@ -416,10 +459,19 @@ export function registerMessagingSockets(io) {
       }
     });
 
-    socket.on("disconnect", (reason) => {
+    socket.on("disconnect", async (reason) => {
       log.info(
         `[messaging-service] User disconnected: ${auth.userId} (${socket.id}) - reason: ${reason}`
       );
+      
+      // Delay to check if it's a real disconnect or just a refresh
+      setTimeout(async () => {
+        const room = io.sockets.adapter.rooms.get(`user:${auth.userId}`);
+        if (!room || room.size === 0) {
+          // Last connection dropped
+          await broadcastPresence(false);
+        }
+      }, 2000);
     });
   });
 }
