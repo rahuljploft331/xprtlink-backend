@@ -8,11 +8,62 @@ import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { getConfig } from "@xprtlink/shared/config/loadEnv.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
+import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
+
 const log = logger.child({ module: "users.routes" });
 
 const router = Router();
 
 router.use(authenticate);
+
+// Get blocked users
+router.get(
+  "/me/blocks",
+  asyncHandler(async (req, res) => {
+    const db = getDb();
+    
+    const blocks = await db.userBlock.findMany({
+      where: { blockerUserId: req.auth.userId },
+      include: {
+        blocked: {
+          include: {
+            customerProfile: {
+              include: {
+                avatarMedia: true,
+              },
+            },
+            expertProfile: {
+              include: {
+                avatarMedia: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const items = blocks.map((block) => {
+      const user = block.blocked;
+      const profile = user.expertProfile || user.customerProfile;
+      
+      return {
+        id: user.id,
+        user: {
+          id: user.id,
+          firstName: profile?.firstName,
+          lastName: profile?.lastName,
+          avatarUrl: resolveMediaUrl(profile?.avatarMedia?.storageKey) ?? null,
+        }
+      };
+    });
+
+    return ResponseFormatter.success(res, {
+      data: { items },
+      status: 200,
+    });
+  })
+);
 
 // Block a user
 router.post(

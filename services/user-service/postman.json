@@ -1127,6 +1127,79 @@
           }
         }
       ]
+    },
+    {
+      "name": "User Blocks",
+      "item": [
+        {
+          "name": "Get Blocked Users",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me/blocks",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "me", "blocks"]
+            },
+            "description": "Get the list of blocked users."
+          }
+        },
+        {
+          "name": "Block User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userIdToBlock\": \"uuid\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me/blocks",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "me", "blocks"]
+            },
+            "description": "Block a user."
+          }
+        },
+        {
+          "name": "Unblock User",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/users/me/blocks/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "users", "me", "blocks", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "uuid"
+                }
+              ]
+            },
+            "description": "Unblock a user."
+          }
+        }
+      ]
     }
   ],
   "variable": [
