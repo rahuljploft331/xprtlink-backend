@@ -279,6 +279,7 @@ export async function createQuote(auth, body) {
         description: body.description,
         category: categoryName,
         preferredLocation: body.preferredLocation ?? null,
+        locationDetails: body.locationDetails ?? null,
         budgetCents: amountToCents(body.budget),
         notes: body.notes ?? null,
         status: "submitted",
@@ -366,6 +367,9 @@ export async function updateQuote(auth, quoteId, body) {
       ...(categoryNameUpdate !== undefined ? { category: categoryNameUpdate } : {}),
       ...(body.preferredLocation !== undefined
         ? { preferredLocation: body.preferredLocation }
+        : {}),
+      ...(body.locationDetails !== undefined
+        ? { locationDetails: body.locationDetails }
         : {}),
       ...(body.budget !== undefined ? { budgetCents: amountToCents(body.budget) } : {}),
       ...(body.notes !== undefined ? { notes: body.notes } : {}),

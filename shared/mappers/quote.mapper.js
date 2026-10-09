@@ -50,6 +50,7 @@ export function toQuoteDetailDto(
     notes: quote.notes ?? null,
     category: quote.category ?? null,
     preferredLocation: quote.preferredLocation ?? null,
+    locationDetails: quote.locationDetails ?? null,
     status: quote.status,
     budget: centsToAmount(quote.budgetCents),
     currency,

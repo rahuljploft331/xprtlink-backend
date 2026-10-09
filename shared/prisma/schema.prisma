@@ -687,6 +687,7 @@ model QuoteRequest {
   description            String
   category               String?     @db.VarChar(120)
   preferredLocation      String?     @map("preferred_location") @db.VarChar(200)
+  locationDetails        String?     @map("location_details") @db.VarChar(500)
   budgetCents            Int?        @map("budget_cents")
   notes                  String?     @db.Text
   status                 QuoteStatus @default(draft)
