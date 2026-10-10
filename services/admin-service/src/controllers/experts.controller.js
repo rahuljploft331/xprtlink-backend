@@ -176,7 +176,7 @@ export async function update(req, res, next) {
     const { 
       email, phone, status, 
       firstName, lastName, headline, bio, title, businessName, 
-      consultationRateCents, currency, experienceYears, searchEligible
+      consultationRateCents, currency, experienceYears, searchEligible, serviceAreas
     } = req.body;
     
     const userData = {};
@@ -207,6 +207,7 @@ export async function update(req, res, next) {
       profileData.experienceYears = parsedExperience;
     }
     if (searchEligible !== undefined) profileData.searchEligible = searchEligible;
+    if (serviceAreas !== undefined) profileData.serviceAreas = serviceAreas;
 
     const expertProfile = await db.expertProfile.findUnique({ where: { id: req.params.id } });
     if (!expertProfile) {
