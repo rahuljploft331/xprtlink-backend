@@ -120,7 +120,7 @@ export async function getById(req, res, next) {
 export async function update(req, res, next) {
   try {
     const db = getDb();
-    const { email, phone, status, firstName, lastName, city, country, language } = req.body;
+    const { email, phone, status, firstName, lastName, city, country, language, lat, lng } = req.body;
     
     const userData = {};
     if (email !== undefined) userData.email = email;
@@ -137,7 +137,7 @@ export async function update(req, res, next) {
     if (firstName !== undefined) profileData.firstName = firstName;
     if (lastName !== undefined) profileData.lastName = lastName;
 
-    if (city !== undefined || country !== undefined || language !== undefined) {
+    if (city !== undefined || country !== undefined || language !== undefined || lat !== undefined || lng !== undefined) {
       const existingUser = await db.user.findUnique({ 
         where: { id: req.params.id }, 
         include: { customerProfile: true } 
@@ -149,6 +149,8 @@ export async function update(req, res, next) {
         if (city !== undefined) prefs.city = city;
         if (country !== undefined) prefs.country = country;
         if (language !== undefined) prefs.language = language;
+        if (lat !== undefined) prefs.lat = lat;
+        if (lng !== undefined) prefs.lng = lng;
         profileData.preferences = prefs;
       }
     }
