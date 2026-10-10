@@ -9,10 +9,13 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
 
 const router = Router();
 
-router.use(authenticate, requireRole("customer"));
+router.use(authenticate);
+
+const requireCustomer = requireRole("customer");
 
 router.get(
   "/me",
+  requireCustomer,
   asyncHandler(async (req, res) => {
     const data = await svc.getCustomerMe(req.auth);
     return ResponseFormatter.success(res, { message: getMessage("profileLoaded"), data });
@@ -21,6 +24,7 @@ router.get(
 
 router.patch(
   "/me",
+  requireCustomer,
   asyncHandler(async (req, res) => {
     const body = customerMeUpdateRequestSchema.parse(req.body);
     const data = await svc.updateCustomerMe(req.auth, body);
@@ -30,6 +34,7 @@ router.patch(
 
 router.post(
   "/me/delete",
+  requireCustomer,
   asyncHandler(async (req, res) => {
     const data = await svc.deleteCustomerAccount(req.auth);
     return ResponseFormatter.success(res, { message: getMessage("accountDeleted"), data });
@@ -38,6 +43,7 @@ router.post(
 
 router.get(
   "/me/recently-viewed",
+  requireCustomer,
   asyncHandler(async (req, res) => {
     const data = await svc.getRecentlyViewed(req.auth, req.query);
     return ResponseFormatter.paginated(res, {
@@ -52,6 +58,7 @@ router.get(
 
 router.get(
   "/me/saved-experts",
+  requireCustomer,
   asyncHandler(async (req, res) => {
     const data = await svc.getSavedExperts(req.auth, req.query);
     return ResponseFormatter.paginated(res, { message: getMessage("savedExperts"), ...data });
@@ -60,6 +67,7 @@ router.get(
 
 router.post(
   "/me/saved-experts/:expertId",
+  requireCustomer,
   asyncHandler(async (req, res) => {
     const data = await svc.saveExpert(req.auth, req.params.expertId);
     return ResponseFormatter.success(res, { message: getMessage("expertSaved"), data });
@@ -68,9 +76,19 @@ router.post(
 
 router.delete(
   "/me/saved-experts/:expertId",
+  requireCustomer,
   asyncHandler(async (req, res) => {
     const data = await svc.unsaveExpert(req.auth, req.params.expertId);
     return ResponseFormatter.success(res, { message: getMessage("expertUnsaved"), data });
+  })
+);
+
+router.get(
+  "/:id",
+  requireRole("expert", "admin", "super_admin"),
+  asyncHandler(async (req, res) => {
+    const data = await svc.getCustomerProfileForExpert(req.params.id);
+    return ResponseFormatter.success(res, { message: getMessage("profileLoaded"), data });
   })
 );
 

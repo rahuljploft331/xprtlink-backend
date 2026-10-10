@@ -1098,6 +1098,30 @@
           }
         },
         {
+          "name": "Get Customer Profile (Public/Expert)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/customers/:id",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "customers", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "{{customer_id}}"
+                }
+              ]
+            },
+            "description": "Load the public profile of a customer. Intended for use by experts when opening a customer's chat profile."
+          }
+        },
+        {
           "name": "Delete Account",
           "event": [
             {

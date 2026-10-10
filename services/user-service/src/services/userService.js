@@ -12,7 +12,7 @@ import { getOtpConfig } from "@xprtlink/shared/auth/otpDelivery.js";
 import { verifyFirebaseIdToken, isFirebaseConfigured } from "@xprtlink/shared/auth/firebaseAdmin.js";
 import { signCompletionToken, verifyCompletionToken } from "@xprtlink/shared/auth/jwt.js";
 import { toAuthSessionDto } from "@xprtlink/shared/mappers/auth.mapper.js";
-import { toCustomerMeDto } from "@xprtlink/shared/mappers/customer.mapper.js";
+import { toCustomerMeDto, toCustomerPublicDto } from "@xprtlink/shared/mappers/customer.mapper.js";
 import { toExpertPublicDto } from "@xprtlink/shared/mappers/expert.mapper.js";
 import { badRequest, conflict, notFound, unauthorized, forbidden } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
@@ -1173,4 +1173,35 @@ export async function unsaveExpert(auth, expertId) {
     where: { customerProfileId: auth.customerProfileId, expertProfileId: expertId },
   });
   return { saved: false };
+}
+
+export async function getCustomerProfileForExpert(customerId) {
+  assertUuid(customerId);
+  const db = getDb();
+  
+  const customer = await db.customerProfile.findUnique({
+    where: { id: customerId },
+    include: {
+      user: {
+        select: {
+          emailVerifiedAt: true,
+          phoneVerifiedAt: true,
+          deviceTokens: {
+            orderBy: { lastSeenAt: 'desc' },
+            take: 1
+          }
+        }
+      },
+      avatarMedia: true,
+      _count: {
+        select: { consultations: true }
+      }
+    }
+  });
+
+  if (!customer) {
+    throw notFound("customerNotFound");
+  }
+
+  return toCustomerPublicDto(customer);
 }

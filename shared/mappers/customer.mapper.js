@@ -40,3 +40,28 @@ export function toRecentlyViewedExpertDto(expert, { viewedAt, categories }) {
     viewedAt: toIso(viewedAt),
   };
 }
+
+export function toCustomerPublicDto(profile) {
+  const finalAvatarUrl = resolveMediaUrl(profile.avatarMedia?.storageKey);
+  
+  let isOnline = false;
+  let lastActive = null;
+  if (profile.user?.deviceTokens?.length > 0) {
+    lastActive = profile.user.deviceTokens[0].lastSeenAt;
+    const FIVE_MINUTES = 5 * 60 * 1000;
+    isOnline = (Date.now() - new Date(lastActive).getTime()) < FIVE_MINUTES;
+  }
+
+  return {
+    id: profile.id,
+    firstName: profile.firstName,
+    lastName: profile.lastName,
+    avatarUrl: finalAvatarUrl,
+    isOnline,
+    lastActive: toIso(lastActive),
+    emailVerified: Boolean(profile.user?.emailVerifiedAt),
+    phoneVerified: Boolean(profile.user?.phoneVerifiedAt),
+    totalConsultations: profile._count?.consultations ?? 0,
+    memberSince: toIso(profile.createdAt),
+  };
+}
