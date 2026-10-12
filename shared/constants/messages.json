@@ -142,6 +142,8 @@
   "emailAlreadyExists": "An account with this email already exists.",
   "accountCreatedViaSocialLogin": "This email is registered via social login. Please use Google/Apple to continue.",
   "phoneAlreadyInUse": "This mobile number is already in use.",
+  "mobileRegistrationInProgress": "A registration with this mobile number is already in progress. Please complete verification or wait for the session to expire.",
+  "emailRegistrationInProgress": "A registration with this email is already in progress. Please complete verification or wait for the session to expire.",
   "emailOrPhoneRequired": "Email or phone is required",
   "refreshTokenRequired": "Refresh token required",
   "invalidRefreshToken": "Invalid refresh token",
