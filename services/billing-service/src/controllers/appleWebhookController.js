@@ -57,10 +57,10 @@ export const handleNotification = async (req, res, next) => {
             where: { id: subscription.id },
             data: { currentPeriodEnd: newPeriodEnd, status: "active", cancelAtPeriodEnd: false },
           });
-        } else if (notificationType === "DID_FAIL_TO_RENEW" || notificationType === "EXPIRED") {
+        } else if (notificationType === "DID_FAIL_TO_RENEW" || notificationType === "EXPIRED" || notificationType === "REVOKE") {
           await db.expertSubscription.update({
             where: { id: subscription.id },
-            data: { status: "expired" },
+            data: { status: notificationType === "REVOKE" ? "canceled" : "expired" },
           });
           // Remove search eligibility if expired
           await db.expertProfile.update({

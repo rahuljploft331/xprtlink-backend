@@ -1,8 +1,9 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
-import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
+import { badRequest, notFound, conflict } from "@xprtlink/shared/utils/errors.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 const log = logger.child({ module: "appleIapController" });
 // N5 fix: decodeSignedTransaction does NOT exist on @apple/app-store-server-library.
 // Only import the symbols that the library actually exports.
@@ -59,12 +60,6 @@ export const verifyPurchase = async (req, res, next) => {
 
     const db = getDb();
 
-    // Find the requested plan
-    let plan = await db.subscriptionPlan.findFirst({
-      where: { code: planCode, isActive: true },
-    });
-    if (!plan) throw notFound("subscriptionPlanNotFound");
-
     const client = getAppleClient();
     const transactionInfo = await client.getTransactionInfo(transactionId);
 
@@ -77,33 +72,64 @@ export const verifyPurchase = async (req, res, next) => {
     const verifier = getAppleVerifier();
     const decoded = await verifier.verifyAndDecodeTransaction(transactionInfo.signedTransactionInfo);
 
-    // 1. Verify the product ID matches the selected plan
-    if (decoded.productId !== plan.code) {
-      throw badRequest("transactionProductMismatch");
+    // 1. Resolve product ID from Apple's cryptographically verified transaction
+    const targetProductCode = decoded.productId || planCode;
+    let plan = await db.subscriptionPlan.findFirst({
+      where: { code: targetProductCode, isActive: true },
+    });
+    if (!plan) throw notFound("subscriptionPlanNotFound");
+
+    // 2. Check revocation & expiration
+    if (decoded.revocationDate) {
+      throw badRequest("subscriptionRevoked");
     }
 
-    // 2. Prevent replay attacks (has someone else already claimed this?)
-    const externalSubscriptionId = decoded.originalTransactionId || transactionId;
-    const existingSub = await db.expertSubscription.findFirst({
-      where: { externalSubscriptionId, expertProfileId: { not: req.auth.expertProfileId } }
-    });
-    if (existingSub) {
-      throw badRequest("transactionAlreadyClaimed");
-    }
-    
     const now = new Date();
-    // 3. Use the actual expiration date from Apple
     const periodEnd = decoded.expiresDate ? new Date(decoded.expiresDate) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    if (decoded.expiresDate && periodEnd.getTime() <= now.getTime()) {
+      throw badRequest("subscriptionExpired");
+    }
+
+    // 3. Prevent replay attacks / multiple accounts claiming same Apple ID subscription
+    const externalSubscriptionId = decoded.originalTransactionId || transactionId;
+    const existingActiveSub = await db.expertSubscription.findFirst({
+      where: {
+        externalSubscriptionId,
+        expertProfileId: { not: req.auth.expertProfileId },
+        status: "active",
+      },
+    });
+    if (existingActiveSub) {
+      throw conflict("subscriptionAlreadyLinkedToAnotherAccount", "SUBSCRIPTION_ALREADY_LINKED");
+    }
 
     const subscription = await db.$transaction(async (tx) => {
-      // Deactivate old active subscriptions for this expert
+      // Deactivate other active subscriptions for this expert
       await tx.expertSubscription.updateMany({
-        where: { expertProfileId: req.auth.expertProfileId, status: "active" },
+        where: {
+          expertProfileId: req.auth.expertProfileId,
+          status: "active",
+          externalSubscriptionId: { not: externalSubscriptionId },
+        },
         data: { status: "canceled", canceledAt: now, cancelAtPeriodEnd: false },
       });
 
-      const created = await tx.expertSubscription.create({
-        data: {
+      const created = await tx.expertSubscription.upsert({
+        where: {
+          store_externalSubscriptionId: {
+            store: "apple",
+            externalSubscriptionId,
+          },
+        },
+        update: {
+          planId: plan.id,
+          status: "active",
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+          cancelAtPeriodEnd: false,
+          canceledAt: null,
+        },
+        create: {
           expertProfileId: req.auth.expertProfileId,
           planId: plan.id,
           store: "apple",
@@ -135,7 +161,7 @@ export const verifyPurchase = async (req, res, next) => {
         data: { subscriptionId: subscription.id, planId: subscription.planId },
       });
 
-      const userEmail = (await getDb().user.findUnique({ where: { id: req.user.userId }, select: { email: true } }))?.email;
+      const userEmail = (await getDb().user.findUnique({ where: { id: req.auth.userId }, select: { email: true } }))?.email;
       if (userEmail) {
         const emailHtml = await renderEmailTemplate({
           title: "Subscription Activated",

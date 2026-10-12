@@ -1,9 +1,10 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
-import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
+import { badRequest, notFound, conflict } from "@xprtlink/shared/utils/errors.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { google } from "googleapis";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 const log = logger.child({ module: "googleIapController" });
 
 function getGoogleClient() {
@@ -57,15 +58,49 @@ export const verifyPurchase = async (req, res, next) => {
     const now = new Date();
     const periodEnd = new Date(lineItem.expiryTime);
 
+    if (periodEnd.getTime() <= now.getTime()) {
+      throw badRequest("subscriptionExpired");
+    }
+
+    // Prevent cross-account claiming of active subscriptions
+    const existingActiveSub = await db.expertSubscription.findFirst({
+      where: {
+        externalSubscriptionId,
+        expertProfileId: { not: req.auth.expertProfileId },
+        status: "active",
+      },
+    });
+    if (existingActiveSub) {
+      throw conflict("subscriptionAlreadyLinkedToAnotherAccount", "SUBSCRIPTION_ALREADY_LINKED");
+    }
+
     const subscription = await db.$transaction(async (tx) => {
-      // Deactivate old active subscriptions for this expert
+      // Deactivate other active subscriptions for this expert
       await tx.expertSubscription.updateMany({
-        where: { expertProfileId: req.auth.expertProfileId, status: "active" },
+        where: {
+          expertProfileId: req.auth.expertProfileId,
+          status: "active",
+          externalSubscriptionId: { not: externalSubscriptionId },
+        },
         data: { status: "canceled", canceledAt: now, cancelAtPeriodEnd: false },
       });
 
-      const created = await tx.expertSubscription.create({
-        data: {
+      const created = await tx.expertSubscription.upsert({
+        where: {
+          store_externalSubscriptionId: {
+            store: "google",
+            externalSubscriptionId,
+          },
+        },
+        update: {
+          planId: plan.id,
+          status: "active",
+          currentPeriodStart: now,
+          currentPeriodEnd: periodEnd,
+          cancelAtPeriodEnd: false,
+          canceledAt: null,
+        },
+        create: {
           expertProfileId: req.auth.expertProfileId,
           planId: plan.id,
           store: "google",
@@ -97,7 +132,7 @@ export const verifyPurchase = async (req, res, next) => {
         data: { subscriptionId: subscription.id, planId: subscription.planId },
       });
 
-      const userEmail = (await getDb().user.findUnique({ where: { id: req.user.userId }, select: { email: true } }))?.email;
+      const userEmail = (await getDb().user.findUnique({ where: { id: req.auth.userId }, select: { email: true } }))?.email;
       if (userEmail) {
         const emailHtml = await renderEmailTemplate({
           title: "Subscription Activated",
