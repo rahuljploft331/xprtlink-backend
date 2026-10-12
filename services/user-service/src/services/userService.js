@@ -218,6 +218,54 @@ export async function register(body) {
   } else {
     // Pre-flight availability check (fast-fails common case; real enforcement is inside the transaction)
     await assertIdentifierAvailable({ email, phone });
+
+    // Fast-fail if there is already an active pending registration session with this phone (different email)
+    if (phone) {
+      const pendingWithSamePhone = await db.user.findFirst({
+        where: {
+          phone,
+          status: "pending_verification",
+          ...(email ? { email: { not: email } } : {}),
+        },
+      });
+      if (pendingWithSamePhone) {
+        const activeOtp = await db.otpChallenge.findFirst({
+          where: {
+            userId: pendingWithSamePhone.id,
+            purpose: "register",
+            consumedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+        });
+        if (activeOtp) {
+          throw conflict("mobileRegistrationInProgress", "REGISTRATION_IN_PROGRESS");
+        }
+      }
+    }
+
+    // Fast-fail if there is already an active pending registration session with this email (different phone)
+    if (email) {
+      const pendingWithSameEmail = await db.user.findFirst({
+        where: {
+          email,
+          status: "pending_verification",
+          ...(phone ? { phone: { not: phone } } : {}),
+        },
+      });
+      if (pendingWithSameEmail) {
+        const activeOtp = await db.otpChallenge.findFirst({
+          where: {
+            userId: pendingWithSameEmail.id,
+            purpose: "register",
+            consumedAt: null,
+            expiresAt: { gt: new Date() },
+          },
+        });
+        if (activeOtp) {
+          throw conflict("emailRegistrationInProgress", "REGISTRATION_IN_PROGRESS");
+        }
+      }
+    }
   }
 
   // Require phone to be pre-verified via OTP (consumed verify_phone challenge within 30 min)
@@ -279,10 +327,41 @@ export async function register(body) {
       });
 
       if (pendings.length > 0) {
+        const now = new Date();
+        for (const p of pendings) {
+          const hasDifferentEmail = Boolean(phone && p.phone === phone && p.email && p.email !== email);
+          const hasDifferentPhone = Boolean(email && p.email === email && p.phone && p.phone !== phone);
+
+          if (hasDifferentEmail || hasDifferentPhone) {
+            const activeOtp = await tx.otpChallenge.findFirst({
+              where: {
+                userId: p.id,
+                purpose: "register",
+                consumedAt: null,
+                expiresAt: { gt: now },
+              },
+            });
+
+            if (activeOtp) {
+              if (hasDifferentEmail) {
+                throw conflict("mobileRegistrationInProgress", "REGISTRATION_IN_PROGRESS");
+              }
+              if (hasDifferentPhone) {
+                throw conflict("emailRegistrationInProgress", "REGISTRATION_IN_PROGRESS");
+              }
+            }
+          }
+        }
+
         const [keep, ...rest] = pendings;
         for (const p of rest) {
+          await tx.otpChallenge.deleteMany({ where: { userId: p.id } }).catch(() => {});
           await tx.user.delete({ where: { id: p.id } });
         }
+        await tx.otpChallenge.updateMany({
+          where: { userId: keep.id, purpose: "register", consumedAt: null },
+          data: { consumedAt: now },
+        });
         await tx.user.update({
           where: { id: keep.id },
           data: { email, phone, passwordHash, termsAcceptedAt },
