@@ -286,6 +286,7 @@ model User {
   notificationPref     NotificationPreference?
   messagesSent         Message[]               @relation("MessageSender")
   conversationReads    ConversationReadState[]
+  conversationDeletions ConversationDeletion[] @relation("ConversationDeletions")
   quoteStatusEvents    QuoteStatusEvent[]      @relation("QuoteStatusActor")
   supportTickets       SupportTicket[]
   platformIssues       PlatformIssue[]
@@ -834,6 +835,7 @@ model Conversation {
   messages   Message[]
   readStates ConversationReadState[]
   reports    ConversationReport[]
+  deletions  ConversationDeletion[]
 
   @@unique([customerId, expertId])
   @@index([lastMessageAt(sort: Desc)])
@@ -851,8 +853,9 @@ model Message {
 
   conversation Conversation            @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User                    @relation("MessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
-  attachments  MessageAttachment[]
-  readStates   ConversationReadState[] @relation("LastReadMessage")
+  attachments           MessageAttachment[]
+  readStates            ConversationReadState[] @relation("LastReadMessage")
+  conversationDeletions ConversationDeletion[]  @relation("LastDeletedMessage")
 
   @@index([conversationId, createdAt])
   @@index([senderUserId])
@@ -886,6 +889,23 @@ model ConversationReadState {
 
   @@unique([conversationId, userId])
   @@map("conversation_read_states")
+}
+
+model ConversationDeletion {
+  id             String    @id @default(uuid()) @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  deletedAt      DateTime  @default(now()) @map("deleted_at") @db.Timestamptz(6)
+  lastMessageId  String?   @map("last_message_id") @db.Uuid
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation("ConversationDeletions", fields: [userId], references: [id], onDelete: Cascade)
+  lastMessage  Message?     @relation("LastDeletedMessage", fields: [lastMessageId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+  @@map("conversation_deletions")
 }
 
 model UserBlock {

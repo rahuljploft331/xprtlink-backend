@@ -29,6 +29,10 @@ function internalServiceGuard(req, res, next) {
 
 const router = Router();
 
+import conversationRoutes from "./conversations.routes.js";
+router.use("/v1/conversations", conversationRoutes);
+router.use("/conversations", conversationRoutes);
+
 router.get("/", (_req, res) => {
   return ResponseFormatter.success(res, {
     message: getMessage("xprtlinkMessagingServiceWebsocketProtocolOnly"),

@@ -199,6 +199,58 @@
           "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Server→`user:<userId>` room. Emitted when admin disables account. Client must treat as forced logout. Server disconnects all user sockets 1s after emitting. Payload: `{userId}`." }
         }
       ]
+    },
+    {
+      "name": "Conversations (REST)",
+      "description": "REST endpoints for per-user conversation management (soft-delete / hide from inbox and restore).",
+      "item": [
+        {
+          "id": "c1d2e3f4-0001-0000-0000-000000000001",
+          "name": "DELETE /api/v1/conversations/:conversationId",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/conversations/:conversationId",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "conversations", ":conversationId"],
+              "variable": [
+                {
+                  "key": "conversationId",
+                  "value": "<uuid>",
+                  "description": "The UUID of the conversation thread to hide"
+                }
+              ]
+            },
+            "description": "Hides (soft-deletes) a conversation from the authenticated caller's inbox without affecting the peer participant. Returns 204 No Content. If new messages arrive later, the conversation automatically reappears."
+          }
+        },
+        {
+          "id": "c1d2e3f4-0001-0000-0000-000000000002",
+          "name": "POST /api/v1/conversations/:conversationId/restore",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/conversations/:conversationId/restore",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "conversations", ":conversationId", "restore"],
+              "variable": [
+                {
+                  "key": "conversationId",
+                  "value": "<uuid>",
+                  "description": "The UUID of the conversation thread to restore"
+                }
+              ]
+            },
+            "description": "Restores (undo delete) a hidden conversation to the caller's inbox immediately. Returns 200 OK."
+          }
+        }
+      ]
     }
   ]
 }

@@ -73,6 +73,7 @@ export function createGatewayProxies() {
     { path: "/api/v1/notifications", target: serviceUrls.notification },
     { path: "/api/v1/media", target: serviceUrls.media },
     { path: "/api/v1/admin", target: serviceUrls.admin },
+    { path: "/api/v1/conversations", target: serviceUrls.messaging },
   ];
 
   return routes.map(({ path, target }) =>

@@ -167,41 +167,102 @@ export async function listConversations(auth, query) {
   const { page, limit, skip } = parsePagination(query);
   const db = getDb();
 
-  const where = {
-    ...conversationWhere(auth),
-    messages: { some: {} },
-  };
+  let idRows, countRows;
+  if (auth.role === "customer") {
+    const profileId = auth.customerProfileId;
+    if (!profileId) throw forbidden("messagingRequiresRole");
+    [idRows, countRows] = await Promise.all([
+      db.$queryRaw`
+        SELECT c.id
+        FROM conversations c
+        LEFT JOIN conversation_deletions cd
+          ON cd.conversation_id = c.id AND cd.user_id = ${auth.userId}::uuid
+        WHERE c.customer_id = ${profileId}::uuid
+          AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id)
+          AND (cd.id IS NULL OR c.last_message_at > cd.deleted_at)
+        ORDER BY c.last_message_at DESC NULLS LAST
+        LIMIT ${limit} OFFSET ${skip}
+      `,
+      db.$queryRaw`
+        SELECT COUNT(*)::int AS count
+        FROM conversations c
+        LEFT JOIN conversation_deletions cd
+          ON cd.conversation_id = c.id AND cd.user_id = ${auth.userId}::uuid
+        WHERE c.customer_id = ${profileId}::uuid
+          AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id)
+          AND (cd.id IS NULL OR c.last_message_at > cd.deleted_at)
+      `,
+    ]);
+  } else if (auth.role === "expert") {
+    const profileId = auth.expertProfileId;
+    if (!profileId) throw forbidden("messagingRequiresRole");
+    [idRows, countRows] = await Promise.all([
+      db.$queryRaw`
+        SELECT c.id
+        FROM conversations c
+        LEFT JOIN conversation_deletions cd
+          ON cd.conversation_id = c.id AND cd.user_id = ${auth.userId}::uuid
+        WHERE c.expert_id = ${profileId}::uuid
+          AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id)
+          AND (cd.id IS NULL OR c.last_message_at > cd.deleted_at)
+        ORDER BY c.last_message_at DESC NULLS LAST
+        LIMIT ${limit} OFFSET ${skip}
+      `,
+      db.$queryRaw`
+        SELECT COUNT(*)::int AS count
+        FROM conversations c
+        LEFT JOIN conversation_deletions cd
+          ON cd.conversation_id = c.id AND cd.user_id = ${auth.userId}::uuid
+        WHERE c.expert_id = ${profileId}::uuid
+          AND EXISTS (SELECT 1 FROM messages m WHERE m.conversation_id = c.id)
+          AND (cd.id IS NULL OR c.last_message_at > cd.deleted_at)
+      `,
+    ]);
+  } else {
+    throw forbidden("messagingRequiresRole");
+  }
 
-  const [rows, total] = await Promise.all([
-    db.conversation.findMany({
-      where,
-      orderBy: { lastMessageAt: "desc" },
-      skip,
-      take: limit,
-      include: {
-        customer: { include: { user: true, avatarMedia: true } },
-        expert: { include: { avatarMedia: true } },
-        messages: { orderBy: { createdAt: "desc" }, take: 1 },
-        readStates: {
-          where: { userId: auth.userId },
-          include: { lastReadMessage: true },
-        },
+  const total = countRows[0]?.count ?? 0;
+  const matchingIds = idRows.map((r) => r.id);
+
+  if (matchingIds.length === 0) {
+    return paginatedResult([], { page, limit, total });
+  }
+
+  const rows = await db.conversation.findMany({
+    where: { id: { in: matchingIds } },
+    include: {
+      customer: { include: { user: true, avatarMedia: true } },
+      expert: { include: { avatarMedia: true } },
+      messages: { orderBy: { createdAt: "desc" }, take: 1 },
+      readStates: {
+        where: { userId: auth.userId },
+        include: { lastReadMessage: true },
       },
-    }),
-    db.conversation.count({ where }),
-  ]);
+      deletions: {
+        where: { userId: auth.userId },
+      },
+    },
+  });
+
+  const rowMap = new Map(rows.map((r) => [r.id, r]));
+  const orderedRows = matchingIds.map((id) => rowMap.get(id)).filter(Boolean);
 
   // Fetch block status
-  const otherUserIds = rows.map(c => auth.role === 'customer' ? c.expert?.userId : c.customer?.userId).filter(Boolean);
-  const blocks = otherUserIds.length ? await db.userBlock.findMany({
-    where: {
-      OR: [
-        { blockerUserId: auth.userId, blockedUserId: { in: otherUserIds } },
-        { blockerUserId: { in: otherUserIds }, blockedUserId: auth.userId }
-      ]
-    }
-  }) : [];
-  
+  const otherUserIds = orderedRows
+    .map((c) => (auth.role === "customer" ? c.expert?.userId : c.customer?.userId))
+    .filter(Boolean);
+  const blocks = otherUserIds.length
+    ? await db.userBlock.findMany({
+        where: {
+          OR: [
+            { blockerUserId: auth.userId, blockedUserId: { in: otherUserIds } },
+            { blockerUserId: { in: otherUserIds }, blockedUserId: auth.userId },
+          ],
+        },
+      })
+    : [];
+
   const blockMap = {};
   for (const block of blocks) {
     if (block.blockerUserId === auth.userId) {
@@ -211,32 +272,45 @@ export async function listConversations(auth, query) {
     }
   }
 
-  const items = await Promise.all(rows.map(async (conversation) => {
-    const otherUserId = auth.role === 'customer' ? conversation.expert?.userId : conversation.customer?.userId;
-    const blockState = blockMap[otherUserId] || { isBlocked: false, blockedByMe: false };
+  const items = await Promise.all(
+    orderedRows.map(async (conversation) => {
+      const otherUserId =
+        auth.role === "customer" ? conversation.expert?.userId : conversation.customer?.userId;
+      const blockState = blockMap[otherUserId] || { isBlocked: false, blockedByMe: false };
 
-    const readState = conversation.readStates[0];
-    const unreadCount = await db.message.count({
-      where: {
-        conversationId: conversation.id,
-        senderUserId: { not: auth.userId },
-        ...(readState ? { createdAt: { gt: readState.readAt } } : {})
+      const readState = conversation.readStates[0];
+      const deletion = conversation.deletions[0];
+
+      let unreadSince = null;
+      if (deletion && readState) {
+        unreadSince = deletion.deletedAt > readState.readAt ? deletion.deletedAt : readState.readAt;
+      } else if (deletion) {
+        unreadSince = deletion.deletedAt;
+      } else if (readState) {
+        unreadSince = readState.readAt;
       }
-    });
 
-    const lastMessage = conversation.messages[0] ?? null;
-    return toConversationSummaryDto(conversation, {
-      ...peerInfo(conversation, auth),
-      unreadCount,
-      lastMessage,
-      isBlocked: blockState.isBlocked,
-      blockedByMe: blockState.blockedByMe,
-      peerIsOnline: isUserOnline(otherUserId),
-    });
-  }));
+      const unreadCount = await db.message.count({
+        where: {
+          conversationId: conversation.id,
+          senderUserId: { not: auth.userId },
+          ...(unreadSince ? { createdAt: { gt: unreadSince } } : {}),
+        },
+      });
+
+      const lastMessage = conversation.messages[0] ?? null;
+      return toConversationSummaryDto(conversation, {
+        ...peerInfo(conversation, auth),
+        unreadCount,
+        lastMessage,
+        isBlocked: blockState.isBlocked,
+        blockedByMe: blockState.blockedByMe,
+        peerIsOnline: isUserOnline(otherUserId),
+      });
+    })
+  );
 
   return paginatedResult(items, { page, limit, total });
-
 }
 
 export async function createConversation(auth, body) {
@@ -553,4 +627,106 @@ export async function reportConversation(auth, conversationId, reason) {
     },
   });
   return { id: report.id, reported: true };
+}
+
+export async function deleteConversation(auth, conversationId) {
+  const db = getDb();
+  const conversation = await db.conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      customer: { select: { userId: true, id: true } },
+      expert: { select: { userId: true, id: true } },
+    },
+  });
+
+  if (!conversation) {
+    throw notFound("conversationNotFound");
+  }
+
+  const isCustomer =
+    conversation.customer?.userId === auth.userId ||
+    (auth.customerProfileId && conversation.customerId === auth.customerProfileId);
+  const isExpert =
+    conversation.expert?.userId === auth.userId ||
+    (auth.expertProfileId && conversation.expertId === auth.expertProfileId);
+
+  if (!isCustomer && !isExpert) {
+    throw notFound("conversationNotFound");
+  }
+
+  const latestMessage = await db.message.findFirst({
+    where: { conversationId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+
+  const now = new Date();
+
+  await db.conversationDeletion.upsert({
+    where: {
+      conversationId_userId: {
+        conversationId,
+        userId: auth.userId,
+      },
+    },
+    create: {
+      conversationId,
+      userId: auth.userId,
+      deletedAt: now,
+      lastMessageId: latestMessage?.id ?? null,
+    },
+    update: {
+      deletedAt: now,
+      lastMessageId: latestMessage?.id ?? null,
+    },
+  });
+
+  return { success: true };
+}
+
+export async function restoreConversation(auth, conversationId) {
+  const db = getDb();
+  const conversation = await db.conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      customer: { select: { userId: true, id: true } },
+      expert: { select: { userId: true, id: true } },
+    },
+  });
+
+  if (!conversation) {
+    throw notFound("conversationNotFound");
+  }
+
+  const isCustomer =
+    conversation.customer?.userId === auth.userId ||
+    (auth.customerProfileId && conversation.customerId === auth.customerProfileId);
+  const isExpert =
+    conversation.expert?.userId === auth.userId ||
+    (auth.expertProfileId && conversation.expertId === auth.expertProfileId);
+
+  if (!isCustomer && !isExpert) {
+    throw notFound("conversationNotFound");
+  }
+
+  await db.conversationDeletion.deleteMany({
+    where: {
+      conversationId,
+      userId: auth.userId,
+    },
+  });
+
+  // Signal inbox updated via socket if available
+  try {
+    const io = getIo();
+    if (io) {
+      io.to(`user:${auth.userId}`).emit("inbox:updated", {
+        conversationId,
+      });
+    }
+  } catch (err) {
+    log.warn({ err: err.message }, "[messagingService] Failed to emit inbox:updated on restore");
+  }
+
+  return { success: true };
 }
