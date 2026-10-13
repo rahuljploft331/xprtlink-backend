@@ -63,15 +63,45 @@ export const verifyPurchase = async (req, res, next) => {
     }
 
     // Prevent cross-account claiming of active subscriptions
-    const existingActiveSub = await db.expertSubscription.findFirst({
+    const existingSub = await db.expertSubscription.findFirst({
       where: {
+        store: "google",
         externalSubscriptionId,
         expertProfileId: { not: req.auth.expertProfileId },
-        status: "active",
       },
+      include: { expert: { include: { user: true } } },
     });
-    if (existingActiveSub) {
-      throw conflict("subscriptionAlreadyLinkedToAnotherAccount", "SUBSCRIPTION_ALREADY_LINKED");
+
+    if (existingSub) {
+      const isStillActive = existingSub.status === "active" && existingSub.currentPeriodEnd > now;
+
+      if (isStillActive) {
+        // In development / sandbox testing OR if client explicitly requests transfer
+        const isDevOrSandbox = process.env.NODE_ENV !== "production";
+        if (isDevOrSandbox || req.body.transfer === true) {
+          log.info(
+            {
+              externalSubscriptionId,
+              fromExpertId: existingSub.expertProfileId,
+              toExpertId: req.auth.expertProfileId,
+              isDevOrSandbox,
+            },
+            "[googleIapController] Transferring active subscription to new account"
+          );
+          await db.expertSubscription.update({
+            where: { id: existingSub.id },
+            data: { status: "canceled", canceledAt: now },
+          });
+        } else {
+          throw conflict("subscriptionAlreadyLinkedToAnotherAccount", "SUBSCRIPTION_ALREADY_LINKED");
+        }
+      } else {
+        // Previous owner's subscription has expired; mark as expired so new owner can claim cleanly
+        await db.expertSubscription.update({
+          where: { id: existingSub.id },
+          data: { status: "expired" },
+        });
+      }
     }
 
     const subscription = await db.$transaction(async (tx) => {
@@ -93,6 +123,7 @@ export const verifyPurchase = async (req, res, next) => {
           },
         },
         update: {
+          expertProfileId: req.auth.expertProfileId,
           planId: plan.id,
           status: "active",
           currentPeriodStart: now,

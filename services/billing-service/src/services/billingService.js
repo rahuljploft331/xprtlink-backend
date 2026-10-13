@@ -1708,7 +1708,8 @@ export async function subscribe() {
 
 export async function getMySubscription(auth) {
   // Includes subscriptions that are active OR scheduled to cancel at period end
-  const subscription = await getDb().expertSubscription.findFirst({
+  const db = getDb();
+  const subscription = await db.expertSubscription.findFirst({
     where: {
       expertProfileId: auth.expertProfileId,
       status: "active",
@@ -1718,6 +1719,15 @@ export async function getMySubscription(auth) {
   });
 
   if (!subscription) throw notFound("noActiveSubscription");
+
+  if (subscription.currentPeriodEnd < new Date()) {
+    await db.expertSubscription.update({
+      where: { id: subscription.id },
+      data: { status: "expired" },
+    });
+    throw notFound("noActiveSubscription");
+  }
+
   return toExpertSubscriptionDto(subscription, subscription.plan);
 }
 
