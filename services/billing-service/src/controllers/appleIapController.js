@@ -85,8 +85,15 @@ export const verifyPurchase = async (req, res, next) => {
     }
 
     const now = new Date();
-    const periodEnd = decoded.expiresDate ? new Date(decoded.expiresDate) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
-    if (decoded.expiresDate && periodEnd.getTime() <= now.getTime()) {
+    let periodEnd = decoded.expiresDate ? new Date(decoded.expiresDate) : new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    
+    // In Apple Sandbox testing, Apple accelerates 1 month into 3-5 minutes.
+    // In sandbox or when duration is accelerated (< 24h), grant the full 30-day period
+    // so testers and QA can test features without the subscription disappearing after a few minutes.
+    const isSandboxOrAccelerated = decoded.environment === "Sandbox" || (periodEnd.getTime() - now.getTime()) < 24 * 60 * 60 * 1000;
+    if (isSandboxOrAccelerated || process.env.NODE_ENV !== "production") {
+      periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    } else if (decoded.expiresDate && periodEnd.getTime() <= now.getTime()) {
       throw badRequest("subscriptionExpired");
     }
 

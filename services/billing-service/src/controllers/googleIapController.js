@@ -56,9 +56,15 @@ export const verifyPurchase = async (req, res, next) => {
 
     const externalSubscriptionId = purchaseToken;
     const now = new Date();
-    const periodEnd = new Date(lineItem.expiryTime);
+    let periodEnd = new Date(lineItem.expiryTime);
 
-    if (periodEnd.getTime() <= now.getTime()) {
+    // In Google Play license testing, periods are accelerated to 5 minutes.
+    // In development or when duration is accelerated (< 24h), grant the full 30-day period
+    // so testers can test features without the subscription disappearing.
+    const isAccelerated = (periodEnd.getTime() - now.getTime()) < 24 * 60 * 60 * 1000;
+    if (isAccelerated || process.env.NODE_ENV !== "production") {
+      periodEnd = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    } else if (periodEnd.getTime() <= now.getTime()) {
       throw badRequest("subscriptionExpired");
     }
 

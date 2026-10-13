@@ -42,7 +42,17 @@ export const handleNotification = async (req, res, next) => {
     const db = getDb();
 
     const { notificationType, subtype, data } = decodedNotification;
-    const externalSubscriptionId = data?.signedTransactionInfo?.originalTransactionId;
+    
+    let transactionInfo = null;
+    if (data?.signedTransactionInfo) {
+      try {
+        transactionInfo = await verifier.verifyAndDecodeTransaction(data.signedTransactionInfo);
+      } catch (err) {
+        log.warn({ err: err.message }, "[appleWebhookController] Error decoding signedTransactionInfo");
+      }
+    }
+
+    const externalSubscriptionId = transactionInfo?.originalTransactionId;
 
     if (externalSubscriptionId) {
       const subscription = await db.expertSubscription.findFirst({
@@ -52,21 +62,37 @@ export const handleNotification = async (req, res, next) => {
 
       if (subscription) {
         if (notificationType === "DID_RENEW") {
-          const newPeriodEnd = new Date(data.signedTransactionInfo.expiresDate);
+          let newPeriodEnd = transactionInfo?.expiresDate
+            ? new Date(transactionInfo.expiresDate)
+            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+          if (data?.environment === "Sandbox" || process.env.NODE_ENV !== "production") {
+            newPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+          }
           await db.expertSubscription.update({
             where: { id: subscription.id },
             data: { currentPeriodEnd: newPeriodEnd, status: "active", cancelAtPeriodEnd: false },
           });
-        } else if (notificationType === "DID_FAIL_TO_RENEW" || notificationType === "EXPIRED" || notificationType === "REVOKE") {
+        } else if (notificationType === "REVOKE") {
           await db.expertSubscription.update({
             where: { id: subscription.id },
-            data: { status: notificationType === "REVOKE" ? "canceled" : "expired" },
+            data: { status: "canceled" },
           });
-          // Remove search eligibility if expired
           await db.expertProfile.update({
             where: { id: subscription.expertProfileId },
             data: { searchEligible: false },
           });
+        } else if (notificationType === "DID_FAIL_TO_RENEW" || notificationType === "EXPIRED") {
+          const isDevOrSandbox = data?.environment === "Sandbox" || process.env.NODE_ENV !== "production";
+          if (!isDevOrSandbox || subscription.currentPeriodEnd <= new Date()) {
+            await db.expertSubscription.update({
+              where: { id: subscription.id },
+              data: { status: "expired" },
+            });
+            await db.expertProfile.update({
+              where: { id: subscription.expertProfileId },
+              data: { searchEligible: false },
+            });
+          }
         } else if (notificationType === "DID_CHANGE_RENEWAL_STATUS") {
           if (subtype === "AUTO_RENEW_DISABLED") {
             await db.expertSubscription.update({
