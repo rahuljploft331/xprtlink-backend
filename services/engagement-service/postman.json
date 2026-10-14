@@ -239,7 +239,7 @@
           }
         },
         {
-          "name": "Reject Quote (Customer)",
+          "name": "Reject Quote",
           "request": {
             "method": "POST",
             "header": [
@@ -268,7 +268,7 @@
                 }
               ]
             },
-            "description": "Customer rejects the expert's quotation estimate."
+            "description": "Customer rejects the expert's quotation estimate, or expert rejects customer's quote request."
           }
         },
         {

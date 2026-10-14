@@ -635,7 +635,8 @@ export async function acceptQuote(auth, quoteId) {
 export async function rejectQuote(auth, quoteId) {
   const quote = await loadQuote(quoteId);
 
-  if (auth.userRole === "expert") {
+  if (auth.role === "expert") {
+    assertExpert(auth);
     assertQuoteExpert(auth, quote);
     const EXPERT_REJECTABLE_STATUSES = new Set(["submitted", "pending_expert_review", "expert_reviewed", "quoted"]);
     
@@ -657,20 +658,29 @@ export async function rejectQuote(auth, quoteId) {
     // Notify customer that the expert rejected their request
     try {
       const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
-      const expertName = `${updated.expert.user.firstName ?? ""} ${updated.expert.user.lastName ?? ""}`.trim() || "An expert";
+      const expertName = `${updated.expert?.firstName ?? updated.expert?.user?.firstName ?? ""}`.trim() || "An expert";
       await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
         userIds: [updated.customer.user.id],
         type: "quote_rejected",
         title: "Quote Rejected",
         body: `${expertName} rejected your quote request for "${updated.title}"`,
-        emailHtml: `<p>${expertName} rejected your quote request for "${updated.title}"</p>`,
-        emailSubject: "Quote Request Rejected",
+        data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
       });
+
+      if (updated.customer?.user?.email) {
+        const emailHtml = await renderEmailTemplate({
+          title: "Quote Request Rejected",
+          bodyHtml: `<p>${expertName} rejected your quote request for "${updated.title}"</p>`,
+          ctaText: "View Details",
+          ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://app.xprtlink.com"}/quotes/${updated.id}`,
+        });
+        await sendEmail({ to: updated.customer.user.email, subject: "Quote Request Rejected", html: emailHtml }).catch(e => log.error(e));
+      }
     } catch (err) {
       log.error(`[rejectQuote] Notification dispatch failed: ${err.message}`);
     }
 
-    return updated;
+    return toQuoteDetailDto(updated, quoteContext(updated));
   }
 
   // Customer logic
