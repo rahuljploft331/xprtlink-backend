@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
+import cookieParser from "cookie-parser";
 import { disconnectDb, getDb } from "../db/getClient.js";
 import { loadSecret } from "./secrets.js";
 import { logger } from "../lib/logger.js";
@@ -55,6 +56,7 @@ export function createApp() {
       allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
     })
   );
+  app.use(cookieParser());
 
   // 1MB default — sufficient for all JSON API payloads.
   // media-service directUpload route overrides with 100mb locally for base64 uploads.

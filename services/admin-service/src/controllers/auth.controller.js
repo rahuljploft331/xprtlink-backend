@@ -9,6 +9,40 @@ import { getDb } from "@xprtlink/shared/db/index.js";
 import { createHash } from "crypto";
 import crypto from "crypto";
 
+const isProduction = process.env.NODE_ENV === "production";
+
+function setAuthCookies(res, accessToken, refreshToken) {
+  if (accessToken) {
+    res.cookie("admin_access_token", accessToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 15 * 60 * 1000, // 15 mins
+    });
+  }
+  if (refreshToken) {
+    res.cookie("admin_refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    });
+  }
+}
+
+function clearAuthCookies(res) {
+  const options = {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: "lax",
+    path: "/",
+  };
+  res.clearCookie("admin_access_token", options);
+  res.clearCookie("admin_refresh_token", options);
+}
+
 /** Hash an admin JWT for denylist storage (SHA-256 hex, 64 chars) */
 function hashAdminToken(token) {
   return createHash("sha256").update(token).digest("hex");
@@ -62,6 +96,8 @@ export async function login(req, res, next) {
       ]
     });
 
+    setAuthCookies(res, accessToken, refreshPlain);
+
     const { passwordHash: _ph, ...adminSafe } = admin;
 
     return ResponseFormatter.success(res, {
@@ -87,11 +123,12 @@ export async function login(req, res, next) {
 export async function logout(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
-    const { refreshToken } = req.body || {};
+    const token = req.token || (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : req.cookies?.admin_access_token);
+    const refreshToken = req.body?.refreshToken || req.cookies?.admin_refresh_token;
     const hashes = [];
 
-    if (authHeader?.startsWith("Bearer ")) {
-      hashes.push(hashAdminToken(authHeader.slice(7)));
+    if (token) {
+      hashes.push(hashAdminToken(token));
     }
     if (refreshToken) {
       hashes.push(hashRefreshToken(refreshToken));
@@ -104,6 +141,8 @@ export async function logout(req, res, next) {
         data: { revokedAt: new Date() },
       });
     }
+
+    clearAuthCookies(res);
     return ResponseFormatter.success(res, { message: getMessage("loggedOut") });
   } catch (err) {
     next(err);
@@ -113,7 +152,7 @@ export async function logout(req, res, next) {
 /** POST /api/auth/refresh — refresh admin token */
 export async function refresh(req, res, next) {
   try {
-    const { refreshToken } = req.body;
+    const refreshToken = req.cookies?.admin_refresh_token || req.body?.refreshToken;
     if (!refreshToken) return next(badRequest("refreshTokenRequired"));
 
     const tokenHash = hashRefreshToken(refreshToken);
@@ -131,6 +170,7 @@ export async function refresh(req, res, next) {
     });
 
     if (!session || !session.admin || session.admin.status !== "active") {
+      clearAuthCookies(res);
       return next(unauthorized("invalidRefreshToken"));
     }
 
@@ -168,6 +208,8 @@ export async function refresh(req, res, next) {
       ]
     });
 
+    setAuthCookies(res, accessToken, newRefreshPlain);
+
     const { passwordHash: _ph, ...adminSafe } = admin;
 
     return ResponseFormatter.success(res, {
@@ -197,6 +239,7 @@ export async function me(req, res, next) {
     return ResponseFormatter.success(res, {
       data: {
         ...adminSafe,
+        ...(req.token ? { accessToken: req.token } : {}),
         permissions: admin.permissions.reduce((acc, p) => {
           acc[p.module] = p.level;
           return acc;

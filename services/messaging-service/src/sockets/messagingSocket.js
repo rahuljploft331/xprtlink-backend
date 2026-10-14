@@ -50,6 +50,12 @@ export function registerMessagingSockets(io) {
         socket.handshake.headers?.authorization ||
         socket.handshake.query?.token;
 
+      if (!token && socket.handshake.headers?.cookie) {
+        const cookieStr = socket.handshake.headers.cookie;
+        const match = cookieStr.match(/(?:^|;\s*)admin_access_token=([^;]+)/);
+        if (match) token = decodeURIComponent(match[1]);
+      }
+
       if (!token) {
         return next(new Error(getMessage("authTokenRequired")));
       }
@@ -60,12 +66,23 @@ export function registerMessagingSockets(io) {
 
       const payload = verifyAccessToken(token);
 
-      // Check user status in DB to enforce bans/suspensions on WebSocket connections
-      const user = await getDb().user.findUnique({
-        where: { id: payload.sub },
-        select: { status: true },
-      });
-      if (!user || user.status !== "active") {
+      // Check user/admin status in DB to enforce bans/suspensions on WebSocket connections
+      let accountStatus = null;
+      if (payload.role === "super_admin" || payload.role === "subadmin") {
+        const admin = await getDb().adminUser.findUnique({
+          where: { id: payload.sub },
+          select: { status: true },
+        });
+        accountStatus = admin?.status;
+      } else {
+        const user = await getDb().user.findUnique({
+          where: { id: payload.sub },
+          select: { status: true },
+        });
+        accountStatus = user?.status;
+      }
+
+      if (!accountStatus || accountStatus !== "active") {
         return next(new Error(getMessage("accountSuspendedOrDeleted")));
       }
 

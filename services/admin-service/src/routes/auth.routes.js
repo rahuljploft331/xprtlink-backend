@@ -8,8 +8,12 @@ const router = Router();
 /** POST /api/auth/login */
 router.post("/login", asyncHandler(login));
 
+const optionalAdmin = (req, res, next) => {
+  requireAdmin(req, res, () => next());
+};
+
 /** POST /api/auth/logout */
-router.post("/logout", requireAdmin, asyncHandler(logout));
+router.post("/logout", optionalAdmin, asyncHandler(logout));
 
 /** POST /api/auth/refresh */
 router.post("/refresh", asyncHandler(refresh));

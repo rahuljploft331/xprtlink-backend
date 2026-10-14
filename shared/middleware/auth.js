@@ -5,15 +5,17 @@ import { logger } from "../lib/logger.js";
 const log = logger.child({ module: "auth" });
 
 /**
- * Extract a Bearer token from the request.
+ * Extract an auth token from the request.
  * Checks (in order):
  *   1. Authorization: Bearer <token>  header  (all normal API calls)
  *   2. ?token=<token>                 query   (SSE / EventSource — browsers can't send headers)
+ *   3. admin_access_token             cookie  (HttpOnly session cookie for admin web portal)
  */
 function parseBearer(req) {
   const header = req.headers.authorization;
   if (header?.startsWith("Bearer ")) return header.slice(7);
   if (req.query?.token) return req.query.token;
+  if (req.cookies?.admin_access_token) return req.cookies.admin_access_token;
   return null;
 }
 
@@ -50,6 +52,7 @@ export async function authenticate(req, _res, next) {
   try {
     const token = parseBearer(req);
     if (!token) throw unauthorized("missingOrInvalidAuthToken");
+    req.token = token;
     const payload = verifyAccessToken(token);
 
     const status = await checkUserStatus(payload.sub, payload.role);
@@ -83,6 +86,7 @@ export async function optionalAuthenticate(req, _res, next) {
       req.auth = null;
       return next();
     }
+    req.token = token;
     const payload = verifyAccessToken(token);
     const status = await checkUserStatus(payload.sub, payload.role);
     

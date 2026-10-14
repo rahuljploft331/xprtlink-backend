@@ -22,9 +22,8 @@ export async function requireAdmin(req, res, next) {
 
     try {
       // M8: Check that the token hasn't been revoked via logout
-      const authHeader = req.headers.authorization;
-      if (authHeader?.startsWith("Bearer ")) {
-        const token = authHeader.slice(7);
+      const token = req.token || (req.headers.authorization?.startsWith("Bearer ") ? req.headers.authorization.slice(7) : req.cookies?.admin_access_token);
+      if (token) {
         const tokenHash = createHash("sha256").update(token).digest("hex");
         const session = await getDb().adminSession.findFirst({
           where: { tokenHash, revokedAt: null, expiresAt: { gt: new Date() } },
