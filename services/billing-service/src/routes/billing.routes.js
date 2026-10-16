@@ -18,6 +18,7 @@ import * as googleIapController from "../controllers/googleIapController.js";
 import * as appleWebhookController from "../controllers/appleWebhookController.js";
 import * as googlePlayWebhookController from "../controllers/googlePlayWebhookController.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { badRequest } from "@xprtlink/shared/utils/errors.js";
 
 const router = Router();
 
@@ -445,6 +446,23 @@ router.get(
   asyncHandler(async (req, res) => {
     const data = await svc.listSubscriptionPlans();
     return ResponseFormatter.success(res, { message: getMessage("subscriptionPlans"), data });
+  })
+);
+
+// Web checkout: creates a Stripe Checkout Session and returns the redirect URL.
+// The subscription is activated by the checkout.session.completed webhook, never
+// by the success_url return. successUrl / cancelUrl come from the request body
+// so the frontend can pass its own return path.
+router.post(
+  "/subscriptions/checkout-session",
+  stripeGuard,
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const { planCode, successUrl, cancelUrl } = req.body;
+    if (!planCode) throw badRequest("planCode is required", "MISSING_PLAN_CODE");
+    if (!successUrl || !cancelUrl) throw badRequest("successUrl and cancelUrl are required", "MISSING_URLS");
+    const data = await svc.createStripeCheckoutSession(req.auth, { planCode, successUrl, cancelUrl });
+    return ResponseFormatter.success(res, { message: "Checkout session created", data });
   })
 );
 

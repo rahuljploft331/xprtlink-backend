@@ -179,6 +179,7 @@ enum TransactionStatus {
 enum SubscriptionStore {
   apple
   google
+  stripe
 
   @@map("subscription_store")
 }
