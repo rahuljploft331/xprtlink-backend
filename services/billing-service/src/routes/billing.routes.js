@@ -18,6 +18,7 @@ import * as googleIapController from "../controllers/googleIapController.js";
 import * as appleWebhookController from "../controllers/appleWebhookController.js";
 import * as googlePlayWebhookController from "../controllers/googlePlayWebhookController.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { badRequest } from "@xprtlink/shared/utils/errors.js";
 
 const router = Router();
 
@@ -458,8 +459,8 @@ router.post(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const { planCode, successUrl, cancelUrl } = req.body;
-    if (!planCode) throw new Error("planCode is required");
-    if (!successUrl || !cancelUrl) throw new Error("successUrl and cancelUrl are required");
+    if (!planCode) throw badRequest("planCode is required", "MISSING_PLAN_CODE");
+    if (!successUrl || !cancelUrl) throw badRequest("successUrl and cancelUrl are required", "MISSING_URLS");
     const data = await svc.createStripeCheckoutSession(req.auth, { planCode, successUrl, cancelUrl });
     return ResponseFormatter.success(res, { message: "Checkout session created", data });
   })

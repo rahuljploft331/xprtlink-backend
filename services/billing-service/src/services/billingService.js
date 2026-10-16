@@ -2832,17 +2832,18 @@ export async function retryPayout(payoutId, { adminUserId } = {}) {
 export async function createStripeCheckoutSession(auth, { planCode, successUrl, cancelUrl }) {
   const db = getDb();
 
+  // Check for existing active subscription before any Stripe calls — prevents
+  // double-billing IAP subscribers and gives a clearer error than Stripe config issues.
+  const existing = await db.expertSubscription.findFirst({
+    where: { expertProfileId: auth.expertProfileId, status: "active" },
+  });
+  if (existing) throw conflict("subscriptionAlreadyActive", "SUBSCRIPTION_ALREADY_ACTIVE");
+
   const plan = await db.subscriptionPlan.findFirst({
     where: { code: planCode, isActive: true },
   });
   if (!plan) throw notFound("planNotFound");
   if (!plan.stripePriceId) throw badRequest("planNotAvailableOnWeb", "PLAN_NO_STRIPE_PRICE");
-
-  // Block if expert already has an active subscription from any store
-  const existing = await db.expertSubscription.findFirst({
-    where: { expertProfileId: auth.expertProfileId, status: "active" },
-  });
-  if (existing) throw conflict("subscriptionAlreadyActive", "SUBSCRIPTION_ALREADY_ACTIVE");
 
   // Resolve expert name + email for Stripe customer
   const expert = await db.expertProfile.findUnique({
