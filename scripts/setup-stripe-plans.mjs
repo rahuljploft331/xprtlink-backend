@@ -14,7 +14,8 @@ function psql(sql) {
   const url = process.env.DATABASE_URL;
   // Parse postgresql://user:pass@host:port/db
   const m = url.match(/postgresql?:\/\/([^:]+):([^@]+)@([^:\/]+):?(\d+)?\/([^?]+)/);
-  const [, user, pass, host, port = '5432', db] = m;
+  const [, user, rawPass, host, port = '5432', db] = m;
+  const pass = decodeURIComponent(rawPass);
   return execSync(`PGPASSWORD="${pass}" psql -h ${host} -p ${port} -U ${user} -d ${db} -c "${sql.replace(/"/g, '\\"')}"`, {
     encoding: 'utf8',
   });
