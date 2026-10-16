@@ -87,6 +87,19 @@ router.post("/internal/events/account-disabled", internalServiceGuard, (req, res
   return res.json({ success: true });
 });
 
+router.post("/internal/events/expert-subscription-expired", internalServiceGuard, (req, res) => {
+  const { userId } = req.body;
+  const io = getIo();
+  if (io) {
+    log.info("EMITTING expert:subscription_expired", { userId });
+    io.to(`user:${userId}`).emit("expert:subscription_expired", {
+      userId,
+      availabilityStatus: "offline",
+    });
+  }
+  return res.json({ success: true });
+});
+
 router.post("/internal/events/zego-revoked", internalServiceGuard, async (req, res) => {
   const { userId, role, newIat } = req.body;
   const io = getIo();

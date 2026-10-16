@@ -2169,7 +2169,7 @@ export async function expireSubscriptions() {
     if (!stillActive) {
       await db.expertProfile.updateMany({
         where: { id: expertProfileId, searchEligible: true },
-        data: { searchEligible: false },
+        data: { searchEligible: false, availabilityStatus: "offline" },
       });
     }
   }
@@ -2188,7 +2188,7 @@ export async function expireSubscriptions() {
   if (orphanedEligible.length > 0) {
     await db.expertProfile.updateMany({
       where: { id: { in: orphanedEligible.map((e) => e.id) } },
-      data: { searchEligible: false },
+      data: { searchEligible: false, availabilityStatus: "offline" },
     });
     log.info(`[billing] expireSubscriptions: reconciled ${orphanedEligible.length} orphaned searchEligible expert(s)`);
   }
@@ -2213,6 +2213,14 @@ export async function expireSubscriptions() {
           body: "Your expert subscription has expired. Renew now to stay discoverable on XpertLink.",
           data: {},
         });
+
+        // Emit socket event so online experts get an immediate availability update
+        const msgUrl = process.env.MESSAGING_SERVICE_URL ?? "http://localhost:4005";
+        for (const userId of userIds) {
+          internalPost(msgUrl, "/internal/events/expert-subscription-expired", { userId }).catch(
+            (e) => log.error(`[expireSubscriptions] Socket emit failed for userId=${userId}: ${e.message}`)
+          );
+        }
 
         const users = await db2.user.findMany({ where: { id: { in: userIds } }, select: { email: true } });
         for (const u of users) {
