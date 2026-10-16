@@ -248,6 +248,15 @@ export async function createQuote(auth, body) {
       },
     });
     if (block) throw forbidden("userBlockedCannotEngage");
+
+    // Guard: expert must hold an active subscription to receive quote requests
+    const activeSubscription = await db.expertSubscription.findFirst({
+      where: { expertProfileId: body.expertId, status: "active" },
+      select: { id: true },
+    });
+    if (!activeSubscription) {
+      throw badRequest("expertSubscriptionInactive", "EXPERT_SUBSCRIPTION_INACTIVE");
+    }
   } else {
     // No specific expert requested — find any approved expert (discovery-style quote)
     expert = await db.expertProfile.findFirst({ 
@@ -933,6 +942,15 @@ export async function createConsultation(auth, body) {
   }
   if (expert.availabilityStatus !== "online") {
     throw badRequest("expertCurrentlyOffline", "EXPERT_OFFLINE");
+  }
+
+  // Guard: expert must hold an active subscription to receive consultations
+  const activeSubscription = await db.expertSubscription.findFirst({
+    where: { expertProfileId: body.expertId, status: "active" },
+    select: { id: true },
+  });
+  if (!activeSubscription) {
+    throw badRequest("expertSubscriptionInactive", "EXPERT_SUBSCRIPTION_INACTIVE");
   }
 
   // Guard: prevent creating multiple active consultations for the same pair

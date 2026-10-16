@@ -200,6 +200,7 @@
   "adminIdMustBeValidUuid": "adminId must be a valid UUID",
   "expertNotVerified": "This expert is not yet verified and cannot accept consultations.",
   "expertCurrentlyOffline": "This expert is currently offline. Please try again when they are available.",
+  "expertSubscriptionInactive": "This expert is not currently accepting new consultations.",
   "consultationNotAwaitingAcceptance": "Consultation is not awaiting acceptance",
   "consultationNotAwaitingResponse": "Consultation is not awaiting a response",
   "consultationCannotBeEnded": "Consultation cannot be ended in its current status",
