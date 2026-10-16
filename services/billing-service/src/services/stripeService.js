@@ -501,6 +501,52 @@ export async function findTransferForPayout(payoutId) {
 }
 
 /**
+ * Exposes the initialized Stripe SDK for use in webhook handlers that already
+ * have the event object (event was verified by constructWebhookEvent).
+ */
+export function _requireStripeForWebhook() {
+  return requireStripe();
+}
+
+/**
+ * Creates a Stripe Checkout Session for a web subscription.
+ * Activation is handled by the checkout.session.completed webhook event,
+ * never by the success_url redirect alone.
+ */
+export async function createCheckoutSession({
+  customerId,
+  priceId,
+  successUrl,
+  cancelUrl,
+  metadata = {},
+  idempotencyKey,
+}) {
+  const sdk = requireStripe();
+  const params = {
+    customer: customerId,
+    mode: "subscription",
+    line_items: [{ price: priceId, quantity: 1 }],
+    success_url: successUrl,
+    cancel_url: cancelUrl,
+    subscription_data: { metadata },
+    metadata,
+    allow_promotion_codes: true,
+  };
+  const opts = idempotencyKey ? { idempotencyKey } : {};
+  return await sdk.checkout.sessions.create(params, opts);
+}
+
+/**
+ * Retrieves a Stripe Checkout Session by id (used to reconcile on success_url return).
+ */
+export async function retrieveCheckoutSession(sessionId) {
+  const sdk = requireStripe();
+  return await sdk.checkout.sessions.retrieve(sessionId, {
+    expand: ["subscription"],
+  });
+}
+
+/**
  * Constructs and verifies incoming Stripe Webhook events.
  */
 export function constructWebhookEvent(payload, signature) {

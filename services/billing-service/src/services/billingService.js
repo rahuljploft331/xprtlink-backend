@@ -1563,6 +1563,129 @@ export async function handleStripeWebhook(payload, signature) {
       break;
     }
 
+    case "checkout.session.completed": {
+      const session = event.data.object;
+      if (session.mode !== "subscription" || session.payment_status !== "paid") break;
+      const { expertProfileId, planId } = session.metadata ?? {};
+      if (!expertProfileId || !planId) {
+        log.warn(`[billing-webhook] checkout.session.completed missing metadata session=${session.id}`);
+        break;
+      }
+      const stripeSubscriptionId =
+        typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
+      if (!stripeSubscriptionId) {
+        log.warn(`[billing-webhook] checkout.session.completed no subscription id session=${session.id}`);
+        break;
+      }
+
+      // Retrieve the subscription from Stripe to get the actual period dates
+      const sdk = stripeSvc._requireStripeForWebhook();
+      const stripeSub = await sdk.subscriptions.retrieve(stripeSubscriptionId);
+      const periodStart = new Date(stripeSub.current_period_start * 1000);
+      const periodEnd = new Date(stripeSub.current_period_end * 1000);
+
+      await db.$transaction(async (tx) => {
+        // Cancel any other active subscriptions for this expert
+        await tx.expertSubscription.updateMany({
+          where: { expertProfileId, status: "active" },
+          data: { status: "canceled", canceledAt: new Date(), cancelAtPeriodEnd: false },
+        });
+
+        await tx.expertSubscription.upsert({
+          where: { store_externalSubscriptionId: { store: "stripe", externalSubscriptionId: stripeSubscriptionId } },
+          update: {
+            expertProfileId,
+            planId,
+            status: "active",
+            currentPeriodStart: periodStart,
+            currentPeriodEnd: periodEnd,
+            cancelAtPeriodEnd: false,
+            canceledAt: null,
+          },
+          create: {
+            expertProfileId,
+            planId,
+            store: "stripe",
+            externalSubscriptionId: stripeSubscriptionId,
+            status: "active",
+            currentPeriodStart: periodStart,
+            currentPeriodEnd: periodEnd,
+          },
+        });
+
+        // Flip search eligibility when verification is approved
+        await tx.expertProfile.updateMany({
+          where: { id: expertProfileId, verificationStatus: "approved", searchEligible: false },
+          data: { searchEligible: true },
+        });
+      });
+
+      // Best-effort notification
+      const expertUser = await db.expertProfile.findUnique({
+        where: { id: expertProfileId },
+        select: { userId: true },
+      });
+      if (expertUser) {
+        internalPost(NOTIFICATION_URL(), "/api/v1/notifications/dispatch", {
+          userIds: [expertUser.userId],
+          type: "subscription_activated",
+          title: "Subscription Activated",
+          body: "Your XprtLink expert plan is now active.",
+          data: { planId },
+        }).catch((err) => log.warn(`[billing-webhook] notification dispatch failed: ${err.message}`));
+      }
+      log.info(`[billing-webhook] checkout.session.completed expertProfileId=${expertProfileId} sub=${stripeSubscriptionId}`);
+      break;
+    }
+
+    case "customer.subscription.updated": {
+      const sub = event.data.object;
+      const stripeSubscriptionId = sub.id;
+      const row = await db.expertSubscription.findUnique({
+        where: { store_externalSubscriptionId: { store: "stripe", externalSubscriptionId: stripeSubscriptionId } },
+      });
+      if (!row) break;
+
+      const newStatus = sub.status === "active" ? "active" : sub.status === "canceled" ? "canceled" : "expired";
+      await db.expertSubscription.update({
+        where: { id: row.id },
+        data: {
+          status: newStatus,
+          currentPeriodStart: new Date(sub.current_period_start * 1000),
+          currentPeriodEnd: new Date(sub.current_period_end * 1000),
+          cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
+          canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
+        },
+      });
+
+      if (newStatus !== "active") {
+        await db.expertProfile.updateMany({
+          where: { id: row.expertProfileId, searchEligible: true },
+          data: { searchEligible: false },
+        });
+      }
+      log.info(`[billing-webhook] customer.subscription.updated sub=${stripeSubscriptionId} status=${newStatus}`);
+      break;
+    }
+
+    case "customer.subscription.deleted": {
+      const sub = event.data.object;
+      const row = await db.expertSubscription.findUnique({
+        where: { store_externalSubscriptionId: { store: "stripe", externalSubscriptionId: sub.id } },
+      });
+      if (!row) break;
+      await db.expertSubscription.update({
+        where: { id: row.id },
+        data: { status: "canceled", canceledAt: new Date(), cancelAtPeriodEnd: false },
+      });
+      await db.expertProfile.updateMany({
+        where: { id: row.expertProfileId, searchEligible: true },
+        data: { searchEligible: false },
+      });
+      log.info(`[billing-webhook] customer.subscription.deleted sub=${sub.id}`);
+      break;
+    }
+
     default:
       break;
   }
@@ -2699,6 +2822,59 @@ export async function retryPayout(payoutId, { adminUserId } = {}) {
   log.info(`[retryPayout] admin ${adminUserId ?? "-"} retrying payout ${payoutId}`);
   const result = await sendPayoutTransfer(payout, expert, "retryPayout");
   return { payout: toExpertPayoutDto(result.payout), transferred: result.ok, error: result.error };
+}
+
+/**
+ * Creates a Stripe Checkout Session for a web subscription purchase.
+ * The session URL is returned to the client for redirect.  Subscription
+ * activation happens in handleStripeWebhook on checkout.session.completed.
+ */
+export async function createStripeCheckoutSession(auth, { planCode, successUrl, cancelUrl }) {
+  const db = getDb();
+
+  const plan = await db.subscriptionPlan.findFirst({
+    where: { code: planCode, isActive: true },
+  });
+  if (!plan) throw notFound("planNotFound");
+  if (!plan.stripePriceId) throw badRequest("planNotAvailableOnWeb", "PLAN_NO_STRIPE_PRICE");
+
+  // Block if expert already has an active subscription from any store
+  const existing = await db.expertSubscription.findFirst({
+    where: { expertProfileId: auth.expertProfileId, status: "active" },
+  });
+  if (existing) throw conflict("subscriptionAlreadyActive", "SUBSCRIPTION_ALREADY_ACTIVE");
+
+  // Resolve expert name + email for Stripe customer
+  const expert = await db.expertProfile.findUnique({
+    where: { id: auth.expertProfileId },
+    select: { userId: true, firstName: true, lastName: true },
+  });
+  const user = await db.user.findUnique({
+    where: { id: expert.userId },
+    select: { email: true },
+  });
+
+  const customer = await stripeSvc.getOrCreateStripeCustomer({
+    email: user.email,
+    name: `${expert.firstName ?? ""} ${expert.lastName ?? ""}`.trim() || undefined,
+    metadata: { expertProfileId: auth.expertProfileId, userId: auth.userId },
+  });
+
+  const session = await stripeSvc.createCheckoutSession({
+    customerId: customer.id,
+    priceId: plan.stripePriceId,
+    successUrl: `${successUrl}&session_id={CHECKOUT_SESSION_ID}`,
+    cancelUrl,
+    metadata: {
+      expertProfileId: auth.expertProfileId,
+      userId: auth.userId,
+      planId: plan.id,
+      planCode,
+    },
+    idempotencyKey: `checkout_${auth.expertProfileId}_${plan.id}`,
+  });
+
+  return { checkoutUrl: session.url, sessionId: session.id };
 }
 
 /** The signed-in expert's payouts (money actually sent to their bank). */

@@ -448,6 +448,23 @@ router.get(
   })
 );
 
+// Web checkout: creates a Stripe Checkout Session and returns the redirect URL.
+// The subscription is activated by the checkout.session.completed webhook, never
+// by the success_url return. successUrl / cancelUrl come from the request body
+// so the frontend can pass its own return path.
+router.post(
+  "/subscriptions/checkout-session",
+  stripeGuard,
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const { planCode, successUrl, cancelUrl } = req.body;
+    if (!planCode) throw new Error("planCode is required");
+    if (!successUrl || !cancelUrl) throw new Error("successUrl and cancelUrl are required");
+    const data = await svc.createStripeCheckoutSession(req.auth, { planCode, successUrl, cancelUrl });
+    return ResponseFormatter.success(res, { message: "Checkout session created", data });
+  })
+);
+
 // Legacy generic subscribe route. DISABLED as an activation path — it used to mint
 // a subscription from an unvalidated receipt (revenue bypass). Real activations must
 // go through the store verification endpoints below. `subscribe()` hard-rejects.
