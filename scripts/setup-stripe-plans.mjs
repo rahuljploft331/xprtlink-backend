@@ -6,7 +6,7 @@ import Stripe from 'stripe';
 import { execSync } from 'child_process';
 import * as dotenv from 'dotenv';
 
-dotenv.config({ path: '/home/jploft-php/Documents/xpertlink/xpertlink-backend/.env' });
+dotenv.config({ path: new URL('../.env', import.meta.url) });
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2023-10-16' });
 
