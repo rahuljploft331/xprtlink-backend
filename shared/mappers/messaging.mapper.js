@@ -12,7 +12,7 @@ export function toConversationSummaryDto(
     peerName,
     peerAvatarUrl,
     lastMessagePreview: lastMessage?.body ?? null,
-    lastMessageAt: toIso(conversation.lastMessageAt),
+    lastMessageAt: lastMessage ? toIso(lastMessage.createdAt) : null,
     unreadCount,
     isBlocked: isBlocked ?? false,
     blockedByMe: blockedByMe ?? false,

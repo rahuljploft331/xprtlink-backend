@@ -298,7 +298,10 @@ export async function listConversations(auth, query) {
         },
       });
 
-      const lastMessage = conversation.messages[0] ?? null;
+      let lastMessage = conversation.messages[0] ?? null;
+      if (deletion && lastMessage && lastMessage.createdAt <= deletion.deletedAt) {
+        lastMessage = null;
+      }
       return toConversationSummaryDto(conversation, {
         ...peerInfo(conversation, auth),
         unreadCount,
@@ -344,6 +347,13 @@ export async function createConversation(auth, body) {
     throw badRequest("cannotEngageWithSelf");
   }
 
+  const existing = await db.conversation.findUnique({
+    where: {
+      customerId_expertId: { customerId, expertId },
+    },
+    select: { id: true },
+  });
+
   const conversation = await db.conversation.upsert({
     where: {
       customerId_expertId: { customerId, expertId },
@@ -354,14 +364,28 @@ export async function createConversation(auth, body) {
       customer: { include: { user: true, avatarMedia: true } },
       expert: { include: { avatarMedia: true } },
       messages: { orderBy: { createdAt: "desc" }, take: 1 },
+      deletions: {
+        where: { userId: auth.userId },
+      },
     },
   });
 
-  return toConversationSummaryDto(conversation, {
+  const deletion = conversation.deletions?.[0];
+  let lastMessage = conversation.messages[0] ?? null;
+  if (deletion && lastMessage && lastMessage.createdAt <= deletion.deletedAt) {
+    lastMessage = null;
+  }
+
+  const dto = toConversationSummaryDto(conversation, {
     ...peerInfo(conversation, auth),
     unreadCount: 0,
-    lastMessage: conversation.messages[0] ?? null,
+    lastMessage,
   });
+
+  return {
+    ...dto,
+    isNew: !existing,
+  };
 }
 
 function getCategoryFromMime(mimeType) {
@@ -390,9 +414,23 @@ export async function listMessages(auth, conversationId, query) {
   const { page, limit, skip } = parsePagination(query);
   const db = getDb();
 
+  const deletion = await db.conversationDeletion.findUnique({
+    where: {
+      conversationId_userId: {
+        conversationId,
+        userId: auth.userId,
+      },
+    },
+  });
+
+  const where = {
+    conversationId,
+    ...(deletion ? { createdAt: { gt: deletion.deletedAt } } : {}),
+  };
+
   const [rows, total] = await Promise.all([
     db.message.findMany({
-      where: { conversationId },
+      where,
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
@@ -400,7 +438,7 @@ export async function listMessages(auth, conversationId, query) {
         attachments: { include: { media: true } },
       },
     }),
-    db.message.count({ where: { conversationId } }),
+    db.message.count({ where }),
   ]);
 
   const items = await Promise.all(
@@ -525,8 +563,20 @@ export async function markConversationRead(auth, conversationId) {
   await loadConversation(auth, conversationId);
   const db = getDb();
 
+  const deletion = await db.conversationDeletion.findUnique({
+    where: {
+      conversationId_userId: {
+        conversationId,
+        userId: auth.userId,
+      },
+    },
+  });
+
   const lastMessage = await db.message.findFirst({
-    where: { conversationId },
+    where: {
+      conversationId,
+      ...(deletion ? { createdAt: { gt: deletion.deletedAt } } : {}),
+    },
     orderBy: { createdAt: "desc" },
   });
 
@@ -560,6 +610,7 @@ export async function markConversationRead(auth, conversationId) {
         conversationId,
         senderUserId: { not: auth.userId },
         deliveryStatus: { in: ["sent", "delivered"] },
+        ...(deletion ? { createdAt: { gt: deletion.deletedAt } } : {}),
       },
       data: { deliveryStatus: "read" },
     }),
@@ -657,10 +708,13 @@ export async function deleteConversation(auth, conversationId) {
   const latestMessage = await db.message.findFirst({
     where: { conversationId },
     orderBy: { createdAt: "desc" },
-    select: { id: true },
+    select: { id: true, createdAt: true },
   });
 
   const now = new Date();
+  const deletedAt = latestMessage?.createdAt && latestMessage.createdAt > now
+    ? latestMessage.createdAt
+    : now;
 
   await db.conversationDeletion.upsert({
     where: {
@@ -672,14 +726,27 @@ export async function deleteConversation(auth, conversationId) {
     create: {
       conversationId,
       userId: auth.userId,
-      deletedAt: now,
+      deletedAt,
       lastMessageId: latestMessage?.id ?? null,
     },
     update: {
-      deletedAt: now,
+      deletedAt,
       lastMessageId: latestMessage?.id ?? null,
     },
   });
+
+  // Signal inbox updated via socket if available
+  try {
+    const io = getIo();
+    if (io) {
+      io.to(`user:${auth.userId}`).emit("inbox:updated", {
+        conversationId,
+        deleted: true,
+      });
+    }
+  } catch (err) {
+    log.warn({ err: err.message }, "[messagingService] Failed to emit inbox:updated on delete");
+  }
 
   return { success: true };
 }

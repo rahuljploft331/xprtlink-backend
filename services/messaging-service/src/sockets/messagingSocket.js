@@ -181,10 +181,12 @@ export function registerMessagingSockets(io) {
         
         socket.join(`conversation:${data.id}`);
 
-        // Notify peer user if online
-        const peerUserId = await svc.getConversationPeerUserId(data.id, auth.userId);
-        if (peerUserId) {
-          io.to(`user:${peerUserId}`).emit("conversation:new", { conversation: data });
+        // Notify peer user only if this conversation was freshly created
+        if (data.isNew) {
+          const peerUserId = await svc.getConversationPeerUserId(data.id, auth.userId);
+          if (peerUserId) {
+            io.to(`user:${peerUserId}`).emit("conversation:new", { conversation: data });
+          }
         }
 
         if (typeof callback === "function") {
