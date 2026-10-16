@@ -2061,6 +2061,23 @@ export async function cancelSubscription(auth) {
     include: { plan: true },
   });
 
+  // Tell the store to stop auto-renewing. Best-effort — DB is already updated.
+  let manualCancelRequired = false;
+  try {
+    if (subscription.store === "stripe" && subscription.externalSubscriptionId) {
+      await stripeSvc.setStripeCancelAtPeriodEnd(subscription.externalSubscriptionId);
+    } else if (subscription.store === "google" && subscription.externalSubscriptionId) {
+      const cancelResults = await cancelSupersededSubscriptions([subscription]);
+      if (cancelResults[0]?.manualCancelRequired) manualCancelRequired = true;
+    } else if (subscription.store === "apple") {
+      // Apple has no server-side cancel API — user must cancel in iOS Settings.
+      manualCancelRequired = true;
+    }
+  } catch (err) {
+    log.error(`[cancelSubscription] Store cancel failed (store=${subscription.store}): ${err.message}`);
+    manualCancelRequired = true;
+  }
+
   // Notify expert of the cancellation schedule — non-fatal
   try {
     const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
@@ -2093,7 +2110,7 @@ export async function cancelSubscription(auth) {
     log.error(`[cancelSubscription] Notification dispatch failed: ${err.message}`);
   }
 
-  return toExpertSubscriptionDto(updated, updated.plan);
+  return { ...toExpertSubscriptionDto(updated, updated.plan), manualCancelRequired };
 }
 
 /**

@@ -161,6 +161,13 @@ export async function cancelStripeSubscriptionImmediate(stripeSubscriptionId) {
   return sdk.subscriptions.cancel(stripeSubscriptionId);
 }
 
+export async function setStripeCancelAtPeriodEnd(stripeSubscriptionId) {
+  const sdk = requireStripe();
+  const sub = await sdk.subscriptions.retrieve(stripeSubscriptionId);
+  if (sub.status === "canceled" || sub.cancel_at_period_end) return sub;
+  return sdk.subscriptions.update(stripeSubscriptionId, { cancel_at_period_end: true });
+}
+
 /**
  * Cancels an uncaptured PaymentIntent, releasing the authorization hold on the
  * customer's card. Safe to call repeatedly: a PI that is already canceled (or was
