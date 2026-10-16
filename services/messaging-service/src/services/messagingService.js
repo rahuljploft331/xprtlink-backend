@@ -9,6 +9,7 @@ import {
   toConversationSummaryDto,
   toConversationJoinDto,
   toMessageDto,
+  toTotalUnreadCountDto,
 } from "@xprtlink/shared/mappers/messaging.mapper.js";
 import { isChatMediaAllowed } from "@xprtlink/shared/config/attachmentConfig.js";
 import { badRequest, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";

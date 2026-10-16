@@ -75,3 +75,10 @@ export async function toMessageDto(message, attachments = []) {
     createdAt: toIso(message.createdAt),
   };
 }
+
+export function toTotalUnreadCountDto(totalUnreadCount, role = null) {
+  return {
+    totalUnreadCount: Number(totalUnreadCount) || 0,
+    role: role ?? null,
+  };
+}
