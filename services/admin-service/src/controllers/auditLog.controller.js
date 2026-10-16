@@ -58,10 +58,144 @@ function truncate(str) {
   return str.length > DETAILS_MAX_LEN ? `${str.slice(0, DETAILS_MAX_LEN - 1)}…` : str;
 }
 
+async function resolveTargetNames(db, logs) {
+  const targetMap = new Map();
+
+  const grouped = {};
+  for (const log of logs) {
+    if (!log.entityId) continue;
+    if (log.entityId.toLowerCase() === "batch") {
+      targetMap.set(`${log.entityType}:batch`, "Batch Operation");
+      continue;
+    }
+    if (!UUID_RE.test(log.entityId)) continue;
+    if (!grouped[log.entityType]) grouped[log.entityType] = new Set();
+    grouped[log.entityType].add(log.entityId);
+  }
+
+  const queries = [];
+
+  if (grouped.CmsPage?.size) {
+    const ids = Array.from(grouped.CmsPage);
+    queries.push(
+      db.cmsPage.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, title: true, slug: true },
+      }).then((rows) => {
+        for (const r of rows) {
+          targetMap.set(`CmsPage:${r.id}`, r.title || (r.slug ? `/${r.slug}` : "CMS Page"));
+        }
+      }).catch(() => {})
+    );
+  }
+
+  if (grouped.Category?.size) {
+    const ids = Array.from(grouped.Category);
+    queries.push(
+      db.category.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true, slug: true },
+      }).then((rows) => {
+        for (const r of rows) {
+          targetMap.set(`Category:${r.id}`, r.name || r.slug || "Category");
+        }
+      }).catch(() => {})
+    );
+  }
+
+  if (grouped.ExpertProfile?.size) {
+    const ids = Array.from(grouped.ExpertProfile);
+    queries.push(
+      db.expertProfile.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, firstName: true, lastName: true },
+      }).then((rows) => {
+        for (const r of rows) {
+          const name = [r.firstName, r.lastName].filter(Boolean).join(" ");
+          targetMap.set(`ExpertProfile:${r.id}`, name || "Expert Profile");
+        }
+      }).catch(() => {})
+    );
+  }
+
+  if (grouped.ExpertVerification?.size) {
+    const ids = Array.from(grouped.ExpertVerification);
+    queries.push(
+      db.expertVerification.findMany({
+        where: { id: { in: ids } },
+        select: {
+          id: true,
+          expert: { select: { firstName: true, lastName: true } },
+        },
+      }).then((rows) => {
+        for (const r of rows) {
+          const name = r.expert ? [r.expert.firstName, r.expert.lastName].filter(Boolean).join(" ") : null;
+          targetMap.set(`ExpertVerification:${r.id}`, name ? `${name} (Verification)` : "Verification");
+        }
+      }).catch(() => {})
+    );
+  }
+
+  if (grouped.AdminUser?.size) {
+    const ids = Array.from(grouped.AdminUser);
+    queries.push(
+      db.adminUser.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true, email: true },
+      }).then((rows) => {
+        for (const r of rows) {
+          targetMap.set(`AdminUser:${r.id}`, r.name || r.email || "Admin User");
+        }
+      }).catch(() => {})
+    );
+  }
+
+  if (grouped.CustomerProfile?.size) {
+    const ids = Array.from(grouped.CustomerProfile);
+    queries.push(
+      db.customerProfile.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, firstName: true, lastName: true },
+      }).then((rows) => {
+        for (const r of rows) {
+          const name = [r.firstName, r.lastName].filter(Boolean).join(" ");
+          targetMap.set(`CustomerProfile:${r.id}`, name || "Customer");
+        }
+      }).catch(() => {})
+    );
+  }
+
+  if (grouped.User?.size) {
+    const ids = Array.from(grouped.User);
+    queries.push(
+      db.user.findMany({
+        where: { id: { in: ids } },
+        select: {
+          id: true,
+          email: true,
+          customerProfile: { select: { firstName: true, lastName: true } },
+          expertProfile: { select: { firstName: true, lastName: true } },
+        },
+      }).then((rows) => {
+        for (const r of rows) {
+          const name =
+            (r.customerProfile && [r.customerProfile.firstName, r.customerProfile.lastName].filter(Boolean).join(" ")) ||
+            (r.expertProfile && [r.expertProfile.firstName, r.expertProfile.lastName].filter(Boolean).join(" ")) ||
+            r.email;
+          targetMap.set(`User:${r.id}`, name || "User");
+        }
+      }).catch(() => {})
+    );
+  }
+
+  await Promise.all(queries);
+  return targetMap;
+}
+
 /**
  * GET /api/v1/admin/audit-log
  * Read-only, super-admin-only view of the immutable admin action trail.
- * Query: page, limit, action, module, adminId (empty string = no filter).
+ * Query: page, limit, action, module, adminId, search/q (empty string = no filter).
  */
 export async function list(req, res, next) {
   try {
@@ -71,28 +205,46 @@ export async function list(req, res, next) {
     const action = req.query.action?.trim();
     const module = req.query.module?.trim();
     const adminId = req.query.adminId?.trim();
+    const search = req.query.search?.trim() || req.query.q?.trim();
 
-    const where = {};
+    const conditions = [];
 
     // Stored actions are namespaced ("verification.approve"), while the portal
     // filters by bare verbs ("approve") — match on `contains`, never rename.
-    if (action) where.action = { contains: action, mode: "insensitive" };
+    if (action) conditions.push({ action: { contains: action, mode: "insensitive" } });
 
     if (adminId) {
       if (!UUID_RE.test(adminId)) {
         // Passing a non-uuid straight to Prisma raises P2023 → 500.
         return next(badRequest("adminIdMustBeValidUuid", "BAD_REQUEST", "adminId"));
       }
-      where.actorAdminId = adminId;
+      conditions.push({ actorAdminId: adminId });
     }
 
     if (module) {
       const mapped = MODULE_ENTITY_TYPES[module.toLowerCase()] ?? [];
-      where.OR = [
-        ...(mapped.length ? [{ entityType: { in: mapped } }] : []),
-        { entityType: { contains: module, mode: "insensitive" } },
-      ];
+      conditions.push({
+        OR: [
+          ...(mapped.length ? [{ entityType: { in: mapped } }] : []),
+          { entityType: { contains: module, mode: "insensitive" } },
+        ],
+      });
     }
+
+    if (search) {
+      conditions.push({
+        OR: [
+          { action: { contains: search, mode: "insensitive" } },
+          { entityType: { contains: search, mode: "insensitive" } },
+          { entityId: { contains: search, mode: "insensitive" } },
+          { ipAddress: { contains: search, mode: "insensitive" } },
+          { actor: { name: { contains: search, mode: "insensitive" } } },
+          { actor: { email: { contains: search, mode: "insensitive" } } },
+        ],
+      });
+    }
+
+    const where = conditions.length > 0 ? { AND: conditions } : {};
 
     const validSortFields = {
       createdAt: "createdAt",
@@ -117,23 +269,38 @@ export async function list(req, res, next) {
         take: limit,
         orderBy,
         include: {
-          actor: { select: { id: true, name: true, email: true } },
+          actor: { select: { id: true, name: true, email: true, role: true } },
         },
       }),
     ]);
 
-    const items = logs.map((log) => ({
-      id: log.id,
-      createdAt: log.createdAt,
-      adminId: log.actorAdminId,
-      adminName: log.actor?.name || log.actor?.email || "System",
-      action: log.action,
-      module: log.entityType,
-      targetId: log.entityId,
-      targetName: null,
-      details: summarizePayload(log.payload),
-      ipAddress: log.ipAddress,
-    }));
+    const targetMap = await resolveTargetNames(db, logs);
+
+    const items = logs.map((log) => {
+      const payload = log.payload && typeof log.payload === "object" ? log.payload : {};
+      const resolvedName =
+        targetMap.get(`${log.entityType}:${log.entityId}`) ||
+        payload.title ||
+        payload.name ||
+        (payload.slug ? `Page: ${payload.slug}` : null) ||
+        null;
+
+      return {
+        id: log.id,
+        createdAt: log.createdAt,
+        adminId: log.actorAdminId,
+        adminName: log.actor?.name || log.actor?.email || "System",
+        adminEmail: log.actor?.email || null,
+        adminRole: log.actor?.role || null,
+        action: log.action,
+        module: log.entityType,
+        targetId: log.entityId,
+        targetName: resolvedName,
+        details: summarizePayload(log.payload),
+        payload,
+        ipAddress: log.ipAddress,
+      };
+    });
 
     return ResponseFormatter.success(res, {
       message: getMessage("auditLogLoaded"),
