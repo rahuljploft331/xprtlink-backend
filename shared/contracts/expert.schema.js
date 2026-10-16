@@ -58,6 +58,8 @@ export const expertMeDtoSchema = expertPublicDtoSchema.extend({
   onboardingComplete: z.boolean(),
   searchEligible: z.boolean(),
   subscriptionActive: z.boolean(),
+  subscriptionStatus: z.enum(["active", "expired", "no_subscription"]).optional(),
+  subscriptionMessage: z.string().nullable().optional(),
 });
 
 export const expertMeUpdateRequestSchema = z.object({
@@ -133,6 +135,8 @@ export const expertDashboardDtoSchema = z.object({
   availabilityStatus: z.enum(["online", "offline", "busy"]),
   verificationStatus: z.string(),
   subscriptionActive: z.boolean(),
+  subscriptionStatus: z.enum(["active", "expired", "no_subscription"]).optional(),
+  subscriptionMessage: z.string().nullable().optional(),
   pendingQuoteCount: z.number().int().nonnegative(),
   activeConsultationCount: z.number().int().nonnegative(),
   unreadNotificationCount: z.number().int().nonnegative(),

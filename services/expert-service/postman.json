@@ -316,7 +316,7 @@
                 "me"
               ]
             },
-            "description": "Load the authenticated expert's professional hub details."
+            "description": "Load the authenticated expert's professional hub details. Returns subscriptionActive (boolean), subscriptionStatus ('active' | 'expired' | 'no_subscription'), and subscriptionMessage ('A subscription is required to go online and receive requests. Please subscribe to continue.' for new users without a subscription, 'Your subscription is inactive. Renew it to go online and receive requests.' for expired users, or null when active). Top-level message returns subscriptionMessage when subscription is inactive."
           }
         },
         {

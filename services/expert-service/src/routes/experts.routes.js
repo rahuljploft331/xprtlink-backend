@@ -46,8 +46,8 @@ router.get(
   authenticate,
   requireRole("expert"),
   asyncHandler(async (req, res) => {
-    const data = await svc.getExpertMe(req.auth);
-    return ResponseFormatter.success(res, { message: getMessage("expertProfile"), data });
+    const result = await svc.getExpertMe(req.auth);
+    return ResponseFormatter.success(res, { message: result.message, data: result.data });
   })
 );
 
@@ -57,8 +57,8 @@ router.patch(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const body = expertMeUpdateRequestSchema.parse(req.body);
-    const data = await svc.updateExpertMe(req.auth, body);
-    return ResponseFormatter.success(res, { message: getMessage("expertProfileUpdated"), data });
+    const result = await svc.updateExpertMe(req.auth, body);
+    return ResponseFormatter.success(res, { message: result.message, data: result.data });
   })
 );
 

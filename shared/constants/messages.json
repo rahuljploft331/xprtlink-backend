@@ -228,6 +228,8 @@
   "transactionAlreadyClaimed": "This transaction has already been claimed by another account",
   "subscriptionAlreadyLinkedToAnotherAccount": "This subscription is already linked to another account. Please sign in with the original account or manage your subscription in store settings.",
   "subscriptionExpired": "The subscription has expired and cannot be restored or activated.",
+  "subscriptionRequiredNewUser": "A subscription is required to go online and receive requests. Please subscribe to continue.",
+  "subscriptionInactiveRenew": "Your subscription is inactive. Renew it to go online and receive requests.",
   "subscriptionRevoked": "The subscription has been revoked or refunded.",
   "transactionProductMismatch": "Transaction product ID does not match the requested plan",
   "planDoesNotSupportBanners": "Your current subscription plan does not support banners.",

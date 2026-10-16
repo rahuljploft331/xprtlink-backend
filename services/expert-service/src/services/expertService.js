@@ -11,6 +11,7 @@ import {
 } from "@xprtlink/shared/mappers/expert.mapper.js";
 import { amountToCents } from "@xprtlink/shared/mappers/common.js";
 import { badRequest, notFound, unauthorized } from "@xprtlink/shared/utils/errors.js";
+import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 
 const PUBLIC_WHERE = { searchEligible: true, verificationStatus: "approved", user: { status: "active" } };
@@ -354,17 +355,62 @@ async function getExpertProfileOrThrow(auth) {
   const subscriptionActive = expert.subscriptions.length > 0;
   const maxBanners = expert.subscriptions[0]?.plan?.maxBanners || 0;
   return { expert, user, subscriptionActive, maxBanners };
+}
 
+export async function resolveSubscriptionState(expertProfileId, subscriptionActive) {
+  if (subscriptionActive) {
+    return {
+      subscriptionStatus: "active",
+      subscriptionMessage: null,
+      subscriptionMessageKey: null,
+    };
+  }
+
+  const pastSubscription = await getDb().expertSubscription.findFirst({
+    where: { expertProfileId },
+    select: { id: true },
+  });
+
+  if (pastSubscription) {
+    return {
+      subscriptionStatus: "expired",
+      subscriptionMessage: getMessage("subscriptionInactiveRenew"),
+      subscriptionMessageKey: "subscriptionInactiveRenew",
+    };
+  }
+
+  return {
+    subscriptionStatus: "no_subscription",
+    subscriptionMessage: getMessage("subscriptionRequiredNewUser"),
+    subscriptionMessageKey: "subscriptionRequiredNewUser",
+  };
 }
 
 export async function getExpertMe(auth) {
   const { expert, user, subscriptionActive, maxBanners } = await getExpertProfileOrThrow(auth);
-  return toExpertMeDto(expert, { user, categories: expert.categories, subscriptionActive, maxBanners });
+  const subState = await resolveSubscriptionState(expert.id, subscriptionActive);
+  const data = toExpertMeDto(expert, {
+    user,
+    categories: expert.categories,
+    subscriptionActive,
+    subscriptionStatus: subState.subscriptionStatus,
+    subscriptionMessage: subState.subscriptionMessage,
+    maxBanners,
+  });
+  return {
+    data,
+    message: subState.subscriptionMessage || getMessage("expertProfile"),
+  };
 }
 
 export async function updateExpertMe(auth, body) {
   const { expert, user, subscriptionActive } = await getExpertProfileOrThrow(auth);
-  
+  const subState = await resolveSubscriptionState(expert.id, subscriptionActive);
+
+  if (body.availabilityStatus === "online" && !subscriptionActive) {
+    throw badRequest(subState.subscriptionMessageKey);
+  }
+
   if (body.avatarMediaId) {
     const media = await getDb().mediaAsset.findFirst({
       where: { id: body.avatarMediaId, ownerUserId: auth.userId, status: "ready" }
@@ -399,12 +445,20 @@ export async function updateExpertMe(auth, body) {
     },
     include: { categories: true, avatarMedia: true, subscriptions: { where: { status: "active" }, take: 1, include: { plan: true } } },
   });
-  return toExpertMeDto(updated, {
+  const updatedSubActive = updated.subscriptions.length > 0;
+  const updatedSubState = await resolveSubscriptionState(updated.id, updatedSubActive);
+  const data = toExpertMeDto(updated, {
     user,
     categories: updated.categories,
-    subscriptionActive,
+    subscriptionActive: updatedSubActive,
+    subscriptionStatus: updatedSubState.subscriptionStatus,
+    subscriptionMessage: updatedSubState.subscriptionMessage,
     maxBanners: updated.subscriptions[0]?.plan?.maxBanners || 0,
   });
+  return {
+    data,
+    message: updatedSubState.subscriptionMessage || getMessage("expertProfileUpdated"),
+  };
 }
 
 /**
@@ -680,6 +734,7 @@ export async function resubmitVerificationDocuments(auth, body) {
 
 export async function getDashboard(auth) {
   const { expert, subscriptionActive } = await getExpertProfileOrThrow(auth);
+  const subState = await resolveSubscriptionState(expert.id, subscriptionActive);
   const db = getDb();
 
   const now = new Date();
@@ -814,6 +869,8 @@ export async function getDashboard(auth) {
     satisfactionRate,
     earningsTrend,
     subscriptionActive,
+    subscriptionStatus: subState.subscriptionStatus,
+    subscriptionMessage: subState.subscriptionMessage,
     subscription,
     latestQuote,
     latestMessage,
