@@ -149,6 +149,19 @@ export async function retrievePaymentIntent(paymentIntentId) {
 }
 
 /**
+ * Immediately cancels a Stripe subscription (no period-end grace).
+ * Used when an expert activates a new subscription on a different store,
+ * superseding an existing Stripe-billed one.
+ * Safe to call on an already-canceled subscription — returns it as-is.
+ */
+export async function cancelStripeSubscriptionImmediate(stripeSubscriptionId) {
+  const sdk = requireStripe();
+  const sub = await sdk.subscriptions.retrieve(stripeSubscriptionId);
+  if (sub.status === "canceled") return sub;
+  return sdk.subscriptions.cancel(stripeSubscriptionId);
+}
+
+/**
  * Cancels an uncaptured PaymentIntent, releasing the authorization hold on the
  * customer's card. Safe to call repeatedly: a PI that is already canceled (or was
  * captured) is returned as-is instead of throwing.

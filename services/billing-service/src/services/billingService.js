@@ -1,6 +1,7 @@
 import { getDb } from "@xprtlink/shared/db";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 const log = logger.child({ module: "billingService" });
+import { google } from "googleapis";
 import {
   toEarningsEntryDto,
   toExpertPayoutDto,
@@ -1950,6 +1951,92 @@ export async function getEarnings(auth, query) {
 
   const items = rows.map((row) => toEarningsEntryDto(row, expert?.currency || "USD"));
   return paginatedResult(items, { page, limit, total });
+}
+
+function _getGoogleAndroidPublisher() {
+  const serviceAccount = process.env.SERVICE_ACCOUNT_JSON;
+  if (!serviceAccount) throw new Error("SERVICE_ACCOUNT_JSON not configured");
+  const credentials = JSON.parse(serviceAccount);
+  const auth = new google.auth.GoogleAuth({
+    credentials,
+    scopes: ["https://www.googleapis.com/auth/androidpublisher"],
+  });
+  return google.androidpublisher({ version: "v3", auth });
+}
+
+/**
+ * After a new subscription is committed to the DB, attempt to cancel any
+ * pre-existing subscriptions on OTHER stores for the same expert.
+ *
+ * Must be called AFTER the Prisma transaction (never inside it) because
+ * this makes outbound network calls to Apple / Google / Stripe.
+ *
+ * @param {Array} rows  - expertSubscription rows fetched before the transaction
+ *                        (store, externalSubscriptionId).  All are already
+ *                        status:"canceled" in the DB by the time this runs.
+ * @returns {Array<{store, canceledAtStore, manualCancelRequired}>}
+ */
+export async function cancelSupersededSubscriptions(rows) {
+  const results = [];
+
+  for (const sub of rows) {
+    if (sub.store === "google") {
+      try {
+        const packageName = process.env.GOOGLE_PACKAGE_NAME;
+        const androidPublisher = _getGoogleAndroidPublisher();
+
+        // Fetch the live purchase to get the store-side product ID (SKU),
+        // which is required by the cancel endpoint and is not stored in our DB.
+        const purchaseResp = await androidPublisher.purchases.subscriptionsv2.get({
+          packageName,
+          token: sub.externalSubscriptionId,
+        });
+        const productId = purchaseResp.data.lineItems?.[0]?.productId;
+        if (!productId) throw new Error("productId missing from Google lineItems");
+
+        await androidPublisher.purchases.subscriptions.cancel({
+          packageName,
+          subscriptionId: productId,
+          token: sub.externalSubscriptionId,
+        });
+        log.info(
+          { expertProfileId: sub.expertProfileId, subId: sub.id },
+          "[cancelSuperseded] Google Play subscription canceled at store"
+        );
+        results.push({ store: "google", canceledAtStore: true, manualCancelRequired: false });
+      } catch (err) {
+        log.error(
+          { expertProfileId: sub.expertProfileId, subId: sub.id, err: err.message },
+          "[cancelSuperseded] Google Play store-side cancel failed — expert must cancel manually"
+        );
+        results.push({ store: "google", canceledAtStore: false, manualCancelRequired: true });
+      }
+    } else if (sub.store === "apple") {
+      // Apple has no server-side subscription-cancel API.
+      log.warn(
+        { expertProfileId: sub.expertProfileId, subId: sub.id },
+        "[cancelSuperseded] Apple subscription superseded — manual cancel required in iOS Settings"
+      );
+      results.push({ store: "apple", canceledAtStore: false, manualCancelRequired: true });
+    } else if (sub.store === "stripe") {
+      try {
+        await stripeSvc.cancelStripeSubscriptionImmediate(sub.externalSubscriptionId);
+        log.info(
+          { expertProfileId: sub.expertProfileId, subId: sub.id },
+          "[cancelSuperseded] Stripe subscription canceled at store"
+        );
+        results.push({ store: "stripe", canceledAtStore: true, manualCancelRequired: false });
+      } catch (err) {
+        log.error(
+          { expertProfileId: sub.expertProfileId, subId: sub.id, err: err.message },
+          "[cancelSuperseded] Stripe store-side cancel failed"
+        );
+        results.push({ store: "stripe", canceledAtStore: false, manualCancelRequired: true });
+      }
+    }
+  }
+
+  return results;
 }
 
 export async function cancelSubscription(auth) {

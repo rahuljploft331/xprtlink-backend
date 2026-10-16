@@ -4,6 +4,7 @@ import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
+import { cancelSupersededSubscriptions } from "../services/billingService.js";
 const log = logger.child({ module: "appleIapController" });
 // N5 fix: decodeSignedTransaction does NOT exist on @apple/app-store-server-library.
 // Only import the symbols that the library actually exports.
