@@ -20,6 +20,19 @@ router.param("conversationId", (req, _res, next, value) => {
 
 router.use(authenticate);
 
+// GET /api/v1/conversations/unread-count
+// Total unread messages count for the authenticated user across all conversations
+router.get(
+  "/unread-count",
+  asyncHandler(async (req, res) => {
+    const data = await svc.getTotalUnreadCount(req.auth);
+    return ResponseFormatter.success(res, {
+      message: getMessage("totalUnreadCount"),
+      data,
+    });
+  })
+);
+
 // DELETE /api/v1/conversations/:conversationId
 // Soft-delete (hide) conversation from caller's inbox
 router.delete(

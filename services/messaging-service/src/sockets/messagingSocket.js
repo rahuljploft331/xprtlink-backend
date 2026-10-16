@@ -154,6 +154,13 @@ export function registerMessagingSockets(io) {
       }
     }, 500);
 
+    // Emit initial total unread count to newly connected socket
+    svc.getTotalUnreadCount(auth).then((unreadData) => {
+      socket.emit("chat:unread-count", unreadData);
+    }).catch((err) => {
+      log.warn({ err: err.message }, "[messaging-service] Failed to emit initial unread count on connect");
+    });
+
     // 1. List conversations
     socket.on("conversation:list", async (payload = {}, callback) => {
       try {
@@ -167,6 +174,25 @@ export function registerMessagingSockets(io) {
           callback({
             success: false,
             message: err.message || getMessage("failedToListConversations"),
+            code: err.code || "INTERNAL_ERROR",
+          });
+        }
+      }
+    });
+
+    // 1b. Get total unread messages count
+    socket.on("chat:unread-count", async (_payload = {}, callback) => {
+      try {
+        const data = await svc.getTotalUnreadCount(auth);
+        if (typeof callback === "function") {
+          callback({ success: true, data });
+        }
+      } catch (err) {
+        log.error({ err: err.message }, "[messaging-service] chat:unread-count error:");
+        if (typeof callback === "function") {
+          callback({
+            success: false,
+            message: err.message || getMessage("failedToLoadMessages"),
             code: err.code || "INTERNAL_ERROR",
           });
         }
@@ -281,6 +307,18 @@ export function registerMessagingSockets(io) {
         const peerUserId = await svc.getConversationPeerUserId(conversationId, auth.userId);
         log.info(`[messaging-service] message:send - Resolved peerUserId: ${peerUserId}`);
         
+        let peerUnreadData = null;
+        if (peerUserId) {
+          try {
+            const peerAuth = await svc.getConversationPeerAuth(conversationId, auth.userId);
+            if (peerAuth) {
+              peerUnreadData = await svc.getTotalUnreadCount(peerAuth);
+            }
+          } catch (e) {
+            log.warn({ err: e.message }, "[messaging-service] Failed to compute peer total unread count");
+          }
+        }
+
         io.to(`user:${auth.userId}`).emit("inbox:updated", {
           conversationId,
           lastMessage: message,
@@ -293,7 +331,12 @@ export function registerMessagingSockets(io) {
             conversationId,
             lastMessage: message,
             senderUserId: auth.userId,
+            totalUnreadCount: peerUnreadData?.totalUnreadCount ?? 0,
           });
+
+          if (peerUnreadData) {
+            io.to(`user:${peerUserId}`).emit("chat:unread-count", peerUnreadData);
+          }
 
           // sees a badge even if they were offline when the message arrived.
           try {
@@ -364,11 +407,25 @@ export function registerMessagingSockets(io) {
           readAt: new Date().toISOString(),
         });
 
+        // Compute updated total unread count for caller
+        let callerUnreadData = null;
+        try {
+          callerUnreadData = await svc.getTotalUnreadCount(auth);
+        } catch (e) {
+          log.warn({ err: e.message }, "[messaging-service] Failed to compute caller total unread count on read");
+        }
+
+        // Notify caller's room with updated total unread count
+        if (callerUnreadData) {
+          io.to(`user:${auth.userId}`).emit("chat:unread-count", callerUnreadData);
+        }
+
         // Notify both users' rooms for inbox updates (live double-ticks)
         io.to(`user:${auth.userId}`).emit("conversation:read", {
           conversationId,
           userId: auth.userId,
           readAt: new Date().toISOString(),
+          totalUnreadCount: callerUnreadData?.totalUnreadCount ?? 0,
         });
 
         const peerUserId = await svc.getConversationPeerUserId(conversationId, auth.userId);
@@ -381,7 +438,13 @@ export function registerMessagingSockets(io) {
         }
 
         if (typeof callback === "function") {
-          callback({ success: true, data: result });
+          callback({
+            success: true,
+            data: {
+              ...result,
+              totalUnreadCount: callerUnreadData?.totalUnreadCount ?? 0,
+            },
+          });
         }
       } catch (err) {
         log.error({ err: err.message }, "[messaging-service] message:read error:");

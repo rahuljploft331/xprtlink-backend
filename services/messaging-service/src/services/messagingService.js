@@ -135,6 +135,94 @@ export async function getConversationPeerUserId(conversationId, currentUserId) {
   return conversation.customer?.userId ?? null;
 }
 
+export async function getConversationPeerAuth(conversationId, currentUserId) {
+  const conversation = await getDb().conversation.findUnique({
+    where: { id: conversationId },
+    include: {
+      customer: { select: { userId: true, id: true } },
+      expert: { select: { userId: true, id: true } },
+    },
+  });
+  if (!conversation) return null;
+  if (conversation.customer?.userId === currentUserId) {
+    return {
+      userId: conversation.expert?.userId ?? null,
+      role: "expert",
+      customerProfileId: null,
+      expertProfileId: conversation.expert?.id ?? null,
+    };
+  }
+  return {
+    userId: conversation.customer?.userId ?? null,
+    role: "customer",
+    customerProfileId: conversation.customer?.id ?? null,
+    expertProfileId: null,
+  };
+}
+
+export async function getTotalUnreadCount(auth) {
+  if (!auth?.userId) {
+    return toTotalUnreadCountDto(0, auth?.role ?? null);
+  }
+
+  const db = getDb();
+  let count = 0;
+
+  if (auth.role === "customer") {
+    let profileId = auth.customerProfileId;
+    if (!profileId) {
+      const customer = await db.customerProfile.findUnique({
+        where: { userId: auth.userId },
+        select: { id: true },
+      });
+      profileId = customer?.id;
+    }
+    if (!profileId) return toTotalUnreadCountDto(0, auth.role);
+
+    const rows = await db.$queryRaw`
+      SELECT COALESCE(COUNT(m.id), 0)::int AS count
+      FROM conversations c
+      JOIN messages m ON m.conversation_id = c.id
+      LEFT JOIN conversation_read_states rs
+        ON rs.conversation_id = c.id AND rs.user_id = ${auth.userId}::uuid
+      LEFT JOIN conversation_deletions cd
+        ON cd.conversation_id = c.id AND cd.user_id = ${auth.userId}::uuid
+      WHERE c.customer_id = ${profileId}::uuid
+        AND m.sender_user_id != ${auth.userId}::uuid
+        AND (cd.id IS NULL OR m.created_at > cd.deleted_at)
+        AND (rs.id IS NULL OR m.created_at > rs.read_at)
+    `;
+    count = rows[0]?.count ?? 0;
+  } else if (auth.role === "expert") {
+    let profileId = auth.expertProfileId;
+    if (!profileId) {
+      const expert = await db.expertProfile.findUnique({
+        where: { userId: auth.userId },
+        select: { id: true },
+      });
+      profileId = expert?.id;
+    }
+    if (!profileId) return toTotalUnreadCountDto(0, auth.role);
+
+    const rows = await db.$queryRaw`
+      SELECT COALESCE(COUNT(m.id), 0)::int AS count
+      FROM conversations c
+      JOIN messages m ON m.conversation_id = c.id
+      LEFT JOIN conversation_read_states rs
+        ON rs.conversation_id = c.id AND rs.user_id = ${auth.userId}::uuid
+      LEFT JOIN conversation_deletions cd
+        ON cd.conversation_id = c.id AND cd.user_id = ${auth.userId}::uuid
+      WHERE c.expert_id = ${profileId}::uuid
+        AND m.sender_user_id != ${auth.userId}::uuid
+        AND (cd.id IS NULL OR m.created_at > cd.deleted_at)
+        AND (rs.id IS NULL OR m.created_at > rs.read_at)
+    `;
+    count = rows[0]?.count ?? 0;
+  }
+
+  return toTotalUnreadCountDto(count, auth.role);
+}
+
 export async function getConversationSenderInfo(conversationId, auth) {
   const conversation = await loadConversation(auth, conversationId);
   if (auth.role === "customer") {
@@ -744,6 +832,8 @@ export async function deleteConversation(auth, conversationId) {
         conversationId,
         deleted: true,
       });
+      const unreadData = await getTotalUnreadCount(auth);
+      io.to(`user:${auth.userId}`).emit("chat:unread-count", unreadData);
     }
   } catch (err) {
     log.warn({ err: err.message }, "[messagingService] Failed to emit inbox:updated on delete");
@@ -791,6 +881,8 @@ export async function restoreConversation(auth, conversationId) {
       io.to(`user:${auth.userId}`).emit("inbox:updated", {
         conversationId,
       });
+      const unreadData = await getTotalUnreadCount(auth);
+      io.to(`user:${auth.userId}`).emit("chat:unread-count", unreadData);
     }
   } catch (err) {
     log.warn({ err: err.message }, "[messagingService] Failed to emit inbox:updated on restore");

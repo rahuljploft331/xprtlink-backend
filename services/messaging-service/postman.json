@@ -99,6 +99,11 @@
           "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{page,limit}`. Returns paginated conversations with peerName, peerAvatarUrl, lastMessagePreview, unreadCount, isBlocked, blockedByMe." }
         },
         {
+          "id": "a1b2c3d4-0001-0000-0000-00000000001b",
+          "name": "[EVENT] chat:unread-count",
+          "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack) & Server→Client broadcast. Returns `{ totalUnreadCount, role }` across all non-deleted conversations. Emitted automatically on socket connect, on message send/read, and on delete/restore." }
+        },
+        {
           "id": "a1b2c3d4-0001-0000-0000-000000000002",
           "name": "[EVENT] conversation:create",
           "request": { "method": "GET", "header": [{"key":"Authorization","value":"Bearer {{accessToken}}"}], "url": { "raw": "{{base_url}}/socket.io/", "host": ["{{base_url}}"], "path": ["socket.io",""] }, "description": "Client→Server (ack). Payload: `{expertId}` or `{customerId}`. Upserts conversation. Side effect: emits `conversation:new` to peer's user room." }
@@ -204,6 +209,22 @@
       "name": "Conversations (REST)",
       "description": "REST endpoints for per-user conversation management (soft-delete / hide from inbox and restore).",
       "item": [
+        {
+          "id": "c1d2e3f4-0000-0000-0000-000000000001",
+          "name": "GET /api/v1/conversations/unread-count",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/conversations/unread-count",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "conversations", "unread-count"]
+            },
+            "description": "Returns total unread message count across all active conversations for the authenticated user (scoped to their current role). Excludes soft-deleted conversations."
+          }
+        },
         {
           "id": "c1d2e3f4-0001-0000-0000-000000000001",
           "name": "DELETE /api/v1/conversations/:conversationId",
