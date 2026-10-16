@@ -354,6 +354,16 @@ async function getExpertProfileOrThrow(auth) {
   // including those scheduled to cancel at period end (access remains until currentPeriodEnd)
   const subscriptionActive = expert.subscriptions.length > 0;
   const maxBanners = expert.subscriptions[0]?.plan?.maxBanners || 0;
+
+  // Auto-heal search discoverability if expert is approved and holds an active subscription
+  if (expert.verificationStatus === "approved" && subscriptionActive && !expert.searchEligible) {
+    expert.searchEligible = true;
+    getDb().expertProfile.update({
+      where: { id: expert.id },
+      data: { searchEligible: true },
+    }).catch(() => {});
+  }
+
   return { expert, user, subscriptionActive, maxBanners };
 }
 

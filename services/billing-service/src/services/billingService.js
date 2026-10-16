@@ -1660,10 +1660,16 @@ export async function handleStripeWebhook(payload, signature) {
       });
 
       if (newStatus !== "active") {
-        await db.expertProfile.updateMany({
-          where: { id: row.expertProfileId, searchEligible: true },
-          data: { searchEligible: false },
+        const stillActive = await db.expertSubscription.findFirst({
+          where: { expertProfileId: row.expertProfileId, status: "active" },
+          select: { id: true },
         });
+        if (!stillActive) {
+          await db.expertProfile.updateMany({
+            where: { id: row.expertProfileId, searchEligible: true },
+            data: { searchEligible: false },
+          });
+        }
       }
       log.info(`[billing-webhook] customer.subscription.updated sub=${stripeSubscriptionId} status=${newStatus}`);
       break;
@@ -1679,10 +1685,16 @@ export async function handleStripeWebhook(payload, signature) {
         where: { id: row.id },
         data: { status: "canceled", canceledAt: new Date(), cancelAtPeriodEnd: false },
       });
-      await db.expertProfile.updateMany({
-        where: { id: row.expertProfileId, searchEligible: true },
-        data: { searchEligible: false },
+      const stillActive = await db.expertSubscription.findFirst({
+        where: { expertProfileId: row.expertProfileId, status: "active" },
+        select: { id: true },
       });
+      if (!stillActive) {
+        await db.expertProfile.updateMany({
+          where: { id: row.expertProfileId, searchEligible: true },
+          data: { searchEligible: false },
+        });
+      }
       log.info(`[billing-webhook] customer.subscription.deleted sub=${sub.id}`);
       break;
     }
