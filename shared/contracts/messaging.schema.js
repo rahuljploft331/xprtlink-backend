@@ -37,3 +37,8 @@ export const sendMessageRequestSchema = z.object({
   body: z.string().max(5000).optional(),
   mediaIds: z.array(z.string().uuid()).optional(),
 });
+
+export const totalUnreadCountDtoSchema = z.object({
+  totalUnreadCount: z.number().int().nonnegative(),
+  role: z.string().nullable().optional(),
+});

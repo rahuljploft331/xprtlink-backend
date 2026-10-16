@@ -12,6 +12,7 @@
   "xprtlinkMessagingServiceWebsocketProtocolOnly": "XprtLink Messaging Service (WebSocket Protocol Only)",
   "deviceTokenRegistered": "Device token registered",
   "unreadCount": "Unread count",
+  "totalUnreadCount": "Total unread count",
   "allNotificationsMarkedRead": "All notifications marked read",
   "notificationPreferences": "Notification preferences",
   "preferencesUpdated": "Preferences updated",
