@@ -103,7 +103,7 @@ export async function getById(req, res, next) {
         avatarMedia: true,
         categories: true,
         verifications: { include: { documents: true }, orderBy: { createdAt: "desc" }, take: 5 },
-        subscriptions: { include: { plan: true }, orderBy: { createdAt: "desc" }, take: 1 },
+        subscriptions: { include: { plan: true }, orderBy: { createdAt: "desc" }, take: 20 },
         reviews: { take: 10, orderBy: { createdAt: "desc" } },
         payouts: { take: 5, orderBy: { createdAt: "desc" } },
         user: { select: { email: true, phone: true, status: true, createdAt: true } },
@@ -119,6 +119,19 @@ export async function getById(req, res, next) {
     }
     if (expert) {
       expert.avatarUrl = resolveMediaUrl(expert.avatarMedia?.storageKey);
+      expert.activeSubscription = expert.subscriptions?.find((s) => s.status === "active") || null;
+      if (!expert.activeSubscription) {
+        const activeSub = await db.expertSubscription.findFirst({
+          where: { expertProfileId: expert.id, status: "active" },
+          include: { plan: true },
+        });
+        if (activeSub) {
+          expert.activeSubscription = activeSub;
+          if (!expert.subscriptions.some((s) => s.id === activeSub.id)) {
+            expert.subscriptions.unshift(activeSub);
+          }
+        }
+      }
     }
     return ResponseFormatter.success(res, { data: expert });
   } catch (err) {
