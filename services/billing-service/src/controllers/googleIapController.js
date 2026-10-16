@@ -187,7 +187,15 @@ export const verifyPurchase = async (req, res, next) => {
       log.error(`[googleIapController] Notification dispatch failed: ${err.message}`);
     }
 
-    res.status(200).json({ success: true, message: getMessage("googlePlaySubscriptionVerified"), data: subscription });
+    res.status(200).json({
+      success: true,
+      message: getMessage("googlePlaySubscriptionVerified"),
+      data: {
+        ...subscription,
+        gateway: subscription.store,
+        subscribedVia: subscription.store,
+      },
+    });
   } catch (error) {
     next(error);
   }

@@ -56,6 +56,8 @@ export function toExpertSubscriptionDto(subscription, plan, currency = "USD") {
     id: subscription.id,
     plan: toSubscriptionPlanDto(plan, currency),
     store: subscription.store,
+    gateway: subscription.store,
+    subscribedVia: subscription.store,
     status: subscription.status,
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd ?? false,
     currentPeriodStart: toIso(subscription.currentPeriodStart),

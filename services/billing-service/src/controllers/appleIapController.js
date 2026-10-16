@@ -217,7 +217,15 @@ export const verifyPurchase = async (req, res, next) => {
       log.error(`[appleIapController] Notification dispatch failed: ${err.message}`);
     }
 
-    res.status(200).json({ success: true, message: getMessage("appleSubscriptionVerified"), data: subscription });
+    res.status(200).json({
+      success: true,
+      message: getMessage("appleSubscriptionVerified"),
+      data: {
+        ...subscription,
+        gateway: subscription.store,
+        subscribedVia: subscription.store,
+      },
+    });
   } catch (error) {
     next(error);
   }

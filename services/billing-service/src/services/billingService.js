@@ -1802,12 +1802,35 @@ export async function getConsultationCharge(consultationId) {
   });
 }
 
-export async function listSubscriptionPlans() {
-  const plans = await getDb().subscriptionPlan.findMany({
+export async function listSubscriptionPlans(auth) {
+  const db = getDb();
+  const plans = await db.subscriptionPlan.findMany({
     where: { isActive: true },
     orderBy: { priceMonthlyCents: "asc" },
   });
-  return plans.map((plan) => toSubscriptionPlanDto(plan));
+
+  let activeSub = null;
+  if (auth?.expertProfileId) {
+    activeSub = await db.expertSubscription.findFirst({
+      where: {
+        expertProfileId: auth.expertProfileId,
+        status: "active",
+        currentPeriodEnd: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+  }
+
+  return plans.map((plan) => {
+    const dto = toSubscriptionPlanDto(plan);
+    const isCurrent = Boolean(activeSub && activeSub.planId === plan.id);
+    dto.isCurrentPlan = isCurrent;
+    dto.isSubscribed = isCurrent;
+    dto.gateway = isCurrent ? activeSub.store : null;
+    dto.store = isCurrent ? activeSub.store : null;
+    dto.subscribedVia = isCurrent ? activeSub.store : null;
+    return dto;
+  });
 }
 
 /**
