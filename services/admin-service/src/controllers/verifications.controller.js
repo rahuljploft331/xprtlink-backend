@@ -178,7 +178,7 @@ export async function reject(req, res, next) {
     });
     await db.expertProfile.update({
       where: { id: v.expertProfileId },
-      data: { verificationStatus: "rejected" },
+      data: { verificationStatus: "rejected", searchEligible: false },
     });
     await logAdminAction(req, "verification.reject", "ExpertVerification", v.id, {
       notes: rejectionNotes,

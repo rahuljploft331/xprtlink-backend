@@ -152,16 +152,37 @@ export async function searchExperts(query, auth) {
   }
   if (query.verified === "true") where.verificationStatus = "approved";
 
-  if (query.q) {
-    where.OR = [
-      { firstName: { contains: query.q, mode: "insensitive" } },
-      { lastName: { contains: query.q, mode: "insensitive" } },
-      { headline: { contains: query.q, mode: "insensitive" } },
-      { bio: { contains: query.q, mode: "insensitive" } },
-      { title: { contains: query.q, mode: "insensitive" } },
-      // Match experts by their linked category/organisation name (e.g. "Legal").
-      { categories: { some: { name: { contains: query.q, mode: "insensitive" } } } },
-    ];
+  const searchTerm = (query.q || "").trim();
+  if (searchTerm) {
+    const words = searchTerm.split(/\s+/).filter(Boolean);
+    if (words.length <= 1) {
+      where.OR = [
+        { firstName: { contains: searchTerm, mode: "insensitive" } },
+        { lastName: { contains: searchTerm, mode: "insensitive" } },
+        { businessName: { contains: searchTerm, mode: "insensitive" } },
+        { headline: { contains: searchTerm, mode: "insensitive" } },
+        { bio: { contains: searchTerm, mode: "insensitive" } },
+        { title: { contains: searchTerm, mode: "insensitive" } },
+        // Match experts by their linked category/organisation name (e.g. "Legal").
+        { categories: { some: { name: { contains: searchTerm, mode: "insensitive" } } } },
+      ];
+    } else {
+      // Multi-word search (e.g. "Vishal Kumar"): each word must match at least one field
+      where.AND = [
+        ...(where.AND || []),
+        ...words.map((word) => ({
+          OR: [
+            { firstName: { contains: word, mode: "insensitive" } },
+            { lastName: { contains: word, mode: "insensitive" } },
+            { businessName: { contains: word, mode: "insensitive" } },
+            { headline: { contains: word, mode: "insensitive" } },
+            { bio: { contains: word, mode: "insensitive" } },
+            { title: { contains: word, mode: "insensitive" } },
+            { categories: { some: { name: { contains: word, mode: "insensitive" } } } },
+          ],
+        })),
+      ];
+    }
   }
 
   // Location filter: lat, lng, radius (km) — uses Haversine post-filter on serviceAreas Json

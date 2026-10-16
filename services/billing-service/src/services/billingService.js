@@ -2174,6 +2174,25 @@ export async function expireSubscriptions() {
     }
   }
 
+  // Safety sweep: revoke searchEligible for any experts who have searchEligible: true
+  // but currently hold zero active subscriptions in the database.
+  const orphanedEligible = await db.expertProfile.findMany({
+    where: {
+      searchEligible: true,
+      subscriptions: {
+        none: { status: "active" },
+      },
+    },
+    select: { id: true },
+  });
+  if (orphanedEligible.length > 0) {
+    await db.expertProfile.updateMany({
+      where: { id: { in: orphanedEligible.map((e) => e.id) } },
+      data: { searchEligible: false },
+    });
+    log.info(`[billing] expireSubscriptions: reconciled ${orphanedEligible.length} orphaned searchEligible expert(s)`);
+  }
+
   log.info(`[billing] expireSubscriptions: expired ${result.count} subscription(s) at ${now.toISOString()}`);
 
   // Notify each affected expert that their subscription has expired — non-fatal
