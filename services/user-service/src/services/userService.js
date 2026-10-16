@@ -511,7 +511,7 @@ export async function refresh(refreshToken, role) {
 // ─── OTP ──────────────────────────────────────────────────────────────────────
 
 export async function sendOtp(body) {
-  const { email, phone, purpose } = body;
+  const { email, phone, purpose, role } = body;
   if (!email && !phone) throw badRequest("emailOrPhoneRequired");
 
   if (purpose === "register" || purpose === "reset_password") {
@@ -521,12 +521,22 @@ export async function sendOtp(body) {
     );
   }
 
+  const db = getDb();
+  let user = null;
+  let userId = body.userId || null;
+  let registrationData = body.registrationData || null;
+
   if (purpose === "login") {
-    const db = getDb();
-    const user = await db.user.findFirst({
+    user = await db.user.findFirst({
       where: email ? { email, deletedAt: null } : { phone, deletedAt: null },
+      include: { customerProfile: true, expertProfile: true },
     });
     if (!user) throw notFound("unregisteredUser");
+    userId = user.id;
+    if (!registrationData) {
+      const targetRole = role || (user.expertProfile && !user.customerProfile ? "expert" : "customer");
+      registrationData = { role: targetRole };
+    }
   }
 
   const channel = phone ? "phone" : "email";
@@ -535,6 +545,8 @@ export async function sendOtp(body) {
     phone,
     purpose,
     channel,
+    userId,
+    registrationData,
   });
 }
 
@@ -572,8 +584,20 @@ export async function verifyOtp(body) {
         where: { id: challenge.id },
         data: { consumedAt: new Date() },
       });
-      return tx.user.findUnique({
-        where: { id: challenge.userId },
+      if (challenge.userId) {
+        return tx.user.findUnique({
+          where: { id: challenge.userId },
+          include: {
+            customerProfile: true,
+            expertProfile: { include: { subscriptions: { where: { status: "active" }, take: 1 } } },
+          },
+        });
+      }
+      return tx.user.findFirst({
+        where: {
+          ...(challenge.phone ? { phone: challenge.phone } : { email: challenge.email }),
+          deletedAt: null,
+        },
         include: {
           customerProfile: true,
           expertProfile: { include: { subscriptions: { where: { status: "active" }, take: 1 } } },
@@ -581,7 +605,9 @@ export async function verifyOtp(body) {
       });
     });
 
-    const targetRole = challenge.registrationData?.role || "customer";
+    if (!user) throw notFound("unregisteredUser");
+
+    const targetRole = challenge.registrationData?.role || (user.expertProfile && !user.customerProfile ? "expert" : "customer");
     const tokens = await issueTokens(user, targetRole);
     if (!tokens) throw badRequest("noProfileForRole", "PROFILE_MISSING", null, { role: targetRole });
     return tokens;
@@ -724,7 +750,21 @@ export async function verifyOtp(body) {
 }
 
 export async function resendOtp(body) {
-  return sendOtp(body);
+  const { email, phone, purpose } = body;
+  const db = getDb();
+  const prevChallenge = await db.otpChallenge.findFirst({
+    where: {
+      purpose,
+      ...(email ? { email } : { phone }),
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return sendOtp({
+    ...body,
+    userId: prevChallenge?.userId,
+    registrationData: prevChallenge?.registrationData,
+  });
 }
 
 // ─── Password ─────────────────────────────────────────────────────────────────
