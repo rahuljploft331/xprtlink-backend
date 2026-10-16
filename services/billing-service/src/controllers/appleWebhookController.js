@@ -77,10 +77,18 @@ export const handleNotification = async (req, res, next) => {
             where: { id: subscription.id },
             data: { status: "canceled" },
           });
-          await db.expertProfile.update({
-            where: { id: subscription.expertProfileId },
-            data: { searchEligible: false },
+          // Only revoke search eligibility when the expert has no other active subscription
+          // (e.g. they may have already switched to a new store before Apple fired REVOKE).
+          const stillActive = await db.expertSubscription.findFirst({
+            where: { expertProfileId: subscription.expertProfileId, status: "active" },
+            select: { id: true },
           });
+          if (!stillActive) {
+            await db.expertProfile.update({
+              where: { id: subscription.expertProfileId },
+              data: { searchEligible: false },
+            });
+          }
         } else if (notificationType === "DID_FAIL_TO_RENEW" || notificationType === "EXPIRED") {
           const isDevOrSandbox = data?.environment === "Sandbox" || process.env.NODE_ENV !== "production";
           if (!isDevOrSandbox || subscription.currentPeriodEnd <= new Date()) {
@@ -88,10 +96,16 @@ export const handleNotification = async (req, res, next) => {
               where: { id: subscription.id },
               data: { status: "expired" },
             });
-            await db.expertProfile.update({
-              where: { id: subscription.expertProfileId },
-              data: { searchEligible: false },
+            const stillActive = await db.expertSubscription.findFirst({
+              where: { expertProfileId: subscription.expertProfileId, status: "active" },
+              select: { id: true },
             });
+            if (!stillActive) {
+              await db.expertProfile.update({
+                where: { id: subscription.expertProfileId },
+                data: { searchEligible: false },
+              });
+            }
           }
         } else if (notificationType === "DID_CHANGE_RENEWAL_STATUS") {
           if (subtype === "AUTO_RENEW_DISABLED") {

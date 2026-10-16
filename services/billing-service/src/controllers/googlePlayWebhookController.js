@@ -55,11 +55,18 @@ export const handleNotification = async (req, res, next) => {
           where: { id: subscription.id },
           data: { status: "expired" },
         });
-        // Remove search eligibility if expired
-        await db.expertProfile.update({
-          where: { id: subscription.expertProfileId },
-          data: { searchEligible: false },
+        // Only revoke search eligibility when the expert has no other active subscription
+        // (e.g. they may have already switched to Apple before Google fired EXPIRED).
+        const stillActive = await db.expertSubscription.findFirst({
+          where: { expertProfileId: subscription.expertProfileId, status: "active" },
+          select: { id: true },
         });
+        if (!stillActive) {
+          await db.expertProfile.update({
+            where: { id: subscription.expertProfileId },
+            data: { searchEligible: false },
+          });
+        }
       }
     }
 

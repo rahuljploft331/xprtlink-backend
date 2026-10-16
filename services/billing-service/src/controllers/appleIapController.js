@@ -141,6 +141,19 @@ export const verifyPurchase = async (req, res, next) => {
       }
     }
 
+    // Snapshot any cross-store active subs BEFORE the transaction cancels them in the DB.
+    // We pass these to cancelSupersededSubscriptions after the transaction to attempt
+    // store-side cancellation — preventing the expert from being billed by two stores.
+    const crossStoreRows = await db.expertSubscription.findMany({
+      where: {
+        expertProfileId: req.auth.expertProfileId,
+        store: { not: "apple" },
+        status: "active",
+        currentPeriodEnd: { gt: now },
+      },
+      select: { id: true, store: true, externalSubscriptionId: true, expertProfileId: true },
+    });
+
     const subscription = await db.$transaction(async (tx) => {
       // Deactivate other active subscriptions for this expert
       await tx.expertSubscription.updateMany({
@@ -189,6 +202,13 @@ export const verifyPurchase = async (req, res, next) => {
       return created;
     });
 
+    // Attempt to cancel superseded cross-store subscriptions at the store level.
+    // Done after the transaction so a store API failure never rolls back activation.
+    // Best-effort — errors are logged and surfaced to the client as a warning.
+    const supersededSubscriptions = crossStoreRows.length > 0
+      ? await cancelSupersededSubscriptions(crossStoreRows)
+      : [];
+
     // Notify expert
     try {
       const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
@@ -225,6 +245,7 @@ export const verifyPurchase = async (req, res, next) => {
         ...subscription,
         gateway: subscription.store,
         subscribedVia: subscription.store,
+        supersededSubscriptions,
       },
     });
   } catch (error) {
