@@ -31,6 +31,14 @@ router.get(
   })
 );
 
+router.get(
+  "/email-available",
+  asyncHandler(async (req, res) => {
+    const data = await svc.checkAvailability(req.query);
+    return ResponseFormatter.success(res, { message: "Availability checked", data });
+  })
+);
+
 router.post(
   "/register",
   asyncHandler(async (req, res) => {
