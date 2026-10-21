@@ -6,7 +6,7 @@ import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
-import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
+import { sendEmail, renderEmailTemplate, escapeHtml, nl2br } from "@xprtlink/shared/lib/email.js";
 const log = logger.child({ module: "verifications.controller" });
 
 
@@ -226,12 +226,12 @@ export async function reject(req, res, next) {
     try {
       if (expertEmail) {
         const firstName = expertProfile?.firstName ?? "Expert";
-        const reasonHtml = `<p style="margin:0 0 12px">${rejectionNotes.replace(/\n/g, "<br>")}</p>`;
+        const reasonHtml = `<p style="margin:0;color:#ffe4e8">${nl2br(rejectionNotes)}</p>`;
         const bodyHtml = `
-          <p style="margin:0 0 12px">Hi ${firstName},</p>
+          <p style="margin:0 0 12px">Hi ${escapeHtml(firstName)},</p>
           <p style="margin:0 0 12px">Thank you for submitting your verification documents on XprtLink. Unfortunately, we were unable to verify your identity at this time.</p>
           <p style="margin:0 0 6px"><strong>Reason provided by the reviewer:</strong></p>
-          <div style="background:#fff1f2;border-left:4px solid #e11d48;padding:12px 16px;border-radius:4px;margin:0 0 16px">${reasonHtml}</div>
+          <div style="background:#4a2230;color:#ffe4e8;border-left:4px solid #f43f5e;padding:12px 16px;border-radius:4px;margin:0 0 16px;text-align:left">${reasonHtml}</div>
           <p style="margin:0 0 12px">Please re-open the XprtLink app, upload fresh, high-quality copies of your government-issued ID, and resubmit for review. Our team will process your new submission promptly.</p>
           <p style="margin:0">If you believe this decision was made in error, please contact our support team.</p>
         `;

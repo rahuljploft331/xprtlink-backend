@@ -417,7 +417,15 @@ export async function login(body) {
     },
   });
 
-  if (!user) {
+  const hasRequestedRole = user
+    ? role === "customer"
+      ? Boolean(user.customerProfile)
+      : role === "expert"
+      ? Boolean(user.expertProfile)
+      : true
+    : false;
+
+  if (!user || !hasRequestedRole) {
     // M7: constant-time dummy compare to prevent timing-based email enumeration.
     // Without this, nonexistent emails return ~0ms while valid ones take ~100ms (bcrypt).
     await verifyPassword("__dummy_password_that_never_matches__", "$2b$10$abcdefghijklmnopqrstuvuXzGO7fMC7VYzWH4HmM0vXcB9tBr7bq");
@@ -444,22 +452,6 @@ export async function login(body) {
   }
 
   if (user.status !== "active") throw unauthorized("invalidCredentials");
-
-  // Gate on the requested role BEFORE sending an OTP / issuing tokens.
-  // The User row is shared across roles, so a phone/email match alone does not
-  // mean the account can log in as the requested role. Without this check an
-  // expert-only user requesting role=customer would still receive a login OTP
-  // and only fail after entering it (at issueTokens → resolveRoleContext).
-  const hasRequestedRole =
-    role === "customer" ? Boolean(user.customerProfile) : Boolean(user.expertProfile);
-  if (!hasRequestedRole) {
-    throw forbidden(
-      role === "customer" ? "notRegisteredAsCustomer" : "notRegisteredAsExpert",
-      "PROFILE_MISSING",
-      null,
-      { role }
-    );
-  }
 
   if (phone) {
     const otpResult = await createAndDeliverOtp({
