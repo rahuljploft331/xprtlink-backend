@@ -4,7 +4,7 @@ import { errorHandler, notFoundHandler } from "@xprtlink/shared/middleware/error
 import routes from "./src/routes/index.js";
 
 const config = getConfig("media-service");
-const app = createApp();
+const app = createApp({ jsonLimit: "100mb", urlEncodedLimit: "100mb" });
 
 app.use("/api", routes);
 app.use(notFoundHandler);

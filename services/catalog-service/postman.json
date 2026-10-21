@@ -124,7 +124,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"subject\": \"Cannot access my consultation history\",\n  \"body\": \"I am unable to see my past consultations in the app. The list shows empty even though I have completed sessions.\",\n  \"category\": \"consultation\",\n  \"referenceId\": \"BK-9821\",\n  \"attachmentId\": \"00000000-0000-0000-0000-000000000000\"\n}",
+              "raw": "{\n  \"subject\": \"Cannot access my consultation history\",\n  \"body\": \"I am unable to see my past consultations in the app. The list shows empty even though I have completed sessions.\",\n  \"category\": \"consultation\",\n  \"referenceId\": \"BK-9821\",\n  \"attachmentIds\": [\"00000000-0000-0000-0000-000000000000\"]\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -144,7 +144,7 @@
                 "tickets"
               ]
             },
-            "description": "Submit a new support ticket. Available for both customer and expert roles.\n\n**Figma screen**: Create New Ticket, Ticket Created - Successful.\n\n**categories**: `billing` | `account` | `technical` | `expert_issue` | `consultation` | `other`\n\n**Response**: 201 with ticket object."
+            "description": "Submit a new support ticket. Available for both customer and expert roles.\n\n**Figma screen**: Create New Ticket, Ticket Created - Successful.\n\n**categories**: `billing` | `account` | `technical` | `expert_issue` | `consultation` | `other`\n\n**attachments**: Supports `attachmentIds: string[]` (up to 10 UUIDs), as well as legacy `attachmentId: string`.\n\n**Response**: 201 with ticket object."
           },
           "response": [
             {

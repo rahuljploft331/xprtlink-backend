@@ -6,7 +6,7 @@ import routes, { mountGatewayProxies } from "./src/routes/index.js";
 import { createSocketProxy } from "./src/proxy.js";
 
 const config = getConfig("api-gateway");
-const app = createApp();
+const app = createApp({ jsonLimit: "100mb", urlEncodedLimit: "100mb" });
 
 // Mount WebSocket proxy for Socket.IO polling / HTTP requests
 const socketProxy = createSocketProxy();
