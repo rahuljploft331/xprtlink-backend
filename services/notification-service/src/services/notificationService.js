@@ -9,7 +9,7 @@ import {
 import { notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 import { DEFAULT_NOTIFICATION_PREFERENCES } from "@xprtlink/shared/constants/index.js";
-import { sendPushToUsers, resetBadgeForUser } from "./fcmSender.js";
+import { sendPushToUsers, resetBadgeForUser, syncBadgeForUser } from "./fcmSender.js";
 
 export async function registerDeviceToken(auth, body) {
   const db = getDb();
@@ -99,6 +99,7 @@ export async function markNotificationRead(auth, notificationId) {
     where: { id: notification.id },
     data: { readAt: new Date() },
   });
+  syncBadgeForUser(db, auth.userId).catch(() => {});
 
   return toNotificationDto(updated);
 }
@@ -133,6 +134,7 @@ export async function clearNotification(auth, notificationId) {
     where: { id: notification.id },
     data: { clearedAt: new Date() },
   });
+  syncBadgeForUser(db, auth.userId).catch(() => {});
 
   return { cleared: true };
 }
@@ -146,6 +148,7 @@ export async function clearAllNotifications(auth) {
     where: { userId: auth.userId, clearedAt: null },
     data: { clearedAt: new Date() },
   });
+  resetBadgeForUser(getDb(), auth.userId).catch(() => {});
   return { cleared: result.count };
 }
 

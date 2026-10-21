@@ -45,8 +45,9 @@ function getApp() {
  * @param {string} title  - Notification title
  * @param {string} body   - Notification body
  * @param {object} data   - Optional key-value data payload (strings only)
+ * @param {number} badge  - iOS app-icon badge (user's unread notification count)
  */
-export async function sendPushToToken(token, title, body, data = {}) {
+export async function sendPushToToken(token, title, body, data = {}, badge = 1) {
   const firebaseApp = getApp();
   if (!firebaseApp) return { ok: false, isStale: false };
 
@@ -70,7 +71,7 @@ export async function sendPushToToken(token, title, body, data = {}) {
     },
     apns: {
       payload: {
-        aps: { sound: "default", badge: 1 },
+        aps: { sound: "default", badge },
       },
     },
   };
@@ -104,7 +105,7 @@ export async function sendPushToUsers(db, userIds, title, body, data = {}) {
 
   const tokens = await db.deviceToken.findMany({
     where: { userId: { in: userIds } },
-    select: { id: true, token: true },
+    select: { id: true, token: true, userId: true },
   });
 
   if (!tokens.length) return;
@@ -118,9 +119,17 @@ export async function sendPushToUsers(db, userIds, title, body, data = {}) {
     return true;
   });
 
+  // Badge = the user's unread count, same as the bell icon.
+  const counts = await db.notification.groupBy({
+    by: ["userId"],
+    where: { userId: { in: userIds }, readAt: null, clearedAt: null },
+    _count: { _all: true },
+  });
+  const badgeByUser = new Map(counts.map((c) => [c.userId, c._count._all]));
+
   const results = await Promise.all(
-    unique.map(async ({ id, token }) => {
-      const res = await sendPushToToken(token, title, body, data);
+    unique.map(async ({ id, token, userId }) => {
+      const res = await sendPushToToken(token, title, body, data, badgeByUser.get(userId) ?? 0);
       return { id, isStale: res.isStale };
     })
   );
@@ -134,11 +143,28 @@ export async function sendPushToUsers(db, userIds, title, body, data = {}) {
 }
 
 /**
+ * Send a silent push to all of a user's iOS devices to set the badge to their
+ * current unread notification count (matches the bell icon).
+ * @param {import('@prisma/client').PrismaClient} db
+ * @param {string} userId
+ */
+export async function syncBadgeForUser(db, userId) {
+  const count = await db.notification.count({
+    where: { userId, readAt: null, clearedAt: null },
+  });
+  return setBadgeForUser(db, userId, count);
+}
+
+/**
  * Send a silent push to all of a user's iOS devices to reset the badge to 0.
  * @param {import('@prisma/client').PrismaClient} db
  * @param {string} userId
  */
-export async function resetBadgeForUser(db, userId) {
+export function resetBadgeForUser(db, userId) {
+  return setBadgeForUser(db, userId, 0);
+}
+
+async function setBadgeForUser(db, userId, badge) {
   const firebaseApp = getApp();
   if (!firebaseApp) return;
 
@@ -155,7 +181,7 @@ export async function resetBadgeForUser(db, userId) {
         await admin.messaging().send({
           token,
           apns: {
-            payload: { aps: { "content-available": 1, badge: 0 } },
+            payload: { aps: { "content-available": 1, badge } },
           },
         });
       } catch (err) {
