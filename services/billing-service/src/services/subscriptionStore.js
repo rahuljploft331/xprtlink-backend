@@ -97,7 +97,19 @@ export async function fetchAppleState(originalTransactionId) {
       cancelAtPeriodEnd: renewal ? renewal.autoRenewStatus === 0 : null,
     };
   } catch (err) {
-    log.error({ err: err.message }, "[fetchAppleState] failed");
+    // Apple's APIException / VerificationException leave .message empty; detail is on these fields.
+    log.error(
+      {
+        err: err.message || err.name,
+        errName: err.name,
+        httpStatusCode: err.httpStatusCode,
+        apiError: err.apiError,
+        errorMessage: err.errorMessage,
+        verificationStatus: err.status,
+        cause: err.cause?.message,
+      },
+      "[fetchAppleState] failed",
+    );
     return null;
   }
 }
