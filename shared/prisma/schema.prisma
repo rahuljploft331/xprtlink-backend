@@ -48,6 +48,13 @@ enum CmsPageStatus {
   @@map("cms_page_status")
 }
 
+enum BannerFrequency {
+  monthly
+  weekly
+
+  @@map("banner_frequency")
+}
+
 enum VisibilityBoost {
   listing
   top_25
@@ -263,40 +270,40 @@ enum SupportTicketStatus {
 // ─── Identity (user-service) ─────────────────────────────────────────────────
 
 model User {
-  id              String     @id @default(uuid()) @db.Uuid
-  email           String?    @db.VarChar(320)
-  phone           String?    @db.VarChar(32)
-  passwordHash    String?    @map("password_hash") @db.VarChar(255)
-  firebaseUid     String?    @unique @map("firebase_uid") @db.VarChar(128)
-  emailVerifiedAt DateTime?  @map("email_verified_at") @db.Timestamptz(6)
-  phoneVerifiedAt DateTime?  @map("phone_verified_at") @db.Timestamptz(6)
-  termsAcceptedAt DateTime?  @map("terms_accepted_at") @db.Timestamptz(6)
-  status          UserStatus @default(active)
-  deletedAt       DateTime?  @map("deleted_at") @db.Timestamptz(6)
+  id                String     @id @default(uuid()) @db.Uuid
+  email             String?    @db.VarChar(320)
+  phone             String?    @db.VarChar(32)
+  passwordHash      String?    @map("password_hash") @db.VarChar(255)
+  firebaseUid       String?    @unique @map("firebase_uid") @db.VarChar(128)
+  emailVerifiedAt   DateTime?  @map("email_verified_at") @db.Timestamptz(6)
+  phoneVerifiedAt   DateTime?  @map("phone_verified_at") @db.Timestamptz(6)
+  termsAcceptedAt   DateTime?  @map("terms_accepted_at") @db.Timestamptz(6)
+  status            UserStatus @default(active)
+  deletedAt         DateTime?  @map("deleted_at") @db.Timestamptz(6)
   passwordUpdatedAt DateTime?  @map("password_updated_at") @db.Timestamptz(6)
-  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  customerProfile      CustomerProfile?
-  expertProfile        ExpertProfile?
-  refreshTokens        RefreshToken[]
-  authSessions         AuthSession[]
-  otpChallenges        OtpChallenge[]
-  deviceTokens         DeviceToken[]
-  mediaAssets          MediaAsset[]
-  notifications        Notification[]
-  notificationPref     NotificationPreference?
-  messagesSent         Message[]               @relation("MessageSender")
-  conversationReads    ConversationReadState[]
-  conversationDeletions ConversationDeletion[] @relation("ConversationDeletions")
-  quoteStatusEvents    QuoteStatusEvent[]      @relation("QuoteStatusActor")
-  supportTickets       SupportTicket[]
-  platformIssues       PlatformIssue[]
-  supportConversations SupportConversation[]
-  supportMessagesSent  SupportMessage[]
-  blocksMade           UserBlock[]             @relation("BlocksMade")
-  blocksReceived       UserBlock[]             @relation("BlocksReceived")
-  conversationReports  ConversationReport[]    @relation("ConversationReports")
+  customerProfile       CustomerProfile?
+  expertProfile         ExpertProfile?
+  refreshTokens         RefreshToken[]
+  authSessions          AuthSession[]
+  otpChallenges         OtpChallenge[]
+  deviceTokens          DeviceToken[]
+  mediaAssets           MediaAsset[]
+  notifications         Notification[]
+  notificationPref      NotificationPreference?
+  messagesSent          Message[]               @relation("MessageSender")
+  conversationReads     ConversationReadState[]
+  conversationDeletions ConversationDeletion[]  @relation("ConversationDeletions")
+  quoteStatusEvents     QuoteStatusEvent[]      @relation("QuoteStatusActor")
+  supportTickets        SupportTicket[]
+  platformIssues        PlatformIssue[]
+  supportConversations  SupportConversation[]
+  supportMessagesSent   SupportMessage[]
+  blocksMade            UserBlock[]             @relation("BlocksMade")
+  blocksReceived        UserBlock[]             @relation("BlocksReceived")
+  conversationReports   ConversationReport[]    @relation("ConversationReports")
 
   @@index([email])
   @@index([status])
@@ -495,22 +502,24 @@ model AppConfig {
 }
 
 model SubscriptionPlan {
-  id                String          @id @default(uuid()) @db.Uuid
-  code              String          @unique @db.VarChar(32)
-  name              String          @db.VarChar(120)
-  tagline           String?         @db.VarChar(120)
-  priceMonthlyCents Int             @map("price_monthly_cents")
-  visibilityBoost   VisibilityBoost @map("visibility_boost")
-  keyFeatures       String[]        @default([]) @map("key_features")
-  isMostPopular     Boolean         @default(false) @map("is_most_popular")
-  isActive          Boolean         @default(true) @map("is_active")
-  maxBanners        Int             @default(0) @map("max_banners")
-  stripeProductId   String?         @map("stripe_product_id") @db.VarChar(128)
-  stripePriceId     String?         @map("stripe_price_id") @db.VarChar(128)
-  appleProductId    String?         @map("apple_product_id") @db.VarChar(128)
-  googleProductId   String?         @map("google_product_id") @db.VarChar(128)
-  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                  String          @id @default(uuid()) @db.Uuid
+  code                String          @unique @db.VarChar(32)
+  name                String          @db.VarChar(120)
+  tagline             String?         @db.VarChar(120)
+  priceMonthlyCents   Int             @map("price_monthly_cents")
+  visibilityBoost     VisibilityBoost @map("visibility_boost")
+  keyFeatures         String[]        @default([]) @map("key_features")
+  isMostPopular       Boolean         @default(false) @map("is_most_popular")
+  isActive            Boolean         @default(true) @map("is_active")
+  bannerUploadEnabled Boolean         @default(false) @map("banner_upload_enabled")
+  maxBanners          Int             @default(0) @map("max_banners")
+  bannerFrequency     BannerFrequency @default(monthly) @map("banner_frequency")
+  stripeProductId     String?         @map("stripe_product_id") @db.VarChar(128)
+  stripePriceId       String?         @map("stripe_price_id") @db.VarChar(128)
+  appleProductId      String?         @map("apple_product_id") @db.VarChar(128)
+  googleProductId     String?         @map("google_product_id") @db.VarChar(128)
+  createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   subscriptions ExpertSubscription[]
 
@@ -855,8 +864,8 @@ model Message {
   deliveryStatus MessageDeliveryStatus @default(sent) @map("delivery_status")
   createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  conversation Conversation            @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User                    @relation("MessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
+  conversation          Conversation            @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender                User                    @relation("MessageSender", fields: [senderUserId], references: [id], onDelete: Cascade)
   attachments           MessageAttachment[]
   readStates            ConversationReadState[] @relation("LastReadMessage")
   conversationDeletions ConversationDeletion[]  @relation("LastDeletedMessage")
@@ -896,11 +905,11 @@ model ConversationReadState {
 }
 
 model ConversationDeletion {
-  id             String    @id @default(uuid()) @db.Uuid
-  conversationId String    @map("conversation_id") @db.Uuid
-  userId         String    @map("user_id") @db.Uuid
-  deletedAt      DateTime  @default(now()) @map("deleted_at") @db.Timestamptz(6)
-  lastMessageId  String?   @map("last_message_id") @db.Uuid
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  deletedAt      DateTime @default(now()) @map("deleted_at") @db.Timestamptz(6)
+  lastMessageId  String?  @map("last_message_id") @db.Uuid
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation("ConversationDeletions", fields: [userId], references: [id], onDelete: Cascade)

@@ -53,18 +53,31 @@ export const createBanner = async (auth, inputData) => {
   if (!profile) throw notFound("expertProfileNotFound");
 
   const activeSubscription = profile.subscriptions[0];
-  const maxBanners = activeSubscription?.plan?.maxBanners || 0;
+  const plan = activeSubscription?.plan;
+  const maxBanners = plan?.maxBanners || 0;
 
-  if (maxBanners === 0) {
+  if (!plan?.bannerUploadEnabled || maxBanners === 0) {
     throw badRequest("planDoesNotSupportBanners");
   }
 
+  // maxBanners is a monthly allowance; "weekly" frequency also caps uploads at one per week.
+  const now = Date.now();
+  const DAY_MS = 24 * 60 * 60 * 1000;
   const currentBannersCount = await db.expertBanner.count({
-    where: { expertProfileId: profile.id },
+    where: { expertProfileId: profile.id, createdAt: { gte: new Date(now - 30 * DAY_MS) } },
   });
 
   if (currentBannersCount >= maxBanners) {
     throw badRequest("bannerLimitReached", "BAD_REQUEST", null, { maxBanners });
+  }
+
+  if (plan.bannerFrequency === "weekly") {
+    const lastWeekCount = await db.expertBanner.count({
+      where: { expertProfileId: profile.id, createdAt: { gte: new Date(now - 7 * DAY_MS) } },
+    });
+    if (lastWeekCount >= 1) {
+      throw badRequest("bannerWeeklyLimitReached");
+    }
   }
 
   const banner = await db.expertBanner.create({

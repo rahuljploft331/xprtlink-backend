@@ -1,5 +1,5 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
-import { notFound } from "@xprtlink/shared/utils/errors.js";
+import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 
 export const list = async (req, res) => {
   const db = getDb();
@@ -21,7 +21,14 @@ export const getById = async (req, res) => {
 export const update = async (req, res) => {
   const db = getDb();
   const { id } = req.params;
-  const { code, name, tagline, priceMonthlyCents, visibilityBoost, keyFeatures, isActive, isMostPopular, maxBanners } = req.body;
+  const { code, name, tagline, priceMonthlyCents, visibilityBoost, keyFeatures, isActive, isMostPopular, maxBanners, bannerUploadEnabled, bannerFrequency } = req.body;
+
+  if (bannerFrequency !== undefined && !["monthly", "weekly"].includes(bannerFrequency)) {
+    throw badRequest("validationFailed");
+  }
+  if (maxBanners !== undefined && (!Number.isInteger(maxBanners) || maxBanners < 0)) {
+    throw badRequest("validationFailed");
+  }
 
   const exists = await db.subscriptionPlan.findUnique({ where: { id } });
   if (!exists) throw notFound("subscriptionPlanNotFound");
@@ -38,6 +45,8 @@ export const update = async (req, res) => {
       isActive,
       isMostPopular,
       maxBanners,
+      bannerUploadEnabled,
+      bannerFrequency,
     },
   });
 
