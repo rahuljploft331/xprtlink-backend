@@ -39,6 +39,17 @@ describe("computeConsultationChargeCents — per 30 minutes, billed in minutes",
     expect(computeConsultationChargeCents(rate(6000))).toBe(0);
   });
 
+  it("floors billable completed calls to at least 50¢ (Stripe minimum charge)", () => {
+    // 1 minute at $2 / 30 min would be 7¢ raw, must floor to 50¢
+    expect(computeConsultationChargeCents({ ...rate(200), durationSeconds: 60 })).toBe(50);
+    // 2 minutes at $2 / 30 min would be 13¢ raw, must floor to 50¢
+    expect(computeConsultationChargeCents({ ...rate(200), durationSeconds: 120 })).toBe(50);
+    // 1 minute at $9 / 30 min would be 30¢ raw, must floor to 50¢
+    expect(computeConsultationChargeCents({ ...rate(900), durationSeconds: 60 })).toBe(50);
+    // Rate of 0 (free) remains 0
+    expect(computeConsultationChargeCents({ ...rate(0), durationSeconds: 60 })).toBe(0);
+  });
+
   it("always yields whole cents", () => {
     for (const seconds of [1, 59, 61, 620, 3599]) {
       const cents = computeConsultationChargeCents({ ...rate(333), durationSeconds: seconds });

@@ -383,5 +383,6 @@
   "subscriptionRestored": "Subscription restored successfully",
   "subscriptionAlreadyCurrent": "Your subscription is already up to date",
   "subscriptionOnHold": "Your subscription is on hold due to a billing issue. Please update your payment method in {store}.",
-  "subscriptionInGracePeriod": "Your subscription payment failed. You are in a grace period until {date}. Please update your payment method to keep your access."
+  "subscriptionInGracePeriod": "Your subscription payment failed. You are in a grace period until {date}. Please update your payment method to keep your access.",
+  "consultationRateTooLow": "Consultation rate must be at least $15.00 per 30 minutes"
 }

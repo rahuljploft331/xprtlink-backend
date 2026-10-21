@@ -449,6 +449,10 @@ export async function updateExpertMe(auth, body) {
     if (!media) throw badRequest("invalidAvatarMediaAsset");
   }
 
+  if (body.consultationRate !== undefined && body.consultationRate < 15) {
+    throw badRequest("consultationRateTooLow");
+  }
+
   // Resolve categories when provided: must be a non-empty set of active categories.
   const categoryConnect = await resolveCategoryConnect(body.categoryIds);
 
@@ -525,6 +529,10 @@ export async function submitOnboarding(auth, body) {
       where: { id: body.avatarMediaId, ownerUserId: auth.userId, status: "ready" }
     });
     if (!media) throw badRequest("invalidAvatarMediaAsset");
+  }
+
+  if (body.consultationRate !== undefined && body.consultationRate < 15) {
+    throw badRequest("consultationRateTooLow");
   }
 
   // Resolve categories when provided (must be a non-empty set of active categories).

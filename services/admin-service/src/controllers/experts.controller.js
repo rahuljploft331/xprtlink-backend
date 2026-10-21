@@ -210,7 +210,13 @@ export async function update(req, res, next) {
     if (bio !== undefined) profileData.bio = bio;
     if (title !== undefined) profileData.title = title;
     if (businessName !== undefined) profileData.businessName = businessName;
-    if (consultationRateCents !== undefined) profileData.consultationRateCents = consultationRateCents;
+    if (consultationRateCents !== undefined) {
+      const parsedRate = parseInt(consultationRateCents, 10);
+      if (isNaN(parsedRate) || parsedRate < 1500) {
+        return res.status(400).json({ success: false, message: getMessage("consultationRateTooLow"), code: "VALIDATION_ERROR" });
+      }
+      profileData.consultationRateCents = parsedRate;
+    }
     if (currency !== undefined) profileData.currency = currency;
     if (experienceYears !== undefined) {
       const parsedExperience = parseInt(experienceYears, 10);

@@ -3,6 +3,13 @@ export const CONSULTATION_RATE_MINUTES = 30;
 
 export const CONSULTATION_COMMISSION_RATE = 0.15;
 
+/** Minimum charge in cents for any billable completed consultation (Stripe minimum charge threshold) */
+export const MINIMUM_CONSULTATION_CHARGE_CENTS = 50;
+
+/** Minimum allowed expert rate per 30 minutes in cents ($15.00) */
+export const MINIMUM_EXPERT_RATE_PER_30_MIN_CENTS = 1500;
+export const MINIMUM_EXPERT_RATE_PER_30_MIN_DOLLARS = 15;
+
 /**
  * Convert stored call length to billable minutes.
  * Partial minutes round UP — 54s → 1, 10m20s → 11. Never prorate by the second.
@@ -35,9 +42,12 @@ export function perMinuteCentsFromListedRate(ratePer30MinutesCents) {
  */
 export function computeConsultationChargeCents(consultation, durationSecondsOverride) {
   const durationSeconds = durationSecondsOverride ?? consultation.durationSeconds ?? 0;
+  if (!durationSeconds || durationSeconds <= 0) return 0;
   const listedRateCents = consultation.ratePerMinuteCents ?? 0;
+  if (!listedRateCents || listedRateCents <= 0) return 0;
   const minutes = consultationBillableMinutes(durationSeconds);
-  return Math.round((minutes * listedRateCents) / CONSULTATION_RATE_MINUTES);
+  const rawCents = Math.round((minutes * listedRateCents) / CONSULTATION_RATE_MINUTES);
+  return Math.max(rawCents, MINIMUM_CONSULTATION_CHARGE_CENTS);
 }
 
 export function computeConsultationCommissionCents(

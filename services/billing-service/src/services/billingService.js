@@ -379,7 +379,7 @@ async function collectConsultationPayment({ consultation, amountCents, currency,
   }
 
   const remainderCents = amountCents - collectedCents;
-  if (remainderCents > 0) {
+  if (remainderCents >= 50) {
     let card = explicitCard ?? null;
     if (!card && stripeId(holdPi?.customer) && stripeId(holdPi?.payment_method)) {
       card = {
@@ -420,6 +420,10 @@ async function collectConsultationPayment({ consultation, amountCents, currency,
     } else if (!lastError) {
       lastError = new Error("No capturable hold and no card on file");
     }
+  } else if (remainderCents > 0) {
+    log.info(
+      `[billing] remainder of ${remainderCents}¢ for ${consultation.id} is below Stripe minimum ($0.50) — skipping off-session charge`
+    );
   }
 
   return { payments, collectedCents, shortfallCents: amountCents - collectedCents, error: lastError };
