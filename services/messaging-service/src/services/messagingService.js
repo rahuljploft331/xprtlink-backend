@@ -1,3 +1,4 @@
+import { createConversationReport } from "@xprtlink/shared/utils/reportReasons.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { getDb } from "@xprtlink/shared/db";
 import { moveS3Object } from "@xprtlink/shared/utils/s3.js";
@@ -756,16 +757,9 @@ export async function unblockUser(auth, targetUserId) {
   return { blocked: false };
 }
 
-export async function reportConversation(auth, conversationId, reason) {
-  await loadConversation(auth, conversationId);
-  const db = getDb();
-  const report = await db.conversationReport.create({
-    data: {
-      conversationId,
-      reporterUserId: auth.userId,
-      reason,
-    },
-  });
+export async function reportConversation(auth, conversationId, input) {
+  const conversation = await loadConversation(auth, conversationId);
+  const report = await createConversationReport(getDb(), auth, conversation, input);
   return { id: report.id, reported: true };
 }
 

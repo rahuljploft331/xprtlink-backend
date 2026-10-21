@@ -7,18 +7,9 @@ import * as svc from "../services/engagementService.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { getDb } from "@xprtlink/shared/db";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
+import { REPORT_REASONS, createConversationReport } from "@xprtlink/shared/utils/reportReasons.js";
 
 const router = Router();
-
-const REPORT_REASONS = [
-  "Inappropriate behavior",
-  "Offensive language",
-  "Spam or misleading",
-  "Harassment or abuse",
-  "Did not show up",
-  "Requested off-platform payment",
-  "Other"
-];
 
 router.use(authenticate);
 
@@ -54,28 +45,32 @@ router.post(
 router.post(
   "/conversations",
   asyncHandler(async (req, res) => {
-    const { conversationId, reason } = req.body;
+    const { conversationId, reason, details } = req.body;
     if (!conversationId || !reason) {
       throw badRequest("missingRequiredFields");
     }
 
+    const { role, customerProfileId, expertProfileId } = req.auth;
+    const ownerWhere =
+      role === "customer"
+        ? { customerId: customerProfileId }
+        : role === "expert"
+          ? { expertId: expertProfileId }
+          : null;
+    if (!ownerWhere) throw notFound("conversationNotFound");
+
     const db = getDb();
-    
-    // Check if conversation exists
-    const conversation = await db.conversation.findUnique({ where: { id: conversationId } });
-    if (!conversation) {
-      throw notFound("conversationNotFound");
-    }
-
-    const report = await db.conversationReport.create({
-      data: {
-        conversationId,
-        reporterUserId: req.auth.userId,
-        reason: reason.substring(0, 500),
-      },
+    const conversation = await db.conversation.findFirst({
+      where: { id: conversationId, ...ownerWhere },
     });
+    if (!conversation) throw notFound("conversationNotFound");
 
-    return ResponseFormatter.success(res, { message: getMessage("conversationReported"), data: report, status: 201 });
+    const report = await createConversationReport(db, req.auth, conversation, { reason, details });
+    return ResponseFormatter.success(res, {
+      message: getMessage("conversationReported"),
+      data: { id: report.id },
+      status: 201,
+    });
   })
 );
 

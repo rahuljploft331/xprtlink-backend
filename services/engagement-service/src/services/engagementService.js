@@ -1,3 +1,4 @@
+import { normalizeReportInput } from "@xprtlink/shared/utils/reportReasons.js";
 import crypto from "crypto";
 import { generateZegoToken } from "@xprtlink/shared/lib/zegoToken.js";
 import { getDb } from "@xprtlink/shared/db";
@@ -1455,13 +1456,15 @@ export async function createReport(auth, body) {
   const expert = await db.expertProfile.findUnique({ where: { id: body.expertId } });
   if (!expert) throw notFound("expertNotFound");
 
+  const { reason, details } = normalizeReportInput({ reason: body.reason, details: body.details });
   const report = await db.expertReport.create({
     data: {
       customerId: auth.customerProfileId,
       expertId: body.expertId,
-      reason: body.reason,
-      details: body.details ?? null,
+      reason,
+      details,
       evidence: body.evidence ?? [],
+      source: "expert_profile",
     },
   });
 

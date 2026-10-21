@@ -103,24 +103,24 @@ async function poll() {
       cursors.reportFiled = newReports.at(-1).createdAt;
     }
 
-    // ── 3b. Conversation reports ─────────────────────────────────────────────
-    const newChatReports = await db.conversationReport.findMany({
+    // ── 3b. Customer reports (expert reported a customer) ───────────────────
+    const newCustomerReports = await db.customerReport.findMany({
       where: { createdAt: { gt: cursors.chatReportFiled } },
       orderBy: { createdAt: "asc" },
-      select: { id: true, conversationId: true, reporterUserId: true, reason: true, createdAt: true },
+      select: { id: true, expertId: true, customerId: true, reason: true, createdAt: true },
     });
-    for (const r of newChatReports) {
+    for (const r of newCustomerReports) {
       publish("report:filed", {
         id: r.id,
-        type: "chat",
-        conversationId: r.conversationId,
-        reporterUserId: r.reporterUserId,
+        type: "customer",
+        expertId: r.expertId,
+        customerId: r.customerId,
         reason: r.reason,
         createdAt: r.createdAt.toISOString(),
       });
     }
-    if (newChatReports.length > 0) {
-      cursors.chatReportFiled = newChatReports.at(-1).createdAt;
+    if (newCustomerReports.length > 0) {
+      cursors.chatReportFiled = newCustomerReports.at(-1).createdAt;
     }
 
     // ── 4. Completed consultations ──────────────────────────────────────────

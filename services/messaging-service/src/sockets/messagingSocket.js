@@ -546,13 +546,13 @@ export function registerMessagingSockets(io) {
     });
 
     // 10. Report conversation
-    socket.on("conversation:report", async ({ conversationId, reason } = {}, callback) => {
+    socket.on("conversation:report", async ({ conversationId, reason, details } = {}, callback) => {
       try {
         if (!conversationId) throw new Error(getMessage("conversationIdRequired"));
         if (!reason || typeof reason !== "string" || !reason.trim()) {
           throw new Error(getMessage("reportReasonRequired"));
         }
-        const data = await svc.reportConversation(auth, conversationId, reason.trim());
+        const data = await svc.reportConversation(auth, conversationId, { reason, details });
         if (typeof callback === "function") {
           callback({ success: true, data });
         }

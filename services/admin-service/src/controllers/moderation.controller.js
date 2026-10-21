@@ -4,17 +4,72 @@ import { notFound, badRequest } from "@xprtlink/shared/utils/errors.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 
-export const listExpertReports = async (req, res) => {
+const fullName = (p) => `${p?.firstName || ""} ${p?.lastName || ""}`.trim() || "Unknown";
+
+const toReportRow = (r, reporter) => ({
+  id: r.id,
+  reason: r.reason,
+  details: r.details,
+  status: r.status,
+  source: r.source,
+  createdAt: r.createdAt,
+  reporter: { id: reporter?.id, name: fullName(reporter), email: reporter?.user?.email ?? null },
+});
+
+/**
+ * One row per reported expert, consolidating every report about them — filed
+ * from the expert profile or from chat — with each reporter and reason.
+ */
+export const listReportedExperts = async (req, res) => {
   const db = getDb();
   const reports = await db.expertReport.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      customer: { select: { id: true, firstName: true, lastName: true } },
-      expert: { select: { id: true, firstName: true, lastName: true } }
-    }
+      customer: { select: { id: true, firstName: true, lastName: true, user: { select: { email: true } } } },
+      expert: { select: { id: true, firstName: true, lastName: true, user: { select: { email: true, status: true } } } },
+    },
   });
-  return ResponseFormatter.success(res, { data: reports });
+  return ResponseFormatter.success(res, { data: groupReports(reports, "expert", "customer") });
 };
+
+/** Mirror of [listReportedExperts]: customers reported by experts. */
+export const listReportedCustomers = async (req, res) => {
+  const db = getDb();
+  const reports = await db.customerReport.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      expert: { select: { id: true, firstName: true, lastName: true, user: { select: { email: true } } } },
+      customer: { select: { id: true, userId: true, firstName: true, lastName: true, user: { select: { email: true, status: true } } } },
+    },
+  });
+  return ResponseFormatter.success(res, { data: groupReports(reports, "customer", "expert") });
+};
+
+function groupReports(reports, targetKey, reporterKey) {
+  const map = new Map();
+  for (const r of reports) {
+    const target = r[targetKey];
+    if (!target) continue;
+    if (!map.has(target.id)) {
+      map.set(target.id, {
+        id: target.id,
+        // customersApi.suspend takes the user id, expertsApi.suspend the profile id.
+        suspendId: targetKey === "customer" ? target.userId : target.id,
+        name: fullName(target),
+        email: target.user?.email ?? null,
+        accountStatus: target.user?.status ?? null,
+        role: targetKey,
+        count: 0,
+        lastReportedAt: r.createdAt,
+        reports: [],
+      });
+    }
+    const group = map.get(target.id);
+    group.count += 1;
+    group.reports.push(toReportRow(r, r[reporterKey]));
+  }
+  return [...map.values()];
+}
 
 export const updateExpertReport = async (req, res) => {
   const db = getDb();
@@ -32,78 +87,20 @@ export const updateExpertReport = async (req, res) => {
   return ResponseFormatter.success(res, { data: report, message: getMessage("updatedSuccessfully") });
 };
 
-export const listConversationReports = async (req, res) => {
-  const db = getDb();
-  const reports = await db.conversationReport.findMany({
-    orderBy: { createdAt: "desc" },
-    include: {
-      reporter: {
-        select: {
-          id: true,
-          email: true,
-          customerProfile: { select: { id: true, firstName: true, lastName: true } },
-          expertProfile: { select: { id: true, firstName: true, lastName: true } },
-        }
-      },
-      conversation: { 
-        select: { 
-          id: true, 
-          customerId: true, 
-          expertId: true,
-          customer: { select: { userId: true, firstName: true, lastName: true, user: { select: { email: true } } } },
-          expert: { select: { userId: true, firstName: true, lastName: true, user: { select: { email: true } } } }
-        } 
-      }
-    }
-  });
-
-  const formattedReports = reports.map((r) => {
-    let reportedUser = null;
-    if (r.reporter) {
-      if (r.reporter.expertProfile && r.conversation.customer) {
-        reportedUser = {
-          userId: r.conversation.customer.userId,
-          profileId: r.conversation.customerId,
-          email: r.conversation.customer.user?.email || "Unknown",
-          name: `${r.conversation.customer.firstName} ${r.conversation.customer.lastName}`,
-          role: "customer"
-        };
-      } else if (r.reporter.customerProfile && r.conversation.expert) {
-        reportedUser = {
-          userId: r.conversation.expert.userId,
-          profileId: r.conversation.expertId,
-          email: r.conversation.expert.user?.email || "Unknown",
-          name: `${r.conversation.expert.firstName} ${r.conversation.expert.lastName}`,
-          role: "expert"
-        };
-      }
-    }
-
-    return {
-      ...r,
-      reporter: r.reporter ? {
-        id: r.reporter.id,
-        email: r.reporter.email,
-        role: r.reporter.expertProfile ? "expert" : r.reporter.customerProfile ? "customer" : "unknown",
-      } : null,
-      reportedUser
-    };
-  });
-
-  return ResponseFormatter.success(res, { data: formattedReports });
-};
-
-export const deleteConversationReport = async (req, res) => {
+export const updateCustomerReport = async (req, res) => {
   const db = getDb();
   const { id } = req.params;
-  
-  const report = await db.conversationReport.delete({
-    where: { id }
+  const { status } = req.body;
+  if (!status) throw badRequest("missingRequiredFields");
+
+  const report = await db.customerReport.update({
+    where: { id },
+    data: { status }
   }).catch(() => null);
 
   if (!report) throw notFound("resourceNotFound");
 
-  return ResponseFormatter.success(res, { message: getMessage("deletedSuccessfully") });
+  return ResponseFormatter.success(res, { data: report, message: getMessage("updatedSuccessfully") });
 };
 
 export const listBanners = async (req, res) => {
