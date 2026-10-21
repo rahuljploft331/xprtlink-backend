@@ -1,7 +1,7 @@
 import { AppError } from "@xprtlink/shared/utils/errors.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
-import { getManagementUrl } from "./subscriptionStore.js";
+import { fetchAppleState, fetchGoogleState, getManagementUrl } from "./subscriptionStore.js";
 import {
   ENTITLED_STATUSES,
   PLAN_CHANGE,
@@ -36,6 +36,26 @@ export function findForeignOwner(db, { store, externalSubscriptionId, expertProf
 }
 
 /**
+ * Does another account's stored row still hold a live entitlement in the store?
+ * The stored period end can be synthetic (sandbox grants 30 days), so an owner who
+ * cancelled and let Apple/Google expire the subscription would otherwise block the
+ * purchase until that date. Fails closed: if the store can't be reached, the stored
+ * row decides.
+ */
+export async function ownerHasLiveEntitlement(owner, now) {
+  if (!hasActiveEntitlement(owner, now)) return false;
+  const live = owner.store === "apple"
+    ? await fetchAppleState(owner.externalSubscriptionId)
+    : await fetchGoogleState(owner.externalSubscriptionId);
+  if (!live) return true;
+  const lapsed = owner.store === "apple"
+    ? live.status === 2 || live.status === 5 // expired | revoked
+    : live.state === "SUBSCRIPTION_STATE_EXPIRED";
+  const pastExpiry = live.expiry instanceof Date && live.expiry.getTime() <= now.getTime();
+  return !(lapsed || pastExpiry);
+}
+
+/**
  * Atomically attach a VERIFIED store purchase to `expertProfileId`.
  *
  * Inside one transaction, serialised per purchase and per account by advisory
@@ -61,7 +81,7 @@ export async function activateStoreSubscription(db, p) {
     // 1. Ownership
     const foreign = await findForeignOwner(tx, { store, externalSubscriptionId, expertProfileId });
     if (foreign) {
-      if (hasActiveEntitlement(foreign, now)) {
+      if (await ownerHasLiveEntitlement(foreign, now)) {
         if (!transferAllowed()) {
           log.warn({ store, ownerExpertId: foreign.expertProfileId, claimantExpertId: expertProfileId }, "[activate] purchase owned by another account — blocked");
           throw ownedByAnotherAccountError(store);

@@ -155,6 +155,21 @@ describe("activateStoreSubscription — ownership", () => {
     await expect(claim("B", "professional", "tok")).rejects.toMatchObject({ code: "SUBSCRIPTION_ALREADY_LINKED" });
   });
 
+  it("owner's DB period is still in the future but Apple says expired → another account may claim it", async () => {
+    reload([row({ id: "a1", plan: "core", store: "apple", expertProfileId: "A", externalSubscriptionId: "tok", cancelAtPeriodEnd: true })]);
+    storeState.apple.mockResolvedValue({ status: 2, expiry: new Date(now.getTime() - 60000), cancelAtPeriodEnd: true });
+    const s = await claim("B", "core", "tok", { store: "apple" });
+    expect(s.expertProfileId).toBe("B");
+  });
+
+  it("store still reports the owner active, or can't be reached → still blocked (fail closed)", async () => {
+    reload([row({ id: "a1", plan: "core", store: "apple", expertProfileId: "A", externalSubscriptionId: "tok" })]);
+    storeState.apple.mockResolvedValue({ status: 1, expiry: future, cancelAtPeriodEnd: false });
+    await expect(claim("B", "core", "tok", { store: "apple" })).rejects.toMatchObject({ code: "SUBSCRIPTION_ALREADY_LINKED" });
+    storeState.apple.mockResolvedValue(null);
+    await expect(claim("B", "core", "tok", { store: "apple" })).rejects.toMatchObject({ code: "SUBSCRIPTION_ALREADY_LINKED" });
+  });
+
   it("two simultaneous claims of one new purchase cannot both succeed", async () => {
     const results = await Promise.allSettled([claim("A", "core", "tok-race"), claim("B", "core", "tok-race")]);
     expect(results.filter((r) => r.status === "fulfilled")).toHaveLength(1);
@@ -173,7 +188,7 @@ describe("checkPurchaseEligibility", () => {
     expect(r).toMatchObject({ eligible: false, code: "SUBSCRIPTION_ALREADY_LINKED", title: "Subscription Already Active", store: "google" });
     expect(r.managementUrl).toMatch(/^https:\/\/play\.google\.com\//);
     expect(r.alertMessage).toMatch(/associated with another account/);
-    expect(storeState.google).not.toHaveBeenCalled();
+    expect(storeState.google).toHaveBeenCalledWith("tok"); // owner liveness is checked with the store (fails closed)
   });
 
   it("fails closed when an unknown purchase cannot be verified with the store", async () => {

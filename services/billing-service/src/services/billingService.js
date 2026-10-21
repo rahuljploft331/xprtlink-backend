@@ -26,7 +26,7 @@ import { PAYOUT_SCHEDULE_DEFAULT_DAYS } from "@xprtlink/shared/contracts/setting
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { fetchAppleState, fetchGoogleState, getManagementUrl, isStoreManaged, reconcileSubscription } from "./subscriptionStore.js";
 import { ENTITLED_STATUSES, PLAN_CHANGE, SUBSCRIPTION_ERROR, comparePlans, evaluatePlanChange, hasActiveEntitlement } from "./subscriptionRules.js";
-import { findForeignOwner, ownedByAnotherAccountError } from "./subscriptionOwnership.js";
+import { findForeignOwner, ownedByAnotherAccountError, ownerHasLiveEntitlement } from "./subscriptionOwnership.js";
 import { customerDisplayName, toIso } from "@xprtlink/shared/mappers/common.js";
 import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
 
@@ -1894,7 +1894,7 @@ export async function checkPurchaseEligibility(auth, input = {}) {
   const externalId = store === "google" ? purchaseToken : store === "apple" ? originalTransactionId : null;
   if (externalId) {
     const owner = await findForeignOwner(db, { store, externalSubscriptionId: externalId, expertProfileId: auth.expertProfileId });
-    if (owner && hasActiveEntitlement(owner, now)) {
+    if (owner && (await ownerHasLiveEntitlement(owner, now))) {
       const err = ownedByAnotherAccountError(store);
       return { eligible: false, code: err.code, reason: err.code, message: err.message, ...err.details, activeSubscription: null };
     }
