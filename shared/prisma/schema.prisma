@@ -330,6 +330,7 @@ model CustomerProfile {
   conversations  Conversation[]
   paymentMethods PaymentMethod[]
   expertReports  ExpertReport[]
+  reportedBy     CustomerReport[] @relation("ReportedCustomer")
   reviews        Review[]
 
   @@index([avatarMediaId])
@@ -616,6 +617,7 @@ model ExpertProfile {
   conversations    Conversation[]
   reviews          Review[]
   reports          ExpertReport[]
+  customerReports  CustomerReport[] @relation("ReportingExpert")
   banners          ExpertBanner[]
   payouts          ExpertPayout[]
   earningsLedger   ExpertEarningsLedger[]
@@ -837,6 +839,9 @@ model ExpertReport {
   details    String?
   evidence   Json               @default("[]")
   status     ExpertReportStatus @default(open)
+  /// Where the report was filed: "expert_profile" or "chat".
+  source         String             @default("expert_profile") @db.VarChar(32)
+  conversationId String?            @map("conversation_id") @db.Uuid
   createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -846,6 +851,27 @@ model ExpertReport {
   @@index([expertId])
   @@index([status])
   @@map("expert_reports")
+}
+
+/// Mirror of ExpertReport: an expert reporting a customer (filed from chat).
+model CustomerReport {
+  id             String             @id @default(uuid()) @db.Uuid
+  expertId       String             @map("expert_id") @db.Uuid
+  customerId     String             @map("customer_id") @db.Uuid
+  reason         String             @db.VarChar(120)
+  details        String?
+  status         ExpertReportStatus @default(open)
+  source         String             @default("chat") @db.VarChar(32)
+  conversationId String?            @map("conversation_id") @db.Uuid
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  expert   ExpertProfile   @relation("ReportingExpert", fields: [expertId], references: [id], onDelete: Cascade)
+  customer CustomerProfile @relation("ReportedCustomer", fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([status])
+  @@map("customer_reports")
 }
 
 // ─── Messaging (messaging-service) ───────────────────────────────────────────
