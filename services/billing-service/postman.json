@@ -618,7 +618,7 @@
                 "me"
               ]
             },
-            "description": "Retrieve current plan info and active subscription state of the expert."
+            "description": "Current subscription of the expert. Includes `platform` (ios|android|web), `store`, `status`, `autoRenewEnabled`, `cancelAtPeriodEnd`, `currentPeriodEnd`, `lastVerifiedAt` and, for Apple/Google, `subscriptionManagementUrl`. For store subscriptions the backend re-checks the store (App Store Server API / Play Developer API) if the last verification is older than 5 minutes. Poll this after the user returns from the store page."
           }
         },
         {
@@ -684,7 +684,7 @@
                 "me"
               ]
             },
-            "description": "Cancels the expert's active subscription immediately. Sets status to 'canceled'. Returns 404 if no active subscription exists."
+            "description": "Provider-based cancellation, decided by the ORIGINAL purchase store (never the caller's device).\n\n- Apple / Google Play: does NOT cancel or modify the record. Returns `subscriptionManagementUrl`, `manualCancelRequired: true`, `cancellationConfirmed: false`. The flag flips (`autoRenewEnabled: false`, `cancelAtPeriodEnd: true`) only after a verified App Store Server Notification / Play RTDN or store status check; access continues until `currentPeriodEnd`.\n- Stripe: cancels at period end via Stripe; returns `cancellationConfirmed: true`, `manualCancelRequired: false`, `subscriptionManagementUrl: null`.\n\nIdempotent. Returns 404 if no active subscription exists."
           }
         }
       ]
