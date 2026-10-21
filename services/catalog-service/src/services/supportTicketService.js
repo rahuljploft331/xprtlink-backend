@@ -70,7 +70,7 @@ export async function createTicket(auth, { subject, body, category, referenceId,
       attachments: {
         include: {
           media: {
-            select: { id: true, storageKey: true, fileName: true, mimeType: true },
+            select: { id: true, storageKey: true, mimeType: true },
           },
         },
       },
@@ -83,13 +83,13 @@ export async function createTicket(auth, { subject, body, category, referenceId,
   let attachmentHtml = "";
   if (ticket.attachments && ticket.attachments.length > 0) {
     const list = ticket.attachments
-      .map((att, idx) => `Attachment ${idx + 1}: ${att.media?.fileName || att.mediaId} (Key: ${att.media?.storageKey || 'N/A'})`)
+      .map((att, idx) => `Attachment ${idx + 1}: ${att.media?.storageKey?.split("/").pop() || att.mediaId} (Key: ${att.media?.storageKey || 'N/A'})`)
       .join("\n");
     attachmentText = `\n\nAttachments (${ticket.attachments.length}):\n${list}`;
     const htmlList = ticket.attachments
       .map(
         (att, idx) =>
-          `<li>Attachment ${idx + 1}: ${escapeHtml(att.media?.fileName || att.mediaId)} (${escapeHtml(att.media?.storageKey || 'N/A')})</li>`
+          `<li>Attachment ${idx + 1}: ${escapeHtml(att.media?.storageKey?.split("/").pop() || att.mediaId)} (${escapeHtml(att.media?.storageKey || 'N/A')})</li>`
       )
       .join("");
     attachmentHtml = `<p><strong>Attachments (${ticket.attachments.length}):</strong></p><ul>${htmlList}</ul>`;

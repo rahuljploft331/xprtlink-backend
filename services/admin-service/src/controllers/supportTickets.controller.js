@@ -39,10 +39,10 @@ export async function list(req, res) {
       orderBy: { createdAt: "desc" },
       include: {
         user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true } }, expertProfile: { select: { firstName: true, lastName: true } } } },
-        attachment: { select: { id: true, storageKey: true, mimeType: true, fileName: true, sizeBytes: true } },
+        attachment: { select: { id: true, storageKey: true, mimeType: true, sizeBytes: true } },
         attachments: {
           include: {
-            media: { select: { id: true, storageKey: true, mimeType: true, fileName: true, sizeBytes: true } }
+            media: { select: { id: true, storageKey: true, mimeType: true, sizeBytes: true } }
           }
         }
       }
@@ -69,7 +69,7 @@ export async function list(req, res) {
           id: media.id,
           url,
           mimeType: media.mimeType,
-          fileName: media.fileName,
+          fileName: media.storageKey?.split("/").pop() ?? null,
           sizeBytes: media.sizeBytes,
         };
       })
@@ -86,7 +86,7 @@ export async function list(req, res) {
         id: ticket.attachment.id,
         url,
         mimeType: ticket.attachment.mimeType,
-        fileName: ticket.attachment.fileName,
+        fileName: ticket.attachment.storageKey?.split("/").pop() ?? null,
         sizeBytes: ticket.attachment.sizeBytes,
       });
     }
@@ -186,10 +186,10 @@ export async function getById(req, res) {
     where: { id },
     include: {
       user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true } }, expertProfile: { select: { firstName: true, lastName: true } } } },
-      attachment: { select: { id: true, storageKey: true, mimeType: true, fileName: true, sizeBytes: true } },
+      attachment: { select: { id: true, storageKey: true, mimeType: true, sizeBytes: true } },
       attachments: {
         include: {
-          media: { select: { id: true, storageKey: true, mimeType: true, fileName: true, sizeBytes: true } }
+          media: { select: { id: true, storageKey: true, mimeType: true, sizeBytes: true } }
         }
       }
     }
@@ -218,7 +218,7 @@ export async function getById(req, res) {
         id: media.id,
         url,
         mimeType: media.mimeType,
-        fileName: media.fileName,
+        fileName: media.storageKey?.split("/").pop() ?? null,
         sizeBytes: media.sizeBytes,
       };
     })
@@ -235,7 +235,7 @@ export async function getById(req, res) {
       id: ticket.attachment.id,
       url,
       mimeType: ticket.attachment.mimeType,
-      fileName: ticket.attachment.fileName,
+      fileName: ticket.attachment.storageKey?.split("/").pop() ?? null,
       sizeBytes: ticket.attachment.sizeBytes,
     });
   }
