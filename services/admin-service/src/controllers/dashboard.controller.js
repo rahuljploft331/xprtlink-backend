@@ -64,6 +64,8 @@ export async function getStats(_req, res, next) {
       pendingPaymentsInvestigating,
       subs30d,
       subsPrev30d,
+      pendingSupportTickets,
+      pendingPlatformIssues,
     ] = await Promise.all([
       db.customerProfile.count(),
       db.expertProfile.count(),
@@ -98,6 +100,8 @@ export async function getStats(_req, res, next) {
       db.transaction.count({ where: { status: "pending" } }),
       db.expertSubscription.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
       db.expertSubscription.count({ where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } } }),
+      db.supportTicket.count({ where: { status: { in: ["open", "in_progress"] } } }),
+      db.platformIssue.count({ where: { status: { in: ["open", "in_progress"] } } }),
     ]);
 
     // Platform Revenue = what the platform keeps: consultation commission (on
@@ -118,7 +122,13 @@ export async function getStats(_req, res, next) {
     });
 
     const pendingAdminActions =
-      pendingVerifications + pendingReviews + pendingPaymentsInvestigating + pendingPayouts + paymentsNeedingAttention;
+      pendingVerifications +
+      pendingReviews +
+      pendingPaymentsInvestigating +
+      pendingPayouts +
+      paymentsNeedingAttention +
+      pendingSupportTickets +
+      pendingPlatformIssues;
 
     const custDelta = calculateDelta(customers30d, customersPrev30d);
     const expDelta = calculateDelta(experts30d, expertsPrev30d);
@@ -138,8 +148,8 @@ export async function getStats(_req, res, next) {
       { id: "actions", label: "Pending Admin Actions", value: String(pendingAdminActions), delta: pendingAdminActions > 0 ? `${pendingAdminActions} queue` : "All clear", trend: pendingAdminActions > 0 ? "down" : "up" },
     ];
 
-    // Recent activity — last 10 consultations/verifications/transactions mixed
-    const [recentConsultations, recentVerifications, recentTransactions] = await Promise.all([
+    // Recent activity — consultations/verifications/transactions/tickets
+    const [recentConsultations, recentVerifications, recentTransactions, recentTickets] = await Promise.all([
       db.consultation.findMany({
         take: 5,
         orderBy: { createdAt: "desc" },
@@ -160,6 +170,19 @@ export async function getStats(_req, res, next) {
         orderBy: { createdAt: "desc" },
         where: { status: "succeeded" },
       }),
+      db.supportTicket.findMany({
+        take: 5,
+        orderBy: { createdAt: "desc" },
+        include: {
+          user: {
+            select: {
+              email: true,
+              customerProfile: { select: { firstName: true, lastName: true } },
+              expertProfile: { select: { firstName: true, lastName: true } },
+            },
+          },
+        },
+      }),
     ]);
 
     const recentActivity = [
@@ -169,6 +192,7 @@ export async function getStats(_req, res, next) {
         title: `Consultation ${c.status}`,
         detail: `${c.customer.firstName} ${c.customer.lastName} → ${c.expert.firstName} ${c.expert.lastName}`,
         time: formatRelative(c.createdAt),
+        timestamp: new Date(c.createdAt).getTime(),
       })),
       ...recentVerifications.map((v) => ({
         id: v.id,
@@ -176,6 +200,7 @@ export async function getStats(_req, res, next) {
         title: "Verification submitted",
         detail: `${v.expert.firstName} ${v.expert.lastName}`,
         time: formatRelative(v.submittedAt),
+        timestamp: new Date(v.submittedAt).getTime(),
       })),
       ...recentTransactions.map((t) => ({
         id: t.id,
@@ -183,15 +208,32 @@ export async function getStats(_req, res, next) {
         title: "Payment captured",
         detail: `$${(t.amountCents / 100).toFixed(2)} · ${t.type}`,
         time: formatRelative(t.createdAt),
+        timestamp: new Date(t.createdAt).getTime(),
       })),
+      ...recentTickets.map((t) => {
+        const name =
+          t.user?.customerProfile?.firstName ? `${t.user.customerProfile.firstName} ${t.user.customerProfile.lastName}`.trim() :
+          t.user?.expertProfile?.firstName ? `${t.user.expertProfile.firstName} ${t.user.expertProfile.lastName}`.trim() :
+          t.user?.email || "User";
+        return {
+          id: t.id,
+          type: "ticket",
+          title: `Support ticket (${t.status})`,
+          detail: `${name}: ${t.subject || t.category}`,
+          time: formatRelative(t.createdAt),
+          timestamp: new Date(t.createdAt).getTime(),
+        };
+      }),
     ]
-      .sort((a, b) => 0) // already mixed; for proper sort we'd need timestamps
+      .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 8);
 
     // Pending actions
     const pendingActions = [
-      { id: "d", label: "Resolve card disputes & payment reviews", module: "Payments", count: paymentsNeedingAttention, href: "/payments" },
+      { id: "t", label: "Review open support tickets", module: "Support Tickets", count: pendingSupportTickets, href: "/support-tickets" },
+      { id: "pi", label: "Resolve reported platform issues", module: "Platform Issues", count: pendingPlatformIssues, href: "/platform-issues" },
       { id: "v", label: "Review expert ID documents", module: "Verifications", count: pendingVerifications, href: "/verifications" },
+      { id: "d", label: "Resolve card disputes & payment reviews", module: "Payments", count: paymentsNeedingAttention, href: "/payments" },
       { id: "r", label: "Moderate flagged reviews", module: "Reviews", count: pendingReviews, href: "/reviews" },
       { id: "p", label: "Investigate refund requests", module: "Payments", count: pendingPaymentsInvestigating, href: "/payments" },
       { id: "po", label: "Process pending payouts", module: "Payouts", count: pendingPayouts, href: "/payouts" },
