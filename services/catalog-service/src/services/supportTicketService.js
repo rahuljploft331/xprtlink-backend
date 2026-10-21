@@ -8,12 +8,21 @@ const log = logger.child({ module: "supportTicketService" });
 /**
  * Submit a support request (forwards via email to admin).
  */
-export async function createTicket(auth, { subject, body, category, referenceId, attachmentId }) {
+export async function createTicket(auth, { subject, body, category, referenceId, attachmentId, attachmentIds }) {
   const db = getDb();
   
   if (!subject) {
     subject = `Support Ticket - ${category}`;
   }
+
+  // Deduplicate and collect all attachment IDs
+  const allAttachmentIds = Array.from(
+    new Set([
+      ...(Array.isArray(attachmentIds) ? attachmentIds : []),
+      ...(attachmentId ? [attachmentId] : []),
+    ])
+  ).filter(Boolean);
+  const primaryAttachmentId = allAttachmentIds[0] || null;
   
   // Get user details for the email
   const user = await db.user.findUnique({
@@ -33,8 +42,6 @@ export async function createTicket(auth, { subject, body, category, referenceId,
   if (setting && setting.value) {
     supportEmail = setting.value; // Assuming value is the email string
   } else {
-    // If setting is stored as a JSON object, might need to parse. But usually it's just a string in JSON.
-    // Let's handle if it's an object { email: '...' } just in case.
     if (typeof setting?.value === 'object' && setting.value.email) {
       supportEmail = setting.value.email;
     } else if (typeof setting?.value === 'string') {
@@ -51,27 +58,49 @@ export async function createTicket(auth, { subject, body, category, referenceId,
       body,
       category,
       referenceId,
-      attachmentId,
+      attachmentId: primaryAttachmentId,
       status: "open",
+      attachments: {
+        create: allAttachmentIds.map((mediaId) => ({
+          mediaId,
+        })),
+      },
+    },
+    include: {
+      attachments: {
+        include: {
+          media: {
+            select: { id: true, storageKey: true, fileName: true, mimeType: true },
+          },
+        },
+      },
     },
   });
 
   // Send the email to support
   const userName = `${firstName} ${lastName}`.trim() || 'User';
-  let attachmentUrl = "";
-  if (attachmentId) {
-    const media = await db.mediaAsset.findUnique({ where: { id: attachmentId } });
-    if (media) {
-      attachmentUrl = `\n\nAttachment ID: ${media.id} (Key: ${media.storageKey})`;
-    }
+  let attachmentText = "";
+  let attachmentHtml = "";
+  if (ticket.attachments && ticket.attachments.length > 0) {
+    const list = ticket.attachments
+      .map((att, idx) => `Attachment ${idx + 1}: ${att.media?.fileName || att.mediaId} (Key: ${att.media?.storageKey || 'N/A'})`)
+      .join("\n");
+    attachmentText = `\n\nAttachments (${ticket.attachments.length}):\n${list}`;
+    const htmlList = ticket.attachments
+      .map(
+        (att, idx) =>
+          `<li>Attachment ${idx + 1}: ${escapeHtml(att.media?.fileName || att.mediaId)} (${escapeHtml(att.media?.storageKey || 'N/A')})</li>`
+      )
+      .join("");
+    attachmentHtml = `<p><strong>Attachments (${ticket.attachments.length}):</strong></p><ul>${htmlList}</ul>`;
   }
 
-  const textBody = `New Support Request from ${userName} (${user?.email || 'No email'})\nCategory: ${category}${referenceId ? '\nReference ID: ' + referenceId : ''}\n\nSubject: ${finalSubject}\n\nMessage:\n${body}${attachmentUrl}`;
+  const textBody = `New Support Request from ${userName} (${user?.email || 'No email'})\nCategory: ${category}${referenceId ? '\nReference ID: ' + referenceId : ''}\n\nSubject: ${finalSubject}\n\nMessage:\n${body}${attachmentText}`;
   
   try {
     const html = await renderEmailTemplate({
       title: "New Support Request",
-      bodyHtml: `<p><strong>From:</strong> ${escapeHtml(userName)} (${escapeHtml(user?.email || "No email")})<br><strong>Category:</strong> ${escapeHtml(category)}${referenceId ? `<br><strong>Reference ID:</strong> ${escapeHtml(referenceId)}` : ""}</p><p><strong>Subject:</strong> ${escapeHtml(finalSubject)}</p><p><strong>Message:</strong><br>${nl2br(body)}</p>${attachmentUrl ? `<p>${nl2br(attachmentUrl.trim())}</p>` : ""}`,
+      bodyHtml: `<p><strong>From:</strong> ${escapeHtml(userName)} (${escapeHtml(user?.email || "No email")})<br><strong>Category:</strong> ${escapeHtml(category)}${referenceId ? `<br><strong>Reference ID:</strong> ${escapeHtml(referenceId)}` : ""}</p><p><strong>Subject:</strong> ${escapeHtml(finalSubject)}</p><p><strong>Message:</strong><br>${nl2br(body)}</p>${attachmentHtml}`,
     });
     await sendEmail({
       to: supportEmail,
@@ -85,5 +114,8 @@ export async function createTicket(auth, { subject, body, category, referenceId,
     // Non-fatal, we still created the ticket record
   }
 
-  return { success: true, message: getMessage("ticketForwardedToSupport") };
+  return {
+    ticketId: ticket.id,
+    attachmentsCount: allAttachmentIds.length,
+  };
 }

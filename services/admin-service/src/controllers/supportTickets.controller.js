@@ -39,7 +39,12 @@ export async function list(req, res) {
       orderBy: { createdAt: "desc" },
       include: {
         user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true } }, expertProfile: { select: { firstName: true, lastName: true } } } },
-        attachment: { select: { id: true, storageKey: true } }
+        attachment: { select: { id: true, storageKey: true, mimeType: true, fileName: true, sizeBytes: true } },
+        attachments: {
+          include: {
+            media: { select: { id: true, storageKey: true, mimeType: true, fileName: true, sizeBytes: true } }
+          }
+        }
       }
     })
   ]);
@@ -48,11 +53,44 @@ export async function list(req, res) {
     const profile = ticket.user?.customerProfile || ticket.user?.expertProfile || {};
     const role = ticket.user?.expertProfile ? "expert" : "customer";
     
-    let url = null;
-    if (ticket.attachment?.storageKey) {
-      url = await generatePresignedDownloadUrl(ticket.attachment.storageKey);
+    const attachments = await Promise.all(
+      (ticket.attachments || []).map(async (att) => {
+        const media = att.media;
+        if (!media) return null;
+        let url = null;
+        if (media.storageKey) {
+          try {
+            url = await generatePresignedDownloadUrl(media.storageKey);
+          } catch (e) {
+            log.warn({ err: e.message, storageKey: media.storageKey }, "Failed generating presigned download URL");
+          }
+        }
+        return {
+          id: media.id,
+          url,
+          mimeType: media.mimeType,
+          fileName: media.fileName,
+          sizeBytes: media.sizeBytes,
+        };
+      })
+    ).then((list) => list.filter(Boolean));
+
+    if (attachments.length === 0 && ticket.attachment) {
+      let url = null;
+      if (ticket.attachment.storageKey) {
+        try {
+          url = await generatePresignedDownloadUrl(ticket.attachment.storageKey);
+        } catch (_) {}
+      }
+      attachments.push({
+        id: ticket.attachment.id,
+        url,
+        mimeType: ticket.attachment.mimeType,
+        fileName: ticket.attachment.fileName,
+        sizeBytes: ticket.attachment.sizeBytes,
+      });
     }
-    
+
     const mappedTicket = {
       ...ticket,
       user: {
@@ -61,12 +99,10 @@ export async function list(req, res) {
         firstName: profile.firstName,
         lastName: profile.lastName,
         role: role
-      }
+      },
+      attachments,
+      attachment: attachments[0] || null,
     };
-    
-    if (ticket.attachment) {
-      mappedTicket.attachment = { id: ticket.attachment.id, url };
-    }
     
     return mappedTicket;
   }));
@@ -150,7 +186,12 @@ export async function getById(req, res) {
     where: { id },
     include: {
       user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true } }, expertProfile: { select: { firstName: true, lastName: true } } } },
-      attachment: { select: { id: true, storageKey: true, mimeType: true } }
+      attachment: { select: { id: true, storageKey: true, mimeType: true, fileName: true, sizeBytes: true } },
+      attachments: {
+        include: {
+          media: { select: { id: true, storageKey: true, mimeType: true, fileName: true, sizeBytes: true } }
+        }
+      }
     }
   });
 
@@ -161,11 +202,44 @@ export async function getById(req, res) {
   const profile = ticket.user?.customerProfile || ticket.user?.expertProfile || {};
   const role = ticket.user?.expertProfile ? "expert" : "customer";
   
-  let url = null;
-  if (ticket.attachment?.storageKey) {
-    url = await generatePresignedDownloadUrl(ticket.attachment.storageKey);
+  const attachments = await Promise.all(
+    (ticket.attachments || []).map(async (att) => {
+      const media = att.media;
+      if (!media) return null;
+      let url = null;
+      if (media.storageKey) {
+        try {
+          url = await generatePresignedDownloadUrl(media.storageKey);
+        } catch (e) {
+          log.warn({ err: e.message, storageKey: media.storageKey }, "Failed generating presigned download URL");
+        }
+      }
+      return {
+        id: media.id,
+        url,
+        mimeType: media.mimeType,
+        fileName: media.fileName,
+        sizeBytes: media.sizeBytes,
+      };
+    })
+  ).then((list) => list.filter(Boolean));
+
+  if (attachments.length === 0 && ticket.attachment) {
+    let url = null;
+    if (ticket.attachment.storageKey) {
+      try {
+        url = await generatePresignedDownloadUrl(ticket.attachment.storageKey);
+      } catch (_) {}
+    }
+    attachments.push({
+      id: ticket.attachment.id,
+      url,
+      mimeType: ticket.attachment.mimeType,
+      fileName: ticket.attachment.fileName,
+      sizeBytes: ticket.attachment.sizeBytes,
+    });
   }
-  
+
   const mappedTicket = {
     ...ticket,
     user: {
@@ -174,12 +248,10 @@ export async function getById(req, res) {
       firstName: profile.firstName,
       lastName: profile.lastName,
       role: role
-    }
+    },
+    attachments,
+    attachment: attachments[0] || null,
   };
-  
-  if (ticket.attachment) {
-    mappedTicket.attachment = { id: ticket.attachment.id, url, mimeType: ticket.attachment.mimeType };
-  }
   
   return ResponseFormatter.success(res, { data: mappedTicket });
 }

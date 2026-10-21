@@ -15,6 +15,7 @@ export const createSupportTicketSchema = z.object({
   category: z.enum(SUPPORT_TICKET_CATEGORIES),
   referenceId: z.string().max(100).optional(),
   attachmentId: z.string().uuid().optional(),
+  attachmentIds: z.array(z.string().uuid()).max(10).optional(),
 });
 
 export const listSupportTicketsSchema = z.object({

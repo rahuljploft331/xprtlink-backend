@@ -540,12 +540,27 @@ model SupportTicket {
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  attachment MediaAsset? @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  user        User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  attachment  MediaAsset?               @relation(fields: [attachmentId], references: [id], onDelete: SetNull)
+  attachments SupportTicketAttachment[]
 
   @@index([userId])
   @@index([status])
   @@map("support_tickets")
+}
+
+model SupportTicketAttachment {
+  id        String        @id @default(uuid()) @db.Uuid
+  ticketId  String        @map("ticket_id") @db.Uuid
+  mediaId   String        @map("media_id") @db.Uuid
+  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  media     MediaAsset    @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+
+  @@unique([ticketId, mediaId])
+  @@index([mediaId])
+  @@map("support_ticket_attachments")
 }
 
 // ─── Experts (expert-service) ───────────────────────────────────────────────
@@ -968,8 +983,9 @@ model MediaAsset {
   expertAvatars         ExpertProfile[]              @relation("ExpertAvatar")
   quoteAttachments      QuoteAttachment[]
   messageAttachments    MessageAttachment[]
-  verificationDocuments ExpertVerificationDocument[]
-  supportTickets        SupportTicket[]
+  verificationDocuments    ExpertVerificationDocument[]
+  supportTickets           SupportTicket[]
+  supportTicketAttachments SupportTicketAttachment[]
 
   @@index([ownerUserId])
   @@index([status])
