@@ -532,6 +532,15 @@ export async function sendOtp(body) {
       include: { customerProfile: true, expertProfile: true },
     });
     if (!user) throw notFound("unregisteredUser");
+    if (role) {
+      const hasRole =
+        role === "customer"
+          ? Boolean(user.customerProfile)
+          : role === "expert"
+          ? Boolean(user.expertProfile)
+          : true;
+      if (!hasRole) throw notFound("unregisteredUser");
+    }
     userId = user.id;
     if (!registrationData) {
       const targetRole = role || (user.expertProfile && !user.customerProfile ? "expert" : "customer");
