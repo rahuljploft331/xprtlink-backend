@@ -15,6 +15,18 @@ const log = logger.child({ module: "subscriptionOwnership" });
 /** Explicit opt-in only; never inferred from NODE_ENV or a client-supplied flag. */
 const transferAllowed = () => process.env.SUBSCRIPTION_ALLOW_TRANSFER === "true";
 
+/**
+ * 503 for "we could not reach the store, so we cannot say who owns this purchase".
+ * Kept distinct from the 409 below: that one is a verdict, this one is a retry.
+ */
+export function storeVerificationUnavailableError(store) {
+  return new AppError(getMessage("storeVerificationFailed"), {
+    statusCode: 503,
+    code: SUBSCRIPTION_ERROR.STORE_VERIFICATION_FAILED,
+    details: { store, retryable: true },
+  });
+}
+
 /** 409 for a store purchase that another application account still owns. */
 export function ownedByAnotherAccountError(store) {
   return new AppError(getMessage("subscriptionAlreadyLinkedToAnotherAccount"), {
@@ -44,16 +56,28 @@ export function findForeignOwner(db, { store, externalSubscriptionId, expertProf
  * row decides.
  */
 export async function ownerHasLiveEntitlement(owner, now) {
-  if (!hasActiveEntitlement(owner, now)) return false;
-  const live = owner.store === "apple"
-    ? await fetchAppleState(owner.externalSubscriptionId)
-    : await fetchGoogleState(owner.externalSubscriptionId);
-  if (!live) return true;
+  if (!hasActiveEntitlement(owner, now)) return "lapsed";
+
+  let live;
+  try {
+    live = owner.store === "apple"
+      ? await fetchAppleState(owner.externalSubscriptionId, { throwOnError: true })
+      : await fetchGoogleState(owner.externalSubscriptionId, { throwOnError: true });
+  } catch {
+    // The store never answered, so we cannot say whether the owner is still entitled.
+    // Callers surface a retry rather than a verdict about ownership.
+    return "unknown";
+  }
+
+  // The store answered definitively but has no record (or Apple is not configured):
+  // the stored row decides, which keeps the purchase with its current owner.
+  if (!live) return "live";
+
   const lapsed = owner.store === "apple"
     ? live.status === 2 || live.status === 5 // expired | revoked
     : live.state === "SUBSCRIPTION_STATE_EXPIRED";
   const pastExpiry = live.expiry instanceof Date && live.expiry.getTime() <= now.getTime();
-  return !(lapsed || pastExpiry);
+  return lapsed || pastExpiry ? "lapsed" : "live";
 }
 
 /**
@@ -72,6 +96,9 @@ export async function ownerHasLiveEntitlement(owner, now) {
 export async function activateStoreSubscription(db, p) {
   const { store, externalSubscriptionId, linkedExternalId = null, plan, expertProfileId, now, periodEnd } = p;
 
+  // The store round-trip below runs inside this transaction (it must share the advisory
+  // lock with the write). Apple's retry budget alone can exceed Prisma's 5s default,
+  // which would abort the transaction with P2028 on the success path.
   return db.$transaction(async (tx) => {
     // Fixed order → no deadlocks between concurrent claims.
     const lockKeys = [`sub-purchase:${store}:${externalSubscriptionId}`, `sub-expert:${expertProfileId}`].sort();
@@ -82,7 +109,13 @@ export async function activateStoreSubscription(db, p) {
     // 1. Ownership
     const foreign = await findForeignOwner(tx, { store, externalSubscriptionId, expertProfileId });
     if (foreign) {
-      if (await ownerHasLiveEntitlement(foreign, now)) {
+      const ownerState = await ownerHasLiveEntitlement(foreign, now);
+      if (ownerState === "unknown") {
+        log.warn({ store, ownerExpertId: foreign.expertProfileId, claimantExpertId: expertProfileId }, "[activate] store unreachable — ownership undecided");
+        logSubscriptionEvent("BLOCKED", { store, plan: plan.code, expertProfileId, note: `Could not reach the ${store} store to confirm who owns this purchase — ask the user to retry` });
+        throw storeVerificationUnavailableError(store);
+      }
+      if (ownerState === "live") {
         if (!transferAllowed()) {
           log.warn({ store, ownerExpertId: foreign.expertProfileId, claimantExpertId: expertProfileId }, "[activate] purchase owned by another account — blocked");
           logSubscriptionEvent("BLOCKED", { store, plan: plan.code, expertProfileId, note: `Purchase already belongs to another account (expert=${String(foreign.expertProfileId).slice(0, 8)}) and is still active in the store` });
@@ -154,5 +187,5 @@ export async function activateStoreSubscription(db, p) {
     });
 
     return Object.assign(subscription, { upgradedFrom });
-  });
+  }, { timeout: 30_000, maxWait: 10_000 });
 }

@@ -8,6 +8,21 @@ const APPLE_MANAGE_URL = "https://apps.apple.com/account/subscriptions";
 const GOOGLE_PRODUCT_ID = process.env.GOOGLE_SUBSCRIPTION_PRODUCT_ID ?? "xprtlink_subscription";
 const RECONCILE_STALE_MS = 5 * 60 * 1000;
 
+/**
+ * The store could not be reached / answered 5xx, so its state is UNKNOWN.
+ * Distinct from a `null` result, which means the store answered definitively
+ * (not configured, or no such purchase). Only raised with `{ throwOnError: true }`,
+ * so existing best-effort callers keep their `null` contract.
+ */
+export class StoreUnavailableError extends Error {
+  constructor(store, cause) {
+    super(`${store} store state unavailable`);
+    this.name = "StoreUnavailableError";
+    this.store = store;
+    this.cause = cause;
+  }
+}
+
 /** Env override is used only if it is a real https URL (ignores typos like link text). */
 function envUrl(name) {
   const v = process.env[name]?.trim();
@@ -41,10 +56,24 @@ export function isStoreManaged(store) {
   return store === "apple" || store === "google";
 }
 
+/**
+ * Rows seeded by hand or by test fixtures carry a placeholder in place of a real
+ * store purchase id. Asking Apple/Google about one always fails — Apple answers
+ * 400 apiError 4000006 "Invalid transaction id" — which costs two doomed round
+ * trips per request and logs an error that reads like a real store outage.
+ */
+const PLACEHOLDER_EXTERNAL_ID = /^(manual|iap_stub|stub|test|seed)[_-]/i;
+
+export function isStoreIssuedId(externalSubscriptionId) {
+  return typeof externalSubscriptionId === "string"
+    && externalSubscriptionId.length > 0
+    && !PLACEHOLDER_EXTERNAL_ID.test(externalSubscriptionId);
+}
+
 /** Google Play: live state via Developer API → { cancelAtPeriodEnd, expiry, state } or null. */
-export async function fetchGoogleState(purchaseToken) {
+export async function fetchGoogleState(purchaseToken, { throwOnError = false } = {}) {
   const serviceAccount = process.env.SERVICE_ACCOUNT_JSON;
-  if (!serviceAccount) return null;
+  if (!serviceAccount || !isStoreIssuedId(purchaseToken)) return null;
   try {
     const auth = new google.auth.GoogleAuth({
       credentials: JSON.parse(serviceAccount),
@@ -65,27 +94,73 @@ export async function fetchGoogleState(purchaseToken) {
     };
   } catch (err) {
     log.error({ err: err.message }, "[fetchGoogleState] failed");
+    if (throwOnError) throw new StoreUnavailableError("google", err);
     return null;
   }
 }
 
-/** Apple: App Store Server API → { cancelAtPeriodEnd, expiry, status } or null. */
-export async function fetchAppleState(originalTransactionId) {
+/** Apple status codes used by callers: 1 active, 2 expired, 3 billing retry, 4 grace, 5 revoked. */
+const APPLE_STATUS = { ACTIVE: 1 };
+
+/** Build the API client + JWS verifier from env, or null when Apple is not configured. */
+function appleClients() {
   const { APPLE_ISSUER_ID, APPLE_KEY_ID, APPLE_BUNDLE_ID } = process.env;
   const privateKey = process.env.APPLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
   if (!APPLE_ISSUER_ID || !APPLE_KEY_ID || !privateKey || !APPLE_BUNDLE_ID) return null;
-  try {
-    const prod = process.env.NODE_ENV === "production";
-    const env = prod ? Environment.PRODUCTION : Environment.SANDBOX;
-    const client = new AppStoreServerAPIClient(privateKey, APPLE_KEY_ID, APPLE_ISSUER_ID, APPLE_BUNDLE_ID, env);
-    const roots = (process.env.APPLE_ROOT_CA_PEM ?? "")
-      .split(";")
-      .map((p) => p.trim())
-      .filter(Boolean)
-      .map((p) => Buffer.from(p, "base64"));
-    const appId = process.env.APPLE_APP_ID ? Number(process.env.APPLE_APP_ID) : undefined;
-    const verifier = new SignedDataVerifier(roots, prod, env, APPLE_BUNDLE_ID, appId);
 
+  const prod = process.env.NODE_ENV === "production";
+  const env = prod ? Environment.PRODUCTION : Environment.SANDBOX;
+  const roots = (process.env.APPLE_ROOT_CA_PEM ?? "")
+    .split(";")
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map((p) => Buffer.from(p, "base64"));
+  const appId = process.env.APPLE_APP_ID ? Number(process.env.APPLE_APP_ID) : undefined;
+
+  return {
+    client: new AppStoreServerAPIClient(privateKey, APPLE_KEY_ID, APPLE_ISSUER_ID, APPLE_BUNDLE_ID, env),
+    verifier: new SignedDataVerifier(roots, prod, env, APPLE_BUNDLE_ID, appId),
+  };
+}
+
+/**
+ * Liveness derived from the original transaction alone — only when it is conclusive.
+ *
+ * Used when getAllSubscriptionStatuses is unavailable: Apple's sandbox currently
+ * answers that endpoint (and getTransactionHistory) with 500 GeneralInternalError
+ * for every chain, while getTransactionInfo keeps working.
+ *
+ * getTransactionInfo describes the ORIGINAL transaction only. Every renewal and
+ * resubscribe gets its own transaction id inside the same chain, so:
+ *   - a future expiry PROVES the chain is still live  → report active
+ *   - a past expiry proves NOTHING (a renewal may have extended it) → inconclusive
+ *   - a revoked original is likewise not conclusive for the whole chain
+ * Anything inconclusive returns null so the caller treats the store as unanswered
+ * and fails closed. Never report "expired" from here: that would let another
+ * account claim a purchase whose chain is still live.
+ *
+ * Carries no renewal info, so cancelAtPeriodEnd stays null (callers leave the
+ * stored flag alone).
+ */
+async function fetchAppleStateFromTransaction({ client, verifier }, originalTransactionId) {
+  const info = await client.getTransactionInfo(originalTransactionId);
+  if (!info?.signedTransactionInfo) return null;
+  const tx = await verifier.verifyAndDecodeTransaction(info.signedTransactionInfo);
+  if (!tx || tx.revocationDate) return null;
+
+  const expiry = tx.expiresDate ? new Date(tx.expiresDate) : null;
+  if (!expiry || expiry.getTime() <= Date.now()) return null;
+
+  return { status: APPLE_STATUS.ACTIVE, expiry, cancelAtPeriodEnd: null, source: "transaction" };
+}
+
+/** Apple: App Store Server API → { cancelAtPeriodEnd, expiry, status } or null. */
+export async function fetchAppleState(originalTransactionId, { throwOnError = false } = {}) {
+  const clients = appleClients();
+  if (!clients || !isStoreIssuedId(originalTransactionId)) return null;
+  const { client, verifier } = clients;
+
+  try {
     // Apple's sandbox intermittently answers 5xx; retry briefly before giving up.
     let res;
     for (let attempt = 0; ; attempt++) {
@@ -102,24 +177,36 @@ export async function fetchAppleState(originalTransactionId) {
     const renewal = last.signedRenewalInfo ? await verifier.verifyAndDecodeRenewalInfo(last.signedRenewalInfo) : null;
     const tx = last.signedTransactionInfo ? await verifier.verifyAndDecodeTransaction(last.signedTransactionInfo) : null;
     return {
-      status: last.status, // 1 active, 2 expired, 3 billing retry, 4 grace, 5 revoked
+      status: last.status,
       expiry: tx?.expiresDate ? new Date(tx.expiresDate) : null,
       cancelAtPeriodEnd: renewal ? renewal.autoRenewStatus === 0 : null,
+      source: "statuses",
     };
   } catch (err) {
     // Apple's APIException / VerificationException leave .message empty; detail is on these fields.
-    log.error(
-      {
-        err: err.message || err.name,
-        errName: err.name,
-        httpStatusCode: err.httpStatusCode,
-        apiError: err.apiError,
-        errorMessage: err.errorMessage,
-        verificationStatus: err.status,
-        cause: err.cause?.message,
-      },
-      "[fetchAppleState] failed",
-    );
+    const detail = {
+      err: err.message || err.name,
+      errName: err.name,
+      httpStatusCode: err.httpStatusCode,
+      apiError: err.apiError,
+      errorMessage: err.errorMessage,
+      verificationStatus: err.status,
+      cause: err.cause?.message,
+    };
+
+    // Last resort before declaring the store unreachable: the transaction endpoint.
+    try {
+      const fallback = await fetchAppleStateFromTransaction(clients, originalTransactionId);
+      if (fallback) {
+        log.warn({ ...detail, originalTransactionId }, "[fetchAppleState] subscription statuses unavailable — chain confirmed live via transaction info");
+        return fallback;
+      }
+    } catch (fallbackErr) {
+      detail.fallbackErr = fallbackErr.message || fallbackErr.name;
+    }
+
+    log.error(detail, "[fetchAppleState] failed");
+    if (throwOnError) throw new StoreUnavailableError("apple", err);
     return null;
   }
 }
@@ -132,7 +219,7 @@ export async function fetchAppleState(originalTransactionId) {
  * period end is not touched (sandbox timelines are accelerated).
  */
 export async function reconcileSubscription(db, sub, { force = false } = {}) {
-  if (!isStoreManaged(sub.store)) return sub;
+  if (!isStoreManaged(sub.store) || !isStoreIssuedId(sub.externalSubscriptionId)) return sub;
   const stale = !sub.lastVerifiedAt || Date.now() - new Date(sub.lastVerifiedAt).getTime() > RECONCILE_STALE_MS;
   if (!force && !stale) return sub;
 

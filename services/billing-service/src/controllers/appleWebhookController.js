@@ -2,6 +2,7 @@ import { getDb } from "@xprtlink/shared/db/index.js";
 import { notifyAutoRenewDisabled } from "../services/subscriptionStore.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 import { logSubscriptionEvent } from "../services/subscriptionLog.js";
+import { hasActiveEntitlement } from "../services/subscriptionRules.js";
 const log = logger.child({ module: "appleWebhookController" });
 import {
   SignedDataVerifier,
@@ -95,6 +96,7 @@ export const handleNotification = async (req, res, next) => {
 
         const planCode = subscription.plan?.code;
         const note = {
+          SUBSCRIBED: ["SUBSCRIBED", "Apple confirmed a new or resumed subscription"],
           DID_RENEW: ["RENEWED", "Apple charged the renewal; period extended"],
           EXPIRED: ["EXPIRED", "Apple says the subscription ended"],
           GRACE_PERIOD_EXPIRED: ["EXPIRED", "Grace period ended without payment"],
@@ -128,6 +130,61 @@ export const handleNotification = async (req, res, next) => {
               },
             });
             // Restore search eligibility if it had been revoked during a grace/hold period
+            await db.expertProfile.updateMany({
+              where: {
+                id: subscription.expertProfileId,
+                verificationStatus: "approved",
+                searchEligible: false,
+              },
+              data: { searchEligible: true },
+            });
+            break;
+          }
+
+          /**
+           * SUBSCRIBED/RESUBSCRIBE — the Apple ID bought this chain again after it
+           * lapsed; SUBSCRIBED/INITIAL_BUY can also arrive for a chain we already hold.
+           *
+           * The purchase carries no appAccountToken, so a resubscribe cannot be
+           * attributed to the account that made it. We therefore only refresh a row
+           * that is STILL entitled — whose owner is unambiguous. A lapsed row is left
+           * alone so the authenticated verify call decides who the new owner is;
+           * reactivating it here would silently hand a stranger's purchase back to the
+           * previous owner and then block the buyer with ALREADY_LINKED.
+           */
+          case "SUBSCRIBED": {
+            if (!hasActiveEntitlement(subscription, new Date())) {
+              log.info(
+                { notificationType, subtype, externalSubscriptionId, expertProfileId: subscription.expertProfileId },
+                "[appleWebhookController] SUBSCRIBED for a lapsed subscription — left for verify to attribute"
+              );
+              break;
+            }
+
+            // A resubscribe may land on a different tier than the row currently holds.
+            const productId = transactionInfo?.productId;
+            const newPlan = productId && productId !== planCode
+              ? await db.subscriptionPlan.findFirst({ where: { code: productId, isActive: true } })
+              : null;
+
+            let newPeriodEnd = transactionInfo?.expiresDate
+              ? new Date(transactionInfo.expiresDate)
+              : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            if (isSandbox) {
+              newPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            }
+
+            await update({
+              where: { id: subscription.id },
+              data: {
+                ...(newPlan ? { planId: newPlan.id } : {}),
+                currentPeriodEnd: newPeriodEnd,
+                status: "active",
+                cancelAtPeriodEnd: false,
+                gracePeriodEnd: null,
+                canceledAt: null,
+              },
+            });
             await db.expertProfile.updateMany({
               where: {
                 id: subscription.expertProfileId,

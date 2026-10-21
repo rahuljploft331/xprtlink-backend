@@ -43,6 +43,11 @@ const baseEnv = {
   FIREBASE_PROJECT_ID: process.env.FIREBASE_PROJECT_ID,
   SERVICE_ACCOUNT_JSON: process.env.SERVICE_ACCOUNT_JSON,
   GOOGLE_PACKAGE_NAME: process.env.GOOGLE_PACKAGE_NAME,
+  // Dev/QA opt-in: lets another expert account re-claim a store purchase.
+  // Declared here because PM2 children inherit the daemon's environment, which is
+  // only refreshed when the daemon itself restarts — a new .env key would not
+  // otherwise reach a running service on `pm2 restart --update-env`.
+  SUBSCRIPTION_ALLOW_TRANSFER: process.env.SUBSCRIPTION_ALLOW_TRANSFER,
 };
 
 const services = Object.keys(portMap).map((name) => ({

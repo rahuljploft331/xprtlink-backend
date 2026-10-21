@@ -1895,7 +1895,22 @@ export async function checkPurchaseEligibility(auth, input = {}) {
   const externalId = store === "google" ? purchaseToken : store === "apple" ? originalTransactionId : null;
   if (externalId) {
     const owner = await findForeignOwner(db, { store, externalSubscriptionId: externalId, expertProfileId: auth.expertProfileId });
-    if (owner && (await ownerHasLiveEntitlement(owner, now))) {
+    const ownerState = owner ? await ownerHasLiveEntitlement(owner, now) : null;
+    if (ownerState === "unknown") {
+      // Store unreachable: say so and let the client retry, rather than telling the
+      // user their purchase belongs to someone else when we never confirmed that.
+      logSubscriptionEvent("BLOCKED", { store, plan: planCode, expertProfileId: auth.expertProfileId, note: `Before purchase: could not reach the ${store} store to confirm ownership — ask the user to retry` });
+      return {
+        eligible: false,
+        code: SUBSCRIPTION_ERROR.STORE_VERIFICATION_FAILED,
+        reason: SUBSCRIPTION_ERROR.STORE_VERIFICATION_FAILED,
+        message: getMessage("storeVerificationFailed"),
+        store,
+        retryable: true,
+        activeSubscription: null,
+      };
+    }
+    if (ownerState === "live") {
       const err = ownedByAnotherAccountError(store);
       logSubscriptionEvent("BLOCKED", { store, plan: planCode, expertProfileId: auth.expertProfileId, note: `Before purchase: this ${store} subscription belongs to another account (expert=${String(owner.expertProfileId).slice(0, 8)}) and is still active` });
       return { eligible: false, code: err.code, reason: err.code, message: err.message, ...err.details, activeSubscription: null };

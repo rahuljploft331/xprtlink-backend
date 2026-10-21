@@ -162,12 +162,34 @@ describe("activateStoreSubscription — ownership", () => {
     expect(s.expertProfileId).toBe("B");
   });
 
-  it("store still reports the owner active, or can't be reached → still blocked (fail closed)", async () => {
+  it("store still reports the owner active, or answers with no record → still blocked (fail closed)", async () => {
     reload([row({ id: "a1", plan: "core", store: "apple", expertProfileId: "A", externalSubscriptionId: "tok" })]);
     storeState.apple.mockResolvedValue({ status: 1, expiry: future, cancelAtPeriodEnd: false });
     await expect(claim("B", "core", "tok", { store: "apple" })).rejects.toMatchObject({ code: "SUBSCRIPTION_ALREADY_LINKED" });
     storeState.apple.mockResolvedValue(null);
     await expect(claim("B", "core", "tok", { store: "apple" })).rejects.toMatchObject({ code: "SUBSCRIPTION_ALREADY_LINKED" });
+  });
+
+  it("store unreachable → still blocked, but as a retryable 503 rather than an ownership verdict", async () => {
+    reload([row({ id: "a1", plan: "core", store: "apple", expertProfileId: "A", externalSubscriptionId: "tok" })]);
+    storeState.apple.mockRejectedValue(new Error("apple store state unavailable"));
+    await expect(claim("B", "core", "tok", { store: "apple" })).rejects.toMatchObject({
+      statusCode: 503,
+      code: "STORE_VERIFICATION_FAILED",
+    });
+    // The owner keeps the purchase and nothing is written.
+    expect(db.expertSubscription.rows).toHaveLength(1);
+    expect(db.expertSubscription.rows[0].expertProfileId).toBe("A");
+    expect(db.expertSubscription.rows[0].status).toBe("active");
+  });
+
+  it("owner's stored period is synthetic but the store says expired → the claim succeeds", async () => {
+    // Sandbox grants a 30-day period end, so the stored row still looks active.
+    reload([row({ id: "a1", plan: "core", store: "apple", expertProfileId: "A", externalSubscriptionId: "tok" })]);
+    storeState.apple.mockResolvedValue({ status: 1, expiry: past, cancelAtPeriodEnd: null });
+    const s = await claim("B", "core", "tok", { store: "apple" });
+    expect(s.expertProfileId).toBe("B");
+    expect(db.expertSubscription.rows).toHaveLength(1);
   });
 
   it("two simultaneous claims of one new purchase cannot both succeed", async () => {
@@ -188,7 +210,15 @@ describe("checkPurchaseEligibility", () => {
     expect(r).toMatchObject({ eligible: false, code: "SUBSCRIPTION_ALREADY_LINKED", title: "Subscription Already Active", store: "google" });
     expect(r.managementUrl).toMatch(/^https:\/\/play\.google\.com\//);
     expect(r.alertMessage).toMatch(/associated with another account/);
-    expect(storeState.google).toHaveBeenCalledWith("tok"); // owner liveness is checked with the store (fails closed)
+    expect(storeState.google).toHaveBeenCalledWith("tok", { throwOnError: true }); // owner liveness is checked with the store (fails closed)
+  });
+
+  it("reports a retryable store failure instead of an ownership verdict when the store is unreachable", async () => {
+    reload([row({ id: "a1", plan: "professional", expertProfileId: "A", externalSubscriptionId: "tok" })]);
+    storeState.google.mockRejectedValue(new Error("google store state unavailable"));
+    const r = await checkPurchaseEligibility(auth, { planCode: "professional", store: "google", purchaseToken: "tok" });
+    expect(r).toMatchObject({ eligible: false, code: "STORE_VERIFICATION_FAILED", retryable: true });
+    expect(r.alertMessage).toBeUndefined();
   });
 
   it("fails closed when an unknown purchase cannot be verified with the store", async () => {
