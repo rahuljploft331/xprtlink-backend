@@ -69,9 +69,33 @@ async function maybeRevokeSearchEligibility(db, expertProfileId) {
   }
 }
 
+/**
+ * Pub/Sub push authenticity: when GOOGLE_PUBSUB_AUDIENCE is set, require the OIDC
+ * bearer token Pub/Sub attaches (and, if GOOGLE_PUBSUB_SA_EMAIL is set, its signer).
+ * Unset = legacy open endpoint (state is still re-fetched from the Play API).
+ */
+async function isAuthenticPubSubPush(req) {
+  const audience = process.env.GOOGLE_PUBSUB_AUDIENCE;
+  if (!audience) return true;
+  const token = req.headers.authorization?.replace(/^Bearer\s+/i, "");
+  if (!token) return false;
+  try {
+    const ticket = await new google.auth.OAuth2().verifyIdToken({ idToken: token, audience });
+    const payload = ticket.getPayload();
+    const expected = process.env.GOOGLE_PUBSUB_SA_EMAIL;
+    return !expected || (payload?.email === expected && payload?.email_verified === true);
+  } catch (err) {
+    log.warn({ err: err.message }, "[googlePlayWebhookController] Pub/Sub token verification failed");
+    return false;
+  }
+}
+
 // Google Play Real-Time Developer Notifications handler
 export const handleNotification = async (req, res, next) => {
   try {
+    if (!(await isAuthenticPubSubPush(req))) {
+      return res.status(401).send("Unauthorized");
+    }
     const { message } = req.body;
     if (!message || !message.data) {
       return res.status(400).send("Invalid Google Pub/Sub message");
@@ -136,7 +160,7 @@ export const handleNotification = async (req, res, next) => {
 
         await db.expertSubscription.update({
           where: { id: subscription.id },
-          data: {
+          data: { lastVerifiedAt: new Date(),
             status: "active",
             currentPeriodEnd: newPeriodEnd,
             cancelAtPeriodEnd: false,
@@ -157,11 +181,18 @@ export const handleNotification = async (req, res, next) => {
       }
 
       case RTDN.CANCELED: {
-        // User disabled auto-renewal — access continues until currentPeriodEnd.
-        // Do NOT mark as expired or remove access.
+        // User disabled auto-renewal — access continues until the verified expiry.
+        // Cancellation != expiration: status stays as-is. Confirm against the Play API.
+        const live = await fetchPlaySubscription(externalSubscriptionId);
+        const liveExpiry = live?.lineItems?.[0]?.expiryTime;
         await db.expertSubscription.update({
           where: { id: subscription.id },
-          data: { cancelAtPeriodEnd: true },
+          data: { lastVerifiedAt: new Date(),
+            cancelAtPeriodEnd: true,
+            ...(liveExpiry && process.env.NODE_ENV === "production"
+              ? { currentPeriodEnd: new Date(liveExpiry) }
+              : {}),
+          },
         });
         break;
       }
@@ -170,7 +201,7 @@ export const handleNotification = async (req, res, next) => {
         // Billing failed — subscription is on hold, access revoked immediately.
         await db.expertSubscription.update({
           where: { id: subscription.id },
-          data: { status: "on_hold" },
+          data: { lastVerifiedAt: new Date(), status: "on_hold" },
         });
         await maybeRevokeSearchEligibility(db, subscription.expertProfileId);
         break;
@@ -185,7 +216,7 @@ export const handleNotification = async (req, res, next) => {
 
         await db.expertSubscription.update({
           where: { id: subscription.id },
-          data: {
+          data: { lastVerifiedAt: new Date(),
             status: "grace_period",
             gracePeriodEnd: gracePeriodEnd,
           },
@@ -197,7 +228,7 @@ export const handleNotification = async (req, res, next) => {
         // Subscription refunded/revoked by Google — remove access immediately.
         await db.expertSubscription.update({
           where: { id: subscription.id },
-          data: { status: "canceled", canceledAt: new Date(), cancelAtPeriodEnd: false },
+          data: { lastVerifiedAt: new Date(), status: "canceled", canceledAt: new Date(), cancelAtPeriodEnd: false },
         });
         await maybeRevokeSearchEligibility(db, subscription.expertProfileId);
         break;
@@ -206,7 +237,7 @@ export const handleNotification = async (req, res, next) => {
       case RTDN.EXPIRED: {
         await db.expertSubscription.update({
           where: { id: subscription.id },
-          data: { status: "expired" },
+          data: { lastVerifiedAt: new Date(), status: "expired" },
         });
         await maybeRevokeSearchEligibility(db, subscription.expertProfileId);
         break;

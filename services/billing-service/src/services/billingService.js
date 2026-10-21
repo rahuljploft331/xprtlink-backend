@@ -24,6 +24,7 @@ import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 import { buildConsultationInvoiceEmail } from "@xprtlink/shared/lib/consultationInvoice.js";
 import { PAYOUT_SCHEDULE_DEFAULT_DAYS } from "@xprtlink/shared/contracts/settings.schema.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { getManagementUrl, isStoreManaged, reconcileSubscription } from "./subscriptionStore.js";
 import { customerDisplayName } from "@xprtlink/shared/mappers/common.js";
 import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
 
@@ -1974,7 +1975,11 @@ export async function getMySubscription(auth) {
     throw notFound("noActiveSubscription");
   }
 
-  return toExpertSubscriptionDto(subscription, subscription.plan);
+  const current = await reconcileSubscription(db, subscription);
+  return {
+    ...toExpertSubscriptionDto(current, current.plan),
+    subscriptionManagementUrl: getManagementUrl(current.store),
+  };
 }
 
 export async function getEarnings(auth, query) {
@@ -2148,9 +2153,27 @@ export async function cancelSubscription(auth) {
 
   if (!subscription) throw notFound("noActiveSubscriptionToCancel");
 
+  // Apple / Google Play: the backend cannot cancel on the user's behalf and must
+  // not claim it did. Point the client at the store; cancelAtPeriodEnd is only
+  // flipped later by a verified notification / store status check.
+  if (isStoreManaged(subscription.store)) {
+    const current = await reconcileSubscription(db, subscription);
+    return {
+      ...toExpertSubscriptionDto(current, current.plan),
+      cancellationConfirmed: current.cancelAtPeriodEnd === true,
+      manualCancelRequired: current.cancelAtPeriodEnd !== true,
+      subscriptionManagementUrl: getManagementUrl(current.store),
+    };
+  }
+
   // If already scheduled to cancel at period end, no-op
   if (subscription.cancelAtPeriodEnd) {
-    return toExpertSubscriptionDto(subscription, subscription.plan);
+    return {
+      ...toExpertSubscriptionDto(subscription, subscription.plan),
+      cancellationConfirmed: true,
+      manualCancelRequired: false,
+      subscriptionManagementUrl: null,
+    };
   }
 
   // Mark as cancel-at-period-end — expert keeps access until currentPeriodEnd
@@ -2165,12 +2188,6 @@ export async function cancelSubscription(auth) {
   try {
     if (subscription.store === "stripe" && subscription.externalSubscriptionId) {
       await stripeSvc.setStripeCancelAtPeriodEnd(subscription.externalSubscriptionId);
-    } else if (subscription.store === "google" && subscription.externalSubscriptionId) {
-      const cancelResults = await cancelSupersededSubscriptions([subscription]);
-      if (cancelResults[0]?.manualCancelRequired) manualCancelRequired = true;
-    } else if (subscription.store === "apple") {
-      // Apple has no server-side cancel API — user must cancel in iOS Settings.
-      manualCancelRequired = true;
     }
   } catch (err) {
     log.error(`[cancelSubscription] Store cancel failed (store=${subscription.store}): ${err.message}`);
@@ -2209,7 +2226,12 @@ export async function cancelSubscription(auth) {
     log.error(`[cancelSubscription] Notification dispatch failed: ${err.message}`);
   }
 
-  return { ...toExpertSubscriptionDto(updated, updated.plan), manualCancelRequired };
+  return {
+    ...toExpertSubscriptionDto(updated, updated.plan),
+    cancellationConfirmed: !manualCancelRequired,
+    manualCancelRequired,
+    subscriptionManagementUrl: null,
+  };
 }
 
 /**

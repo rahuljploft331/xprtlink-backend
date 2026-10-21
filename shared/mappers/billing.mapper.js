@@ -54,6 +54,8 @@ export function toSubscriptionPlanDto(plan, currency = "USD") {
   };
 }
 
+const PLATFORM_BY_STORE = { apple: "ios", google: "android", stripe: "web" };
+
 export function toExpertSubscriptionDto(subscription, plan, currency = "USD") {
   return {
     id: subscription.id,
@@ -62,7 +64,11 @@ export function toExpertSubscriptionDto(subscription, plan, currency = "USD") {
     gateway: subscription.store,
     subscribedVia: subscription.store,
     status: subscription.status,
+    platform: PLATFORM_BY_STORE[subscription.store] ?? subscription.store,
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd ?? false,
+    // Derived: auto-renew is on until a verified store event / Stripe flag turns it off.
+    autoRenewEnabled: !(subscription.cancelAtPeriodEnd ?? false),
+    lastVerifiedAt: toIso(subscription.lastVerifiedAt ?? null),
     currentPeriodStart: toIso(subscription.currentPeriodStart),
     currentPeriodEnd: toIso(subscription.currentPeriodEnd),
     gracePeriodEnd: toIso(subscription.gracePeriodEnd ?? null),

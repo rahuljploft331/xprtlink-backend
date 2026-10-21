@@ -82,6 +82,13 @@ export const handleNotification = async (req, res, next) => {
           }
         };
 
+        // Every verified notification stamps lastVerifiedAt. Updates below are
+        // absolute (not incremental), so duplicate/replayed notifications are idempotent.
+        const origUpdate = db.expertSubscription.update.bind(db.expertSubscription);
+        const verifiedAt = new Date();
+        const update = (args) =>
+          origUpdate({ ...args, data: { ...args.data, lastVerifiedAt: verifiedAt } });
+
         const isSandbox = data?.environment === "Sandbox" || process.env.NODE_ENV !== "production";
 
         switch (notificationType) {
@@ -92,7 +99,7 @@ export const handleNotification = async (req, res, next) => {
             if (isSandbox) {
               newPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
             }
-            await db.expertSubscription.update({
+            await update({
               where: { id: subscription.id },
               data: {
                 currentPeriodEnd: newPeriodEnd,
@@ -120,13 +127,13 @@ export const handleNotification = async (req, res, next) => {
               const gracePeriodEnd = transactionInfo?.expiresDate
                 ? new Date(transactionInfo.expiresDate)
                 : null;
-              await db.expertSubscription.update({
+              await update({
                 where: { id: subscription.id },
                 data: { status: "grace_period", gracePeriodEnd },
               });
             } else {
               // Billing retry exhausted without payment — subscription on hold.
-              await db.expertSubscription.update({
+              await update({
                 where: { id: subscription.id },
                 data: { status: "on_hold", gracePeriodEnd: null },
               });
@@ -137,7 +144,7 @@ export const handleNotification = async (req, res, next) => {
 
           case "GRACE_PERIOD_EXPIRED": {
             // Grace period ended without payment — move to on_hold
-            await db.expertSubscription.update({
+            await update({
               where: { id: subscription.id },
               data: { status: "on_hold", gracePeriodEnd: null },
             });
@@ -147,7 +154,7 @@ export const handleNotification = async (req, res, next) => {
 
           case "EXPIRED": {
             if (!isSandbox || subscription.currentPeriodEnd <= new Date()) {
-              await db.expertSubscription.update({
+              await update({
                 where: { id: subscription.id },
                 data: { status: "expired" },
               });
@@ -156,8 +163,9 @@ export const handleNotification = async (req, res, next) => {
             break;
           }
 
+          case "REFUND":
           case "REVOKE": {
-            await db.expertSubscription.update({
+            await update({
               where: { id: subscription.id },
               data: { status: "canceled", canceledAt: new Date(), cancelAtPeriodEnd: false },
             });
@@ -167,12 +175,17 @@ export const handleNotification = async (req, res, next) => {
 
           case "DID_CHANGE_RENEWAL_STATUS": {
             if (subtype === "AUTO_RENEW_DISABLED") {
-              await db.expertSubscription.update({
+              await update({
                 where: { id: subscription.id },
-                data: { cancelAtPeriodEnd: true },
+                data: {
+                  cancelAtPeriodEnd: true,
+                  ...(transactionInfo?.expiresDate && !isSandbox
+                    ? { currentPeriodEnd: new Date(transactionInfo.expiresDate) }
+                    : {}),
+                },
               });
             } else if (subtype === "AUTO_RENEW_ENABLED") {
-              await db.expertSubscription.update({
+              await update({
                 where: { id: subscription.id },
                 data: { cancelAtPeriodEnd: false },
               });
