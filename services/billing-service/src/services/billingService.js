@@ -593,6 +593,7 @@ function notifyPaymentFailed(consultationId) {
     await internalPost(NOTIFICATION_URL(), "/api/v1/notifications/dispatch", {
       userIds: [consultation.customer.user.id],
       type: "payment_failed",
+      audience: "customer",
       title: "Payment Failed",
       body: "We were unable to process your consultation payment. Please check your payment method and try again.",
       data: { consultationId },
@@ -627,11 +628,20 @@ function notifyPaymentSucceeded({ consultationId, amountCents, commissionCents, 
         expert: { include: { user: true } },
       },
     });
-    const userIds = [consultation?.customer?.user?.id, consultation?.expert?.userId].filter(Boolean);
-    if (userIds.length > 0) {
+    // Both parties are told, but as two dispatches rather than one. When the same
+    // email holds both profiles, customer and expert are the SAME user row, so a
+    // single call could not say which surface each copy belonged to — and the
+    // expert's "Payment Successful" surfaced in the customer app.
+    const recipients = [
+      { userId: consultation?.customer?.user?.id, audience: "customer" },
+      { userId: consultation?.expert?.userId, audience: "expert" },
+    ].filter((r) => Boolean(r.userId));
+
+    for (const recipient of recipients) {
       await internalPost(NOTIFICATION_URL(), "/api/v1/notifications/dispatch", {
-        userIds,
+        userIds: [recipient.userId],
         type: "payment_succeeded",
+        audience: recipient.audience,
         title: "Payment Successful",
         body: `Consultation payment of $${(amountCents / 100).toFixed(2)} was processed successfully.`,
         data: { consultationId, amountCents, transactionId },
@@ -898,6 +908,7 @@ export async function refundConsultation(consultationId, { reason, adminUserId }
     internalPost(NOTIFICATION_URL(), "/api/v1/notifications/dispatch", {
       userIds: [customerUserId],
       type: "payment_refunded",
+      audience: "customer",
       title: "Refund Issued",
       body: `A refund of $${(refundedCents / 100).toFixed(2)} for your consultation is on its way to your card.`,
       data: { consultationId, amountCents: refundedCents },
@@ -1639,6 +1650,7 @@ export async function handleStripeWebhook(payload, signature) {
         internalPost(NOTIFICATION_URL(), "/api/v1/notifications/dispatch", {
           userIds: [expertUser.userId],
           type: "subscription_activated",
+          audience: "expert",
           title: "Subscription Activated",
           body: "Your XprtLink expert plan is now active.",
           data: { planId },
@@ -2294,6 +2306,7 @@ export async function cancelSubscription(auth) {
     await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
       userIds: [auth.userId],
       type: "subscription_cancelled",
+      audience: "expert",
       title: "Subscription Cancellation Scheduled",
       body: `Your ${updated.plan.name} subscription will be cancelled on ${periodEnd}. You retain access until then.`,
       data: { subscriptionId: updated.id, planId: updated.planId },
@@ -2410,6 +2423,7 @@ export async function expireSubscriptions() {
         await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
           userIds,
           type: "subscription_expired",
+          audience: "expert",
           title: "Subscription Expired",
           body: "Your expert subscription has expired. Renew now to stay discoverable on XpertLink.",
           data: {},
@@ -2672,6 +2686,7 @@ async function sendPayoutTransfer(payout, expert, logTag) {
       internalPost(NOTIFICATION_URL(), "/api/v1/notifications/dispatch", {
         userIds: [expert.userId],
         type: "payout_sent",
+        audience: "expert",
         title: "Payout Sent",
         body: `Your earnings payout of $${(payout.amountCents / 100).toFixed(2)} is on its way to your bank.`,
         data: { payoutId: payout.id, amountCents: payout.amountCents },

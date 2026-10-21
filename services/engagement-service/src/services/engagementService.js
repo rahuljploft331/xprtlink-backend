@@ -336,6 +336,7 @@ export async function createQuote(auth, body) {
     await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
       userIds: [quote.expert.userId],
       type: "quote_received",
+      audience: "expert",
       title: "New Quote Request",
       body: `${customerName} sent you a new quote request: "${quote.title}"`,
       data: { quoteId: quote.id, referenceNumber: quote.referenceNumber },
@@ -573,6 +574,7 @@ export async function submitQuotation(auth, quoteId, body) {
     await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
       userIds: [updated.customer.user.id],
       type: "quote_submitted",
+      audience: "customer",
       title: "Quote Ready",
       body: `${expertName} has sent you a quote for "${updated.title}"`,
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
@@ -622,6 +624,7 @@ export async function acceptQuote(auth, quoteId) {
     await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
       userIds: [updated.expert.user.id],
       type: "quote_accepted",
+      audience: "expert",
       title: "Quote Accepted",
       body: `${customerName} accepted your quote for "${updated.title}"`,
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
@@ -673,6 +676,7 @@ export async function rejectQuote(auth, quoteId) {
       await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
         userIds: [updated.customer.user.id],
         type: "quote_rejected",
+        audience: "customer",
         title: "Quote Rejected",
         body: `${expertName} rejected your quote request for "${updated.title}"`,
         data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
@@ -720,6 +724,7 @@ export async function rejectQuote(auth, quoteId) {
     await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
       userIds: [updated.expert.user.id],
       type: "quote_rejected",
+      audience: "expert",
       title: "Quote Rejected",
       body: `${customerName} rejected your quote for "${updated.title}"`,
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
@@ -768,6 +773,7 @@ export async function cancelQuote(auth, quoteId) {
     await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
       userIds: [updated.expert.user.id],
       type: "quote_cancelled",
+      audience: "expert",
       title: "Quote Request Cancelled",
       body: `${customerName} cancelled their quote request: "${updated.title}"`,
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
@@ -1120,6 +1126,7 @@ export async function acceptConsultation(auth, consultationId) {
     await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
       userIds: [updated.customer.user.id],
       type: "consultation_accepted",
+      audience: "customer",
       title: "Consultation Accepted",
       body: `${expertName} has accepted your consultation request.`,
       data: { consultationId: updated.id, zegoRoomId: updated.zegoRoomId },
@@ -1159,6 +1166,7 @@ export async function declineConsultation(auth, consultationId) {
     await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
       userIds: [updated.customer.user.id],
       type: "consultation_declined",
+      audience: "customer",
       title: "Consultation Declined",
       body: `${expertName} is currently unavailable and declined your request`,
       data: { consultationId: updated.id },
@@ -1374,6 +1382,10 @@ export async function submitReview(auth, consultationId, body) {
           await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
             userIds: adminIds,
             type: "poor_reviews_alert",
+            // Admin-facing, so neither mobile surface owns it.
+            // NOTE: this dispatch is currently unreachable — the adminUser query
+            // above selects a `userId` column that AdminUser does not have.
+            audience: "all",
             title: "Expert Alert: Consecutive Poor Reviews",
             body: `${expertName} has received back-to-back reviews of 3 stars or below.`,
             data: { expertId: consultation.expertId },
@@ -1391,6 +1403,7 @@ export async function submitReview(auth, consultationId, body) {
       await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
         userIds: [expertProfile.userId],
         type: "review_received",
+        audience: "expert",
         title: "New Review Received",
         body: `You received a ${body.rating}-star review ${stars}`,
         data: { consultationId, reviewId: review.id, rating: body.rating },

@@ -247,6 +247,7 @@ export async function notifyAutoRenewDisabled(sub, userId) {
     await internalPost(process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007", "/api/v1/notifications/dispatch", {
       userIds: [userId],
       type: "subscription_cancelled",
+      audience: "expert",
       title: "Subscription Cancellation Confirmed",
       body: `Auto-renewal is off. You keep access until ${when}.`,
       data: { subscriptionId: sub.id, planId: sub.planId, event: "subscription_status_changed" },

@@ -11,6 +11,11 @@
 
 import admin from "firebase-admin";
 import { logger } from "@xprtlink/shared/lib/logger.js";
+import {
+  NOTIFICATION_AUDIENCE,
+  audienceRowFilter,
+  deviceFilterForAudience,
+} from "@xprtlink/shared/utils/notificationAudience.js";
 const log = logger.child({ module: "fcmSender" });
 
 let app = null;
@@ -96,15 +101,17 @@ export async function sendPushToToken(token, title, body, data = {}, badge = 1) 
  * @param {string} title
  * @param {string} body
  * @param {object} data
+ * @param {"customer"|"expert"|"all"} audience  which app surface this is for —
+ *   only devices last logged in as that role are pushed to.
  */
-export async function sendPushToUsers(db, userIds, title, body, data = {}) {
+export async function sendPushToUsers(db, userIds, title, body, data = {}, audience = NOTIFICATION_AUDIENCE.ALL) {
   if (!userIds?.length) return;
 
   const firebaseApp = getApp();
   if (!firebaseApp) return;
 
   const tokens = await db.deviceToken.findMany({
-    where: { userId: { in: userIds } },
+    where: { userId: { in: userIds }, role: deviceFilterForAudience(audience) },
     select: { id: true, token: true, userId: true },
   });
 
@@ -122,7 +129,12 @@ export async function sendPushToUsers(db, userIds, title, body, data = {}) {
   // Badge = the user's unread count, same as the bell icon.
   const counts = await db.notification.groupBy({
     by: ["userId"],
-    where: { userId: { in: userIds }, readAt: null, clearedAt: null },
+    where: {
+      userId: { in: userIds },
+      recipientRole: audienceRowFilter(audience),
+      readAt: null,
+      clearedAt: null,
+    },
     _count: { _all: true },
   });
   const badgeByUser = new Map(counts.map((c) => [c.userId, c._count._all]));
@@ -147,29 +159,36 @@ export async function sendPushToUsers(db, userIds, title, body, data = {}) {
  * current unread notification count (matches the bell icon).
  * @param {import('@prisma/client').PrismaClient} db
  * @param {string} userId
+ * @param {"customer"|"expert"|"all"} audience
  */
-export async function syncBadgeForUser(db, userId) {
+export async function syncBadgeForUser(db, userId, audience = NOTIFICATION_AUDIENCE.ALL) {
   const count = await db.notification.count({
-    where: { userId, readAt: null, clearedAt: null },
+    where: {
+      userId,
+      recipientRole: audienceRowFilter(audience),
+      readAt: null,
+      clearedAt: null,
+    },
   });
-  return setBadgeForUser(db, userId, count);
+  return setBadgeForUser(db, userId, count, audience);
 }
 
 /**
  * Send a silent push to all of a user's iOS devices to reset the badge to 0.
  * @param {import('@prisma/client').PrismaClient} db
  * @param {string} userId
+ * @param {"customer"|"expert"|"all"} audience
  */
-export function resetBadgeForUser(db, userId) {
-  return setBadgeForUser(db, userId, 0);
+export function resetBadgeForUser(db, userId, audience = NOTIFICATION_AUDIENCE.ALL) {
+  return setBadgeForUser(db, userId, 0, audience);
 }
 
-async function setBadgeForUser(db, userId, badge) {
+async function setBadgeForUser(db, userId, badge, audience = NOTIFICATION_AUDIENCE.ALL) {
   const firebaseApp = getApp();
   if (!firebaseApp) return;
 
   const tokens = await db.deviceToken.findMany({
-    where: { userId },
+    where: { userId, role: deviceFilterForAudience(audience) },
     select: { token: true },
   });
 

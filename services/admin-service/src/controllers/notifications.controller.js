@@ -77,6 +77,10 @@ export async function send(req, res) {
   if (audience === "customers") roleFilter = { customerProfile: { isNot: null } };
   else if (audience === "experts") roleFilter = { expertProfile: { isNot: null } };
 
+  // Map the admin-facing audience onto the notification audience enum.
+  const broadcastAudience =
+    audience === "customers" ? "customer" : audience === "experts" ? "expert" : "all";
+
   const db = getDb();
   
   const users = await db.user.findMany({
@@ -143,6 +147,9 @@ export async function send(req, res) {
       await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
         userIds: chunk,
         type: type,
+        // A broadcast aimed at everyone legitimately belongs to both surfaces,
+        // so it stays in the shared "all" bucket.
+        audience: broadcastAudience,
         title: title,
         body: body,
         data: {}, // no extra payload needed for simple broadcast

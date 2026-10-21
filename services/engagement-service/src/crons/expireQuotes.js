@@ -42,6 +42,7 @@ export async function expireStaleQuotes() {
       internalPost(notifUrl, "/api/v1/notifications/dispatch", {
         userIds: customerIds,
         type: "quote_expired",
+        audience: "customer",
         title: "Quote Expired",
         body: getMessage("quoteExpiredCustomer"),
         data: {},
@@ -67,6 +68,7 @@ export async function expireStaleQuotes() {
       internalPost(notifUrl, "/api/v1/notifications/dispatch", {
         userIds: expertIds,
         type: "quote_expired",
+        audience: "expert",
         title: "Quote Expired",
         body: getMessage("quoteExpiredExpert"),
         data: {},

@@ -138,6 +138,7 @@ export async function approve(req, res, next) {
         await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
           userIds: [expertProfile.userId],
           type: "verification_approved",
+          audience: "expert",
           title: "Profile Approved ✓",
           body: `Congratulations${expertProfile.firstName ? `, ${expertProfile.firstName}` : ""}! Your expert profile has been approved. You can now receive consultation requests.`,
           data: { verificationId: result.id },
@@ -213,6 +214,7 @@ export async function reject(req, res, next) {
         await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
           userIds: [expertProfile.userId],
           type: "verification_rejected",
+          audience: "expert",
           title: "Verification Update",
           body: `Your expert profile verification was not approved. Please review the admin notes and resubmit your documents.`,
           data: { verificationId: v.id, notes: rejectionNotes },

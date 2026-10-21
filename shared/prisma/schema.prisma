@@ -220,6 +220,16 @@ enum OtpPurpose {
   @@map("otp_purpose")
 }
 
+/// Which app surface a notification / device session belongs to.
+/// `all` = legacy rows and genuine broadcasts: visible to both roles.
+enum NotificationAudience {
+  customer
+  expert
+  all
+
+  @@map("notification_audience")
+}
+
 enum DevicePlatform {
   ios
   android
@@ -395,6 +405,10 @@ model OtpChallenge {
 model DeviceToken {
   id         String         @id @default(uuid()) @db.Uuid
   userId     String         @map("user_id") @db.Uuid
+  // The role this device was last logged in as. One physical device holds one
+  // active session, so re-registering the same token after a role switch
+  // updates this and pushes follow the switch.
+  role       NotificationAudience @default(all)
   platform   DevicePlatform
   token      String         @db.VarChar(512)
   lastSeenAt DateTime       @default(now()) @map("last_seen_at") @db.Timestamptz(6)
@@ -1161,6 +1175,10 @@ model ExpertEarningsLedger {
 model Notification {
   id        String    @id @default(uuid()) @db.Uuid
   userId    String    @map("user_id") @db.Uuid
+  // Which app surface this row belongs to. A dual-role account (same email for
+  // both a customer and an expert profile) is ONE user row, so userId alone is
+  // not enough to scope a feed — every read path filters on this too.
+  recipientRole NotificationAudience @default(all) @map("recipient_role")
   type      String    @db.VarChar(64)
   title     String    @db.VarChar(200)
   body      String
@@ -1173,6 +1191,7 @@ model Notification {
 
   @@index([userId, createdAt(sort: Desc)])
   @@index([userId, readAt])
+  @@index([userId, recipientRole, createdAt(sort: Desc)])
   @@map("notifications")
 }
 

@@ -308,10 +308,15 @@ export function registerMessagingSockets(io) {
         log.info(`[messaging-service] message:send - Resolved peerUserId: ${peerUserId}`);
         
         let peerUnreadData = null;
+        // The peer's role decides which app surface their notification belongs to.
+        // Needed because a dual-role account (same email, both profiles) is one
+        // user row, so userId alone cannot place the notification.
+        let peerRole = null;
         if (peerUserId) {
           try {
             const peerAuth = await svc.getConversationPeerAuth(conversationId, auth.userId);
             if (peerAuth) {
+              peerRole = peerAuth.role;
               peerUnreadData = await svc.getTotalUnreadCount(peerAuth);
             }
           } catch (e) {
@@ -368,6 +373,9 @@ export function registerMessagingSockets(io) {
               await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
                 userIds: [peerUserId],
                 type: "new_message",
+                // Fall back to the opposite of the sender's role: a conversation
+                // always has one customer and one expert.
+                audience: peerRole ?? (auth.role === "expert" ? "customer" : "expert"),
                 title: senderName,
                 body: preview,
                 data: { conversationId, messageId: message.id, senderUserId: auth.userId, senderName, senderAvatarUrl },

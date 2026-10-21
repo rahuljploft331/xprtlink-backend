@@ -141,6 +141,7 @@ export const verifyPurchase = async (req, res, next) => {
       await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
         userIds: [req.auth.userId],
         type: "subscription_activated",
+        audience: "expert",
         title: "Subscription Activated",
         body: `Your ${subscription.plan.name} plan is now active via Apple.`,
         data: { subscriptionId: subscription.id, planId: subscription.planId },

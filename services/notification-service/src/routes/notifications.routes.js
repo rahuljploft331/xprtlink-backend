@@ -4,6 +4,7 @@ import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { authenticate } from "@xprtlink/shared/middleware/auth.js";
 import {
   deviceTokenRequestSchema,
+  dispatchNotificationRequestSchema,
   updateNotificationPreferencesRequestSchema,
 } from "@xprtlink/shared/contracts";
 import * as svc from "../services/notificationService.js";
@@ -38,9 +39,12 @@ function internalServiceGuard(req, res, next) {
 /**
  * POST /api/v1/notifications/dispatch
  * Internal-only — creates in-app notification records for one or more users.
- * Body: { userIds: string[], type: string, title: string, body: string, data?: object }
+ * Body: { userIds: string[], type: string, title: string, body: string,
+ *          audience?: "customer"|"expert"|"all", data?: object }
  * `type` is required by the Notification model; if omitted it falls back to
  * `data.type` and then to "system". `data` is stored in the `payload` column.
+ * `audience` scopes the row to one app surface; omitting it falls back to the
+ * shared "all" bucket (visible to both roles) and logs a warning.
  */
 router.post(
   "/dispatch",
@@ -49,7 +53,8 @@ router.post(
     if (Array.isArray(req.body.userIds) && req.body.userIds.length > 500) {
       return res.status(400).json({ success: false, message: "Too many userIds (max 500)" });
     }
-    const data = await svc.dispatchNotification(req.body);
+    const body = dispatchNotificationRequestSchema.parse(req.body);
+    const data = await svc.dispatchNotification(body);
     return ResponseFormatter.success(res, { message: "Notifications dispatched", data });
   })
 );
@@ -135,7 +140,8 @@ router.post(
 /**
  * DELETE /api/v1/notifications
  * Clear all notifications for the current user (soft delete — rows are retained).
- * Role-agnostic: used by both the customer and the expert app, scoped by userId.
+ * Used by both apps, scoped by userId AND the JWT's role — clearing on one
+ * surface leaves the other surface's notifications untouched.
  * Declared before "/:id" for readability; Express matches on method + path, so the
  * two DELETE routes cannot shadow each other.
  */
@@ -149,8 +155,9 @@ router.delete(
 
 /**
  * DELETE /api/v1/notifications/:id
- * Clear a single notification (soft delete). Scoped by userId — clearing another
- * user's notification returns 404. Idempotent: repeating the call succeeds.
+ * Clear a single notification (soft delete). Scoped by userId and role — clearing
+ * another user's notification, or one belonging to the other app surface of the
+ * same account, returns 404. Idempotent: repeating the call succeeds.
  */
 router.delete(
   "/:id",

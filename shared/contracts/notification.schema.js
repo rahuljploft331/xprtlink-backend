@@ -23,6 +23,23 @@ export const deviceTokenRequestSchema = z.object({
   platform: z.enum(["ios", "android", "web"]).optional().default("android"),
 });
 
+/**
+ * Internal dispatch payload (POST /api/v1/notifications/dispatch).
+ *
+ * `audience` decides which app surface the row belongs to. It is optional only
+ * so an older caller cannot 500 the endpoint — omitting it lands the row in the
+ * shared `all` bucket, visible to BOTH roles, and the service logs a warning.
+ * New call sites must always set it.
+ */
+export const dispatchNotificationRequestSchema = z.object({
+  userIds: z.array(z.string().uuid()).min(1).max(500),
+  type: z.string().min(1).max(64).optional(),
+  title: z.string().optional(),
+  body: z.string().optional(),
+  audience: z.enum(["customer", "expert", "all"]).optional(),
+  data: z.record(z.unknown()).optional().default({}),
+});
+
 export const updateNotificationPreferencesRequestSchema = z.object({
   preferences: z.record(z.boolean()),
 });

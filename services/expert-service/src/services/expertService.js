@@ -806,7 +806,16 @@ export async function getDashboard(auth) {
     }),
     // clearedAt must be excluded here too — notifications are soft-deleted, and a
     // cleared item must not keep the dashboard badge lit (see notification-service).
-    db.notification.count({ where: { userId: auth.userId, readAt: null, clearedAt: null } }),
+    // recipientRole keeps a dual-role account's customer notifications out of the
+    // expert dashboard badge.
+    db.notification.count({
+      where: {
+        userId: auth.userId,
+        recipientRole: { in: ["expert", "all"] },
+        readAt: null,
+        clearedAt: null,
+      },
+    }),
     db.expertEarningsLedger.aggregate({
       where: { expertProfileId: expert.id, createdAt: { gte: startOfWeek } },
       _sum: { netCents: true },
