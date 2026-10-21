@@ -2,6 +2,7 @@ import { getDb } from "@xprtlink/shared/db/index.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
+import { logSubscriptionEvent } from "../services/subscriptionLog.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 import { cancelSupersededSubscriptions } from "../services/billingService.js";
@@ -131,6 +132,8 @@ export const verifyPurchase = async (req, res, next) => {
     const supersededSubscriptions = crossStoreRows.length > 0
       ? await cancelSupersededSubscriptions(crossStoreRows)
       : [];
+
+    logSubscriptionEvent("SUBSCRIBED", { store: "apple", plan: subscription.plan?.code, expertProfileId: req.auth.expertProfileId, note: "Purchase verified and activated" });
 
     // Notify expert
     try {

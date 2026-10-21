@@ -1,6 +1,7 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { notifyAutoRenewDisabled } from "../services/subscriptionStore.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
+import { logSubscriptionEvent } from "../services/subscriptionLog.js";
 import { google } from "googleapis";
 const log = logger.child({ module: "googlePlayWebhookController" });
 
@@ -117,7 +118,7 @@ export const handleNotification = async (req, res, next) => {
     const db = getDb();
     const subscription = await db.expertSubscription.findFirst({
       where: { store: "google", externalSubscriptionId },
-      include: { expert: true },
+      include: { expert: true, plan: true },
     });
 
     if (!subscription) {
@@ -133,6 +134,19 @@ export const handleNotification = async (req, res, next) => {
       { externalSubscriptionId, notificationType, expertProfileId: subscription.expertProfileId },
       "[googlePlayWebhookController] Processing RTDN notification"
     );
+
+    const eventNote = {
+      [RTDN.RENEWED]: ["RENEWED", "Google charged the renewal; period extended"],
+      [RTDN.RECOVERED]: ["RENEWED", "Payment recovered; access restored"],
+      [RTDN.RESTARTED]: ["RENEWED", "User restarted the subscription"],
+      [RTDN.PURCHASED]: ["SUBSCRIBED", "Google confirmed a new purchase"],
+      [RTDN.CANCELED]: ["CANCELLED", "User turned auto-renew off; access continues until period end"],
+      [RTDN.ON_HOLD]: ["PAYMENT_FAILED", "Payment failed; subscription on hold"],
+      [RTDN.IN_GRACE_PERIOD]: ["PAYMENT_FAILED", "Payment failed; in grace period, access continues"],
+      [RTDN.REVOKED]: ["REVOKED", "Google revoked access (refund/chargeback)"],
+      [RTDN.EXPIRED]: ["EXPIRED", "Google says the subscription ended"],
+    }[notificationType];
+    if (eventNote) logSubscriptionEvent(eventNote[0], { store: "google", plan: subscription.plan?.code, expertProfileId: subscription.expertProfileId, note: eventNote[1] });
 
     switch (notificationType) {
       case RTDN.RENEWED:

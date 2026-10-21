@@ -1,6 +1,7 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { notifyAutoRenewDisabled } from "../services/subscriptionStore.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
+import { logSubscriptionEvent } from "../services/subscriptionLog.js";
 const log = logger.child({ module: "appleWebhookController" });
 import {
   SignedDataVerifier,
@@ -58,7 +59,7 @@ export const handleNotification = async (req, res, next) => {
     if (externalSubscriptionId) {
       const subscription = await db.expertSubscription.findFirst({
         where: { store: "apple", externalSubscriptionId },
-        include: { expert: true },
+        include: { expert: true, plan: true },
       });
 
       if (subscription) {
@@ -91,6 +92,23 @@ export const handleNotification = async (req, res, next) => {
           origUpdate({ ...args, data: { ...args.data, lastVerifiedAt: verifiedAt } });
 
         const isSandbox = data?.environment === "Sandbox" || process.env.NODE_ENV !== "production";
+
+        const planCode = subscription.plan?.code;
+        const note = {
+          DID_RENEW: ["RENEWED", "Apple charged the renewal; period extended"],
+          EXPIRED: ["EXPIRED", "Apple says the subscription ended"],
+          GRACE_PERIOD_EXPIRED: ["EXPIRED", "Grace period ended without payment"],
+          REFUND: ["REVOKED", "Apple refunded the purchase"],
+          REVOKE: ["REVOKED", "Apple revoked access"],
+          DID_FAIL_TO_RENEW: ["PAYMENT_FAILED", "Renewal payment failed"],
+        }[notificationType];
+        if (note) logSubscriptionEvent(note[0], { store: "apple", plan: planCode, expertProfileId: subscription.expertProfileId, note: `${note[1]} (Apple: ${notificationType}${subtype ? "/" + subtype : ""})` });
+        if (notificationType === "DID_CHANGE_RENEWAL_STATUS") {
+          logSubscriptionEvent(subtype === "AUTO_RENEW_DISABLED" ? "CANCELLED" : "RESUMED", {
+            store: "apple", plan: planCode, expertProfileId: subscription.expertProfileId,
+            note: subtype === "AUTO_RENEW_DISABLED" ? "User turned auto-renew off; access continues until period end" : "User turned auto-renew back on",
+          });
+        }
 
         switch (notificationType) {
           case "DID_RENEW": {

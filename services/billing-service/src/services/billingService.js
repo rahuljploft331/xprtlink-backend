@@ -26,6 +26,7 @@ import { PAYOUT_SCHEDULE_DEFAULT_DAYS } from "@xprtlink/shared/contracts/setting
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { fetchAppleState, fetchGoogleState, getManagementUrl, isStoreManaged, reconcileSubscription } from "./subscriptionStore.js";
 import { ENTITLED_STATUSES, PLAN_CHANGE, SUBSCRIPTION_ERROR, comparePlans, evaluatePlanChange, hasActiveEntitlement } from "./subscriptionRules.js";
+import { logSubscriptionEvent } from "./subscriptionLog.js";
 import { findForeignOwner, ownedByAnotherAccountError, ownerHasLiveEntitlement } from "./subscriptionOwnership.js";
 import { customerDisplayName, toIso } from "@xprtlink/shared/mappers/common.js";
 import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
@@ -2370,6 +2371,7 @@ export async function expireSubscriptions() {
   }
 
   log.info(`[billing] expireSubscriptions: expired ${result.count} subscription(s) at ${now.toISOString()}`);
+  for (const e of expiring) logSubscriptionEvent("EXPIRED", { expertProfileId: e.expertProfileId, note: "Cancelled subscription reached the end of its paid period" });
 
   // Notify each affected expert that their subscription has expired — non-fatal
   if (affectedExpertIds.length > 0) {

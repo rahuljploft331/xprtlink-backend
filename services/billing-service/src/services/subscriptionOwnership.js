@@ -1,6 +1,7 @@
 import { AppError } from "@xprtlink/shared/utils/errors.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
+import { logSubscriptionEvent } from "./subscriptionLog.js";
 import { fetchAppleState, fetchGoogleState, getManagementUrl } from "./subscriptionStore.js";
 import {
   ENTITLED_STATUSES,
@@ -84,11 +85,13 @@ export async function activateStoreSubscription(db, p) {
       if (await ownerHasLiveEntitlement(foreign, now)) {
         if (!transferAllowed()) {
           log.warn({ store, ownerExpertId: foreign.expertProfileId, claimantExpertId: expertProfileId }, "[activate] purchase owned by another account — blocked");
+          logSubscriptionEvent("BLOCKED", { store, plan: plan.code, expertProfileId, note: `Purchase already belongs to another account (expert=${String(foreign.expertProfileId).slice(0, 8)}) and is still active in the store` });
           throw ownedByAnotherAccountError(store);
         }
         log.info({ store, fromExpertId: foreign.expertProfileId, toExpertId: expertProfileId }, "[activate] transferring purchase (SUBSCRIPTION_ALLOW_TRANSFER)");
         await tx.expertSubscription.update({ where: { id: foreign.id }, data: { status: "canceled", canceledAt: now } });
       } else {
+        logSubscriptionEvent("EXPIRED", { store, expertProfileId: foreign.expertProfileId, note: `Previous owner's subscription had lapsed; released to expert=${String(expertProfileId).slice(0, 8)}` });
         await tx.expertSubscription.update({ where: { id: foreign.id }, data: { status: "expired" } });
       }
     }
