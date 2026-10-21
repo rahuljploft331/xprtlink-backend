@@ -120,6 +120,7 @@ function lifecycleCopy(role) {
     submitted: {
       icon: "check",
       done: expert ? "Request Received" : "Request Submitted",
+      pending: expert ? "Request Received" : "Request Submitted",
     },
     expert_reviewed: {
       icon: "eye",
@@ -140,6 +141,19 @@ function lifecycleCopy(role) {
     canceled: { icon: "cancel", done: "Request Canceled" },
     expired: { icon: "timer_off", done: "Request Expired" },
   };
+}
+
+// Who closed the journey changes the wording: "You declined" vs "Expert declined".
+function terminalTitle(status, role, actorIsCustomer, fallback) {
+  const viewerIsCustomer = role !== "expert";
+  if (status === "canceled") {
+    return viewerIsCustomer ? "You Canceled the Request" : "Customer Canceled the Request";
+  }
+  if (status === "rejected" && actorIsCustomer != null) {
+    if (actorIsCustomer) return viewerIsCustomer ? "You Rejected the Quote" : "Customer Rejected Your Quote";
+    return viewerIsCustomer ? "Expert Declined Your Request" : "You Declined the Request";
+  }
+  return fallback;
 }
 
 /**
@@ -198,7 +212,12 @@ export function toQuoteLifecycleDto(
     const resolved = events.filter((ev) => ev.toStatus === t).at(-1);
     steps.push({
       key: t,
-      title: copy[t].done,
+      title: terminalTitle(
+        t,
+        role,
+        resolved?.actorUserId ? resolved.actorUserId === customerUser?.id : null,
+        copy[t].done
+      ),
       icon: copy[t].icon,
       state: "current",
       occurredAt: resolved ? toIso(resolved.createdAt) : toIso(quote.resolvedAt ?? quote.updatedAt),
