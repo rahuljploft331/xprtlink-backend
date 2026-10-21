@@ -492,7 +492,7 @@ export async function updateExpertMe(auth, body) {
   });
   return {
     data,
-    message: updatedSubState.subscriptionMessage || getMessage("expertProfileUpdated"),
+    message: getMessage("expertProfileUpdated"),
   };
 }
 
