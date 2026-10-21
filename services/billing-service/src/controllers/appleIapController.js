@@ -1,10 +1,11 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
-import { badRequest, notFound, conflict } from "@xprtlink/shared/utils/errors.js";
+import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 import { cancelSupersededSubscriptions } from "../services/billingService.js";
+import { activateStoreSubscription } from "../services/subscriptionOwnership.js";
 const log = logger.child({ module: "appleIapController" });
 // N5 fix: decodeSignedTransaction does NOT exist on @apple/app-store-server-library.
 // Only import the symbols that the library actually exports.
@@ -98,49 +99,7 @@ export const verifyPurchase = async (req, res, next) => {
       throw badRequest("subscriptionExpired");
     }
 
-    // 3. Prevent replay attacks / multiple accounts claiming same Apple ID subscription
-    const externalSubscriptionId = decoded.originalTransactionId || transactionId;
-    const existingSub = await db.expertSubscription.findFirst({
-      where: {
-        store: "apple",
-        externalSubscriptionId,
-        expertProfileId: { not: req.auth.expertProfileId },
-      },
-      include: { expert: { include: { user: true } } },
-    });
-
-    if (existingSub) {
-      const isStillActive = existingSub.status === "active" && existingSub.currentPeriodEnd > now;
-
-      if (isStillActive) {
-        // In development / sandbox testing OR if client explicitly requests transfer
-        const isDevOrSandbox = process.env.NODE_ENV !== "production";
-        if (isDevOrSandbox || req.body.transfer === true) {
-          log.info(
-            {
-              externalSubscriptionId,
-              fromExpertId: existingSub.expertProfileId,
-              toExpertId: req.auth.expertProfileId,
-              isDevOrSandbox,
-            },
-            "[appleIapController] Transferring active subscription to new account"
-          );
-          await db.expertSubscription.update({
-            where: { id: existingSub.id },
-            data: { status: "canceled", canceledAt: now },
-          });
-        } else {
-          throw conflict("subscriptionAlreadyLinkedToAnotherAccount", "SUBSCRIPTION_ALREADY_LINKED");
-        }
-      } else {
-        // Previous owner's subscription has expired; mark as expired so new owner can claim cleanly
-        await db.expertSubscription.update({
-          where: { id: existingSub.id },
-          data: { status: "expired" },
-        });
-      }
-    }
-
+    // Ownership + plan-hierarchy checks run atomically inside activateStoreSubscription.
     // Snapshot any cross-store active subs BEFORE the transaction cancels them in the DB.
     // We pass these to cancelSupersededSubscriptions after the transaction to attempt
     // store-side cancellation — preventing the expert from being billed by two stores.
@@ -154,52 +113,14 @@ export const verifyPurchase = async (req, res, next) => {
       select: { id: true, store: true, externalSubscriptionId: true, expertProfileId: true },
     });
 
-    const subscription = await db.$transaction(async (tx) => {
-      // Deactivate other active subscriptions for this expert
-      await tx.expertSubscription.updateMany({
-        where: {
-          expertProfileId: req.auth.expertProfileId,
-          status: "active",
-          externalSubscriptionId: { not: externalSubscriptionId },
-        },
-        data: { status: "canceled", canceledAt: now, cancelAtPeriodEnd: false },
-      });
-
-      const created = await tx.expertSubscription.upsert({
-        where: {
-          store_externalSubscriptionId: {
-            store: "apple",
-            externalSubscriptionId,
-          },
-        },
-        update: {
-          expertProfileId: req.auth.expertProfileId,
-          planId: plan.id,
-          status: "active",
-          currentPeriodStart: now,
-          currentPeriodEnd: periodEnd,
-          cancelAtPeriodEnd: false,
-          canceledAt: null,
-        },
-        create: {
-          expertProfileId: req.auth.expertProfileId,
-          planId: plan.id,
-          store: "apple",
-          externalSubscriptionId,
-          status: "active",
-          currentPeriodStart: now,
-          currentPeriodEnd: periodEnd,
-        },
-        include: { plan: true },
-      });
-
-      // Mark expert as discoverable in search
-      await tx.expertProfile.updateMany({
-        where: { id: req.auth.expertProfileId, verificationStatus: "approved", searchEligible: false },
-        data: { searchEligible: true },
-      });
-
-      return created;
+    const subscription = await activateStoreSubscription(db, {
+      store: "apple",
+      externalSubscriptionId,
+      linkedExternalId: null,
+      plan,
+      expertProfileId: req.auth.expertProfileId,
+      now,
+      periodEnd,
     });
 
     // Attempt to cancel superseded cross-store subscriptions at the store level.

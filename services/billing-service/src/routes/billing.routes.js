@@ -523,7 +523,30 @@ router.get(
   "/subscriptions/eligibility",
   requireRole("expert"),
   asyncHandler(async (req, res) => {
-    const data = await svc.checkPurchaseEligibility(req.auth);
+    const data = await svc.checkPurchaseEligibility(req.auth, { planCode: req.query.planCode ?? null });
+    return ResponseFormatter.success(res, { message: getMessage("subscriptionEligibility"), data });
+  })
+);
+
+/**
+ * Same check, plus the store purchase the device currently holds (so ownership can
+ * be verified server-side before the billing sheet opens). POST keeps purchase
+ * tokens out of URLs and access logs.
+ * Body: { planCode, store: "google"|"apple", purchaseToken?, originalTransactionId? }
+ */
+router.post(
+  "/subscriptions/eligibility",
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const { planCode, store, purchaseToken, originalTransactionId } = req.body ?? {};
+    const str = (v) => (typeof v === "string" && v.length > 0 && v.length <= 4096 ? v : null);
+    if (store != null && store !== "google" && store !== "apple") throw badRequest("invalidStore");
+    const data = await svc.checkPurchaseEligibility(req.auth, {
+      planCode: str(planCode),
+      store: store ?? null,
+      purchaseToken: str(purchaseToken),
+      originalTransactionId: str(originalTransactionId),
+    });
     return ResponseFormatter.success(res, { message: getMessage("subscriptionEligibility"), data });
   })
 );

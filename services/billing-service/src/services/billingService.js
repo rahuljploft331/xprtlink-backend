@@ -24,8 +24,10 @@ import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 import { buildConsultationInvoiceEmail } from "@xprtlink/shared/lib/consultationInvoice.js";
 import { PAYOUT_SCHEDULE_DEFAULT_DAYS } from "@xprtlink/shared/contracts/settings.schema.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
-import { getManagementUrl, isStoreManaged, reconcileSubscription } from "./subscriptionStore.js";
-import { customerDisplayName } from "@xprtlink/shared/mappers/common.js";
+import { fetchAppleState, fetchGoogleState, getManagementUrl, isStoreManaged, reconcileSubscription } from "./subscriptionStore.js";
+import { ENTITLED_STATUSES, PLAN_CHANGE, SUBSCRIPTION_ERROR, comparePlans, evaluatePlanChange, hasActiveEntitlement } from "./subscriptionRules.js";
+import { findForeignOwner, ownedByAnotherAccountError } from "./subscriptionOwnership.js";
+import { customerDisplayName, toIso } from "@xprtlink/shared/mappers/common.js";
 import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
 
 export {
@@ -1831,12 +1833,15 @@ export async function listSubscriptionPlans(auth) {
         status: { in: ["active", "grace_period", "on_hold"] },
         currentPeriodEnd: { gt: new Date() },
       },
+      include: { plan: true },
       orderBy: { createdAt: "desc" },
     });
   }
 
   // Determine top-level eligibility once so every plan can reference it
   const hasActiveEntitlement = Boolean(activeSub);
+  const activeSubPlanCode = activeSub?.plan?.code ?? null;
+  const anyPlanPurchasable = plans.some((p) => comparePlans(activeSubPlanCode, p.code) === PLAN_CHANGE.UPGRADE);
   const activeStore = activeSub?.store ?? null;
   const activePlanId = activeSub?.planId ?? null;
 
@@ -1851,7 +1856,11 @@ export async function listSubscriptionPlans(auth) {
 
     // Eligibility signal — Flutter uses this to disable/hide purchase buttons
     // and display the correct locked-state alert before the user even taps.
-    dto.purchaseEligible = !hasActiveEntitlement;
+    const change = activeSub ? comparePlans(activeSubPlanCode, plan.code) : PLAN_CHANGE.NEW;
+    dto.planChangeAction = change === PLAN_CHANGE.SAME ? "current" : change === PLAN_CHANGE.DOWNGRADE ? "downgrade_blocked" : change === PLAN_CHANGE.UPGRADE ? "upgrade" : "purchase";
+    dto.planPurchaseEligible = change !== PLAN_CHANGE.SAME && change !== PLAN_CHANGE.DOWNGRADE;
+    // Screen-level flag (identical on every plan): true when anything can still be bought.
+    dto.purchaseEligible = !hasActiveEntitlement || anyPlanPurchasable;
     dto.activeSubscriptionStore = activeStore;   // null when no active subscription
     dto.activePlanId = activePlanId;             // null when no active subscription
     return dto;
@@ -1870,40 +1879,93 @@ export async function listSubscriptionPlans(auth) {
  * NOTE: This is informational only. The IAP verify endpoints enforce eligibility
  * authoritatively on the server side regardless of what this endpoint returns.
  */
-export async function checkPurchaseEligibility(auth) {
+export async function checkPurchaseEligibility(auth, input = {}) {
   const db = getDb();
   const now = new Date();
+  const { planCode = null, store = null, purchaseToken = null, originalTransactionId = null } = input;
 
-  const activeSub = await db.expertSubscription.findFirst({
+  // 1. Ownership: does the store purchase the device holds belong to someone else?
+  //    Server-side lookup only — never trusts local/cached state or device IDs.
+  const externalId = store === "google" ? purchaseToken : store === "apple" ? originalTransactionId : null;
+  if (externalId) {
+    const owner = await findForeignOwner(db, { store, externalSubscriptionId: externalId, expertProfileId: auth.expertProfileId });
+    if (owner && hasActiveEntitlement(owner, now)) {
+      const err = ownedByAnotherAccountError(store);
+      return { eligible: false, code: err.code, reason: err.code, message: err.message, ...err.details, activeSubscription: null };
+    }
+    if (!owner) {
+      const own = await db.expertSubscription.findFirst({ where: { store, externalSubscriptionId: externalId, expertProfileId: auth.expertProfileId } });
+      if (!own) {
+        // Unknown to us: confirm with the store before letting the client proceed.
+        const live = store === "google" ? await fetchGoogleState(externalId) : await fetchAppleState(externalId);
+        if (!live) {
+          return {
+            eligible: false,
+            code: SUBSCRIPTION_ERROR.STORE_VERIFICATION_FAILED,
+            reason: SUBSCRIPTION_ERROR.STORE_VERIFICATION_FAILED,
+            message: getMessage("storeVerificationFailed"),
+            activeSubscription: null,
+          };
+        }
+      }
+    }
+  }
+
+  // 2. This account's own entitlement + plan hierarchy
+  const candidates = await db.expertSubscription.findMany({
     where: {
       expertProfileId: auth.expertProfileId,
-      status: { in: ["active", "grace_period", "on_hold"] },
+      status: { in: ENTITLED_STATUSES },
       currentPeriodEnd: { gt: now },
     },
     include: { plan: true },
     orderBy: { createdAt: "desc" },
   });
+  const activeSub = candidates[0] ?? null;
 
   if (!activeSub) {
-    return {
-      eligible: true,
-      reason: null,
-      activeSubscription: null,
-    };
+    return { eligible: true, code: null, reason: null, action: "purchase", activeSubscription: null };
   }
 
+  const activeSubscription = {
+    store: activeSub.store,
+    planName: activeSub.plan.name,
+    planCode: activeSub.plan.code,
+    status: activeSub.status,
+    currentPeriodEnd: toIso(activeSub.currentPeriodEnd),
+    cancelAtPeriodEnd: activeSub.cancelAtPeriodEnd,
+    managementUrl: getManagementUrl(activeSub.store),
+  };
+
+  // Legacy callers (no planCode): any live subscription still blocks, as before.
+  if (!planCode) {
+    return { eligible: false, code: "ACTIVE_SUBSCRIPTION", reason: "ACTIVE_SUBSCRIPTION", activeSubscription };
+  }
+
+  const verdict = evaluatePlanChange(activeSub.plan.code, planCode);
+  if (!verdict.allowed) {
+    return {
+      eligible: false,
+      code: verdict.code,
+      reason: verdict.code,
+      message: getMessage(verdict.messageKey),
+      activeSubscription,
+    };
+  }
+  const isUpgrade = verdict.relation === PLAN_CHANGE.UPGRADE;
   return {
-    eligible: false,
-    reason: "ACTIVE_SUBSCRIPTION",
-    // Flutter uses activeStore to decide which management URL to open
-    activeSubscription: {
-      store: activeSub.store,
-      planName: activeSub.plan.name,
-      planCode: activeSub.plan.code,
-      status: activeSub.status,
-      currentPeriodEnd: toIso(activeSub.currentPeriodEnd),
-      cancelAtPeriodEnd: activeSub.cancelAtPeriodEnd,
-    },
+    eligible: true,
+    code: null,
+    reason: null,
+    action: isUpgrade ? "upgrade" : "purchase",
+    activeSubscription,
+    // Google Play replaces the old purchase in-store; the client needs its token.
+    // Apple upgrades inside the subscription group, so nothing extra is needed.
+    ...(isUpgrade && activeSub.store === "google"
+      ? { upgrade: { store: "google", fromPlanCode: activeSub.plan.code, toPlanCode: planCode, oldPurchaseToken: activeSub.externalSubscriptionId } }
+      : isUpgrade
+        ? { upgrade: { store: activeSub.store, fromPlanCode: activeSub.plan.code, toPlanCode: planCode } }
+        : {}),
   };
 }
 
