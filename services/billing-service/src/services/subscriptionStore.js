@@ -86,7 +86,17 @@ export async function fetchAppleState(originalTransactionId) {
     const appId = process.env.APPLE_APP_ID ? Number(process.env.APPLE_APP_ID) : undefined;
     const verifier = new SignedDataVerifier(roots, prod, env, APPLE_BUNDLE_ID, appId);
 
-    const res = await client.getAllSubscriptionStatuses(originalTransactionId);
+    // Apple's sandbox intermittently answers 5xx; retry briefly before giving up.
+    let res;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        res = await client.getAllSubscriptionStatuses(originalTransactionId);
+        break;
+      } catch (err) {
+        if (!(err?.httpStatusCode >= 500) || attempt >= 2) throw err;
+        await new Promise((r) => setTimeout(r, 400 * (attempt + 1)));
+      }
+    }
     const last = res?.data?.flatMap((g) => g.lastTransactions ?? []).find((t) => t.originalTransactionId === originalTransactionId);
     if (!last) return null;
     const renewal = last.signedRenewalInfo ? await verifier.verifyAndDecodeRenewalInfo(last.signedRenewalInfo) : null;
