@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import { AppStoreServerAPIClient, Environment, SignedDataVerifier } from "@apple/app-store-server-library";
+import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 const log = logger.child({ module: "subscriptionStore" });
 
@@ -105,4 +106,26 @@ export async function reconcileSubscription(db, sub, { force = false } = {}) {
   if (typeof live.cancelAtPeriodEnd === "boolean") data.cancelAtPeriodEnd = live.cancelAtPeriodEnd;
   if (live.expiry && process.env.NODE_ENV === "production") data.currentPeriodEnd = live.expiry;
   return db.expertSubscription.update({ where: { id: sub.id }, data, include: { plan: true } });
+}
+
+/**
+ * Push the expert when a VERIFIED store event turned auto-renew off, so an open
+ * app refreshes GET /subscriptions/me and hides its Cancel button. Best-effort;
+ * callers only invoke it on a real false->true transition (duplicates are silent).
+ */
+export async function notifyAutoRenewDisabled(sub, userId) {
+  try {
+    const when = sub.currentPeriodEnd
+      ? new Date(sub.currentPeriodEnd).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })
+      : "the end of your billing period";
+    await internalPost(process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007", "/api/v1/notifications/dispatch", {
+      userIds: [userId],
+      type: "subscription_cancelled",
+      title: "Subscription Cancellation Confirmed",
+      body: `Auto-renewal is off. You keep access until ${when}.`,
+      data: { subscriptionId: sub.id, planId: sub.planId, event: "subscription_status_changed" },
+    });
+  } catch (err) {
+    log.warn({ err: err.message }, "[notifyAutoRenewDisabled] dispatch failed");
+  }
 }

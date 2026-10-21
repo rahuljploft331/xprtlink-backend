@@ -1,4 +1,5 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
+import { notifyAutoRenewDisabled } from "../services/subscriptionStore.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 const log = logger.child({ module: "appleWebhookController" });
 import {
@@ -175,6 +176,7 @@ export const handleNotification = async (req, res, next) => {
 
           case "DID_CHANGE_RENEWAL_STATUS": {
             if (subtype === "AUTO_RENEW_DISABLED") {
+              const wasEnabled = !subscription.cancelAtPeriodEnd;
               await update({
                 where: { id: subscription.id },
                 data: {
@@ -184,6 +186,7 @@ export const handleNotification = async (req, res, next) => {
                     : {}),
                 },
               });
+              if (wasEnabled) await notifyAutoRenewDisabled(subscription, subscription.expert.userId);
             } else if (subtype === "AUTO_RENEW_ENABLED") {
               await update({
                 where: { id: subscription.id },

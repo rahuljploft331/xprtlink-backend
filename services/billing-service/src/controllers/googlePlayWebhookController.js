@@ -1,4 +1,5 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
+import { notifyAutoRenewDisabled } from "../services/subscriptionStore.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 import { google } from "googleapis";
 const log = logger.child({ module: "googlePlayWebhookController" });
@@ -185,6 +186,7 @@ export const handleNotification = async (req, res, next) => {
         // Cancellation != expiration: status stays as-is. Confirm against the Play API.
         const live = await fetchPlaySubscription(externalSubscriptionId);
         const liveExpiry = live?.lineItems?.[0]?.expiryTime;
+        const wasEnabled = !subscription.cancelAtPeriodEnd;
         await db.expertSubscription.update({
           where: { id: subscription.id },
           data: { lastVerifiedAt: new Date(),
@@ -194,6 +196,7 @@ export const handleNotification = async (req, res, next) => {
               : {}),
           },
         });
+        if (wasEnabled) await notifyAutoRenewDisabled(subscription, subscription.expert.userId);
         break;
       }
 
