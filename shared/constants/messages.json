@@ -370,5 +370,12 @@
   "payoutSentEmailSubject": "Your XprtLink payout of {amount} is on its way",
   "payoutFailedAlertSubject": "Payout failed: {amount} — action may be needed",
   "reportsFetched": "Reports retrieved successfully",
-  "quoteCannotBeRejectedByExpert": "Quote request cannot be rejected by the expert at this stage"
+  "quoteCannotBeRejectedByExpert": "Quote request cannot be rejected by the expert at this stage",
+  "subscriptionEligibility": "Subscription purchase eligibility",
+  "purchaseBlockedActiveSubscription": "You already have an active {plan} subscription purchased via {store}. Manage it from the original store before purchasing a new plan.",
+  "purchaseBlockedCrossPlatform": "Your active subscription was purchased on {store}. To switch platforms, cancel your current subscription first and wait for it to expire.",
+  "subscriptionRestored": "Subscription restored successfully",
+  "subscriptionAlreadyCurrent": "Your subscription is already up to date",
+  "subscriptionOnHold": "Your subscription is on hold due to a billing issue. Please update your payment method in {store}.",
+  "subscriptionInGracePeriod": "Your subscription payment failed. You are in a grace period until {date}. Please update your payment method to keep your access."
 }

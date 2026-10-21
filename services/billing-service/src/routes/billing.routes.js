@@ -510,6 +510,55 @@ router.delete(
   })
 );
 
+/**
+ * Pre-purchase eligibility check.
+ * Flutter calls this before showing the IAP sheet. Returns:
+ *   { eligible: true }                          — safe to purchase
+ *   { eligible: false, reason, activeSubscription }  — show locked-state alert
+ *
+ * Cases 1 & 2 (platform switch / device switch) surface here as eligible=false.
+ * Case 3 (account ownership conflict) is enforced authoritatively at verify time.
+ */
+router.get(
+  "/subscriptions/eligibility",
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const data = await svc.checkPurchaseEligibility(req.auth);
+    return ResponseFormatter.success(res, { message: getMessage("subscriptionEligibility"), data });
+  })
+);
+
+/**
+ * Restore / sync subscription.
+ * Flutter calls this on "Restore Purchases" tap, after login on a new device,
+ * and after returning from store settings.
+ *
+ * - Apple:  POST body { store: "apple",  transactionId }       → delegates to verifyPurchase (idempotent upsert)
+ * - Google: POST body { store: "google", purchaseToken, subscriptionId } → delegates to verifyPurchase
+ * - Stripe: POST body { store: "stripe" }                       → syncs from DB
+ *
+ * This is intentionally an alias of the verify flow for Apple/Google; the verify
+ * controllers already handle idempotent upsert and cross-account conflict detection,
+ * so there is no separate "restore-only" code path that could be exploited.
+ */
+router.post(
+  "/subscriptions/restore",
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const { store } = req.body;
+    if (!store) throw badRequest("missingTransactionId"); // reuse key — store is required
+    if (store === "apple") {
+      return appleIapController.verifyPurchase(req, res);
+    }
+    if (store === "google") {
+      return googleIapController.verifyPurchase(req, res);
+    }
+    // Stripe: no receipt — just return current active sub from DB
+    const data = await svc.restoreStripeSubscription(req.auth);
+    return ResponseFormatter.success(res, { message: getMessage("subscriptionRestored"), data });
+  })
+);
+
 
 // Payouts actually sent to the signed-in expert's bank (vs. /earnings, which
 // lists per-consultation earnings whether or not they have been paid out).

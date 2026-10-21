@@ -48,6 +48,9 @@ export function toSubscriptionPlanDto(plan, currency = "USD") {
     visibilityBoost: plan.visibilityBoost,
     isMostPopular: plan.isMostPopular ?? false,
     keyFeatures: plan.keyFeatures ?? [],
+    // Store-side product identifiers — needed by Flutter to initiate IAP purchases.
+    appleProductId: plan.appleProductId ?? null,
+    googleProductId: plan.googleProductId ?? null,
   };
 }
 
@@ -62,6 +65,7 @@ export function toExpertSubscriptionDto(subscription, plan, currency = "USD") {
     cancelAtPeriodEnd: subscription.cancelAtPeriodEnd ?? false,
     currentPeriodStart: toIso(subscription.currentPeriodStart),
     currentPeriodEnd: toIso(subscription.currentPeriodEnd),
+    gracePeriodEnd: toIso(subscription.gracePeriodEnd ?? null),
     canceledAt: toIso(subscription.canceledAt),
   };
 }

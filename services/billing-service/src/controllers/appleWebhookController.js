@@ -61,26 +61,17 @@ export const handleNotification = async (req, res, next) => {
       });
 
       if (subscription) {
-        if (notificationType === "DID_RENEW") {
-          let newPeriodEnd = transactionInfo?.expiresDate
-            ? new Date(transactionInfo.expiresDate)
-            : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-          if (data?.environment === "Sandbox" || process.env.NODE_ENV !== "production") {
-            newPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-          }
-          await db.expertSubscription.update({
-            where: { id: subscription.id },
-            data: { currentPeriodEnd: newPeriodEnd, status: "active", cancelAtPeriodEnd: false },
-          });
-        } else if (notificationType === "REVOKE") {
-          await db.expertSubscription.update({
-            where: { id: subscription.id },
-            data: { status: "canceled" },
-          });
-          // Only revoke search eligibility when the expert has no other active subscription
-          // (e.g. they may have already switched to a new store before Apple fired REVOKE).
+        /**
+         * Helper: revoke search eligibility only when no other active entitlement exists.
+         * An expert who switched stores before Apple fired REVOKE would still have a
+         * google/stripe active subscription — don't remove them from search.
+         */
+        const maybeRevokeSearch = async () => {
           const stillActive = await db.expertSubscription.findFirst({
-            where: { expertProfileId: subscription.expertProfileId, status: "active" },
+            where: {
+              expertProfileId: subscription.expertProfileId,
+              status: { in: ["active", "grace_period", "on_hold"] },
+            },
             select: { id: true },
           });
           if (!stillActive) {
@@ -89,36 +80,111 @@ export const handleNotification = async (req, res, next) => {
               data: { searchEligible: false },
             });
           }
-        } else if (notificationType === "DID_FAIL_TO_RENEW" || notificationType === "EXPIRED") {
-          const isDevOrSandbox = data?.environment === "Sandbox" || process.env.NODE_ENV !== "production";
-          if (!isDevOrSandbox || subscription.currentPeriodEnd <= new Date()) {
+        };
+
+        const isSandbox = data?.environment === "Sandbox" || process.env.NODE_ENV !== "production";
+
+        switch (notificationType) {
+          case "DID_RENEW": {
+            let newPeriodEnd = transactionInfo?.expiresDate
+              ? new Date(transactionInfo.expiresDate)
+              : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            if (isSandbox) {
+              newPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+            }
             await db.expertSubscription.update({
               where: { id: subscription.id },
-              data: { status: "expired" },
+              data: {
+                currentPeriodEnd: newPeriodEnd,
+                status: "active",
+                cancelAtPeriodEnd: false,
+                gracePeriodEnd: null,
+              },
             });
-            const stillActive = await db.expertSubscription.findFirst({
-              where: { expertProfileId: subscription.expertProfileId, status: "active" },
-              select: { id: true },
+            // Restore search eligibility if it had been revoked during a grace/hold period
+            await db.expertProfile.updateMany({
+              where: {
+                id: subscription.expertProfileId,
+                verificationStatus: "approved",
+                searchEligible: false,
+              },
+              data: { searchEligible: true },
             });
-            if (!stillActive) {
-              await db.expertProfile.update({
-                where: { id: subscription.expertProfileId },
-                data: { searchEligible: false },
+            break;
+          }
+
+          case "DID_FAIL_TO_RENEW": {
+            if (subtype === "GRACE_PERIOD") {
+              // Billing failed but within grace period — expert retains access.
+              // gracePeriodEnd comes from the transaction's expiresDate in this context.
+              const gracePeriodEnd = transactionInfo?.expiresDate
+                ? new Date(transactionInfo.expiresDate)
+                : null;
+              await db.expertSubscription.update({
+                where: { id: subscription.id },
+                data: { status: "grace_period", gracePeriodEnd },
+              });
+            } else {
+              // Billing retry exhausted without payment — subscription on hold.
+              await db.expertSubscription.update({
+                where: { id: subscription.id },
+                data: { status: "on_hold", gracePeriodEnd: null },
+              });
+              await maybeRevokeSearch();
+            }
+            break;
+          }
+
+          case "GRACE_PERIOD_EXPIRED": {
+            // Grace period ended without payment — move to on_hold
+            await db.expertSubscription.update({
+              where: { id: subscription.id },
+              data: { status: "on_hold", gracePeriodEnd: null },
+            });
+            await maybeRevokeSearch();
+            break;
+          }
+
+          case "EXPIRED": {
+            if (!isSandbox || subscription.currentPeriodEnd <= new Date()) {
+              await db.expertSubscription.update({
+                where: { id: subscription.id },
+                data: { status: "expired" },
+              });
+              await maybeRevokeSearch();
+            }
+            break;
+          }
+
+          case "REVOKE": {
+            await db.expertSubscription.update({
+              where: { id: subscription.id },
+              data: { status: "canceled", canceledAt: new Date(), cancelAtPeriodEnd: false },
+            });
+            await maybeRevokeSearch();
+            break;
+          }
+
+          case "DID_CHANGE_RENEWAL_STATUS": {
+            if (subtype === "AUTO_RENEW_DISABLED") {
+              await db.expertSubscription.update({
+                where: { id: subscription.id },
+                data: { cancelAtPeriodEnd: true },
+              });
+            } else if (subtype === "AUTO_RENEW_ENABLED") {
+              await db.expertSubscription.update({
+                where: { id: subscription.id },
+                data: { cancelAtPeriodEnd: false },
               });
             }
+            break;
           }
-        } else if (notificationType === "DID_CHANGE_RENEWAL_STATUS") {
-          if (subtype === "AUTO_RENEW_DISABLED") {
-            await db.expertSubscription.update({
-              where: { id: subscription.id },
-              data: { cancelAtPeriodEnd: true },
-            });
-          } else if (subtype === "AUTO_RENEW_ENABLED") {
-            await db.expertSubscription.update({
-              where: { id: subscription.id },
-              data: { cancelAtPeriodEnd: false },
-            });
-          }
+
+          default:
+            log.info(
+              { notificationType, subtype, externalSubscriptionId },
+              "[appleWebhookController] Unhandled notification type — no action taken"
+            );
         }
       }
     }

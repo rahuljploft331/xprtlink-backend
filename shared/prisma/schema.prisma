@@ -189,6 +189,7 @@ enum ExpertSubscriptionStatus {
   expired
   canceled
   grace_period
+  on_hold
 
   @@map("expert_subscription_status")
 }
@@ -506,6 +507,8 @@ model SubscriptionPlan {
   maxBanners        Int             @default(0) @map("max_banners")
   stripeProductId   String?         @map("stripe_product_id") @db.VarChar(128)
   stripePriceId     String?         @map("stripe_price_id") @db.VarChar(128)
+  appleProductId    String?         @map("apple_product_id") @db.VarChar(128)
+  googleProductId   String?         @map("google_product_id") @db.VarChar(128)
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -1035,6 +1038,7 @@ model ExpertSubscription {
   status                 ExpertSubscriptionStatus @default(active)
   currentPeriodStart     DateTime                 @map("current_period_start") @db.Timestamptz(6)
   currentPeriodEnd       DateTime                 @map("current_period_end") @db.Timestamptz(6)
+  gracePeriodEnd         DateTime?                @map("grace_period_end") @db.Timestamptz(6)
   cancelAtPeriodEnd      Boolean                  @default(false) @map("cancel_at_period_end")
   canceledAt             DateTime?                @map("canceled_at") @db.Timestamptz(6)
   createdAt              DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)

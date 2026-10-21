@@ -1827,12 +1827,17 @@ export async function listSubscriptionPlans(auth) {
     activeSub = await db.expertSubscription.findFirst({
       where: {
         expertProfileId: auth.expertProfileId,
-        status: "active",
+        status: { in: ["active", "grace_period", "on_hold"] },
         currentPeriodEnd: { gt: new Date() },
       },
       orderBy: { createdAt: "desc" },
     });
   }
+
+  // Determine top-level eligibility once so every plan can reference it
+  const hasActiveEntitlement = Boolean(activeSub);
+  const activeStore = activeSub?.store ?? null;
+  const activePlanId = activeSub?.planId ?? null;
 
   return plans.map((plan) => {
     const dto = toSubscriptionPlanDto(plan);
@@ -1842,8 +1847,89 @@ export async function listSubscriptionPlans(auth) {
     dto.gateway = isCurrent ? activeSub.store : null;
     dto.store = isCurrent ? activeSub.store : null;
     dto.subscribedVia = isCurrent ? activeSub.store : null;
+
+    // Eligibility signal — Flutter uses this to disable/hide purchase buttons
+    // and display the correct locked-state alert before the user even taps.
+    dto.purchaseEligible = !hasActiveEntitlement;
+    dto.activeSubscriptionStore = activeStore;   // null when no active subscription
+    dto.activePlanId = activePlanId;             // null when no active subscription
     return dto;
   });
+}
+
+/**
+ * Pre-purchase eligibility check — called by Flutter before showing the purchase
+ * sheet or initiating an IAP. Returns a structured response so the UI can show the
+ * correct locked-state alert for each of the three cross-platform cases:
+ *
+ *   Case 1 & 2  eligible=false, reason="ACTIVE_SUBSCRIPTION", activeStore tells UI which URL to open
+ *   Case 3      handled at verify time (conflict throws SUBSCRIPTION_ALREADY_LINKED)
+ *   Eligible    eligible=true — safe to initiate a new IAP
+ *
+ * NOTE: This is informational only. The IAP verify endpoints enforce eligibility
+ * authoritatively on the server side regardless of what this endpoint returns.
+ */
+export async function checkPurchaseEligibility(auth) {
+  const db = getDb();
+  const now = new Date();
+
+  const activeSub = await db.expertSubscription.findFirst({
+    where: {
+      expertProfileId: auth.expertProfileId,
+      status: { in: ["active", "grace_period", "on_hold"] },
+      currentPeriodEnd: { gt: now },
+    },
+    include: { plan: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!activeSub) {
+    return {
+      eligible: true,
+      reason: null,
+      activeSubscription: null,
+    };
+  }
+
+  return {
+    eligible: false,
+    reason: "ACTIVE_SUBSCRIPTION",
+    // Flutter uses activeStore to decide which management URL to open
+    activeSubscription: {
+      store: activeSub.store,
+      planName: activeSub.plan.name,
+      planCode: activeSub.plan.code,
+      status: activeSub.status,
+      currentPeriodEnd: toIso(activeSub.currentPeriodEnd),
+      cancelAtPeriodEnd: activeSub.cancelAtPeriodEnd,
+    },
+  };
+}
+
+/**
+ * Restore / sync subscription — called by Flutter on "Restore Purchases" tap,
+ * after login on a new device, or after returning from store settings.
+ *
+ * The route layer delegates Apple and Google restore directly to the respective
+ * IAP verify controllers (POST /verify/apple | /verify/google), which already
+ * handle idempotent upsert, cross-account conflict checks, and DB sync.
+ *
+ * This function handles only the Stripe case — fetching the current active
+ * Stripe subscription from DB and returning its DTO so the Flutter UI refreshes.
+ */
+export async function restoreStripeSubscription(auth) {
+  const db = getDb();
+  const sub = await db.expertSubscription.findFirst({
+    where: {
+      expertProfileId: auth.expertProfileId,
+      store: "stripe",
+      status: { in: ["active", "grace_period"] },
+    },
+    include: { plan: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!sub) throw notFound("noActiveSubscription");
+  return toExpertSubscriptionDto(sub, sub.plan);
 }
 
 /**
@@ -1866,12 +1952,13 @@ export async function subscribe() {
 }
 
 export async function getMySubscription(auth) {
-  // Includes subscriptions that are active OR scheduled to cancel at period end
+  // Includes active, grace_period, and on_hold subscriptions (all represent
+  // active entitlements where access should still be granted).
   const db = getDb();
   const subscription = await db.expertSubscription.findFirst({
     where: {
       expertProfileId: auth.expertProfileId,
-      status: "active",
+      status: { in: ["active", "grace_period", "on_hold"] },
     },
     include: { plan: true },
     orderBy: { createdAt: "desc" },
@@ -1879,7 +1966,7 @@ export async function getMySubscription(auth) {
 
   if (!subscription) throw notFound("noActiveSubscription");
 
-  if (subscription.currentPeriodEnd < new Date()) {
+  if (subscription.currentPeriodEnd < new Date() && subscription.status !== "grace_period" && subscription.status !== "on_hold") {
     await db.expertSubscription.update({
       where: { id: subscription.id },
       data: { status: "expired" },
