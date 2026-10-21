@@ -113,6 +113,8 @@ export const verifyPurchase = async (req, res, next) => {
       select: { id: true, store: true, externalSubscriptionId: true, expertProfileId: true },
     });
 
+    const externalSubscriptionId = decoded.originalTransactionId || transactionId;
+
     const subscription = await activateStoreSubscription(db, {
       store: "apple",
       externalSubscriptionId,
