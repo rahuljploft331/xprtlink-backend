@@ -1,7 +1,7 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { notFound, badRequest } from "@xprtlink/shared/utils/errors.js";
-import { sendEmail } from "@xprtlink/shared/lib/email.js";
+import { sendEmail, renderEmailTemplate, escapeHtml, nl2br } from "@xprtlink/shared/lib/email.js";
 import { generatePresignedDownloadUrl } from "@xprtlink/shared/utils/s3.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
@@ -118,11 +118,15 @@ export async function reply(req, res) {
     const textBody = `Hi ${userName},\n\nYour support ticket regarding "${ticket.subject || ticket.category}" has been updated.\n\nReply from Admin:\n${message}\n\nBest regards,\nXprtLink Support Team`;
 
     try {
+      const html = await renderEmailTemplate({
+        title: "Support Ticket Update",
+        bodyHtml: `<p>Hi ${escapeHtml(userName)},</p><p>Your support ticket regarding "${escapeHtml(ticket.subject || ticket.category)}" has been updated.</p><p><strong>Reply from Admin:</strong><br>${nl2br(message)}</p><p>Best regards,<br>XprtLink Support Team</p>`,
+      });
       await sendEmail({
         to: user.email,
         subject: `Re: [Support] ${ticket.subject || ticket.category}`,
         text: textBody,
-        html: textBody.replace(/\n/g, "<br>")
+        html,
       });
     } catch (err) {
       log.error({ err: err.message }, "[supportTickets.controller] Failed to send email:");

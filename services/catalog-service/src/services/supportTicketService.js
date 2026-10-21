@@ -1,6 +1,6 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { notFound } from "@xprtlink/shared/utils/errors.js";
-import { sendEmail } from "@xprtlink/shared/lib/email.js";
+import { sendEmail, renderEmailTemplate, escapeHtml, nl2br } from "@xprtlink/shared/lib/email.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 const log = logger.child({ module: "supportTicketService" });
@@ -69,11 +69,15 @@ export async function createTicket(auth, { subject, body, category, referenceId,
   const textBody = `New Support Request from ${userName} (${user?.email || 'No email'})\nCategory: ${category}${referenceId ? '\nReference ID: ' + referenceId : ''}\n\nSubject: ${finalSubject}\n\nMessage:\n${body}${attachmentUrl}`;
   
   try {
+    const html = await renderEmailTemplate({
+      title: "New Support Request",
+      bodyHtml: `<p><strong>From:</strong> ${escapeHtml(userName)} (${escapeHtml(user?.email || "No email")})<br><strong>Category:</strong> ${escapeHtml(category)}${referenceId ? `<br><strong>Reference ID:</strong> ${escapeHtml(referenceId)}` : ""}</p><p><strong>Subject:</strong> ${escapeHtml(finalSubject)}</p><p><strong>Message:</strong><br>${nl2br(body)}</p>${attachmentUrl ? `<p>${nl2br(attachmentUrl.trim())}</p>` : ""}`,
+    });
     await sendEmail({
       to: supportEmail,
       subject: `[Support] ${finalSubject}`,
       text: textBody,
-      html: textBody.replace(/\n/g, "<br>"),
+      html,
       replyTo: user?.email // Optional: allows support team to hit 'reply' directly
     });
   } catch (err) {

@@ -1,6 +1,6 @@
 import { getSecretSync } from "../config/secrets.js";
 import { badRequest } from "../utils/errors.js";
-import { sendEmail } from "../lib/email.js";
+import { sendEmail, renderEmailTemplate } from "../lib/email.js";
 import { logger } from "../lib/logger.js";
 const log = logger.child({ module: "otpDelivery" });
 
@@ -36,11 +36,17 @@ async function sendEmailOtp({ email, code, purpose }) {
 
   const label = OTP_PURPOSE_LABELS[purpose] ?? "verification";
 
+  const html = await renderEmailTemplate({
+    title: `Your ${label} code`,
+    bodyHtml: `<p>Your verification code is <strong style="font-size:22px;letter-spacing:2px;">${code}</strong></p><p>It expires in 10 minutes.</p>`,
+    bottomNoteHtml: "If you didn't request this code, you can safely ignore this email.",
+  });
+
   await sendEmail({
     to: email,
     subject: `Your XprtLink ${label} code`,
     text: `Your verification code is ${code}. It expires in 10 minutes.`,
-    html: `<p>Your verification code is <strong>${code}</strong>.</p><p>It expires in 10 minutes.</p>`,
+    html,
   });
 }
 

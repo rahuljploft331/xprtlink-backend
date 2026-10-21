@@ -12,7 +12,7 @@ import {
 import { toAdminUserDto } from "@xprtlink/shared/mappers/admin.mapper.js";
 import { logAdminAction } from "#utils/audit.js";
 import { notFound, badRequest } from "@xprtlink/shared/utils/errors.js";
-import { sendEmail } from "@xprtlink/shared/lib/email.js";
+import { sendEmail, renderEmailTemplate, escapeHtml } from "@xprtlink/shared/lib/email.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 
 
@@ -88,11 +88,16 @@ export async function resetPassword(req, res, next) {
       data: { passwordHash: await hashPassword(tempPassword) },
     });
 
+    const html = await renderEmailTemplate({
+      title: "Your admin password has been reset",
+      bodyHtml: `<p>Hi ${escapeHtml(admin.name)},</p><p>Your XprtLink admin password was reset by a super admin. Your new temporary password is:</p><p style="font-size:18px;font-weight:600;letter-spacing:1px;">${tempPassword}</p><p>Please sign in and change it as soon as possible.</p>`,
+    });
+
     await sendEmail({
       to: admin.email,
       subject: "Your XprtLink admin password has been reset",
       text: `Hi ${admin.name},\n\nYour XprtLink admin password was reset by a super admin. Your new temporary password is:\n\n${tempPassword}\n\nPlease sign in and change it as soon as possible.`,
-      html: `<p>Hi ${admin.name},</p><p>Your XprtLink admin password was reset by a super admin. Your new temporary password is:</p><p style="font-size:18px;font-weight:600;letter-spacing:1px;">${tempPassword}</p><p>Please sign in and change it as soon as possible.</p>`,
+      html,
     });
 
     await logAdminAction(req, "admin.password_reset", "AdminUser", admin.id, { email: admin.email });

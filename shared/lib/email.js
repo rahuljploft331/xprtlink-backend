@@ -12,6 +12,16 @@ function isDevFallbackEnabled() {
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/** Escape user-supplied text before placing it inside an email body. */
+export function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+/** Escape text and keep its line breaks. */
+export function nl2br(value) {
+  return escapeHtml(value).replace(/\r?\n/g, "<br>");
+}
+
 /**
  * Render the base email template with provided variables.
  */
@@ -26,35 +36,35 @@ export async function renderEmailTemplate({
   const templatePath = path.join(__dirname, "../templates/base-email.hbs");
   let html = await fs.readFile(templatePath, "utf-8");
 
-  html = html.replace(/{{TITLE}}/g, title || "");
-  html = html.replace(/{{BODY_HTML}}/g, bodyHtml || "");
+  html = html.replace(/{{TITLE}}/g, () => title || "");
+  html = html.replace(/{{BODY_HTML}}/g, () => bodyHtml || "");
 
   if (badgeText) {
-    html = html.replace(/{{SHOW_BADGE}}/g, "table");
-    html = html.replace(/{{BADGE_TEXT}}/g, badgeText);
+    html = html.replace(/{{SHOW_BADGE}}/g, () => "table");
+    html = html.replace(/{{BADGE_TEXT}}/g, () => badgeText);
   } else {
-    html = html.replace(/{{SHOW_BADGE}}/g, "none");
-    html = html.replace(/{{BADGE_TEXT}}/g, "");
+    html = html.replace(/{{SHOW_BADGE}}/g, () => "none");
+    html = html.replace(/{{BADGE_TEXT}}/g, () => "");
   }
 
   if (ctaText && ctaUrl) {
-    html = html.replace(/{{SHOW_CTA}}/g, "table-cell");
-    html = html.replace(/{{CTA_TEXT}}/g, ctaText);
-    html = html.replace(/{{CTA_URL}}/g, ctaUrl);
+    html = html.replace(/{{SHOW_CTA}}/g, () => "table-cell");
+    html = html.replace(/{{CTA_TEXT}}/g, () => ctaText);
+    html = html.replace(/{{CTA_URL}}/g, () => ctaUrl);
   } else {
     // Blank the hidden button too: some email clients ignore display:none and
     // would otherwise show a literal "{{CTA_TEXT}}" button.
-    html = html.replace(/{{SHOW_CTA}}/g, "none");
-    html = html.replace(/{{CTA_TEXT}}/g, "");
-    html = html.replace(/{{CTA_URL}}/g, "#");
+    html = html.replace(/{{SHOW_CTA}}/g, () => "none");
+    html = html.replace(/{{CTA_TEXT}}/g, () => "");
+    html = html.replace(/{{CTA_URL}}/g, () => "#");
   }
 
   if (bottomNoteHtml) {
-    html = html.replace(/{{SHOW_BOTTOM_NOTE}}/g, "table-cell");
-    html = html.replace(/{{BOTTOM_NOTE_HTML}}/g, bottomNoteHtml);
+    html = html.replace(/{{SHOW_BOTTOM_NOTE}}/g, () => "table-cell");
+    html = html.replace(/{{BOTTOM_NOTE_HTML}}/g, () => bottomNoteHtml);
   } else {
-    html = html.replace(/{{SHOW_BOTTOM_NOTE}}/g, "none");
-    html = html.replace(/{{BOTTOM_NOTE_HTML}}/g, "");
+    html = html.replace(/{{SHOW_BOTTOM_NOTE}}/g, () => "none");
+    html = html.replace(/{{BOTTOM_NOTE_HTML}}/g, () => "");
   }
 
   return html;

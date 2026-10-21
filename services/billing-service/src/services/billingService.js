@@ -20,7 +20,7 @@ import {
   CONSULTATION_COMMISSION_RATE,
   consultationHoldMinimumCents,
 } from "@xprtlink/shared/lib/consultationBilling.js";
-import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
+import { sendEmail, renderEmailTemplate, escapeHtml } from "@xprtlink/shared/lib/email.js";
 import { buildConsultationInvoiceEmail } from "@xprtlink/shared/lib/consultationInvoice.js";
 import { PAYOUT_SCHEDULE_DEFAULT_DAYS } from "@xprtlink/shared/contracts/settings.schema.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
@@ -1208,9 +1208,10 @@ function alertAdmins(subject, lines) {
   (async () => {
     const row = await getDb().platformSetting.findUnique({ where: { key: "supportEmail" } });
     const to = typeof row?.value === "string" && row.value.includes("@") ? row.value : "support@xpertlink.com";
-    const html = `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">${lines
-      .map((l) => `<p style="margin:0 0 8px">${String(l).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" })[c])}</p>`)
-      .join("")}</div>`;
+    const html = await renderEmailTemplate({
+      title: subject,
+      bodyHtml: lines.map((l) => `<p>${escapeHtml(l)}</p>`).join(""),
+    });
     await sendEmail({ to, subject, html });
   })().catch((err) => log.error(`[billing-alert] "${subject}" email failed: ${err.message}`));
 }
