@@ -101,4 +101,13 @@ router.get(
   })
 );
 
+router.get(
+  "/:id/lifecycle",
+  requireUuidId,
+  asyncHandler(async (req, res) => {
+    const data = await svc.getQuoteLifecycle(req.auth, req.params.id);
+    return ResponseFormatter.success(res, { message: getMessage("quoteLifecycleLoaded"), data });
+  })
+);
+
 export default router;

@@ -11,6 +11,7 @@ import {
   toQuoteSummaryDto,
   toQuoteDetailDto,
   toQuoteHistoryDto,
+  toQuoteLifecycleDto,
 } from "@xprtlink/shared/mappers/quote.mapper.js";
 import {
   toConsultationSummaryDto,
@@ -1493,4 +1494,22 @@ export async function getCallStatus(consultationId) {
     status: consultation.status,
     connectedDurationSeconds: consultation.durationSeconds,
   };
+}
+
+export async function getQuoteLifecycle(auth, quoteId) {
+  const quote = await loadQuote(quoteId);
+  assertQuoteParticipant(auth, quote);
+
+  const events = await getDb().quoteStatusEvent.findMany({
+    where: { quoteId },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const { customerUser, customerProfile, expertProfile } = quoteContext(quote);
+  return toQuoteLifecycleDto(quote, events, {
+    role: auth.role,
+    customerUser,
+    customerProfile,
+    expertProfile,
+  });
 }

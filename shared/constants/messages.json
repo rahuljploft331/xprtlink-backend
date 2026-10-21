@@ -90,6 +90,7 @@
   "quoteRejected": "Quote rejected",
   "quoteCanceled": "Quote canceled",
   "quoteHistoryLoaded": "Quote history loaded",
+  "quoteLifecycleLoaded": "Quote lifecycle loaded",
   "invalidSignature": "Invalid signature",
   "reportSubmitted": "Report submitted",
   "missingRequiredFields": "Missing required fields",

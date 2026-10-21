@@ -336,6 +336,39 @@
             },
             "description": "Load the status change history log list of the quote."
           }
+        },
+        {
+          "name": "Get Quote Lifecycle (Activity Timeline)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/quotes/:id/lifecycle",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "quotes",
+                ":id",
+                "lifecycle"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "00000000-0000-4000-8000-000000000000"
+                }
+              ]
+            },
+            "description": "Display-ready lifecycle steps for the Activity Timeline screen (customer and expert; titles are role-aware). Returns reached steps + next pending step, or a closing terminal step (rejected/canceled/expired)."
+          }
         }
       ]
     },
@@ -789,7 +822,7 @@
                 "zego"
               ]
             },
-            "description": "ZegoCloud server callback endpoint. No JWT auth — verified via CallbackSecret SHA-1 signature. Events: room_create, user_login, user_logout, room_close. Returns { code: 0 } on success."
+            "description": "ZegoCloud server callback endpoint. No JWT auth \u2014 verified via CallbackSecret SHA-1 signature. Events: room_create, user_login, user_logout, room_close. Returns { code: 0 } on success."
           }
         }
       ]
