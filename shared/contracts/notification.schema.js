@@ -32,8 +32,12 @@ export const deviceTokenRequestSchema = z.object({
  * New call sites must always set it.
  */
 export const dispatchNotificationRequestSchema = z.object({
-  userIds: z.array(z.string().uuid()).min(1).max(500),
-  type: z.string().min(1).max(64).optional(),
+  // Deliberately permissive everywhere except `audience`: this endpoint already
+  // handled an empty userIds list, a missing type and an over-long type by
+  // degrading rather than failing, and dispatch is non-fatal at every call site,
+  // so tightening it here would turn working notifications into silent 400s.
+  userIds: z.array(z.string()).max(500),
+  type: z.string().optional(),
   title: z.string().optional(),
   body: z.string().optional(),
   audience: z.enum(["customer", "expert", "all"]).optional(),
