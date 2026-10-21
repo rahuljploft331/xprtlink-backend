@@ -65,7 +65,19 @@ export function resolveRoleContext(user, role) {
   };
 }
 
-export async function issueTokens(user, role) {
+/**
+ * Issues a fresh access/refresh token pair for the given user and role.
+ *
+ * @param {object} user - Prisma user row (with customerProfile/expertProfile included).
+ * @param {string} role - "customer" | "expert".
+ * @param {object} [opts]
+ * @param {boolean} [opts.isRefresh=false] - Set to true when called from the silent token-refresh
+ *   flow. When true, the `zego:revoked` event is NOT emitted — that event is only meaningful when
+ *   a user logs in from a NEW device and older devices should lose call-receiver privileges.
+ *   Emitting it on every silent refresh incorrectly detaches the current device from ZegoCloud
+ *   every time the access token rotates.
+ */
+export async function issueTokens(user, role, { isRefresh = false } = {}) {
   const ctx = resolveRoleContext(user, role);
   if (!ctx) return null;
 
@@ -100,18 +112,23 @@ export async function issueTokens(user, role) {
     gates: { expertSubscriptionActive: ctx.subscriptionActive, isPrimaryCallDevice: true },
   });
 
-  try {
-    const { serviceUrls } = getConfig("user-service");
-    if (serviceUrls && serviceUrls.messaging) {
-      const newIat = Math.floor(Date.now() / 1000) - 2; // Allow small clock skew
-      internalPost(serviceUrls.messaging, '/api/internal/events/zego-revoked', {
-        userId: user.id,
-        role: ctx.role,
-        newIat,
-      }).catch(() => {});
+  // Only emit `zego:revoked` on a real new-device login — NOT on silent token refresh.
+  // Emitting on refresh incorrectly detaches the current device from ZegoCloud, causing
+  // experts to stop receiving incoming calls until they restart the app.
+  if (!isRefresh) {
+    try {
+      const { serviceUrls } = getConfig("user-service");
+      if (serviceUrls && serviceUrls.messaging) {
+        const newIat = Math.floor(Date.now() / 1000) - 2; // Allow small clock skew
+        internalPost(serviceUrls.messaging, '/api/internal/events/zego-revoked', {
+          userId: user.id,
+          role: ctx.role,
+          newIat,
+        }).catch(() => {});
+      }
+    } catch (err) {
+      // Ignore config errors or network errors to not break login
     }
-  } catch (err) {
-    // Ignore config errors or network errors to not break login
   }
 
   return toAuthTokensDto({
@@ -122,14 +139,26 @@ export async function issueTokens(user, role) {
   });
 }
 
+// Grace period for recently-rotated refresh tokens.
+// When multiple in-flight requests (e.g. concurrent API calls at the exact moment an access
+// token expires) hit the server around the same time, the first request rotates the refresh
+// token and the second arrives milliseconds later with the now-revoked token. Without a grace
+// period the second request gets a hard 401, which Flutter interprets as a dead session and
+// signs the user out. A 30-second window is short enough to be safe against token reuse
+// attacks and long enough to cover any realistic network/concurrency delay.
+const REFRESH_GRACE_PERIOD_MS = 30_000;
+
 /**
  * Find a refresh token by its SHA-256 hash (O(1) indexed lookup).
- * Falls back to bcrypt loop for legacy tokens issued before this migration.
+ * Accepts tokens that were rotated within the last REFRESH_GRACE_PERIOD_MS milliseconds
+ * so that parallel requests that race at the token-expiry boundary do not all get hard 401s.
  */
 async function findRefreshTokenRow(db, refreshToken) {
   // SHA-256 HMAC indexed lookup — O(1) direct DB query
   const fastHash = hashRefreshToken(refreshToken);
-  const fast = await db.refreshToken.findFirst({
+
+  // --- Primary lookup: valid (not yet rotated) token ---
+  const active = await db.refreshToken.findFirst({
     where: { tokenHash: fastHash, revokedAt: null, expiresAt: { gt: new Date() } },
     include: {
       user: {
@@ -140,7 +169,29 @@ async function findRefreshTokenRow(db, refreshToken) {
       },
     },
   });
-  return fast || null;
+  if (active) return active;
+
+  // --- Grace-period fallback: recently rotated token ---
+  // Accept tokens that were revoked within the last 30 seconds. This handles the race where
+  // two concurrent requests both present the same refresh token: the first rotates it
+  // (revokedAt = now) and the second arrives before the client has stored the new one.
+  const graceThreshold = new Date(Date.now() - REFRESH_GRACE_PERIOD_MS);
+  const recent = await db.refreshToken.findFirst({
+    where: {
+      tokenHash: fastHash,
+      revokedAt: { gte: graceThreshold }, // rotated within the last 30 s
+      expiresAt: { gt: new Date() },       // underlying long-lived token not expired
+    },
+    include: {
+      user: {
+        include: {
+          customerProfile: true,
+          expertProfile: { include: { subscriptions: { where: { status: "active" }, take: 1 } } },
+        },
+      },
+    },
+  });
+  return recent || null;
 }
 
 export async function revokeRefreshToken(refreshToken) {

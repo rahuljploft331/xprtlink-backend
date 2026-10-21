@@ -503,7 +503,7 @@ export async function refresh(refreshToken, role) {
   const result = await lookupRefreshToken(refreshToken, role);
   if (!result) throw unauthorized("invalidRefreshToken");
 
-  const issued = await issueTokens(result.user, result.resolvedRole);
+  const issued = await issueTokens(result.user, result.resolvedRole, { isRefresh: true });
   if (!issued) throw unauthorized("sessionInvalid");
   return issued;
 }
