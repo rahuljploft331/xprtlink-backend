@@ -221,6 +221,17 @@ describe("checkPurchaseEligibility", () => {
     expect(r.alertMessage).toBeUndefined();
   });
 
+  it("with SUBSCRIPTION_ALLOW_TRANSFER the pre-check agrees with activate and lets the purchase through", async () => {
+    // Without this the client is told "not eligible" and never reaches verify,
+    // so the transfer that activateStoreSubscription would allow never happens.
+    reload([row({ id: "a1", plan: "professional", expertProfileId: "A", externalSubscriptionId: "tok" })]);
+    storeState.google.mockResolvedValue({ state: "SUBSCRIPTION_STATE_ACTIVE", expiry: future });
+    process.env.SUBSCRIPTION_ALLOW_TRANSFER = "true";
+    const r = await checkPurchaseEligibility(auth, { planCode: "professional", store: "google", purchaseToken: "tok" });
+    expect(r).toMatchObject({ eligible: true });
+    expect(r.code).toBeFalsy();
+  });
+
   it("fails closed when an unknown purchase cannot be verified with the store", async () => {
     storeState.google.mockResolvedValue(null);
     const r = await checkPurchaseEligibility(auth, { planCode: "core", store: "google", purchaseToken: "mystery" });

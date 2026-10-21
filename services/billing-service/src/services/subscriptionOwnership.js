@@ -13,7 +13,7 @@ import {
 const log = logger.child({ module: "subscriptionOwnership" });
 
 /** Explicit opt-in only; never inferred from NODE_ENV or a client-supplied flag. */
-const transferAllowed = () => process.env.SUBSCRIPTION_ALLOW_TRANSFER === "true";
+export const transferAllowed = () => process.env.SUBSCRIPTION_ALLOW_TRANSFER === "true";
 
 /**
  * 503 for "we could not reach the store, so we cannot say who owns this purchase".

@@ -27,7 +27,7 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { fetchAppleState, fetchGoogleState, getManagementUrl, isStoreManaged, reconcileSubscription } from "./subscriptionStore.js";
 import { ENTITLED_STATUSES, PLAN_CHANGE, SUBSCRIPTION_ERROR, comparePlans, evaluatePlanChange, hasActiveEntitlement } from "./subscriptionRules.js";
 import { logSubscriptionEvent } from "./subscriptionLog.js";
-import { findForeignOwner, ownedByAnotherAccountError, ownerHasLiveEntitlement } from "./subscriptionOwnership.js";
+import { findForeignOwner, ownedByAnotherAccountError, ownerHasLiveEntitlement, transferAllowed } from "./subscriptionOwnership.js";
 import { customerDisplayName, toIso } from "@xprtlink/shared/mappers/common.js";
 import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
 
@@ -1910,10 +1910,16 @@ export async function checkPurchaseEligibility(auth, input = {}) {
         activeSubscription: null,
       };
     }
-    if (ownerState === "live") {
+    // SUBSCRIPTION_ALLOW_TRANSFER lets the purchase move to this account. The
+    // transfer itself happens in activateStoreSubscription; this pre-check must
+    // agree, or the client is told "not eligible" and never reaches verify.
+    if (ownerState === "live" && !transferAllowed()) {
       const err = ownedByAnotherAccountError(store);
       logSubscriptionEvent("BLOCKED", { store, plan: planCode, expertProfileId: auth.expertProfileId, note: `Before purchase: this ${store} subscription belongs to another account (expert=${String(owner.expertProfileId).slice(0, 8)}) and is still active` });
       return { eligible: false, code: err.code, reason: err.code, message: err.message, ...err.details, activeSubscription: null };
+    }
+    if (ownerState === "live") {
+      log.info({ store, ownerExpertId: owner.expertProfileId, claimantExpertId: auth.expertProfileId }, "[eligibility] owner is live but transfer is enabled — allowing purchase");
     }
     if (!owner) {
       const own = await db.expertSubscription.findFirst({ where: { store, externalSubscriptionId: externalId, expertProfileId: auth.expertProfileId } });

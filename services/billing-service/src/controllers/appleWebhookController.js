@@ -55,6 +55,17 @@ export const handleNotification = async (req, res, next) => {
       }
     }
 
+    // Renewal info carries autoRenewProductId — the product that will renew next
+    // period. It is the only place a scheduled (deferred) plan change shows up.
+    let renewalInfo = null;
+    if (data?.signedRenewalInfo) {
+      try {
+        renewalInfo = await verifier.verifyAndDecodeRenewalInfo(data.signedRenewalInfo);
+      } catch (err) {
+        log.warn({ err: err.message }, "[appleWebhookController] Error decoding signedRenewalInfo");
+      }
+    }
+
     const externalSubscriptionId = transactionInfo?.originalTransactionId;
 
     if (externalSubscriptionId) {
@@ -95,6 +106,23 @@ export const handleNotification = async (req, res, next) => {
         const isSandbox = data?.environment === "Sandbox" || process.env.NODE_ENV !== "production";
 
         const planCode = subscription.plan?.code;
+
+        /**
+         * The product Apple just billed is the source of truth for which plan the
+         * row should hold — a downgrade that took effect at renewal arrives as a
+         * DID_RENEW carrying the *new*, cheaper productId. Returns {} when the
+         * product is unknown or unchanged, so the caller never nulls a good planId.
+         */
+        const planPatchFor = async (productId) => {
+          if (!productId || productId === planCode) return {};
+          const next = await db.subscriptionPlan.findFirst({ where: { code: productId, isActive: true } });
+          if (!next) {
+            log.warn({ productId, currentPlan: planCode }, "[appleWebhookController] Unknown productId — keeping current plan");
+            return {};
+          }
+          log.info({ from: planCode, to: next.code, notificationType }, "[appleWebhookController] Plan changed by store event");
+          return { planId: next.id };
+        };
         const note = {
           SUBSCRIBED: ["SUBSCRIBED", "Apple confirmed a new or resumed subscription"],
           DID_RENEW: ["RENEWED", "Apple charged the renewal; period extended"],
@@ -123,6 +151,9 @@ export const handleNotification = async (req, res, next) => {
             await update({
               where: { id: subscription.id },
               data: {
+                // A downgrade scheduled earlier lands here: Apple renews on the new
+                // product, so the row has to follow or the expert keeps the old tier.
+                ...(await planPatchFor(transactionInfo?.productId)),
                 currentPeriodEnd: newPeriodEnd,
                 status: "active",
                 cancelAtPeriodEnd: false,
@@ -162,10 +193,7 @@ export const handleNotification = async (req, res, next) => {
             }
 
             // A resubscribe may land on a different tier than the row currently holds.
-            const productId = transactionInfo?.productId;
-            const newPlan = productId && productId !== planCode
-              ? await db.subscriptionPlan.findFirst({ where: { code: productId, isActive: true } })
-              : null;
+            const planPatch = await planPatchFor(transactionInfo?.productId);
 
             let newPeriodEnd = transactionInfo?.expiresDate
               ? new Date(transactionInfo.expiresDate)
@@ -177,7 +205,7 @@ export const handleNotification = async (req, res, next) => {
             await update({
               where: { id: subscription.id },
               data: {
-                ...(newPlan ? { planId: newPlan.id } : {}),
+                ...planPatch,
                 currentPeriodEnd: newPeriodEnd,
                 status: "active",
                 cancelAtPeriodEnd: false,
@@ -246,6 +274,60 @@ export const handleNotification = async (req, res, next) => {
               data: { status: "canceled", canceledAt: new Date(), cancelAtPeriodEnd: false },
             });
             await maybeRevokeSearch();
+            break;
+          }
+
+          /**
+           * The subscriber picked a different product in the same group.
+           *
+           * Apple ranks products by Subscription Level in App Store Connect, not by
+           * price, and the subtype reflects that ranking:
+           *   UPGRADE   — effective immediately, Apple also bills a new transaction
+           *   DOWNGRADE — deferred to the next renewal; nothing changes yet, and the
+           *               DID_RENEW above applies it when Apple bills the new product
+           *   (none)    — the subscriber reverted a pending downgrade
+           */
+          case "DID_CHANGE_RENEWAL_PREF": {
+            const autoRenewProductId = renewalInfo?.autoRenewProductId ?? null;
+            log.info(
+              { subtype: subtype ?? null, currentPlan: planCode, autoRenewProductId, productId: transactionInfo?.productId, externalSubscriptionId },
+              "[appleWebhookController] Renewal preference changed"
+            );
+
+            if (subtype === "UPGRADE") {
+              let newPeriodEnd = transactionInfo?.expiresDate
+                ? new Date(transactionInfo.expiresDate)
+                : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+              if (isSandbox) {
+                newPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+              }
+              await update({
+                where: { id: subscription.id },
+                data: {
+                  ...(await planPatchFor(transactionInfo?.productId)),
+                  currentPeriodEnd: newPeriodEnd,
+                  status: "active",
+                  cancelAtPeriodEnd: false,
+                  gracePeriodEnd: null,
+                  canceledAt: null,
+                },
+              });
+              logSubscriptionEvent("UPGRADED", {
+                store: "apple", plan: autoRenewProductId ?? planCode, expertProfileId: subscription.expertProfileId,
+                note: `Switched to a higher App Store level; effective immediately (Apple: ${notificationType}/UPGRADE)`,
+              });
+              break;
+            }
+
+            // DOWNGRADE and the revert case are both deferred: record only. Touching
+            // planId here would strip paid access the subscriber still owns.
+            await update({ where: { id: subscription.id }, data: {} });
+            logSubscriptionEvent(subtype === "DOWNGRADE" ? "DOWNGRADE_SCHEDULED" : "RENEWAL_PREF_REVERTED", {
+              store: "apple", plan: planCode, expertProfileId: subscription.expertProfileId,
+              note: subtype === "DOWNGRADE"
+                ? `Will switch to ${autoRenewProductId ?? "another plan"} at the next renewal; current plan stays until then`
+                : "Pending plan change reverted; current plan continues",
+            });
             break;
           }
 
