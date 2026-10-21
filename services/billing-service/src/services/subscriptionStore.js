@@ -8,10 +8,27 @@ const APPLE_MANAGE_URL = "https://apps.apple.com/account/subscriptions";
 const GOOGLE_PRODUCT_ID = process.env.GOOGLE_SUBSCRIPTION_PRODUCT_ID ?? "xprtlink_subscription";
 const RECONCILE_STALE_MS = 5 * 60 * 1000;
 
-/** Store-hosted page where the user must cancel auto-renewal. Null for stripe. */
+/** Env override is used only if it is a real https URL (ignores typos like link text). */
+function envUrl(name) {
+  const v = process.env[name]?.trim();
+  if (!v) return null;
+  try {
+    return new URL(v).protocol === "https:" ? v : null;
+  } catch {
+    log.warn(`[getManagementUrl] ${name} is not a valid https URL — using default`);
+    return null;
+  }
+}
+
+/**
+ * Store-hosted page where the user must cancel auto-renewal. Null for stripe.
+ * Overridable via SUBSCRIPTION_CANCEL_URL_IOS / SUBSCRIPTION_CANCEL_URL_ANDROID.
+ */
 export function getManagementUrl(store) {
-  if (store === "apple") return APPLE_MANAGE_URL;
+  if (store === "apple") return envUrl("SUBSCRIPTION_CANCEL_URL_IOS") ?? APPLE_MANAGE_URL;
   if (store === "google") {
+    const override = envUrl("SUBSCRIPTION_CANCEL_URL_ANDROID");
+    if (override) return override;
     const pkg = process.env.GOOGLE_PACKAGE_NAME;
     return `https://play.google.com/store/account/subscriptions?sku=${encodeURIComponent(GOOGLE_PRODUCT_ID)}${
       pkg ? `&package=${encodeURIComponent(pkg)}` : ""
