@@ -40,6 +40,25 @@ function checkMessageRateLimit(userId) {
 let _io = null;
 export function getIo() { return _io; }
 
+/**
+ * Account-wide room: every session of this user, whichever role they are using.
+ * Only for account-level events (blocked, disabled, presence).
+ */
+export function userRoom(userId) { return `user:${userId}`; }
+
+/**
+ * Role-scoped room: one app surface of one account.
+ *
+ * A dual-role account (the same email holding both a customer and an expert
+ * profile) is ONE user row, so the account-wide room is shared by both surfaces.
+ * Anything role-specific — unread counts, inbox updates, read receipts — must be
+ * emitted here, or the expert's numbers land in the customer app.
+ */
+export function roleRoom(userId, role) { return `user:${userId}:${role}`; }
+
+/** A conversation always has one customer and one expert. */
+export function oppositeRole(role) { return role === "expert" ? "customer" : "expert"; }
+
 export function registerMessagingSockets(io) {
   _io = io;
   // Handshake authentication middleware
@@ -102,10 +121,19 @@ export function registerMessagingSockets(io) {
 
   io.on("connection", (socket) => {
     const auth = socket.data.auth;
-    const userRoom = `user:${auth.userId}`;
-    socket.join(userRoom);
-    if (auth.customerProfileId) socket.join(`customer:${auth.customerProfileId}`);
-    if (auth.expertProfileId) socket.join(`expert:${auth.expertProfileId}`);
+    const accountRoom = userRoom(auth.userId);
+    const ownRoleRoom = roleRoom(auth.userId, auth.role);
+    socket.join(accountRoom);
+    socket.join(ownRoleRoom);
+    // The JWT carries BOTH profile ids regardless of which role this session is
+    // using, so joining on their presence put a customer session in the expert's
+    // room. Join only the profile room for the active role.
+    if (auth.role === "customer" && auth.customerProfileId) {
+      socket.join(`customer:${auth.customerProfileId}`);
+    }
+    if (auth.role === "expert" && auth.expertProfileId) {
+      socket.join(`expert:${auth.expertProfileId}`);
+    }
 
     log.info(
       `[messaging-service] User connected: ${auth.userId} (${auth.role}) -> socket ${socket.id}`
@@ -147,7 +175,7 @@ export function registerMessagingSockets(io) {
     // Broadcast online status to peers on connection
     // Small delay to allow the current socket to fully join rooms
     setTimeout(() => {
-      const room = io.sockets.adapter.rooms.get(`user:${auth.userId}`);
+      const room = io.sockets.adapter.rooms.get(accountRoom);
       if (room && room.size === 1) {
         // First connection for this user
         broadcastPresence(true);
@@ -209,9 +237,10 @@ export function registerMessagingSockets(io) {
 
         // Notify peer user only if this conversation was freshly created
         if (data.isNew) {
-          const peerUserId = await svc.getConversationPeerUserId(data.id, auth.userId);
-          if (peerUserId) {
-            io.to(`user:${peerUserId}`).emit("conversation:new", { conversation: data });
+          const peerAuth = await svc.getConversationPeerAuth(data.id, auth.userId);
+          if (peerAuth?.userId) {
+            io.to(roleRoom(peerAuth.userId, peerAuth.role ?? oppositeRole(auth.role)))
+              .emit("conversation:new", { conversation: data });
           }
         }
 
@@ -324,15 +353,16 @@ export function registerMessagingSockets(io) {
           }
         }
 
-        io.to(`user:${auth.userId}`).emit("inbox:updated", {
+        io.to(ownRoleRoom).emit("inbox:updated", {
           conversationId,
           lastMessage: message,
           senderUserId: auth.userId,
         });
 
         if (peerUserId) {
-          log.info(`[messaging-service] message:send - Emitting inbox:updated to user:${peerUserId}`);
-          io.to(`user:${peerUserId}`).emit("inbox:updated", {
+          const peerRoom = roleRoom(peerUserId, peerRole ?? oppositeRole(auth.role));
+          log.info(`[messaging-service] message:send - Emitting inbox:updated to ${peerRoom}`);
+          io.to(peerRoom).emit("inbox:updated", {
             conversationId,
             lastMessage: message,
             senderUserId: auth.userId,
@@ -340,7 +370,8 @@ export function registerMessagingSockets(io) {
           });
 
           if (peerUnreadData) {
-            io.to(`user:${peerUserId}`).emit("chat:unread-count", peerUnreadData);
+            io.to(roleRoom(peerUserId, peerRole ?? oppositeRole(auth.role)))
+              .emit("chat:unread-count", peerUnreadData);
           }
 
           // sees a badge even if they were offline when the message arrived.
@@ -425,24 +456,25 @@ export function registerMessagingSockets(io) {
 
         // Notify caller's room with updated total unread count
         if (callerUnreadData) {
-          io.to(`user:${auth.userId}`).emit("chat:unread-count", callerUnreadData);
+          io.to(ownRoleRoom).emit("chat:unread-count", callerUnreadData);
         }
 
         // Notify both users' rooms for inbox updates (live double-ticks)
-        io.to(`user:${auth.userId}`).emit("conversation:read", {
+        io.to(ownRoleRoom).emit("conversation:read", {
           conversationId,
           userId: auth.userId,
           readAt: new Date().toISOString(),
           totalUnreadCount: callerUnreadData?.totalUnreadCount ?? 0,
         });
 
-        const peerUserId = await svc.getConversationPeerUserId(conversationId, auth.userId);
-        if (peerUserId) {
-          io.to(`user:${peerUserId}`).emit("conversation:read", {
-            conversationId,
-            userId: auth.userId,
-            readAt: new Date().toISOString(),
-          });
+        const readPeerAuth = await svc.getConversationPeerAuth(conversationId, auth.userId);
+        if (readPeerAuth?.userId) {
+          io.to(roleRoom(readPeerAuth.userId, readPeerAuth.role ?? oppositeRole(auth.role)))
+            .emit("conversation:read", {
+              conversationId,
+              userId: auth.userId,
+              readAt: new Date().toISOString(),
+            });
         }
 
         if (typeof callback === "function") {

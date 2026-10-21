@@ -15,7 +15,7 @@ import {
 import { isChatMediaAllowed } from "@xprtlink/shared/config/attachmentConfig.js";
 import { badRequest, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
-import { getIo } from "../sockets/messagingSocket.js";
+import { getIo, roleRoom } from "../sockets/messagingSocket.js";
 
 function isUserOnline(userId) {
   if (!userId) return false;
@@ -822,12 +822,12 @@ export async function deleteConversation(auth, conversationId) {
   try {
     const io = getIo();
     if (io) {
-      io.to(`user:${auth.userId}`).emit("inbox:updated", {
+      io.to(roleRoom(auth.userId, auth.role)).emit("inbox:updated", {
         conversationId,
         deleted: true,
       });
       const unreadData = await getTotalUnreadCount(auth);
-      io.to(`user:${auth.userId}`).emit("chat:unread-count", unreadData);
+      io.to(roleRoom(auth.userId, auth.role)).emit("chat:unread-count", unreadData);
     }
   } catch (err) {
     log.warn({ err: err.message }, "[messagingService] Failed to emit inbox:updated on delete");
@@ -872,11 +872,11 @@ export async function restoreConversation(auth, conversationId) {
   try {
     const io = getIo();
     if (io) {
-      io.to(`user:${auth.userId}`).emit("inbox:updated", {
+      io.to(roleRoom(auth.userId, auth.role)).emit("inbox:updated", {
         conversationId,
       });
       const unreadData = await getTotalUnreadCount(auth);
-      io.to(`user:${auth.userId}`).emit("chat:unread-count", unreadData);
+      io.to(roleRoom(auth.userId, auth.role)).emit("chat:unread-count", unreadData);
     }
   } catch (err) {
     log.warn({ err: err.message }, "[messagingService] Failed to emit inbox:updated on restore");

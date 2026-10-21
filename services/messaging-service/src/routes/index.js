@@ -41,7 +41,7 @@ router.get("/", (_req, res) => {
 });
 
 
-import { getIo } from "../sockets/messagingSocket.js";
+import { getIo, roleRoom } from "../sockets/messagingSocket.js";
 
 router.post("/internal/events/user-blocked", internalServiceGuard, (req, res) => {
   const { blockerUserId, blockedUserId, blockerProfileIds, blockedProfileIds } = req.body;
@@ -92,7 +92,9 @@ router.post("/internal/events/expert-subscription-expired", internalServiceGuard
   const io = getIo();
   if (io) {
     log.info("EMITTING expert:subscription_expired", { userId });
-    io.to(`user:${userId}`).emit("expert:subscription_expired", {
+    // Expert-only event: a dual-role account shares one userId, so this must not
+    // reach their customer session.
+    io.to(roleRoom(userId, "expert")).emit("expert:subscription_expired", {
       userId,
       availabilityStatus: "offline",
     });
