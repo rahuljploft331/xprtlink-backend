@@ -32,12 +32,6 @@ export const verifyPurchase = async (req, res, next) => {
 
     const db = getDb();
     
-    // Find the requested plan
-    let plan = await db.subscriptionPlan.findFirst({
-      where: { code: planCode, isActive: true },
-    });
-    if (!plan) throw notFound("subscriptionPlanNotFound");
-
     // Verify the subscription with Google
     const androidPublisher = getGoogleClient();
     const packageName = process.env.GOOGLE_PACKAGE_NAME;
@@ -56,6 +50,21 @@ export const verifyPurchase = async (req, res, next) => {
     if (!lineItem.expiryTime) {
       throw badRequest("invalidGooglePlayTransaction");
     }
+
+    // The plan comes from what Google says was bought (the Play base plan), never from the
+    // client's selection — otherwise a user could pay for Core and claim Elite.
+    const paidBasePlanId = lineItem.offerDetails?.basePlanId?.trim().toLowerCase() || null;
+    let plan = paidBasePlanId
+      ? await db.subscriptionPlan.findFirst({ where: { code: paidBasePlanId, isActive: true } })
+      : null;
+    if (!plan) {
+      // Base plan id doesn't map to one of our plan codes: fall back to the client's code, but say so.
+      log.warn({ paidBasePlanId, planCode }, "[googleIapController] Play base plan does not match a plan code — using client planCode");
+      plan = await db.subscriptionPlan.findFirst({ where: { code: planCode, isActive: true } });
+    } else if (planCode && planCode !== plan.code) {
+      log.warn({ paidBasePlanId, planCode }, "[googleIapController] Client planCode differs from the plan Google billed — using Google's");
+    }
+    if (!plan) throw notFound("subscriptionPlanNotFound");
 
     const externalSubscriptionId = purchaseToken;
     const now = new Date();
