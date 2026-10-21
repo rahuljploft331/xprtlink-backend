@@ -18,7 +18,6 @@ const supportPermissions = {
   reviews: "edit",
   cms: "none",
   notifications: "view",
-  reports: "view",
   admins: "none",
   settings: "none",
 };
@@ -37,7 +36,6 @@ const financePermissions = {
   reviews: "none",
   cms: "none",
   notifications: "none",
-  reports: "view",
   admins: "none",
   settings: "none",
 };

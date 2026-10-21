@@ -48,7 +48,6 @@ export const ADMIN_MODULES = [
   "cms",
   "notifications",
   "support-chat",
-  "reports",
   "admins",
   "settings",
 ];
