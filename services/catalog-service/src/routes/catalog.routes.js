@@ -32,9 +32,14 @@ router.get(
     const data = await svc.getCmsPage(req.params.slug);
     const content = data.bodyHtml || "";
     
+    res.setHeader("Content-Type", "text/html");
+    res.setHeader(
+      "Content-Security-Policy",
+      "default-src 'self' 'unsafe-inline' data: https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https:; img-src * data: https:; font-src * data: https:; frame-ancestors *;"
+    );
+
     // If the CMS content is already a full HTML document (raw HTML mode), serve it directly
     if (content.toLowerCase().includes("<html") || content.toLowerCase().includes("<!doctype")) {
-      res.setHeader("Content-Type", "text/html");
       return res.send(content);
     }
 
@@ -54,7 +59,6 @@ router.get(
   ${content}
 </body>
 </html>`;
-    res.setHeader("Content-Type", "text/html");
     return res.send(html);
   })
 );
