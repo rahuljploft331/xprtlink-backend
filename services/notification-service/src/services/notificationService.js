@@ -53,7 +53,6 @@ export async function removeDeviceToken(auth, body) {
   const db = getDb();
   await db.deviceToken.deleteMany({
     where: {
-      userId: auth.userId,
       token: body.token,
     },
   });

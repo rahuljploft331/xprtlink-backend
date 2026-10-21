@@ -489,9 +489,17 @@ export async function logout(userId, refreshToken, deviceToken) {
 
   // Remove the device's push token so the user stops receiving
   // notifications on this device after logout.
+  // 1. If deviceToken is provided, delete all records with this token regardless of userId
+  //    so neither this user nor any other user receives pushes on this logged-out physical device.
+  // 2. If deviceToken is not provided, delete all device tokens for this userId as a fallback.
+  const db = getDb();
   if (deviceToken) {
-    await getDb().deviceToken.deleteMany({
-      where: { userId, token: deviceToken },
+    await db.deviceToken.deleteMany({
+      where: { token: deviceToken },
+    }).catch(() => {});
+  } else {
+    await db.deviceToken.deleteMany({
+      where: { userId },
     }).catch(() => {});
   }
 }

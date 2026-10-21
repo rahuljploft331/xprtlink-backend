@@ -107,6 +107,7 @@ export function toExpertVerificationDto(verification, documents = []) {
       id: doc.id,
       mediaId: doc.mediaId,
       docType: doc.docType,
+      mimeType: doc.media?.mimeType ?? null,
       url: resolveMediaUrl(doc.media?.storageKey),
     })),
   };

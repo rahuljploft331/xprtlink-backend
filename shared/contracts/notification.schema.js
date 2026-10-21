@@ -20,7 +20,7 @@ export const notificationPreferencesDtoSchema = z.object({
 
 export const deviceTokenRequestSchema = z.object({
   token: z.string().min(1),
-  platform: z.enum(["ios", "android", "web"]),
+  platform: z.enum(["ios", "android", "web"]).optional().default("android"),
 });
 
 export const updateNotificationPreferencesRequestSchema = z.object({

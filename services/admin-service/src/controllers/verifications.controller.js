@@ -67,12 +67,17 @@ export async function getById(req, res, next) {
     // frontend can display it without needing a separate signed-URL call.
     const payload = {
       ...v,
-      documents: v.documents.map((doc) => ({
-        ...doc,
-        media: doc.media
-          ? { ...doc.media, url: resolveMediaUrl(doc.media.storageKey) }
-          : null,
-      })),
+      documents: v.documents.map((doc) => {
+        const resolvedUrl = doc.media ? resolveMediaUrl(doc.media.storageKey) : null;
+        return {
+          ...doc,
+          url: resolvedUrl,
+          mimeType: doc.media?.mimeType ?? null,
+          media: doc.media
+            ? { ...doc.media, url: resolvedUrl }
+            : null,
+        };
+      }),
     };
 
     return ResponseFormatter.success(res, { data: payload });
