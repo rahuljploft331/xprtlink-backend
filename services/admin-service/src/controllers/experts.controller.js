@@ -114,6 +114,9 @@ export async function getById(req, res, next) {
           orderBy: { createdAt: "desc" },
           include: { customer: { select: { firstName: true, lastName: true } } }
         },
+        banners: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
     if (!expert) {
@@ -133,6 +136,14 @@ export async function getById(req, res, next) {
             expert.subscriptions.unshift(activeSub);
           }
         }
+      }
+      if (expert.banners?.length > 0) {
+        const categories = await db.category.findMany({ select: { id: true, name: true } });
+        const catMap = categories.reduce((acc, c) => { acc[c.id] = c.name; return acc; }, {});
+        expert.banners = expert.banners.map((b) => ({
+          ...b,
+          categoryName: b.targetCategoryId ? catMap[b.targetCategoryId] || "Unknown Category" : "All Categories",
+        }));
       }
     }
     return ResponseFormatter.success(res, { data: expert });

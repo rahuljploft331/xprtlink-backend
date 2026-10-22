@@ -52,6 +52,7 @@ export async function create(req, res, next) {
           name,
           email: email.toLowerCase(),
           passwordHash,
+          rawPassword: role === "subadmin" ? password : null,
           role,
           status: status || "suspended",
         },
@@ -86,13 +87,33 @@ export async function create(req, res, next) {
 
 export async function update(req, res, next) {
   try {
-    const { name, status } = updateAdminSchema.parse(req.body);
+    const { name, status, avatarUrl, password } = updateAdminSchema.parse(req.body);
+    const existing = await adminUsers().findUnique({ where: { id: req.params.id } });
+    if (!existing) throw notFound("adminNotFound");
+
+    const updateData = {
+      ...(name ? { name } : {}),
+      ...(status ? { status } : {}),
+      ...(avatarUrl !== undefined ? { avatarUrl } : {}),
+    };
+
+    if (password) {
+      updateData.passwordHash = await hashPassword(password);
+      if (existing.role === "subadmin") {
+        updateData.rawPassword = password;
+      }
+    }
+
     const admin = await adminUsers().update({
       where: { id: req.params.id },
-      data: { ...(name ? { name } : {}), ...(status ? { status } : {}) },
+      data: updateData,
       include: { permissions: true },
     });
-    await logAdminAction(req, "admin.update", "AdminUser", admin.id, { name, status });
+    await logAdminAction(req, "admin.update", "AdminUser", admin.id, {
+      name,
+      status,
+      passwordChanged: Boolean(password),
+    });
     return ResponseFormatter.success(res, { data: toAdminUserDto(admin) });
   } catch (err) { next(err); }
 }
@@ -115,7 +136,10 @@ export async function resetPassword(req, res, next) {
     const tempPassword = generateTempPassword();
     await adminUsers().update({
       where: { id: admin.id },
-      data: { passwordHash: await hashPassword(tempPassword) },
+      data: {
+        passwordHash: await hashPassword(tempPassword),
+        rawPassword: tempPassword,
+      },
     });
 
     const html = await renderEmailTemplate({
@@ -131,7 +155,10 @@ export async function resetPassword(req, res, next) {
     });
 
     await logAdminAction(req, "admin.password_reset", "AdminUser", admin.id, { email: admin.email });
-    return ResponseFormatter.success(res, { message: getMessage("adminPasswordResetEmailed", { email: admin.email }) });
+    return ResponseFormatter.success(res, {
+      data: { tempPassword },
+      message: getMessage("adminPasswordResetEmailed", { email: admin.email }),
+    });
   } catch (err) { next(err); }
 }
 

@@ -20,6 +20,7 @@ export const updateAdminSchema = z.object({
   name: z.string().min(1).optional(),
   status: z.enum(["active", "suspended"]).optional(),
   avatarUrl: z.string().nullable().optional(),
+  password: z.string().min(8).regex(/^\S+$/, "Password cannot contain spaces").optional(),
 });
 
 export const updateAdminProfileSchema = z.object({

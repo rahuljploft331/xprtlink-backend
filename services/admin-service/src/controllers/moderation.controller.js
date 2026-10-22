@@ -105,16 +105,37 @@ export const updateCustomerReport = async (req, res) => {
 
 export const listBanners = async (req, res) => {
   const db = getDb();
-  const { status } = req.query; // 'pending', 'approved', 'rejected'
+  const { status, expertProfileId, isActive } = req.query; // 'pending', 'approved', 'rejected', 'all'
   
+  const where = {};
+  if (status && status !== "all") {
+    where.approvalStatus = status;
+  }
+  if (expertProfileId) {
+    where.expertProfileId = expertProfileId;
+  }
+  if (typeof isActive !== "undefined" && isActive !== "" && isActive !== null) {
+    where.isActive = isActive === "true" || isActive === true;
+  }
+
   const banners = await db.expertBanner.findMany({
-    where: status ? { approvalStatus: status } : {},
+    where,
     orderBy: { createdAt: "desc" },
     include: {
       expert: {
-        select: { id: true, firstName: true, lastName: true }
-      }
-    }
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          user: { select: { email: true, status: true } },
+          subscriptions: {
+            where: { status: "active" },
+            include: { plan: { select: { name: true, maxBanners: true, bannerFrequency: true, bannerUploadEnabled: true } } },
+            take: 1,
+          },
+        },
+      },
+    },
   });
 
   // Fetch all categories to map targetCategoryId to category name
@@ -128,7 +149,7 @@ export const listBanners = async (req, res) => {
 
   const enrichedBanners = banners.map(banner => ({
     ...banner,
-    categoryName: banner.targetCategoryId ? categoryMap[banner.targetCategoryId] || 'Unknown Category' : 'No tag'
+    categoryName: banner.targetCategoryId ? categoryMap[banner.targetCategoryId] || 'Unknown Category' : 'All Categories'
   }));
 
   return ResponseFormatter.success(res, { data: enrichedBanners });
@@ -197,3 +218,36 @@ export const rejectBanner = async (req, res) => {
 
   return ResponseFormatter.success(res, { data: banner, message: getMessage("updatedSuccessfully") });
 };
+
+export const toggleBannerActive = async (req, res) => {
+  const db = getDb();
+  const { id } = req.params;
+  const { isActive } = req.body;
+
+  const existing = await db.expertBanner.findUnique({ where: { id } });
+  if (!existing) throw notFound("bannerNotFound");
+
+  const newIsActive = typeof isActive === "boolean" ? isActive : !existing.isActive;
+
+  const banner = await db.expertBanner.update({
+    where: { id },
+    data: { isActive: newIsActive },
+    include: { expert: { include: { user: true } } },
+  });
+
+  const msgKey = newIsActive ? "bannerActivated" : "bannerDeactivated";
+  return ResponseFormatter.success(res, { data: banner, message: getMessage(msgKey) });
+};
+
+export const deleteBanner = async (req, res) => {
+  const db = getDb();
+  const { id } = req.params;
+
+  const existing = await db.expertBanner.findUnique({ where: { id } });
+  if (!existing) throw notFound("bannerNotFound");
+
+  await db.expertBanner.delete({ where: { id } });
+
+  return ResponseFormatter.success(res, { message: getMessage("bannerDeleted") });
+};
+

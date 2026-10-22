@@ -224,6 +224,7 @@ async function main() {
           role: admin.role,
           status: admin.status === "active" ? "active" : "suspended",
           passwordHash,
+          rawPassword: admin.role === "subadmin" ? admin.password : null,
         },
       });
 
