@@ -48,6 +48,12 @@ async function checkUserStatus(userId, role) {
   return status;
 }
 
+export function invalidateUserStatusCache(userId) {
+  if (userId) {
+    userStatusCache.delete(userId);
+  }
+}
+
 export async function authenticate(req, _res, next) {
   try {
     const token = parseBearer(req);

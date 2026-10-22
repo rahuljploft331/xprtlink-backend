@@ -10,13 +10,25 @@ const PERMISSION_LEVEL_VALUES = Object.values(ADMIN_PERMISSION_LEVELS);
 export const createAdminSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
-  password: z.string().min(8),
+  password: z.string().min(8).regex(/^\S+$/, "Password cannot contain spaces"),
   role: z.literal("subadmin").optional().default("subadmin"),
+  status: z.enum(["active", "suspended"]).optional().default("active"),
+  permissions: z.record(z.enum(ADMIN_MODULES), z.enum(PERMISSION_LEVEL_VALUES)).optional(),
 });
 
 export const updateAdminSchema = z.object({
   name: z.string().min(1).optional(),
   status: z.enum(["active", "suspended"]).optional(),
+  avatarUrl: z.string().nullable().optional(),
+  password: z.string().min(8).regex(/^\S+$/, "Password cannot contain spaces").optional(),
+});
+
+export const updateAdminProfileSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  avatarUrl: z.string().nullable().optional(),
+  avatarBase64: z.string().nullable().optional(),
+  mimeType: z.string().optional(),
+  fileName: z.string().optional(),
 });
 
 export const setPermissionsSchema = z.object({

@@ -35,7 +35,13 @@
   "loggedOut": "Logged out",
   "broadcastNotificationsNotYetImplemented": "Broadcast notifications not yet implemented",
   "categoryDeleted": "Category deleted",
+  "categoryInUseCannotDelete": "This category is currently in use by {count} expert(s) and cannot be deleted. You can deactivate it instead.",
+  "categoryInUseByBannersCannotDelete": "This category is currently referenced by {count} banner(s) and cannot be deleted.",
+  "categorySlugCannotBeChangedWhenInUse": "Category slug cannot be changed while in use by experts. You can only edit the category name.",
   "customerNotFound": "Customer not found",
+  "customerDeleted": "Customer account deleted successfully",
+  "expertDeleted": "Expert account deleted successfully",
+  "cannotDeleteAlreadyDeleted": "This account has already been deleted.",
   "pageUpdated": "Page updated",
   "sessionValid": "Session valid",
   "registered": "Registered",
@@ -329,6 +335,8 @@
   "otpTooManyAttempts": "Too many incorrect attempts. Please try again later.",
   "otpIncorrect": "Incorrect code. Please try again.",
   "bannerDeleted": "Banner deleted successfully.",
+  "bannerActivated": "Banner activated successfully.",
+  "bannerDeactivated": "Banner deactivated successfully.",
   "callStatusLoaded": "Call status loaded",
   "subscriptionPlanUpdated": "Subscription Plan updated successfully",
   "appleSubscriptionVerified": "Apple subscription verified successfully",
@@ -396,5 +404,7 @@
   "subscriptionAlreadyCurrent": "Your subscription is already up to date",
   "subscriptionOnHold": "Your subscription is on hold due to a billing issue. Please update your payment method in {store}.",
   "subscriptionInGracePeriod": "Your subscription payment failed. You are in a grace period until {date}. Please update your payment method to keep your access.",
-  "consultationRateTooLow": "Consultation rate must be at least $15.00 per 30 minutes"
+  "consultationRateTooLow": "Consultation rate must be at least $15.00 per 30 minutes",
+  "adminProfileUpdated": "Profile updated successfully"
 }
+

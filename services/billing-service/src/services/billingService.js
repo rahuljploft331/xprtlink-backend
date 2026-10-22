@@ -509,6 +509,14 @@ async function settleConsultation(consultationId, { durationSeconds, explicitCar
   const commissionCents = computeConsultationCommissionCents(chargedCents, rate);
   const expertShareCents = chargedCents - commissionCents;
 
+  const customerPm = await db.paymentMethod.findFirst({
+    where: { customerProfileId: consultation.customerId },
+    orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+    select: { brand: true, last4: true },
+  });
+  const pmBrand = customerPm?.brand ? customerPm.brand.charAt(0).toUpperCase() + customerPm.brand.slice(1).toLowerCase() : null;
+  const paymentMethodLabel = pmBrand && customerPm?.last4 ? `${pmBrand} •••• ${customerPm.last4}` : "Card";
+
   let result;
   try {
     result = await db.$transaction(async (tx) => {
@@ -527,6 +535,10 @@ async function settleConsultation(consultationId, { durationSeconds, explicitCar
                 customerProfileId: consultation.customerId,
                 source,
                 kind: payment.kind,
+                brand: customerPm?.brand || null,
+                last4: customerPm?.last4 || null,
+                paymentMethod: paymentMethodLabel,
+                method: "card",
                 ...(shortfallCents > 0 ? { billedCents: amountCents, shortfallCents } : {}),
               },
             },
@@ -891,6 +903,9 @@ export async function refundConsultation(consultationId, { reason, adminUserId }
             stripeRefundId: refund.id,
             reason: reason ?? null,
             adminUserId: adminUserId ?? null,
+            brand: charge.metadata?.brand || null,
+            last4: charge.metadata?.last4 || null,
+            paymentMethod: charge.metadata?.paymentMethod || (charge.metadata?.brand && charge.metadata?.last4 ? `${charge.metadata.brand} •••• ${charge.metadata.last4}` : "Original Payment Method"),
           },
         },
       });
@@ -1382,6 +1397,9 @@ async function handleChargeRefunded(stripeCharge) {
             refundedTransactionId: ctx.txn.id,
             stripeRefundId: r.id,
             source: "stripe_dashboard",
+            brand: ctx.txn.metadata?.brand || null,
+            last4: ctx.txn.metadata?.last4 || null,
+            paymentMethod: ctx.txn.metadata?.paymentMethod || (ctx.txn.metadata?.brand && ctx.txn.metadata?.last4 ? `${ctx.txn.metadata.brand} •••• ${ctx.txn.metadata.last4}` : "Original Payment Method"),
           },
         },
       });

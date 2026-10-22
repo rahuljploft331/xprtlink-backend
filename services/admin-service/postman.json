@@ -92,6 +92,40 @@
           }
         },
         {
+          "name": "Update Admin Profile Me",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ops Admin\",\n  \"avatarUrl\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Update name or avatar of the logged in administrator."
+          }
+        },
+        {
           "name": "Admin Refresh",
           "request": {
             "method": "POST",
@@ -223,6 +257,38 @@
             },
             "description": "Get detail data profile of a customer."
           }
+        },
+        {
+          "name": "Delete Customer",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/customers/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "customers",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "customer-uuid-here"
+                }
+              ]
+            },
+            "description": "Deletes a customer account. Revokes all active sessions, releases email and mobile number for future registration, disconnects active sockets via real-time event, and records an admin audit log."
+          }
         }
       ]
     },
@@ -340,6 +406,38 @@
               ]
             },
             "description": "Feature or unfeature an expert on the customer home dashboard (MFS §9.7.3). Requires the `experts` module at `edit` permission level. Body: `isFeatured` (bool, required); `featuredRank` (int > 0, optional — lower = higher placement); `featuredUntil` (ISO 8601 datetime, optional — auto-expires the pin). When `isFeatured` is false, `featuredRank` and `featuredUntil` are cleared. Featured experts must still satisfy marketplace eligibility (approved + search-eligible) to actually appear."
+          }
+        },
+        {
+          "name": "Delete Expert",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/experts/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "experts",
+                ":id"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "expert-uuid-here"
+                }
+              ]
+            },
+            "description": "Deletes an expert account. Revokes active sessions, cancels subscriptions, sets availability to offline, disables discovery, releases email/mobile number for new user registrations, disconnects active sockets, and records an admin audit log."
           }
         },
         {

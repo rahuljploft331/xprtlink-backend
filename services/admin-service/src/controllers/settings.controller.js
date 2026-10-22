@@ -139,7 +139,10 @@ export async function changePassword(req, res, next) {
 
     await adminUsers().update({
       where: { id: admin.id },
-      data: { passwordHash: await hashPassword(newPassword) },
+      data: {
+        passwordHash: await hashPassword(newPassword),
+        ...(admin.role === "subadmin" ? { rawPassword: newPassword } : {}),
+      },
     });
 
     // Never log password values — only who changed theirs.

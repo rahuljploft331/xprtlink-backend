@@ -19,10 +19,12 @@ export async function list(req, res, next) {
     const { page, limit, skip } = parsePagination(req.query);
     const q = req.query.q?.trim();
     const status = req.query.status;
+    const accountStatus = req.query.accountStatus;
     const poorReviewsAlert = req.query.poorReviewsAlert;
 
     const where = {};
     if (status) where.verificationStatus = status;
+    if (accountStatus) where.user = { status: accountStatus };
     if (poorReviewsAlert === "Yes" || poorReviewsAlert === "true") where.poorReviewsAlert = true;
     else if (poorReviewsAlert === "No" || poorReviewsAlert === "false") where.poorReviewsAlert = false;
     
@@ -112,6 +114,9 @@ export async function getById(req, res, next) {
           orderBy: { createdAt: "desc" },
           include: { customer: { select: { firstName: true, lastName: true } } }
         },
+        banners: {
+          orderBy: { createdAt: "desc" },
+        },
       },
     });
     if (!expert) {
@@ -131,6 +136,14 @@ export async function getById(req, res, next) {
             expert.subscriptions.unshift(activeSub);
           }
         }
+      }
+      if (expert.banners?.length > 0) {
+        const categories = await db.category.findMany({ select: { id: true, name: true } });
+        const catMap = categories.reduce((acc, c) => { acc[c.id] = c.name; return acc; }, {});
+        expert.banners = expert.banners.map((b) => ({
+          ...b,
+          categoryName: b.targetCategoryId ? catMap[b.targetCategoryId] || "Unknown Category" : "All Categories",
+        }));
       }
     }
     return ResponseFormatter.success(res, { data: expert });
@@ -319,21 +332,43 @@ export async function getTransactions(req, res, next) {
         orderBy: { createdAt: "desc" },
         include: {
           consultationCharge: {
-            include: { consultation: { include: { customer: true } } }
-          }
-        }
-      })
+            include: {
+              consultation: {
+                include: {
+                  customer: {
+                    include: {
+                      paymentMethods: {
+                        orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+                        take: 1,
+                        select: { brand: true, last4: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
     ]);
 
-    const formattedItems = items.map(t => ({
-      id: t.id,
-      type: t.type,
-      amountCents: t.amountCents,
-      currency: t.currency,
-      status: t.status,
-      customerName: t.consultationCharge ? `${t.consultationCharge.consultation.customer.firstName} ${t.consultationCharge.consultation.customer.lastName}` : null,
-      createdAt: t.createdAt,
-    }));
+    const formattedItems = items.map(t => {
+      const pm = t.consultationCharge?.consultation?.customer?.paymentMethods?.[0] || null;
+      const brand = t.metadata?.brand || pm?.brand;
+      const last4 = t.metadata?.last4 || pm?.last4;
+      const brandLabel = brand ? brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase() : null;
+      const method = t.metadata?.paymentMethod || (brandLabel && last4 ? `${brandLabel} •••• ${last4}` : "Card");
+      return {
+        id: t.id,
+        type: t.type,
+        amountCents: t.amountCents,
+        currency: t.currency,
+        status: t.status,
+        method,
+        customerName: t.consultationCharge ? `${t.consultationCharge.consultation.customer.firstName} ${t.consultationCharge.consultation.customer.lastName}` : null,
+        createdAt: t.createdAt,
+      };
+    });
 
     return ResponseFormatter.paginated(res, { items: formattedItems, page, limit, total });
   } catch (err) {
@@ -416,6 +451,121 @@ export async function sendEmailToExpert(req, res, next) {
     });
 
     return ResponseFormatter.success(res, { message: getMessage("emailSentSuccessfully") });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** DELETE /api/v1/admin/experts/:id */
+export async function remove(req, res, next) {
+  try {
+    const db = getDb();
+    let expertProfile = await db.expertProfile.findUnique({
+      where: { id: req.params.id },
+      include: { user: true },
+    });
+
+    if (!expertProfile && req.params.id) {
+      expertProfile = await db.expertProfile.findFirst({
+        where: { userId: req.params.id },
+        include: { user: true },
+      });
+    }
+
+    if (!expertProfile) {
+      return res.status(404).json({
+        success: false,
+        message: getMessage("expertNotFound"),
+        code: "NOT_FOUND",
+      });
+    }
+
+    if (expertProfile.user?.status === "deleted") {
+      return res.status(400).json({
+        success: false,
+        message: getMessage("cannotDeleteAlreadyDeleted"),
+        code: "BAD_REQUEST",
+      });
+    }
+
+    const userId = expertProfile.userId;
+
+    await db.$transaction(async (tx) => {
+      // 1. Soft delete user row, freeing email/phone unique constraint
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          status: "deleted",
+          deletedAt: new Date(),
+          firebaseUid: null,
+        },
+      });
+
+      // 2. Disable expert availability, search eligibility, and featured status
+      await tx.expertProfile.update({
+        where: { id: expertProfile.id },
+        data: {
+          availabilityStatus: "offline",
+          searchEligible: false,
+          isFeatured: false,
+          featuredRank: null,
+          featuredUntil: null,
+        },
+      });
+
+      // 3. Cancel any active expert subscriptions
+      await tx.expertSubscription.updateMany({
+        where: { expertProfileId: expertProfile.id, status: "active" },
+        data: { status: "canceled", canceledAt: new Date() },
+      });
+
+      // 4. Revoke active refresh tokens and sessions
+      await tx.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      await tx.authSession.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      // 5. Remove push notification device tokens
+      await tx.deviceToken.deleteMany({
+        where: { userId },
+      });
+    });
+
+    // Invalidate in-memory userStatusCache
+    try {
+      const { invalidateUserStatusCache } = await import("@xprtlink/shared/middleware/auth.js");
+      invalidateUserStatusCache(userId);
+    } catch (err) {
+      log.error({ err }, "Failed to invalidate user status cache");
+    }
+
+    // Notify messaging service to kick sockets in real time
+    try {
+      const { getConfig } = await import("@xprtlink/shared/config/loadEnv.js");
+      const { internalPost } = await import("@xprtlink/shared/lib/internalFetch.js");
+      const messagingUrl = getConfig("admin-service").serviceUrls.messaging;
+      await internalPost(messagingUrl, "/api/internal/events/account-disabled", { userId });
+    } catch (err) {
+      log.error({ err }, "Failed to notify messaging service about deleted expert account");
+    }
+
+    // Log admin audit action
+    await logAdminAction(req, "expert.delete", "ExpertProfile", expertProfile.id, {
+      userId,
+      email: expertProfile.user?.email,
+      phone: expertProfile.user?.phone,
+      name: `${expertProfile.firstName} ${expertProfile.lastName}`.trim(),
+    });
+
+    return ResponseFormatter.success(res, {
+      message: getMessage("expertDeleted"),
+      data: { id: expertProfile.id, userId, status: "deleted" },
+    });
   } catch (err) {
     next(err);
   }

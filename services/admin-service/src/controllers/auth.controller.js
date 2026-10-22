@@ -8,6 +8,10 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { createHash } from "crypto";
 import crypto from "crypto";
+import path from "path";
+import { updateAdminProfileSchema } from "@xprtlink/shared/contracts/admin.schema.js";
+import { logAdminAction } from "#utils/audit.js";
+import { uploadBufferToS3, getS3BucketName } from "@xprtlink/shared/utils/s3.js";
 
 const isProduction = process.env.NODE_ENV === "production";
 
@@ -250,3 +254,71 @@ export async function me(req, res, next) {
     next(err);
   }
 }
+
+/** PATCH /api/auth/me — update current admin's own profile (name, avatar) */
+export async function updateMe(req, res, next) {
+  try {
+    const admin = req.adminUser;
+    const body = updateAdminProfileSchema.parse(req.body);
+    const updateData = {};
+
+    if (body.name !== undefined) {
+      updateData.name = body.name.trim();
+    }
+
+    if (body.avatarBase64) {
+      const rawData = body.avatarBase64.replace(/^data:[^;]+;base64,/, "");
+      const buffer = Buffer.from(rawData, "base64");
+      const ext = body.fileName && body.fileName.includes(".")
+        ? path.extname(body.fileName)
+        : (body.mimeType === "image/png" ? ".png" : body.mimeType === "image/webp" ? ".webp" : ".jpg");
+      const s3Key = `admin/avatars/${admin.id}/${Date.now()}${ext}`;
+
+      try {
+        await uploadBufferToS3(s3Key, buffer, body.mimeType || "image/jpeg");
+        const bucket = getS3BucketName();
+        const region = process.env.AWS_REGION || "us-west-2";
+        updateData.avatarUrl = `https://${bucket}.s3.${region}.amazonaws.com/${s3Key}`;
+      } catch (_s3Err) {
+        // Fall back to storing inline data URL if S3 is unavailable / access denied
+        updateData.avatarUrl = body.avatarBase64.startsWith("data:")
+          ? body.avatarBase64
+          : `data:${body.mimeType || "image/jpeg"};base64,${body.avatarBase64}`;
+      }
+    } else if (body.avatarUrl !== undefined) {
+      updateData.avatarUrl = body.avatarUrl;
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return next(badRequest("missingRequiredFields"));
+    }
+
+    const updated = await adminUsers().update({
+      where: { id: admin.id },
+      data: updateData,
+      include: { permissions: true },
+    });
+
+    await logAdminAction(req, "admin.profile_update", "AdminUser", admin.id, {
+      name: updated.name,
+      avatarUpdated: Boolean(updateData.avatarUrl !== undefined),
+    });
+
+    const { passwordHash: _ph, ...adminSafe } = updated;
+
+    return ResponseFormatter.success(res, {
+      message: getMessage("adminProfileUpdated"),
+      data: {
+        ...adminSafe,
+        ...(req.token ? { accessToken: req.token } : {}),
+        permissions: updated.permissions.reduce((acc, p) => {
+          acc[p.module] = p.level;
+          return acc;
+        }, {}),
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
