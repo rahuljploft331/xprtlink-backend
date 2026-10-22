@@ -118,9 +118,13 @@ async function createProfileForRole(
   role,
   firstName,
   lastName,
-  { categoryIds, avatarMediaId, withPassword = false } = {}
+  { categoryIds, avatarMediaId, withPassword = false, passwordHash } = {}
 ) {
-  const pw = withPassword ? await resolveInitialPasswordHash(tx, userId) : {};
+  const pw = passwordHash
+    ? { passwordHash, passwordUpdatedAt: new Date() }
+    : withPassword
+    ? await resolveInitialPasswordHash(tx, userId)
+    : {};
   if (role === "customer") {
     return tx.user.update({
       where: { id: userId },
@@ -226,26 +230,9 @@ export async function register(body) {
       throw conflict("emailAlreadyExistsForRole", "EMAIL_TAKEN", params);
     }
 
-    const otherHash =
-      roleHash(existingActiveUserWithEmail, otherRoleOf(role)) ??
-      (existingActiveUserWithEmail.customerProfile || existingActiveUserWithEmail.expertProfile
-        ? null
-        : existingActiveUserWithEmail.passwordHash);
-    const hasOtherPassword = Boolean(otherHash);
-    if (!hasOtherPassword && existingActiveUserWithEmail.firebaseUid) {
-      throw conflict("accountCreatedViaSocialLogin", "USE_SOCIAL_LOGIN", params);
-    }
-
-    if (!password) {
-      throw badRequest("passwordRequiredForExistingAccount", "PASSWORD_REQUIRED", "password", params);
-    }
-
-    // Proof of ownership: the password of the role the account already has.
-    const isPasswordValid = await verifyPassword(password, otherHash);
-    if (!isPasswordValid) {
-      throw conflict("existingPasswordWrong", "INVALID_PASSWORD", params);
-    }
-
+    // Proof of ownership is the phone: it must match the account's phone and have
+    // been OTP-verified (checked below). The password typed here becomes the new
+    // role's own password, independent of the other role's.
     if (existingActiveUserWithEmail.phone !== phone) {
       throw conflict("emailRegisteredWithDifferentPhone", "PHONE_MISMATCH", params);
     }
@@ -432,7 +419,15 @@ export async function register(body) {
     purpose: "register",
     channel: otpChannel,
     userId,
-    registrationData: { role, firstName, lastName, otpChannel, categoryIds, avatarMediaId },
+    registrationData: {
+      role,
+      firstName,
+      lastName,
+      otpChannel,
+      categoryIds,
+      avatarMediaId,
+      ...(existingActiveUserWithEmail ? { passwordHash } : {}),
+    },
   });
 }
 
@@ -675,7 +670,7 @@ export async function verifyOtp(body) {
       );
     }
 
-    const { role, firstName, lastName, otpChannel, categoryIds, avatarMediaId } =
+    const { role, firstName, lastName, otpChannel, categoryIds, avatarMediaId, passwordHash: roleOwnHash } =
       challenge.registrationData;
 
     // Validate the optional sign-up avatar: it must be a "ready" avatar asset
@@ -741,6 +736,7 @@ export async function verifyOtp(body) {
         categoryIds,
         avatarMediaId: resolvedAvatarMediaId,
         withPassword: true,
+        passwordHash: roleOwnHash,
       });
     });
 
