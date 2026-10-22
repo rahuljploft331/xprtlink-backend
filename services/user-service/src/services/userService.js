@@ -430,6 +430,21 @@ export async function register(body) {
   });
 }
 
+// Enumeration safety: for an unknown account (or a role the account doesn't have)
+// we still write an OTP row — same resend cooldown, attempt counting and response
+// shape as a real one — but deliver nothing and mark it so it can never succeed.
+async function sendDummyOtp({ email, phone, purpose, channel, role }) {
+  return createAndDeliverOtp({
+    email,
+    phone,
+    purpose,
+    channel: channel ?? (phone ? "phone" : "email"),
+    userId: null,
+    registrationData: { role: role ?? null, dummy: true },
+    skipDelivery: true,
+  });
+}
+
 // ─── Login ────────────────────────────────────────────────────────────────────
 
 export async function login(body) {
@@ -457,7 +472,10 @@ export async function login(body) {
     // M7: constant-time dummy compare to prevent timing-based email enumeration.
     // Without this, nonexistent emails return ~0ms while valid ones take ~100ms (bcrypt).
     await verifyPassword("__dummy_password_that_never_matches__", "$2b$10$abcdefghijklmnopqrstuvuXzGO7fMC7VYzWH4HmM0vXcB9tBr7bq");
-    throw unauthorized("unregisteredUser");
+    // Phone login is OTP-based and has no credentials to fail — answer exactly like a
+    // known account (a code is "sent") so unknown phones can't be told apart.
+    if (phone) return { needsOtp: true, ...(await sendDummyOtp({ phone, purpose: "login", channel: "phone", role })) };
+    throw unauthorized("invalidRoleCredentials", "UNAUTHORIZED", roleParams(role));
   }
 
   if (phone) {
@@ -565,15 +583,10 @@ export async function sendOtp(body) {
       where: email ? { email, deletedAt: null } : { phone, deletedAt: null },
       include: { customerProfile: true, expertProfile: true },
     });
-    if (!user) throw notFound("unregisteredUser");
-    if (role) {
-      const hasRole =
-        role === "customer"
-          ? Boolean(user.customerProfile)
-          : role === "expert"
-          ? Boolean(user.expertProfile)
-          : true;
-      if (!hasRole) throw notFound("unregisteredUser");
+    const hasRole =
+      !role || (role === "customer" ? Boolean(user?.customerProfile) : role === "expert" ? Boolean(user?.expertProfile) : true);
+    if (!user || !hasRole) {
+      return sendDummyOtp({ email, phone, purpose, channel: phone ? "phone" : "email", role });
     }
     userId = user.id;
     if (!registrationData) {
@@ -616,6 +629,8 @@ export async function verifyOtp(body) {
   const db = getDb();
   const challenge = await findValidOtpChallenge({ email, phone, purpose });
   await verifyOtpCode(challenge, code);
+  // Decoy challenge (unknown account) — never redeemable; same error as a wrong code.
+  if (challenge.registrationData?.dummy) throw badRequest("otpIncorrect", "INVALID_OTP", email ? "email" : "phone");
 
   if (purpose === "reset_password") {
     return { verified: true };
@@ -648,7 +663,7 @@ export async function verifyOtp(body) {
       });
     });
 
-    if (!user) throw notFound("unregisteredUser");
+    if (!user) throw badRequest("otpIncorrect", "INVALID_OTP", email ? "email" : "phone");
 
     const targetRole = challenge.registrationData?.role || (user.expertProfile && !user.customerProfile ? "expert" : "customer");
     const tokens = await issueTokens(user, targetRole);
@@ -833,14 +848,20 @@ export async function forgotPassword(body) {
   // Reset is per role. If the caller names a role, that profile must exist; if
   // not (older clients), fall back to the only profile, or both when they have two.
   const role = body.role === "customer" || body.role === "expert" ? body.role : null;
-  // A missing role looks exactly like an unknown account.
+  const { ttlMs } = getOtpConfig();
+  const channel = email ? "email" : "phone";
+
+  // A missing role looks exactly like an unknown account: same 200 shape, same
+  // cooldown behaviour, nothing delivered, and the code can never be redeemed.
   if (!user || (role && !user[profileKey(role)])) {
-    // M7: timing mitigation
-    await verifyPassword("__dummy_password_that_never_matches__", "$2b$10$abcdefghijklmnopqrstuvuXzGO7fMC7VYzWH4HmM0vXcB9tBr7bq");
-    throw notFound("unregisteredUser");
+    try {
+      await sendDummyOtp({ email, phone, purpose: "reset_password", channel, role });
+    } catch (err) {
+      log.error({ err: err.message }, "[forgotPassword] dummy OTP failed:");
+    }
+    return { sent: true, role, expiresInSeconds: ttlMs / 1000, channel };
   }
 
-  const { ttlMs } = getOtpConfig();
 
   // Await so the OTP challenge row is persisted before we respond. Previously this
   // was fire-and-forget, which raced the immediate /password/reset call and made
@@ -871,11 +892,15 @@ export async function resetPassword(body) {
     where: email ? { email, deletedAt: null } : { phone, deletedAt: null },
     include: { customerProfile: { select: { id: true } }, expertProfile: { select: { id: true } } },
   });
-  if (!user) throw notFound("userNotFound");
 
   // Role was recorded when the code was requested. No role (older clients) =
   // every profile on the account, which is the previous behaviour.
   const role = challenge.registrationData?.role ?? null;
+  // Decoy challenge, deleted account, or a role the account doesn't have: all
+  // look exactly like a wrong code.
+  if (challenge.registrationData?.dummy || !user || (role && !user[profileKey(role)])) {
+    throw badRequest("otpIncorrect", "INVALID_OTP", email ? "email" : "phone");
+  }
   const roles = role ? [role] : ["customer", "expert"].filter((r) => user[profileKey(r)]);
   const passwordHash = await hashPassword(newPassword);
   const passwordUpdatedAt = new Date();

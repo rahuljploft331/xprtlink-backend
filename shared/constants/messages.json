@@ -165,7 +165,6 @@
   "currentPasswordIncorrect": "Current password is incorrect",
   "currentRolePasswordIncorrect": "Your current {role} password is incorrect.",
   "samePhoneNumber": "This is already your current mobile number.",
-  "unregisteredUser": "The user is not registered with these details.",
   "userNotFound": "User not found",
   "expertProfileNotFound": "Expert profile not found",
   "customerProfileNotFound": "Customer profile not found",
