@@ -1,4 +1,5 @@
 import { toIso } from "./common.js";
+import { decryptPassword } from "../utils/passwordVault.js";
 
 /**
  * Admin user DTO — explicit allow-list, never exposes passwordHash or other
@@ -12,8 +13,8 @@ export function toAdminUserDto(admin) {
     avatarUrl: admin.avatarUrl ?? null,
     role: admin.role,
     status: admin.status,
-    currentPassword: admin.role === "subadmin" ? (admin.rawPassword ?? null) : null,
-    rawPassword: admin.role === "subadmin" ? (admin.rawPassword ?? null) : null,
+    currentPassword: admin.role === "subadmin" ? decryptPassword(admin.passwordEncrypted) : null,
+    rawPassword: admin.role === "subadmin" ? decryptPassword(admin.passwordEncrypted) : null,
     permissionsMap: (admin.permissions ?? []).reduce((acc, p) => {
       acc[p.module] = p.level;
       return acc;

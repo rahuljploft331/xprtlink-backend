@@ -3,6 +3,7 @@ import { platformSettings } from "@xprtlink/shared/db/repositories/catalog/index
 import { adminUsers } from "@xprtlink/shared/db/repositories/admin/index.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { hashPassword, verifyPassword } from "@xprtlink/shared/auth/password.js";
+import { encryptPassword } from "@xprtlink/shared/utils/passwordVault.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { badRequest, unauthorized } from "@xprtlink/shared/utils/errors.js";
 import {
@@ -141,7 +142,7 @@ export async function changePassword(req, res, next) {
       where: { id: admin.id },
       data: {
         passwordHash: await hashPassword(newPassword),
-        ...(admin.role === "subadmin" ? { rawPassword: newPassword } : {}),
+        ...(admin.role === "subadmin" ? { passwordEncrypted: encryptPassword(newPassword) } : {}),
       },
     });
 

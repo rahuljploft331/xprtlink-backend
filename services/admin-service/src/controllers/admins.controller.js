@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { hashPassword } from "@xprtlink/shared/auth/password.js";
+import { encryptPassword } from "@xprtlink/shared/utils/passwordVault.js";
 import { adminUsers } from "@xprtlink/shared/db/repositories/admin/index.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import {
@@ -52,7 +53,7 @@ export async function create(req, res, next) {
           name,
           email: email.toLowerCase(),
           passwordHash,
-          rawPassword: role === "subadmin" ? password : null,
+          passwordEncrypted: role === "subadmin" ? encryptPassword(password) : null,
           role,
           status: status || "active",
         },
@@ -116,7 +117,7 @@ export async function update(req, res, next) {
     if (password) {
       updateData.passwordHash = await hashPassword(password);
       if (existing.role === "subadmin") {
-        updateData.rawPassword = password;
+        updateData.passwordEncrypted = encryptPassword(password);
       }
     }
 
@@ -154,7 +155,7 @@ export async function resetPassword(req, res, next) {
       where: { id: admin.id },
       data: {
         passwordHash: await hashPassword(tempPassword),
-        rawPassword: tempPassword,
+        passwordEncrypted: encryptPassword(tempPassword),
       },
     });
 
