@@ -17,6 +17,15 @@ export const createAdminSchema = z.object({
 export const updateAdminSchema = z.object({
   name: z.string().min(1).optional(),
   status: z.enum(["active", "suspended"]).optional(),
+  avatarUrl: z.string().nullable().optional(),
+});
+
+export const updateAdminProfileSchema = z.object({
+  name: z.string().trim().min(1).max(120).optional(),
+  avatarUrl: z.string().nullable().optional(),
+  avatarBase64: z.string().nullable().optional(),
+  mimeType: z.string().optional(),
+  fileName: z.string().optional(),
 });
 
 export const setPermissionsSchema = z.object({

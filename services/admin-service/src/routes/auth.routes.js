@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { login, logout, me, refresh } from "#controllers/auth.controller.js";
+import { login, logout, me, refresh, updateMe } from "#controllers/auth.controller.js";
 import { requireAdmin } from "#middlewares/adminAuth.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 
@@ -20,5 +20,8 @@ router.post("/refresh", asyncHandler(refresh));
 
 /** GET /api/auth/me */
 router.get("/me", requireAdmin, asyncHandler(me));
+
+/** PATCH /api/auth/me */
+router.patch("/me", requireAdmin, asyncHandler(updateMe));
 
 export default router;

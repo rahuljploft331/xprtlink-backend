@@ -5,7 +5,7 @@ import routes from "./src/routes/index.js";
 import { startPoller, stopPoller } from "./src/utils/ssePoller.js";
 
 const config = getConfig("admin-service");
-const app = createApp();
+const app = createApp({ jsonLimit: "15mb", urlEncodedLimit: "15mb" });
 
 app.use("/api/v1/admin", routes);
 app.use(notFoundHandler);

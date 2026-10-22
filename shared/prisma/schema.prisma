@@ -1217,6 +1217,7 @@ model AdminUser {
   email        String          @unique @db.VarChar(320)
   passwordHash String          @map("password_hash") @db.VarChar(255)
   name         String          @db.VarChar(120)
+  avatarUrl    String?         @map("avatar_url")
   role         AdminRole
   status       AdminUserStatus @default(active)
   createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)

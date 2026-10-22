@@ -92,6 +92,40 @@
           }
         },
         {
+          "name": "Update Admin Profile Me",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ops Admin\",\n  \"avatarUrl\": null\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/auth/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Update name or avatar of the logged in administrator."
+          }
+        },
+        {
           "name": "Admin Refresh",
           "request": {
             "method": "POST",

@@ -9,6 +9,7 @@ export function toAdminUserDto(admin) {
     id: admin.id,
     name: admin.name,
     email: admin.email,
+    avatarUrl: admin.avatarUrl ?? null,
     role: admin.role,
     status: admin.status,
     permissionsMap: (admin.permissions ?? []).reduce((acc, p) => {
