@@ -189,7 +189,9 @@
               "mode": "raw",
               "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"phone\": \"{{runPhone}}\",\n  \"password\": \"{{runPassword}}\",\n  \"confirmPassword\": \"{{runPassword}}\",\n  \"firstName\": \"John\",\n  \"lastName\": \"Doe\",\n  \"role\": \"customer\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}",
               "options": {
-                "raw": { "language": "json" }
+                "raw": {
+                  "language": "json"
+                }
               }
             },
             "url": {
@@ -325,8 +327,138 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "register"]
             },
-            "description": "**Registration Step 3 of 4 (EXPERT).**\n\n**PREREQUISITE:** The phone number MUST be pre-verified via POST /auth/otp/send + POST /auth/otp/verify (purpose: verify_phone) within the last 30 minutes. Without this, registration will fail with PHONE_NOT_VERIFIED. _(The pre-request script above performs this pre-verification automatically.)_\n\nSame endpoint as customer but with role='expert' and optional categoryIds.\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'expert'.\nOptional: otpChannel ('email' | 'phone', default phone), categoryIds (array of category UUIDs — selects the expert's categories; falls back to first active category if omitted or all invalid), avatarMediaId (UUID — a profile photo the user already uploaded to media-service with purpose 'avatar' and status 'ready'; attached to the profile at OTP verification. Ignored if the asset is missing, not owned by this user, or not ready). Both omitted here so the request stays self-contained.\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens."
-          }
+            "description": "**Registration Step 3 of 4 (EXPERT).**\n\n**PREREQUISITE:** The phone number MUST be pre-verified via POST /auth/otp/send + POST /auth/otp/verify (purpose: verify_phone) within the last 30 minutes. Without this, registration will fail with PHONE_NOT_VERIFIED. _(The pre-request script above performs this pre-verification automatically.)_\n\nSame endpoint as customer but with role='expert' and optional categoryIds.\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'expert'.\nOptional: otpChannel ('email' | 'phone', default phone), categoryIds (array of category UUIDs — selects the expert's categories; falls back to first active category if omitted or all invalid), avatarMediaId (UUID — a profile photo the user already uploaded to media-service with purpose 'avatar' and status 'ready'; attached to the profile at OTP verification. Ignored if the asset is missing, not owned by this user, or not ready). Both omitted here so the request stays self-contained.\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens.\n\n**Email already has a Customer account?** This adds the Expert profile. Send the existing **Customer password** in `password`/`confirmPassword` (it proves the account is yours) and the same phone; the new Expert profile starts with that password. After that the two passwords are independent (reset/change affect one role only).\n\nErrors: `EMAIL_TAKEN` (already has an Expert account), `INVALID_PASSWORD` (wrong Customer password), `PASSWORD_REQUIRED`, `PHONE_MISMATCH`, `USE_SOCIAL_LOGIN`.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+          },
+          "response": [
+            {
+              "name": "409 EMAIL_TAKEN (already an Expert)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{expertEmail}}\",\n  \"phone\": \"{{expertPhone}}\",\n  \"password\": \"{{runPassword}}\",\n  \"confirmPassword\": \"{{runPassword}}\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Expert\",\n  \"role\": \"expert\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/register",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "register"]
+                },
+                "description": "**Registration Step 3 of 4 (EXPERT).**\n\n**PREREQUISITE:** The phone number MUST be pre-verified via POST /auth/otp/send + POST /auth/otp/verify (purpose: verify_phone) within the last 30 minutes. Without this, registration will fail with PHONE_NOT_VERIFIED. _(The pre-request script above performs this pre-verification automatically.)_\n\nSame endpoint as customer but with role='expert' and optional categoryIds.\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'expert'.\nOptional: otpChannel ('email' | 'phone', default phone), categoryIds (array of category UUIDs — selects the expert's categories; falls back to first active category if omitted or all invalid), avatarMediaId (UUID — a profile photo the user already uploaded to media-service with purpose 'avatar' and status 'ready'; attached to the profile at OTP verification. Ignored if the asset is missing, not owned by this user, or not ready). Both omitted here so the request stays self-contained.\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens.\n\n**Email already has a Customer account?** This adds the Expert profile. Send the existing **Customer password** in `password`/`confirmPassword` (it proves the account is yours) and the same phone; the new Expert profile starts with that password. After that the two passwords are independent (reset/change affect one role only).\n\nErrors: `EMAIL_TAKEN` (already has an Expert account), `INVALID_PASSWORD` (wrong Customer password), `PASSWORD_REQUIRED`, `PHONE_MISMATCH`, `USE_SOCIAL_LOGIN`.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"You already have a Expert account with this email. Please log in instead.\",\n  \"code\": \"EMAIL_TAKEN\"\n}"
+            },
+            {
+              "name": "409 INVALID_PASSWORD (wrong Customer password)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{expertEmail}}\",\n  \"phone\": \"{{expertPhone}}\",\n  \"password\": \"{{runPassword}}\",\n  \"confirmPassword\": \"{{runPassword}}\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Expert\",\n  \"role\": \"expert\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/register",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "register"]
+                },
+                "description": "**Registration Step 3 of 4 (EXPERT).**\n\n**PREREQUISITE:** The phone number MUST be pre-verified via POST /auth/otp/send + POST /auth/otp/verify (purpose: verify_phone) within the last 30 minutes. Without this, registration will fail with PHONE_NOT_VERIFIED. _(The pre-request script above performs this pre-verification automatically.)_\n\nSame endpoint as customer but with role='expert' and optional categoryIds.\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'expert'.\nOptional: otpChannel ('email' | 'phone', default phone), categoryIds (array of category UUIDs — selects the expert's categories; falls back to first active category if omitted or all invalid), avatarMediaId (UUID — a profile photo the user already uploaded to media-service with purpose 'avatar' and status 'ready'; attached to the profile at OTP verification. Ignored if the asset is missing, not owned by this user, or not ready). Both omitted here so the request stays self-contained.\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens.\n\n**Email already has a Customer account?** This adds the Expert profile. Send the existing **Customer password** in `password`/`confirmPassword` (it proves the account is yours) and the same phone; the new Expert profile starts with that password. After that the two passwords are independent (reset/change affect one role only).\n\nErrors: `EMAIL_TAKEN` (already has an Expert account), `INVALID_PASSWORD` (wrong Customer password), `PASSWORD_REQUIRED`, `PHONE_MISMATCH`, `USE_SOCIAL_LOGIN`.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"That Customer password is incorrect. Enter the password you use for your Customer account.\",\n  \"code\": \"INVALID_PASSWORD\"\n}"
+            },
+            {
+              "name": "400 PASSWORD_REQUIRED",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{expertEmail}}\",\n  \"phone\": \"{{expertPhone}}\",\n  \"password\": \"{{runPassword}}\",\n  \"confirmPassword\": \"{{runPassword}}\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Expert\",\n  \"role\": \"expert\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/register",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "register"]
+                },
+                "description": "**Registration Step 3 of 4 (EXPERT).**\n\n**PREREQUISITE:** The phone number MUST be pre-verified via POST /auth/otp/send + POST /auth/otp/verify (purpose: verify_phone) within the last 30 minutes. Without this, registration will fail with PHONE_NOT_VERIFIED. _(The pre-request script above performs this pre-verification automatically.)_\n\nSame endpoint as customer but with role='expert' and optional categoryIds.\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'expert'.\nOptional: otpChannel ('email' | 'phone', default phone), categoryIds (array of category UUIDs — selects the expert's categories; falls back to first active category if omitted or all invalid), avatarMediaId (UUID — a profile photo the user already uploaded to media-service with purpose 'avatar' and status 'ready'; attached to the profile at OTP verification. Ignored if the asset is missing, not owned by this user, or not ready). Both omitted here so the request stays self-contained.\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens.\n\n**Email already has a Customer account?** This adds the Expert profile. Send the existing **Customer password** in `password`/`confirmPassword` (it proves the account is yours) and the same phone; the new Expert profile starts with that password. After that the two passwords are independent (reset/change affect one role only).\n\nErrors: `EMAIL_TAKEN` (already has an Expert account), `INVALID_PASSWORD` (wrong Customer password), `PASSWORD_REQUIRED`, `PHONE_MISMATCH`, `USE_SOCIAL_LOGIN`.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"This email already has a Customer account. Enter your Customer password to add a Expert account.\",\n  \"code\": \"PASSWORD_REQUIRED\",\n  \"field\": \"password\"\n}"
+            },
+            {
+              "name": "409 PHONE_MISMATCH",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{expertEmail}}\",\n  \"phone\": \"{{expertPhone}}\",\n  \"password\": \"{{runPassword}}\",\n  \"confirmPassword\": \"{{runPassword}}\",\n  \"firstName\": \"Jane\",\n  \"lastName\": \"Expert\",\n  \"role\": \"expert\",\n  \"termsAccepted\": true,\n  \"otpChannel\": \"phone\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/register",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "register"]
+                },
+                "description": "**Registration Step 3 of 4 (EXPERT).**\n\n**PREREQUISITE:** The phone number MUST be pre-verified via POST /auth/otp/send + POST /auth/otp/verify (purpose: verify_phone) within the last 30 minutes. Without this, registration will fail with PHONE_NOT_VERIFIED. _(The pre-request script above performs this pre-verification automatically.)_\n\nSame endpoint as customer but with role='expert' and optional categoryIds.\n\n**Response:** `{ sent: true, expiresInSeconds, channel }`\n\nRequired: firstName, lastName, email, phone (E.164), password (MFS rules), confirmPassword, termsAccepted: true, role: 'expert'.\nOptional: otpChannel ('email' | 'phone', default phone), categoryIds (array of category UUIDs — selects the expert's categories; falls back to first active category if omitted or all invalid), avatarMediaId (UUID — a profile photo the user already uploaded to media-service with purpose 'avatar' and status 'ready'; attached to the profile at OTP verification. Ignored if the asset is missing, not owned by this user, or not ready). Both omitted here so the request stays self-contained.\n\n**Next step:** Call POST /auth/otp/verify with { phone, code, purpose: 'register' } to complete registration and get tokens.\n\n**Email already has a Customer account?** This adds the Expert profile. Send the existing **Customer password** in `password`/`confirmPassword` (it proves the account is yours) and the same phone; the new Expert profile starts with that password. After that the two passwords are independent (reset/change affect one role only).\n\nErrors: `EMAIL_TAKEN` (already has an Expert account), `INVALID_PASSWORD` (wrong Customer password), `PASSWORD_REQUIRED`, `PHONE_MISMATCH`, `USE_SOCIAL_LOGIN`.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"This email is already registered with a different phone number. Use the phone number from your Customer account to add a Expert account.\",\n  \"code\": \"PHONE_MISMATCH\"\n}"
+            }
+          ]
         },
         {
           "name": "Send OTP",
@@ -444,7 +576,8 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('status is 200', () => pm.response.to.have.status(200));"
+                  "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('message names the role', () => pm.expect(pm.response.json().message).to.match(/Customer|Expert/));"
                 ]
               }
             }
@@ -466,8 +599,74 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "password", "forgot"]
             },
-            "description": "Initiate password reset. Sends a reset code to email/phone. The role field (customer/expert) is optional but recommended."
-          }
+            "description": "Start a password reset for **one role**. `role` (customer/expert) decides which account's password is reset; the other role's password is untouched. Always send `role` (older clients that omit it reset every profile on the account).\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+          },
+          "response": [
+            {
+              "name": "200 Reset code sent",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"role\": \"customer\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/password/forgot",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "password", "forgot"]
+                },
+                "description": "Start a password reset for **one role**. `role` (customer/expert) decides which account's password is reset; the other role's password is untouched. Always send `role` (older clients that omit it reset every profile on the account).\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Reset code sent for your Customer account.\",\n  \"data\": {\n    \"sent\": true,\n    \"role\": \"customer\",\n    \"expiresInSeconds\": 600,\n    \"channel\": \"email\"\n  }\n}"
+            },
+            {
+              "name": "404 no profile for that role",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"role\": \"customer\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/password/forgot",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "password", "forgot"]
+                },
+                "description": "Start a password reset for **one role**. `role` (customer/expert) decides which account's password is reset; the other role's password is untouched. Always send `role` (older clients that omit it reset every profile on the account).\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"There is no Expert account for these details.\",\n  \"code\": \"NOT_FOUND\"\n}"
+            }
+          ]
         },
         {
           "name": "Reset Password",
@@ -478,6 +677,7 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('message names the role', () => pm.expect(pm.response.json().message).to.match(/Customer|Expert/));",
                   "// Keep the working password in sync for the Login request that follows.",
                   "pm.collectionVariables.set('runPassword', 'NewPassword123!');"
                 ]
@@ -501,8 +701,42 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "password", "reset"]
             },
-            "description": "Set a new password using a reset OTP code.\n\nField is 'code', NOT 'otp'.\n\n_Uses the reset code from the previous Forgot Password step (hardcode OTP in dev). Updates `runPassword` so the following Login uses the new password._"
-          }
+            "description": "Set a new password using a reset OTP code.\n\nField is 'code', NOT 'otp'.\n\n_Uses the reset code from the previous Forgot Password step (hardcode OTP in dev). Updates `runPassword` so the following Login uses the new password._\n\nResets only the role chosen at Forgot Password (stored with the code); sessions of that role are signed out, the other role stays signed in.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+          },
+          "response": [
+            {
+              "name": "200 Password reset",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"code\": \"{{otpCode}}\",\n  \"newPassword\": \"NewPassword123!\",\n  \"confirmPassword\": \"NewPassword123!\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/password/reset",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "password", "reset"]
+                },
+                "description": "Set a new password using a reset OTP code.\n\nField is 'code', NOT 'otp'.\n\n_Uses the reset code from the previous Forgot Password step (hardcode OTP in dev). Updates `runPassword` so the following Login uses the new password._\n\nResets only the role chosen at Forgot Password (stored with the code); sessions of that role are signed out, the other role stays signed in.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Your Customer password was reset. You can now log in to your Customer account.\",\n  \"data\": {\n    \"reset\": true,\n    \"role\": \"customer\"\n  }\n}"
+            }
+          ]
         },
         {
           "name": "Login",
@@ -541,8 +775,106 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "login"]
             },
-            "description": "Log in and obtain access & refresh tokens.\n\nIf using `email`, `password` is required and tokens are returned instantly.\nIf using `phone`, `password` is optional. The API will generate an OTP and return `{ needsOtp: true, ... }` instead of tokens. The mobile app must then call `/auth/otp/verify` with `purpose: login`.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead).\n\n_Re-captures a fresh `accessToken` + `refreshToken` (using the password set by Reset Password) for the authenticated requests that follow._"
-          }
+            "description": "Log in and obtain access & refresh tokens.\n\nIf using `email`, `password` is required and tokens are returned instantly.\nIf using `phone`, `password` is optional. The API will generate an OTP and return `{ needsOtp: true, ... }` instead of tokens. The mobile app must then call `/auth/otp/verify` with `purpose: login`.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead).\n\n_Re-captures a fresh `accessToken` + `refreshToken` (using the password set by Reset Password) for the authenticated requests that follow._\n\nChecks the password of the requested `role` only.\n\nErrors: `UNAUTHORIZED` (wrong email/password for that role), `WRONG_ROLE_PASSWORD` (the password belongs to the user's other role), `ROLE_PASSWORD_NOT_SET` (that role has no password, e.g. social-only; use Forgot password).\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+          },
+          "response": [
+            {
+              "name": "401 Incorrect email or password",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{runPassword}}\",\n  \"role\": \"customer\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/login",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "login"]
+                },
+                "description": "Log in and obtain access & refresh tokens.\n\nIf using `email`, `password` is required and tokens are returned instantly.\nIf using `phone`, `password` is optional. The API will generate an OTP and return `{ needsOtp: true, ... }` instead of tokens. The mobile app must then call `/auth/otp/verify` with `purpose: login`.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead).\n\n_Re-captures a fresh `accessToken` + `refreshToken` (using the password set by Reset Password) for the authenticated requests that follow._\n\nChecks the password of the requested `role` only.\n\nErrors: `UNAUTHORIZED` (wrong email/password for that role), `WRONG_ROLE_PASSWORD` (the password belongs to the user's other role), `ROLE_PASSWORD_NOT_SET` (that role has no password, e.g. social-only; use Forgot password).\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Incorrect email or password for your Customer account.\",\n  \"code\": \"UNAUTHORIZED\"\n}"
+            },
+            {
+              "name": "401 WRONG_ROLE_PASSWORD",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{runPassword}}\",\n  \"role\": \"customer\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/login",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "login"]
+                },
+                "description": "Log in and obtain access & refresh tokens.\n\nIf using `email`, `password` is required and tokens are returned instantly.\nIf using `phone`, `password` is optional. The API will generate an OTP and return `{ needsOtp: true, ... }` instead of tokens. The mobile app must then call `/auth/otp/verify` with `purpose: login`.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead).\n\n_Re-captures a fresh `accessToken` + `refreshToken` (using the password set by Reset Password) for the authenticated requests that follow._\n\nChecks the password of the requested `role` only.\n\nErrors: `UNAUTHORIZED` (wrong email/password for that role), `WRONG_ROLE_PASSWORD` (the password belongs to the user's other role), `ROLE_PASSWORD_NOT_SET` (that role has no password, e.g. social-only; use Forgot password).\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"That is your Expert password. For your Customer account use your Customer password, or tap Forgot password to reset it.\",\n  \"code\": \"WRONG_ROLE_PASSWORD\"\n}"
+            },
+            {
+              "name": "401 ROLE_PASSWORD_NOT_SET",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"password\": \"{{runPassword}}\",\n  \"role\": \"customer\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/login",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "login"]
+                },
+                "description": "Log in and obtain access & refresh tokens.\n\nIf using `email`, `password` is required and tokens are returned instantly.\nIf using `phone`, `password` is optional. The API will generate an OTP and return `{ needsOtp: true, ... }` instead of tokens. The mobile app must then call `/auth/otp/verify` with `purpose: login`.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead).\n\n_Re-captures a fresh `accessToken` + `refreshToken` (using the password set by Reset Password) for the authenticated requests that follow._\n\nChecks the password of the requested `role` only.\n\nErrors: `UNAUTHORIZED` (wrong email/password for that role), `WRONG_ROLE_PASSWORD` (the password belongs to the user's other role), `ROLE_PASSWORD_NOT_SET` (that role has no password, e.g. social-only; use Forgot password).\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Your Customer account has no password yet. Tap Forgot password to set one.\",\n  \"code\": \"ROLE_PASSWORD_NOT_SET\"\n}"
+            }
+          ]
         },
         {
           "name": "Change Password",
@@ -579,8 +911,118 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "password", "change"]
             },
-            "description": "Change password for an authenticated session.\n\nField is 'currentPassword', NOT 'oldPassword'.\n\n_Uses the current run password (set by Reset Password) and rotates it to a new value._"
-          }
+            "description": "Change password for an authenticated session.\n\nField is 'currentPassword', NOT 'oldPassword'.\n\n_Uses the current run password (set by Reset Password) and rotates it to a new value._\n\nChanges the password of the role in the access token only; the other role's password and sessions are unchanged.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+          },
+          "response": [
+            {
+              "name": "200 Changed (account has both roles)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"{{runPassword}}\",\n  \"newPassword\": \"ChangedPassword123!\",\n  \"confirmPassword\": \"ChangedPassword123!\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/password/change",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "password", "change"]
+                },
+                "description": "Change password for an authenticated session.\n\nField is 'currentPassword', NOT 'oldPassword'.\n\n_Uses the current run password (set by Reset Password) and rotates it to a new value._\n\nChanges the password of the role in the access token only; the other role's password and sessions are unchanged.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Your Customer password was changed. Your Expert password is unchanged.\",\n  \"data\": {\n    \"changed\": true,\n    \"role\": \"customer\",\n    \"hasOtherRole\": true\n  }\n}"
+            },
+            {
+              "name": "200 Changed (single role)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"{{runPassword}}\",\n  \"newPassword\": \"ChangedPassword123!\",\n  \"confirmPassword\": \"ChangedPassword123!\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/password/change",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "password", "change"]
+                },
+                "description": "Change password for an authenticated session.\n\nField is 'currentPassword', NOT 'oldPassword'.\n\n_Uses the current run password (set by Reset Password) and rotates it to a new value._\n\nChanges the password of the role in the access token only; the other role's password and sessions are unchanged.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": true,\n  \"message\": \"Your Customer password was changed.\",\n  \"data\": {\n    \"changed\": true,\n    \"role\": \"customer\",\n    \"hasOtherRole\": false\n  }\n}"
+            },
+            {
+              "name": "400 Wrong current password",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Authorization",
+                    "value": "Bearer {{accessToken}}"
+                  },
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"currentPassword\": \"{{runPassword}}\",\n  \"newPassword\": \"ChangedPassword123!\",\n  \"confirmPassword\": \"ChangedPassword123!\"\n}"
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/password/change",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "password", "change"]
+                },
+                "description": "Change password for an authenticated session.\n\nField is 'currentPassword', NOT 'oldPassword'.\n\n_Uses the current run password (set by Reset Password) and rotates it to a new value._\n\nChanges the password of the role in the access token only; the other role's password and sessions are unchanged.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"success\": false,\n  \"message\": \"Your current Customer password is incorrect.\",\n  \"code\": \"INVALID_CURRENT_PASSWORD\",\n  \"field\": \"currentPassword\"\n}"
+            }
+          ]
         },
         {
           "name": "Change Mobile Number - Request OTP",
@@ -678,7 +1120,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"phone\": \"{{newPhone}}\",\n  \"role\": \"customer\"\n}"
@@ -745,7 +1192,12 @@
           ],
           "request": {
             "method": "POST",
-            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
             "body": {
               "mode": "raw",
               "raw": "{\n  \"completionToken\": \"not-a-real-token\",\n  \"phone\": \"{{runPhone}}\",\n  \"termsAccepted\": true\n}"
@@ -956,8 +1408,14 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "customers", "me", "recently-viewed"],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "20" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
               ]
             },
             "description": "Fetch a paginated history list of experts recently viewed by the customer."
@@ -990,8 +1448,14 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "customers", "me", "saved-experts"],
               "query": [
-                { "key": "page", "value": "1" },
-                { "key": "limit", "value": "20" }
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
               ]
             },
             "description": "List the customer's bookmarked or saved experts."
@@ -1023,9 +1487,19 @@
             "url": {
               "raw": "{{base_url}}/api/v1/customers/me/recently-viewed/:expertId",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "customers", "me", "recently-viewed", ":expertId"],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "me",
+                "recently-viewed",
+                ":expertId"
+              ],
               "variable": [
-                { "key": "expertId", "value": "00000000-0000-4000-8000-000000000000" }
+                {
+                  "key": "expertId",
+                  "value": "00000000-0000-4000-8000-000000000000"
+                }
               ]
             },
             "description": "Record that an expert profile was viewed.\n\n`:expertId` must be a UUID. A malformed id returns 400 VALIDATION_ERROR; an unknown (but well-formed) UUID may return 400/404 depending on FK. Replace with a real expert UUID to record a view.\n\n_Uses a placeholder well-formed UUID that does not exist, so it must not 500._"
@@ -1056,9 +1530,19 @@
             "url": {
               "raw": "{{base_url}}/api/v1/customers/me/saved-experts/:expertId",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "customers", "me", "saved-experts", ":expertId"],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "me",
+                "saved-experts",
+                ":expertId"
+              ],
               "variable": [
-                { "key": "expertId", "value": "00000000-0000-4000-8000-000000000000" }
+                {
+                  "key": "expertId",
+                  "value": "00000000-0000-4000-8000-000000000000"
+                }
               ]
             },
             "description": "Save/bookmark an expert profile.\n\n`:expertId` must be a UUID. A malformed id returns 400 VALIDATION_ERROR. Replace with a real expert UUID to save.\n\n_Uses a placeholder well-formed UUID that does not exist, so it must not 500._"
@@ -1089,9 +1573,19 @@
             "url": {
               "raw": "{{base_url}}/api/v1/customers/me/saved-experts/:expertId",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "customers", "me", "saved-experts", ":expertId"],
+              "path": [
+                "api",
+                "v1",
+                "customers",
+                "me",
+                "saved-experts",
+                ":expertId"
+              ],
               "variable": [
-                { "key": "expertId", "value": "00000000-0000-4000-8000-000000000000" }
+                {
+                  "key": "expertId",
+                  "value": "00000000-0000-4000-8000-000000000000"
+                }
               ]
             },
             "description": "Remove an expert from the saved list.\n\n`:expertId` must be a UUID. A malformed id returns 400 VALIDATION_ERROR. Replace with a real expert UUID to unsave.\n\n_Uses a placeholder well-formed UUID that does not exist, so it must not 500._"
@@ -1227,15 +1721,45 @@
     }
   ],
   "variable": [
-    { "key": "runSeeded", "value": "" },
-    { "key": "runEmail", "value": "" },
-    { "key": "runPhone", "value": "" },
-    { "key": "newPhone", "value": "" },
-    { "key": "expertEmail", "value": "" },
-    { "key": "expertPhone", "value": "" },
-    { "key": "runPassword", "value": "Password123!" },
-    { "key": "otpCode", "value": "123456" },
-    { "key": "accessToken", "value": "" },
-    { "key": "refreshToken", "value": "" }
+    {
+      "key": "runSeeded",
+      "value": ""
+    },
+    {
+      "key": "runEmail",
+      "value": ""
+    },
+    {
+      "key": "runPhone",
+      "value": ""
+    },
+    {
+      "key": "newPhone",
+      "value": ""
+    },
+    {
+      "key": "expertEmail",
+      "value": ""
+    },
+    {
+      "key": "expertPhone",
+      "value": ""
+    },
+    {
+      "key": "runPassword",
+      "value": "Password123!"
+    },
+    {
+      "key": "otpCode",
+      "value": "123456"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    }
   ]
 }
