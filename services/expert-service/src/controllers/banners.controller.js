@@ -130,6 +130,31 @@ export const deleteBanner = async (auth, bannerId) => {
   return { success: true };
 };
 
+const bumpBannerStats = (bannerIds, field) => {
+  if (!bannerIds.length) return Promise.resolve();
+  const db = getDb();
+  const day = new Date(new Date().toISOString().slice(0, 10));
+  return Promise.all(
+    bannerIds.map((bannerId) =>
+      db.expertBannerDailyStat.upsert({
+        where: { bannerId_day: { bannerId, day } },
+        create: { bannerId, day, [field]: 1 },
+        update: { [field]: { increment: 1 } },
+      })
+    )
+  ).catch((e) => console.error(`[BannerStats] ${field} failed:`, e));
+};
+
+export const recordBannerClick = async (bannerId) => {
+  const db = getDb();
+  const banner = await db.expertBanner.findFirst({
+    where: { id: bannerId, isActive: true, approvalStatus: "approved" },
+    select: { id: true },
+  });
+  if (!banner) throw notFound("bannerNotFound");
+  await bumpBannerStats([banner.id], "clicks");
+};
+
 export const getPublicBanners = async (categoryId, query = {}) => {
   const db = getDb();
   const { limit, skip } = parsePagination(query, { defaultLimit: 20 });
@@ -183,6 +208,8 @@ export const getPublicBanners = async (categoryId, query = {}) => {
     const priceB = b.expert.subscriptions[0]?.plan?.priceMonthlyCents || 0;
     return priceB - priceA; // Descending (highest tier first)
   });
+
+  bumpBannerStats(sortedBanners.map((b) => b.id), "impressions");
 
   // Map to a clean public format
   return sortedBanners.map(b => ({

@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
-import { listReportedExperts, listReportedCustomers, updateExpertReport, updateCustomerReport, listBanners, approveBanner, rejectBanner, toggleBannerActive, deleteBanner } from "#controllers/moderation.controller.js";
+import { listReportedExperts, listReportedCustomers, updateExpertReport, updateCustomerReport, listBanners, getBannerAnalytics, approveBanner, rejectBanner, toggleBannerActive, deleteBanner } from "#controllers/moderation.controller.js";
 
 const router = Router();
 router.use(requireAdmin);
@@ -13,6 +13,7 @@ router.get("/customer-reports", requirePermission(["moderation", "customers"], "
 router.patch("/customer-reports/:id", requirePermission(["moderation", "customers"], "edit"), asyncHandler(updateCustomerReport));
 
 router.get("/banners", requirePermission(["moderation", "experts"], "view"), asyncHandler(listBanners));
+router.get("/banners/analytics", requirePermission(["moderation", "experts"], "view"), asyncHandler(getBannerAnalytics));
 router.patch("/banners/:id/approve", requirePermission(["moderation", "experts"], "edit"), asyncHandler(approveBanner));
 router.patch("/banners/:id/reject", requirePermission(["moderation", "experts"], "edit"), asyncHandler(rejectBanner));
 router.patch("/banners/:id/toggle-active", requirePermission(["moderation", "experts"], "edit"), asyncHandler(toggleBannerActive));
