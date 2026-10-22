@@ -43,13 +43,43 @@ export async function getById(req, res, next) {
 
 export async function create(req, res, next) {
   try {
-    const { name, email, password, role } = createAdminSchema.parse(req.body);
+    const { name, email, password, role, status, permissions } = createAdminSchema.parse(req.body);
     const passwordHash = await hashPassword(password);
-    const admin = await adminUsers().create({
-      data: { name, email: email.toLowerCase(), passwordHash, role },
-      include: { permissions: true },
+    const db = getDb();
+    const admin = await db.$transaction(async (tx) => {
+      const created = await tx.adminUser.create({
+        data: {
+          name,
+          email: email.toLowerCase(),
+          passwordHash,
+          role,
+          status: status || "suspended",
+        },
+      });
+
+      if (permissions && Object.keys(permissions).length > 0) {
+        await Promise.all(
+          Object.entries(permissions).map(([module, level]) =>
+            tx.adminPermission.create({
+              data: { adminUserId: created.id, module, level },
+            })
+          )
+        );
+      }
+
+      return tx.adminUser.findUnique({
+        where: { id: created.id },
+        include: { permissions: true },
+      });
     });
-    await logAdminAction(req, "admin.create", "AdminUser", admin.id, { name, email: admin.email, role });
+
+    await logAdminAction(req, "admin.create", "AdminUser", admin.id, {
+      name,
+      email: admin.email,
+      role: admin.role,
+      status: admin.status,
+      permissions,
+    });
     return ResponseFormatter.success(res, { data: toAdminUserDto(admin), status: 201 });
   } catch (err) { next(err); }
 }

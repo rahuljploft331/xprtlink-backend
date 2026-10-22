@@ -9,6 +9,59 @@ import { assertUuid, billingPost } from "#utils/billingClient.js";
 // Only what the portal renders — never whole profile rows (Stripe ids, etc.).
 const PARTY_SELECT = { id: true, firstName: true, lastName: true };
 
+function formatBrand(brand) {
+  if (!brand) return "Card";
+  return brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase();
+}
+
+export function resolvePaymentInfo(t, customerPm = null) {
+  const meta = t.metadata || {};
+  let brand = meta.brand || customerPm?.brand || null;
+  let last4 = meta.last4 || customerPm?.last4 || null;
+  let method = meta.paymentMethod || null;
+  let gateway = "Stripe";
+
+  if (meta.store) {
+    const s = String(meta.store).toLowerCase();
+    if (s === "apple") {
+      gateway = "Apple App Store";
+      method = method || "Apple Pay";
+    } else if (s === "google") {
+      gateway = "Google Play";
+      method = method || "Google Play";
+    } else {
+      gateway = s.toUpperCase();
+      method = method || "In-App Purchase";
+    }
+  }
+
+  if (t.type === "subscription" && !method) {
+    method = meta.store ? (meta.store === "apple" ? "Apple Pay" : "Google Play") : "In-App Purchase";
+  }
+
+  if (brand && last4 && !method) {
+    method = `${formatBrand(brand)} •••• ${last4}`;
+  } else if (brand && !method) {
+    method = formatBrand(brand);
+  }
+
+  if (t.type === "refund") {
+    if (!method || method === "Card") {
+      method = brand && last4 ? `Refund (${formatBrand(brand)} •••• ${last4})` : "Original Payment Method";
+    }
+  }
+
+  if (!method) {
+    method = "Card";
+  }
+
+  return {
+    method,
+    paymentMethod: brand || last4 ? { brand, last4, type: "card" } : null,
+    gateway,
+  };
+}
+
 export async function list(req, res, next) {
   try {
     const db = getDb();
@@ -19,17 +72,68 @@ export async function list(req, res, next) {
         skip, take: limit, orderBy: { createdAt: "desc" },
         include: {
           consultationCharge: {
-            include: { consultation: { select: { id: true, billingStatus: true } } },
+            include: {
+              consultation: {
+                select: {
+                  id: true,
+                  billingStatus: true,
+                  customerId: true,
+                  customer: {
+                    select: {
+                      id: true,
+                      firstName: true,
+                      lastName: true,
+                      paymentMethods: {
+                        orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+                        take: 1,
+                        select: { brand: true, last4: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       }),
     ]);
-    const mapped = items.map((t) => ({
-      ...t,
-      party: t.consultationCharge?.consultation
-        ? `Consultation #${t.consultationCharge.consultation.id.slice(-6)}`
-        : t.type,
-    }));
+
+    const missingCustIds = [
+      ...new Set(
+        items
+          .filter((t) => !t.consultationCharge?.consultation?.customer && t.metadata?.customerProfileId)
+          .map((t) => t.metadata.customerProfileId)
+      ),
+    ];
+
+    const extraPms = new Map();
+    if (missingCustIds.length > 0) {
+      const pms = await db.paymentMethod.findMany({
+        where: { customerProfileId: { in: missingCustIds } },
+        orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+        select: { customerProfileId: true, brand: true, last4: true },
+      });
+      for (const pm of pms) {
+        if (!extraPms.has(pm.customerProfileId)) {
+          extraPms.set(pm.customerProfileId, pm);
+        }
+      }
+    }
+
+    const mapped = items.map((t) => {
+      const customer = t.consultationCharge?.consultation?.customer;
+      const pm = customer?.paymentMethods?.[0] || (t.metadata?.customerProfileId ? extraPms.get(t.metadata.customerProfileId) : null);
+      const { method, paymentMethod, gateway } = resolvePaymentInfo(t, pm);
+      return {
+        ...t,
+        party: t.consultationCharge?.consultation
+          ? `Consultation #${t.consultationCharge.consultation.id.slice(-6)}`
+          : t.type,
+        method,
+        paymentMethod,
+        gateway,
+      };
+    });
     return ResponseFormatter.paginated(res, { items: mapped, page, limit, total });
   } catch (err) { next(err); }
 }
@@ -48,7 +152,16 @@ export async function getById(req, res, next) {
                 status: true,
                 billingStatus: true,
                 durationSeconds: true,
-                customer: { select: PARTY_SELECT },
+                customer: {
+                  select: {
+                    ...PARTY_SELECT,
+                    paymentMethods: {
+                      orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+                      take: 1,
+                      select: { brand: true, last4: true },
+                    },
+                  },
+                },
                 expert: { select: PARTY_SELECT },
                 earningsLedger: { select: { payoutId: true } },
               },
@@ -59,6 +172,17 @@ export async function getById(req, res, next) {
     });
     if (!t) return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
 
+    let pm = t.consultationCharge?.consultation?.customer?.paymentMethods?.[0] || null;
+    if (!pm && t.metadata?.customerProfileId) {
+      pm = await db.paymentMethod.findFirst({
+        where: { customerProfileId: t.metadata.customerProfileId },
+        orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+        select: { brand: true, last4: true },
+      });
+    }
+
+    const { method, paymentMethod, gateway } = resolvePaymentInfo(t, pm);
+
     // Refundable = a succeeded consultation charge whose expert share has not
     // been paid out yet (billing enforces the same rule).
     const consultation = t.consultationCharge?.consultation;
@@ -68,7 +192,15 @@ export async function getById(req, res, next) {
       consultation?.billingStatus === "charged" &&
       !consultation.earningsLedger.some((row) => row.payoutId);
 
-    return ResponseFormatter.success(res, { data: { ...t, refundable } });
+    return ResponseFormatter.success(res, {
+      data: {
+        ...t,
+        method,
+        paymentMethod,
+        gateway,
+        refundable,
+      },
+    });
   } catch (err) { next(err); }
 }
 

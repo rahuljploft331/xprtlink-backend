@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { list, getById, setFeatured, update, setStatus, getTransactions, getSupportChats, sendEmailToExpert } from "#controllers/experts.controller.js";
+import { list, getById, setFeatured, update, setStatus, getTransactions, getSupportChats, sendEmailToExpert, remove } from "#controllers/experts.controller.js";
 import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 
@@ -11,6 +11,7 @@ router.patch("/:id/featured", requirePermission("experts", "edit"), asyncHandler
 router.patch("/:id", requirePermission("experts", "edit"), asyncHandler(update));
 router.patch("/:id/suspend", requirePermission("experts", "edit"), asyncHandler(setStatus));
 router.patch("/:id/activate", requirePermission("experts", "edit"), asyncHandler(setStatus));
+router.delete("/:id", requirePermission("experts", "edit"), asyncHandler(remove));
 router.get("/:id/transactions", requirePermission("experts", "view"), asyncHandler(getTransactions));
 router.get("/:id/support-chats", requirePermission("experts", "view"), asyncHandler(getSupportChats));
 router.post("/:id/email", requirePermission("experts", "edit"), asyncHandler(sendEmailToExpert));

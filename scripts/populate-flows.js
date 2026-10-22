@@ -260,6 +260,14 @@ async function runAllFlows() {
             currency: "USD",
             status: "succeeded",
             stripePaymentIntentId: `pi_demo_${c.id.slice(0, 8)}`,
+            metadata: {
+              consultationId: c.id,
+              customerProfileId: c.customerId,
+              brand: "visa",
+              last4: "4242",
+              paymentMethod: "Visa •••• 4242",
+              method: "card",
+            },
             createdAt: c.createdAt,
           },
         });

@@ -3,6 +3,7 @@ import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { logAdminAction } from "#utils/audit.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 const log = logger.child({ module: "customers.controller" });
 
@@ -13,16 +14,19 @@ export async function list(req, res, next) {
     const db = getDb();
     const { page, limit, skip } = parsePagination(req.query);
     const q = req.query.q?.trim();
+    const status = req.query.status;
 
-    const where = q
-      ? {
-          OR: [
-            { email: { contains: q, mode: "insensitive" } },
-            { customerProfile: { firstName: { contains: q, mode: "insensitive" } } },
-            { customerProfile: { lastName: { contains: q, mode: "insensitive" } } },
-          ],
-        }
-      : {};
+    const where = {};
+    if (status) {
+      where.status = status;
+    }
+    if (q) {
+      where.OR = [
+        { email: { contains: q, mode: "insensitive" } },
+        { customerProfile: { firstName: { contains: q, mode: "insensitive" } } },
+        { customerProfile: { lastName: { contains: q, mode: "insensitive" } } },
+      ];
+    }
 
     const sortField = req.query.sort || "createdAt";
     const sortOrder = req.query.order === "asc" ? "asc" : "desc";
@@ -192,7 +196,20 @@ export async function getTransactions(req, res, next) {
     const db = getDb();
     const { page, limit, skip } = parsePagination(req.query);
     
-    const user = await db.user.findUnique({ where: { id: req.params.id }, include: { customerProfile: true } });
+    const user = await db.user.findUnique({
+      where: { id: req.params.id },
+      include: {
+        customerProfile: {
+          include: {
+            paymentMethods: {
+              orderBy: [{ isDefault: "desc" }, { createdAt: "desc" }],
+              take: 1,
+              select: { brand: true, last4: true },
+            },
+          },
+        },
+      },
+    });
     if (!user || !user.customerProfile) {
       return res.status(404).json({ success: false, message: getMessage("customerNotFound"), code: "NOT_FOUND" });
     }
@@ -222,15 +239,23 @@ export async function getTransactions(req, res, next) {
       })
     ]);
 
-    const formattedItems = items.map(t => ({
-      id: t.id,
-      type: t.type,
-      amountCents: t.amountCents,
-      currency: t.currency,
-      status: t.status,
-      expertName: t.consultationCharge ? `${t.consultationCharge.consultation.expert.firstName} ${t.consultationCharge.consultation.expert.lastName}` : null,
-      createdAt: t.createdAt,
-    }));
+    const defaultPm = user.customerProfile.paymentMethods?.[0] || null;
+    const formattedItems = items.map(t => {
+      const brand = t.metadata?.brand || defaultPm?.brand;
+      const last4 = t.metadata?.last4 || defaultPm?.last4;
+      const brandLabel = brand ? brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase() : null;
+      const method = t.metadata?.paymentMethod || (brandLabel && last4 ? `${brandLabel} •••• ${last4}` : "Card");
+      return {
+        id: t.id,
+        type: t.type,
+        amountCents: t.amountCents,
+        currency: t.currency,
+        status: t.status,
+        method,
+        expertName: t.consultationCharge ? `${t.consultationCharge.consultation.expert.firstName} ${t.consultationCharge.consultation.expert.lastName}` : null,
+        createdAt: t.createdAt,
+      };
+    });
 
     return ResponseFormatter.paginated(res, { items: formattedItems, page, limit, total });
   } catch (err) {
@@ -269,6 +294,122 @@ export async function getSupportChats(req, res, next) {
     }));
 
     return ResponseFormatter.paginated(res, { items: formattedItems, page, limit, total });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** DELETE /api/v1/admin/customers/:id */
+export async function remove(req, res, next) {
+  try {
+    const db = getDb();
+    let user = await db.user.findUnique({
+      where: { id: req.params.id },
+      include: { customerProfile: true, expertProfile: true },
+    });
+
+    if (!user && req.params.id) {
+      const profile = await db.customerProfile.findUnique({
+        where: { id: req.params.id },
+        include: { user: { include: { customerProfile: true, expertProfile: true } } },
+      });
+      if (profile) user = profile.user;
+    }
+
+    if (!user || !user.customerProfile) {
+      return res.status(404).json({
+        success: false,
+        message: getMessage("customerNotFound"),
+        code: "NOT_FOUND",
+      });
+    }
+
+    if (user.status === "deleted") {
+      return res.status(400).json({
+        success: false,
+        message: getMessage("cannotDeleteAlreadyDeleted"),
+        code: "BAD_REQUEST",
+      });
+    }
+
+    await db.$transaction(async (tx) => {
+      // 1. Soft delete the user row, freeing up email/phone partial unique indexes
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          status: "deleted",
+          deletedAt: new Date(),
+          firebaseUid: null,
+        },
+      });
+
+      // 2. Revoke all active sessions and refresh tokens
+      await tx.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      await tx.authSession.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+
+      // 3. Remove push notification device tokens
+      await tx.deviceToken.deleteMany({
+        where: { userId: user.id },
+      });
+
+      // 4. If expert profile also exists, disable discovery & cancel active subscriptions
+      if (user.expertProfile) {
+        await tx.expertProfile.update({
+          where: { id: user.expertProfile.id },
+          data: {
+            availabilityStatus: "offline",
+            searchEligible: false,
+            isFeatured: false,
+            featuredRank: null,
+            featuredUntil: null,
+          },
+        });
+
+        await tx.expertSubscription.updateMany({
+          where: { expertProfileId: user.expertProfile.id, status: "active" },
+          data: { status: "canceled", canceledAt: new Date() },
+        });
+      }
+    });
+
+    // Invalidate in-memory userStatusCache
+    try {
+      const { invalidateUserStatusCache } = await import("@xprtlink/shared/middleware/auth.js");
+      invalidateUserStatusCache(user.id);
+    } catch (err) {
+      log.error({ err }, "Failed to invalidate user status cache");
+    }
+
+    // Notify messaging service about account disabled to disconnect active sockets in real time
+    try {
+      const { getConfig } = await import("@xprtlink/shared/config/loadEnv.js");
+      const { internalPost } = await import("@xprtlink/shared/lib/internalFetch.js");
+      const messagingUrl = getConfig("admin-service").serviceUrls.messaging;
+      await internalPost(messagingUrl, "/api/internal/events/account-disabled", { userId: user.id });
+    } catch (err) {
+      log.error({ err }, "Failed to notify messaging service about deleted customer account");
+    }
+
+    // Log admin audit action
+    await logAdminAction(req, "customer.delete", "User", user.id, {
+      email: user.email,
+      phone: user.phone,
+      customerProfileId: user.customerProfile.id,
+      firstName: user.customerProfile.firstName,
+      lastName: user.customerProfile.lastName,
+    });
+
+    return ResponseFormatter.success(res, {
+      message: getMessage("customerDeleted"),
+      data: { id: user.id, status: "deleted" },
+    });
   } catch (err) {
     next(err);
   }

@@ -47,11 +47,26 @@ export async function update(req, res, next) {
   try {
     const body = updateCategoryRequestSchema.parse(req.body);
     const db = getDb();
+    const existing = await db.category.findUnique({
+      where: { id: req.params.id },
+      include: { _count: { select: { experts: true } } },
+    });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
+    }
+    if (existing._count.experts > 0 && body.slug !== undefined && body.slug !== existing.slug) {
+      return res.status(400).json({
+        success: false,
+        message: getMessage("categorySlugCannotBeChangedWhenInUse"),
+        code: "CATEGORY_IN_USE",
+      });
+    }
+
     const c = await db.category.update({
       where: { id: req.params.id },
       data: {
         ...(body.name !== undefined ? { name: body.name } : {}),
-        ...(body.slug !== undefined ? { slug: body.slug } : {}),
+        ...(body.slug !== undefined && (existing._count.experts === 0 || body.slug === existing.slug) ? { slug: body.slug } : {}),
         ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
         ...(body.sortOrder !== undefined ? { sortOrder: body.sortOrder } : {}),
       },
@@ -64,8 +79,33 @@ export async function update(req, res, next) {
 export async function remove(req, res, next) {
   try {
     const db = getDb();
+    const existing = await db.category.findUnique({
+      where: { id: req.params.id },
+      include: { _count: { select: { experts: true } } },
+    });
+    if (!existing) {
+      return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
+    }
+    if (existing._count.experts > 0) {
+      return res.status(409).json({
+        success: false,
+        message: getMessage("categoryInUseCannotDelete", { count: existing._count.experts }),
+        code: "CATEGORY_IN_USE",
+      });
+    }
+    const bannerCount = await db.expertBanner.count({
+      where: { targetCategoryId: req.params.id },
+    });
+    if (bannerCount > 0) {
+      return res.status(409).json({
+        success: false,
+        message: getMessage("categoryInUseByBannersCannotDelete", { count: bannerCount }),
+        code: "CATEGORY_IN_USE",
+      });
+    }
+
     await db.category.delete({ where: { id: req.params.id } });
-    await logAdminAction(req, "category.delete", "Category", req.params.id, {});
+    await logAdminAction(req, "category.delete", "Category", req.params.id, { name: existing.name });
     return ResponseFormatter.success(res, { message: getMessage("categoryDeleted") });
   } catch (err) { next(err); }
 }

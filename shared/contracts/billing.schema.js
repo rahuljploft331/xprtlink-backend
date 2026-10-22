@@ -16,6 +16,7 @@ export const transactionDtoSchema = z.object({
   currency: z.string().length(3),
   status: z.enum(["pending", "succeeded", "failed", "refunded"]),
   createdAt: z.string().datetime(),
+  method: z.string().nullable().optional(),
 });
 
 export const subscriptionPlanDtoSchema = z.object({

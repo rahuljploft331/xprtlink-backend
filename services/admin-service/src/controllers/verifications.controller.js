@@ -15,8 +15,13 @@ export async function list(req, res, next) {
   try {
     const db = getDb();
     const { page, limit, skip } = parsePagination(req.query);
-    const status = req.query.status;
-    const where = status ? { status } : {};
+    const statusParam = req.query.status?.toLowerCase();
+    let where = {};
+    if (statusParam === "pending") {
+      where = { status: { in: ["pending", "in_progress"] } };
+    } else if (statusParam) {
+      where = { status: statusParam };
+    }
 
     const [total, verifications] = await Promise.all([
       db.expertVerification.count({ where }),

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { list, getById, update, setStatus, getTransactions, getSupportChats } from "#controllers/customers.controller.js";
+import { list, getById, update, setStatus, getTransactions, getSupportChats, remove } from "#controllers/customers.controller.js";
 import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 
@@ -10,6 +10,7 @@ router.get("/:id", requirePermission("customers", "view"), asyncHandler(getById)
 router.patch("/:id", requirePermission("customers", "edit"), asyncHandler(update));
 router.patch("/:id/suspend", requirePermission("customers", "edit"), asyncHandler(setStatus));
 router.patch("/:id/activate", requirePermission("customers", "edit"), asyncHandler(setStatus));
+router.delete("/:id", requirePermission("customers", "edit"), asyncHandler(remove));
 router.get("/:id/transactions", requirePermission("customers", "view"), asyncHandler(getTransactions));
 router.get("/:id/support-chats", requirePermission("customers", "view"), asyncHandler(getSupportChats));
 export default router;

@@ -285,6 +285,19 @@ export async function createQuote(auth, body) {
     if (category) {
       categoryName = category.name;
     }
+  } else if (body.category && typeof body.category === "string") {
+    categoryName = body.category.trim();
+  }
+
+  // Fall back to expert's primary category if still unset
+  if (!categoryName && expert?.id) {
+    const expertWithCats = await db.expertProfile.findUnique({
+      where: { id: expert.id },
+      include: { categories: { take: 1 } },
+    });
+    if (expertWithCats?.categories?.length > 0) {
+      categoryName = expertWithCats.categories[0].name;
+    }
   }
 
   const now = new Date();

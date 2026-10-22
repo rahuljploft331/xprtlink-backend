@@ -12,12 +12,17 @@ export function toPaymentMethodDto(method) {
 }
 
 export function toTransactionDto(tx) {
+  const brand = tx.metadata?.brand;
+  const last4 = tx.metadata?.last4;
+  const method = tx.metadata?.paymentMethod || (brand && last4 ? `${brand.charAt(0).toUpperCase() + brand.slice(1).toLowerCase()} •••• ${last4}` : (tx.method ?? null));
+
   const dto = {
     id: tx.id,
     type: tx.type,
     amount: centsToAmount(tx.amountCents),
     currency: tx.currency,
     status: tx.status,
+    method,
     createdAt: toIso(tx.createdAt),
   };
 

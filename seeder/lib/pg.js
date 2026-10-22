@@ -282,6 +282,16 @@ export async function seedPostgres(payload) {
             lastName: customer.lastName,
             passwordHash,
             passwordUpdatedAt: new Date(),
+            paymentMethods: {
+              create: {
+                stripePaymentMethodId: `pm_seed_${customer.email.split("@")[0]}`,
+                brand: "visa",
+                last4: "4242",
+                expMonth: 12,
+                expYear: 2028,
+                isDefault: true,
+              },
+            },
           },
         },
       },
@@ -399,6 +409,14 @@ export async function seedPostgres(payload) {
             currency: "USD",
             status: "succeeded",
             stripePaymentIntentId: `pi_seed_${consultation.id.slice(0, 8)}`,
+            metadata: {
+              consultationId: consultation.id,
+              customerProfileId: customer._seedId,
+              brand: "visa",
+              last4: "4242",
+              paymentMethod: "Visa •••• 4242",
+              method: "card",
+            },
             createdAt,
           },
         });
