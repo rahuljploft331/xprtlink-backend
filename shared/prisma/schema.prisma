@@ -327,6 +327,8 @@ model CustomerProfile {
   lastName         String   @map("last_name") @db.VarChar(100)
   avatarMediaId    String?  @map("avatar_media_id") @db.Uuid
   stripeCustomerId String?  @unique @map("stripe_customer_id") @db.VarChar(128)
+  passwordHash      String?  @map("password_hash") @db.VarChar(255)
+  passwordUpdatedAt DateTime? @map("password_updated_at") @db.Timestamptz(6)
   preferences      Json     @default("{}")
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -583,6 +585,8 @@ model SupportTicketAttachment {
 model ExpertProfile {
   id                    String             @id @default(uuid()) @db.Uuid
   userId                String             @unique @map("user_id") @db.Uuid
+  passwordHash          String?            @map("password_hash") @db.VarChar(255)
+  passwordUpdatedAt     DateTime?          @map("password_updated_at") @db.Timestamptz(6)
   firstName             String             @map("first_name") @db.VarChar(100)
   lastName              String             @map("last_name") @db.VarChar(100)
   avatarMediaId         String?            @map("avatar_media_id") @db.Uuid

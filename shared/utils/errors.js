@@ -10,12 +10,12 @@ export class AppError extends Error {
   }
 }
 
-export function notFound(messageKey = "notFound", code = "NOT_FOUND") {
-  return new AppError(getMessage(messageKey), { statusCode: 404, code });
+export function notFound(messageKey = "notFound", code = "NOT_FOUND", params) {
+  return new AppError(getMessage(messageKey, params), { statusCode: 404, code });
 }
 
-export function unauthorized(messageKey = "invalidCredentials", code = "UNAUTHORIZED") {
-  return new AppError(getMessage(messageKey), { statusCode: 401, code });
+export function unauthorized(messageKey = "invalidCredentials", code = "UNAUTHORIZED", params) {
+  return new AppError(getMessage(messageKey, params), { statusCode: 401, code });
 }
 
 export function forbidden(messageKey = "notFound", code = "FORBIDDEN", field, params) {
@@ -26,6 +26,6 @@ export function badRequest(messageKey = "notFound", code = "BAD_REQUEST", field,
   return new AppError(getMessage(messageKey, params), { statusCode: 400, code, field });
 }
 
-export function conflict(messageKey = "recordAlreadyExists", code = "CONFLICT") {
-  return new AppError(getMessage(messageKey), { statusCode: 409, code });
+export function conflict(messageKey = "recordAlreadyExists", code = "CONFLICT", params) {
+  return new AppError(getMessage(messageKey, params), { statusCode: 409, code });
 }

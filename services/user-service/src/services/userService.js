@@ -88,20 +88,45 @@ async function assertIdentifierAvailable({ email, phone, excludeUserId }) {
   }
 }
 
+export const ROLE_LABEL = { customer: "Customer", expert: "Expert" };
+const otherRoleOf = (role) => (role === "customer" ? "expert" : "customer");
+export const roleParams = (role) => ({ role: ROLE_LABEL[role] ?? "account", otherRole: ROLE_LABEL[otherRoleOf(role)] });
+const profileKey = (role) => (role === "customer" ? "customerProfile" : "expertProfile");
+const roleHash = (user, role) => user[profileKey(role)]?.passwordHash ?? null;
+
+// Password a freshly created profile starts with: the hash of the account's other
+// profile when adding a second role (the user proved it at register), else the
+// hash staged on the users row by the first-time register.
+async function resolveInitialPasswordHash(tx, userId) {
+  const u = await tx.user.findUnique({
+    where: { id: userId },
+    select: {
+      passwordHash: true,
+      passwordUpdatedAt: true,
+      customerProfile: { select: { passwordHash: true } },
+      expertProfile: { select: { passwordHash: true } },
+    },
+  });
+  const passwordHash =
+    u?.customerProfile?.passwordHash ?? u?.expertProfile?.passwordHash ?? u?.passwordHash ?? null;
+  return passwordHash ? { passwordHash, passwordUpdatedAt: new Date() } : {};
+}
+
 async function createProfileForRole(
   tx,
   userId,
   role,
   firstName,
   lastName,
-  { categoryIds, avatarMediaId } = {}
+  { categoryIds, avatarMediaId, withPassword = false } = {}
 ) {
+  const pw = withPassword ? await resolveInitialPasswordHash(tx, userId) : {};
   if (role === "customer") {
     return tx.user.update({
       where: { id: userId },
       data: {
         customerProfile: {
-          create: { firstName, lastName, ...(avatarMediaId ? { avatarMediaId } : {}) },
+          create: { firstName, lastName, ...pw, ...(avatarMediaId ? { avatarMediaId } : {}) },
         },
       },
       include: profileInclude(),
@@ -136,6 +161,7 @@ async function createProfileForRole(
         create: {
           firstName,
           lastName,
+          ...pw,
           categories: { connect: resolvedCategoryIds.map((id) => ({ id })) },
           consultationRateCents: 0,
           ...(avatarMediaId ? { avatarMediaId } : {}),
@@ -195,25 +221,33 @@ export async function register(body) {
       ? Boolean(existingActiveUserWithEmail.customerProfile)
       : Boolean(existingActiveUserWithEmail.expertProfile);
 
+    const params = roleParams(role);
     if (hasRequestedRole) {
-      throw conflict("emailAlreadyExists", "EMAIL_TAKEN");
+      throw conflict("emailAlreadyExistsForRole", "EMAIL_TAKEN", params);
     }
 
-    if (!existingActiveUserWithEmail.passwordHash && existingActiveUserWithEmail.firebaseUid) {
-      throw conflict("accountCreatedViaSocialLogin", "USE_SOCIAL_LOGIN");
+    const otherHash =
+      roleHash(existingActiveUserWithEmail, otherRoleOf(role)) ??
+      (existingActiveUserWithEmail.customerProfile || existingActiveUserWithEmail.expertProfile
+        ? null
+        : existingActiveUserWithEmail.passwordHash);
+    const hasOtherPassword = Boolean(otherHash);
+    if (!hasOtherPassword && existingActiveUserWithEmail.firebaseUid) {
+      throw conflict("accountCreatedViaSocialLogin", "USE_SOCIAL_LOGIN", params);
     }
 
     if (!password) {
-      throw badRequest("passwordRequiredForExistingAccount", "PASSWORD_REQUIRED");
+      throw badRequest("passwordRequiredForExistingAccount", "PASSWORD_REQUIRED", "password", params);
     }
 
-    const isPasswordValid = await verifyPassword(password, existingActiveUserWithEmail.passwordHash);
+    // Proof of ownership: the password of the role the account already has.
+    const isPasswordValid = await verifyPassword(password, otherHash);
     if (!isPasswordValid) {
-      throw conflict("emailRegisteredProvidePassword", "INVALID_PASSWORD");
+      throw conflict("existingPasswordWrong", "INVALID_PASSWORD", params);
     }
 
     if (existingActiveUserWithEmail.phone !== phone) {
-      throw conflict("emailRegisteredWithDifferentPhone", "PHONE_MISMATCH");
+      throw conflict("emailRegisteredWithDifferentPhone", "PHONE_MISMATCH", params);
     }
   } else {
     // Pre-flight availability check (fast-fails common case; real enforcement is inside the transaction)
@@ -435,8 +469,19 @@ export async function login(body) {
   if (phone) {
     // Phone auth relies on OTP; we don't verify password here
   } else {
-    const valid = await verifyPassword(password, user.passwordHash);
-    if (!valid) throw unauthorized("invalidCredentials");
+    const hash = roleHash(user, role);
+    const valid = await verifyPassword(password, hash);
+    if (!valid) {
+      const params = roleParams(role);
+      // They proved they know a valid password for this email — tell them if it
+      // belongs to their other account instead of a generic failure.
+      const otherHash = role === "customer" || role === "expert" ? roleHash(user, otherRoleOf(role)) : null;
+      if (otherHash && (await verifyPassword(password, otherHash))) {
+        throw unauthorized("wrongRolePassword", "WRONG_ROLE_PASSWORD", params);
+      }
+      if (!hash) throw unauthorized("rolePasswordNotSet", "ROLE_PASSWORD_NOT_SET", params);
+      throw unauthorized("invalidRoleCredentials", "UNAUTHORIZED", params);
+    }
   }
 
   // Give a clear, actionable error instead of a generic 401
@@ -695,6 +740,7 @@ export async function verifyOtp(body) {
       return createProfileForRole(tx, challenge.userId, role, firstName, lastName, {
         categoryIds,
         avatarMediaId: resolvedAvatarMediaId,
+        withPassword: true,
       });
     });
 
@@ -791,7 +837,15 @@ export async function forgotPassword(body) {
       deletedAt: null,
       status: { not: "pending_verification" },
     },
+    include: { customerProfile: { select: { id: true } }, expertProfile: { select: { id: true } } },
   });
+
+  // Reset is per role. If the caller names a role, that profile must exist; if
+  // not (older clients), fall back to the only profile, or both when they have two.
+  const role = body.role === "customer" || body.role === "expert" ? body.role : null;
+  if (user && role && !user[profileKey(role)]) {
+    throw notFound("roleSpecificResetNoProfile", "NOT_FOUND", roleParams(role));
+  }
 
   if (!user) {
     // M7: timing mitigation
@@ -811,12 +865,13 @@ export async function forgotPassword(body) {
       phone,
       purpose: "reset_password",
       channel: email ? "email" : "phone",
+      registrationData: { role },
     });
   } catch (err) {
     log.error({ err: err.message }, "[forgotPassword] OTP delivery failed:");
   }
 
-  return { sent: true, expiresInSeconds: ttlMs / 1000, channel: email ? "email" : "phone" };
+  return { sent: true, role, expiresInSeconds: ttlMs / 1000, channel: email ? "email" : "phone" };
 }
 
 export async function resetPassword(body) {
@@ -827,47 +882,67 @@ export async function resetPassword(body) {
   const db = getDb();
   const user = await db.user.findFirst({
     where: email ? { email, deletedAt: null } : { phone, deletedAt: null },
+    include: { customerProfile: { select: { id: true } }, expertProfile: { select: { id: true } } },
   });
   if (!user) throw notFound("userNotFound");
 
+  // Role was recorded when the code was requested. No role (older clients) =
+  // every profile on the account, which is the previous behaviour.
+  const role = challenge.registrationData?.role ?? null;
+  const roles = role ? [role] : ["customer", "expert"].filter((r) => user[profileKey(r)]);
+  const passwordHash = await hashPassword(newPassword);
+  const passwordUpdatedAt = new Date();
+
   await db.$transaction([
-    db.user.update({
-      where: { id: user.id },
-      data: { passwordHash: await hashPassword(newPassword), passwordUpdatedAt: new Date() },
-    }),
+    ...roles.map((r) =>
+      r === "customer"
+        ? db.customerProfile.updateMany({ where: { userId: user.id }, data: { passwordHash, passwordUpdatedAt } })
+        : db.expertProfile.updateMany({ where: { userId: user.id }, data: { passwordHash, passwordUpdatedAt } })
+    ),
     db.otpChallenge.update({
       where: { id: challenge.id },
       data: { consumedAt: new Date() },
     }),
-    // C3: Revoke ALL existing sessions so attacker is immediately locked out
+    // C3: revoke this role's sessions (legacy tokens with no role included) so an
+    // attacker is locked out; the user's other role stays signed in.
     db.refreshToken.updateMany({
-      where: { userId: user.id, revokedAt: null },
+      where: {
+        userId: user.id,
+        revokedAt: null,
+        ...(role ? { OR: [{ role }, { role: null }] } : {}),
+      },
       data: { revokedAt: new Date() },
     }),
   ]);
-  return { reset: true };
+  return { reset: true, role };
 }
 
-export async function changePassword(userId, body) {
+export async function changePassword(userId, body, role) {
   const { currentPassword, newPassword } = body;
   const db = getDb();
-  const user = await db.user.findUnique({ where: { id: userId } });
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    include: { customerProfile: true, expertProfile: true },
+  });
   if (!user) throw notFound("userNotFound");
-  const valid = await verifyPassword(currentPassword, user.passwordHash);
-  if (!valid) throw badRequest("currentPasswordIncorrect", "INVALID_CURRENT_PASSWORD", "currentPassword");
+  if (role !== "customer" && role !== "expert") throw badRequest("noProfileForRole", "PROFILE_MISSING", null, { role });
 
+  const params = roleParams(role);
+  const valid = await verifyPassword(currentPassword, roleHash(user, role));
+  if (!valid) throw badRequest("currentRolePasswordIncorrect", "INVALID_CURRENT_PASSWORD", "currentPassword", params);
+
+  const data = { passwordHash: await hashPassword(newPassword), passwordUpdatedAt: new Date() };
   await db.$transaction([
-    db.user.update({
-      where: { id: userId },
-      data: { passwordHash: await hashPassword(newPassword), passwordUpdatedAt: new Date() },
-    }),
-    // C3: Revoke ALL existing sessions on password change
+    role === "customer"
+      ? db.customerProfile.update({ where: { userId }, data })
+      : db.expertProfile.update({ where: { userId }, data }),
+    // C3: revoke this role's sessions (legacy tokens with no role included)
     db.refreshToken.updateMany({
-      where: { userId, revokedAt: null },
+      where: { userId, revokedAt: null, OR: [{ role }, { role: null }] },
       data: { revokedAt: new Date() },
     }),
   ]);
-  return { changed: true };
+  return { changed: true, role, hasOtherRole: Boolean(user[profileKey(otherRoleOf(role))]) };
 }
 
 // ─── Change mobile number ─────────────────────────────────────────────────────

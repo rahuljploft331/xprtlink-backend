@@ -127,7 +127,10 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = forgotPasswordRequestSchema.parse(req.body);
     const data = await svc.forgotPassword({ ...body, purpose: "reset_password" });
-    return ResponseFormatter.success(res, { message: getMessage("resetCodeSent"), data });
+    const message = data.role
+      ? getMessage("resetCodeSent", svc.roleParams(data.role))
+      : getMessage("resetCodeSentAll");
+    return ResponseFormatter.success(res, { message, data });
   })
 );
 
@@ -136,7 +139,10 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = passwordResetRequestSchema.parse(req.body);
     const data = await svc.resetPassword(body);
-    return ResponseFormatter.success(res, { message: getMessage("passwordReset"), data });
+    const message = data.role
+      ? getMessage("passwordReset", svc.roleParams(data.role))
+      : getMessage("passwordResetAll");
+    return ResponseFormatter.success(res, { message, data });
   })
 );
 
@@ -145,8 +151,12 @@ router.post(
   authenticate,
   asyncHandler(async (req, res) => {
     const body = passwordChangeRequestSchema.parse(req.body);
-    const data = await svc.changePassword(req.auth.userId, body);
-    return ResponseFormatter.success(res, { message: getMessage("passwordChanged"), data });
+    const data = await svc.changePassword(req.auth.userId, body, req.auth.role);
+    const message = getMessage(
+      data.hasOtherRole ? "passwordChangedForRole" : "passwordChangedSingle",
+      svc.roleParams(data.role)
+    );
+    return ResponseFormatter.success(res, { message, data });
   })
 );
 

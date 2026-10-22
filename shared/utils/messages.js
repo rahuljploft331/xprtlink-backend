@@ -32,7 +32,7 @@ export function getMessage(key, params = {}) {
 
   // Interpolate {placeholder} tokens, e.g. getMessage("welcome", { name: "John" })
   for (const [paramKey, paramValue] of Object.entries(params)) {
-    message = message.replace(`{${paramKey}}`, paramValue);
+    message = message.replaceAll(`{${paramKey}}`, paramValue);
   }
 
   return message;

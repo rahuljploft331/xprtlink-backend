@@ -280,6 +280,8 @@ export async function seedPostgres(payload) {
           create: {
             firstName: customer.firstName,
             lastName: customer.lastName,
+            passwordHash,
+            passwordUpdatedAt: new Date(),
           },
         },
       },
@@ -306,6 +308,8 @@ export async function seedPostgres(payload) {
         emailVerifiedAt: new Date(),
         expertProfile: {
           create: {
+            passwordHash,
+            passwordUpdatedAt: new Date(),
             categories: { connect: [{ id: category.id }] },
             firstName: expert.firstName,
             lastName: expert.lastName,
