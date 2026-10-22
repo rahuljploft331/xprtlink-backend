@@ -78,7 +78,17 @@ router.post(
     const signature = req.headers["stripe-signature"];
     // The app-wide JSON parser runs first; it stashes the raw bytes on req.rawBody.
     const payload = req.rawBody ?? req.body;
-    const result = await svc.handleStripeWebhook(payload, signature);
+    let result;
+    try {
+      result = await svc.handleStripeWebhook(payload, signature);
+    } catch (err) {
+      // A bad/missing signature is the caller's fault: 400 so Stripe doesn't treat it as our outage.
+      if (err?.type === "StripeSignatureVerificationError") {
+        log.warn(`[Billing Service Webhook] Rejected event with invalid signature: ${err.message}`);
+        return res.status(400).json({ success: false, message: getMessage("invalidWebhookSignature"), code: "INVALID_SIGNATURE" });
+      }
+      throw err;
+    }
     log.info(`[Billing Service Webhook] Handled event: ${result.eventType || "ok"}`);
     return res.status(200).json(result);
   })
@@ -459,10 +469,10 @@ router.post(
   requireRole("expert"),
   asyncHandler(async (req, res) => {
     const { planCode, successUrl, cancelUrl } = req.body;
-    if (!planCode) throw badRequest("planCode is required", "MISSING_PLAN_CODE");
-    if (!successUrl || !cancelUrl) throw badRequest("successUrl and cancelUrl are required", "MISSING_URLS");
+    if (!planCode) throw badRequest("planCodeRequired", "MISSING_PLAN_CODE");
+    if (!successUrl || !cancelUrl) throw badRequest("checkoutUrlsRequired", "MISSING_URLS");
     const data = await svc.createStripeCheckoutSession(req.auth, { planCode, successUrl, cancelUrl });
-    return ResponseFormatter.success(res, { message: "Checkout session created", data });
+    return ResponseFormatter.success(res, { message: getMessage("checkoutSessionCreated"), data });
   })
 );
 

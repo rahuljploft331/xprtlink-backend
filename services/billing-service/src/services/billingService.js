@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { getDb } from "@xprtlink/shared/db";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 const log = logger.child({ module: "billingService" });
@@ -1605,6 +1606,26 @@ export async function handleStripeWebhook(payload, signature) {
       const periodStart = new Date(stripeSub.current_period_start * 1000);
       const periodEnd = new Date(stripeSub.current_period_end * 1000);
 
+      // A second checkout opened in another tab/URL can also complete. Cancel the
+      // older Stripe subscription itself, otherwise the expert is billed for both.
+      const duplicateStripeSubs = await db.expertSubscription.findMany({
+        where: {
+          expertProfileId,
+          status: "active",
+          store: "stripe",
+          externalSubscriptionId: { not: stripeSubscriptionId },
+        },
+        select: { externalSubscriptionId: true },
+      });
+      for (const dup of duplicateStripeSubs) {
+        try {
+          await sdk.subscriptions.cancel(dup.externalSubscriptionId);
+          log.warn(`[billing-webhook] canceled duplicate Stripe subscription ${dup.externalSubscriptionId} for expert ${expertProfileId}`);
+        } catch (err) {
+          log.error(`[billing-webhook] failed to cancel duplicate Stripe subscription ${dup.externalSubscriptionId}: ${err.message}`);
+        }
+      }
+
       await db.$transaction(async (tx) => {
         // Cancel any other active subscriptions for this expert
         await tx.expertSubscription.updateMany({
@@ -1680,7 +1701,13 @@ export async function handleStripeWebhook(payload, signature) {
         },
       });
 
-      if (newStatus !== "active") {
+      if (newStatus === "active") {
+        // Payment recovered after a failed renewal: restore the listing the lapse removed.
+        await db.expertProfile.updateMany({
+          where: { id: row.expertProfileId, verificationStatus: "approved", searchEligible: false },
+          data: { searchEligible: true },
+        });
+      } else {
         const stillActive = await db.expertSubscription.findFirst({
           where: { expertProfileId: row.expertProfileId, status: "active" },
           select: { id: true },
@@ -3211,6 +3238,36 @@ export async function retryPayout(payoutId, { adminUserId } = {}) {
   return { payout: toExpertPayoutDto(result.payout), transferred: result.ok, error: result.error };
 }
 
+const DEFAULT_WEB_CHECKOUT_ORIGINS = ["https://xprtlink.com", "https://www.xprtlink.com"];
+
+/** Origins a web checkout may return to: explicit env list, else CORS_ORIGIN, plus local dev hosts outside production. */
+function allowedCheckoutOrigins() {
+  const explicit = (process.env.WEB_CHECKOUT_ALLOWED_ORIGINS ?? "")
+    .split(",").map((o) => o.trim()).filter(Boolean);
+  const cors = (process.env.CORS_ORIGIN ?? "")
+    .split(",").map((o) => o.trim()).filter((o) => o && o !== "*");
+  const origins = new Set([...explicit, ...(explicit.length ? [] : cors), ...DEFAULT_WEB_CHECKOUT_ORIGINS]);
+  if (process.env.NODE_ENV !== "production") {
+    ["http://localhost:8099", "http://127.0.0.1:8099"].forEach((o) => origins.add(o));
+  }
+  return origins;
+}
+
+/** Validates a checkout return link: absolute http(s), no credentials, origin on the allowlist. */
+function parseCheckoutReturnUrl(raw) {
+  let url;
+  try {
+    url = new URL(String(raw));
+  } catch {
+    throw badRequest("checkoutUrlNotAllowed", "CHECKOUT_URL_NOT_ALLOWED");
+  }
+  const okProtocol = url.protocol === "https:" || (url.protocol === "http:" && process.env.NODE_ENV !== "production");
+  if (!okProtocol || url.username || url.password || !allowedCheckoutOrigins().has(url.origin)) {
+    throw badRequest("checkoutUrlNotAllowed", "CHECKOUT_URL_NOT_ALLOWED");
+  }
+  return url;
+}
+
 /**
  * Creates a Stripe Checkout Session for a web subscription purchase.
  * The session URL is returned to the client for redirect.  Subscription
@@ -3218,6 +3275,12 @@ export async function retryPayout(payoutId, { adminUserId } = {}) {
  */
 export async function createStripeCheckoutSession(auth, { planCode, successUrl, cancelUrl }) {
   const db = getDb();
+
+  // Validate return links before any DB/Stripe work — Stripe redirects the
+  // browser to these after payment, so they must stay on our own origins.
+  const successTarget = parseCheckoutReturnUrl(successUrl);
+  const cancelTarget = parseCheckoutReturnUrl(cancelUrl);
+  successTarget.searchParams.set("session_id", "{CHECKOUT_SESSION_ID}");
 
   // Check for existing active subscription before any Stripe calls — prevents
   // double-billing IAP subscribers and gives a clearer error than Stripe config issues.
@@ -3251,15 +3314,19 @@ export async function createStripeCheckoutSession(auth, { planCode, successUrl, 
   const session = await stripeSvc.createCheckoutSession({
     customerId: customer.id,
     priceId: plan.stripePriceId,
-    successUrl: `${successUrl}&session_id={CHECKOUT_SESSION_ID}`,
-    cancelUrl,
+    // URLSearchParams percent-encodes the braces Stripe substitutes; restore them.
+    successUrl: successTarget.toString().replace("%7BCHECKOUT_SESSION_ID%7D", "{CHECKOUT_SESSION_ID}"),
+    cancelUrl: cancelTarget.toString(),
     metadata: {
       expertProfileId: auth.expertProfileId,
       userId: auth.userId,
       planId: plan.id,
       planCode,
     },
-    idempotencyKey: `checkout_${auth.expertProfileId}_${plan.id}`,
+    // Same retry returns the same open session (no double subscription); the URLs
+    // are part of the key because Stripe rejects a reused key with new params.
+    idempotencyKey: `checkout_${auth.expertProfileId}_${plan.id}_${createHash("sha256")
+      .update(`${successTarget}|${cancelTarget}`).digest("hex").slice(0, 16)}`,
   });
 
   return { checkoutUrl: session.url, sessionId: session.id };
