@@ -46,10 +46,12 @@ export const ADMIN_MODULES = [
   "subscription-plans",
   "reviews",
   "cms",
+  "support_tickets",
   "notifications",
-  "support-chat",
+  "moderation",
   "admins",
   "settings",
+  "support-chat",
 ];
 
 export * from "./enums.js";

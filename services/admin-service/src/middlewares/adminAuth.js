@@ -68,9 +68,11 @@ export function hasPermission(adminUser, module, level = "view") {
  * Express middleware factory — gate a route by module + level.
  */
 export function requirePermission(module, level = "view") {
+  const modules = Array.isArray(module) ? module : [module];
   return (req, _res, next) => {
-    if (!hasPermission(req.adminUser, module, level)) {
-      return next(forbidden("insufficientPermissionForModule", "FORBIDDEN", null, { module }));
+    const allowed = modules.some((mod) => hasPermission(req.adminUser, mod, level));
+    if (!allowed) {
+      return next(forbidden("insufficientPermissionForModule", "FORBIDDEN", null, { module: modules.join(", ") }));
     }
     next();
   };

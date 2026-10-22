@@ -6,15 +6,15 @@ import { listReportedExperts, listReportedCustomers, updateExpertReport, updateC
 const router = Router();
 router.use(requireAdmin);
 
-router.get("/expert-reports", requirePermission("experts", "view"), asyncHandler(listReportedExperts));
-router.patch("/expert-reports/:id", requirePermission("experts", "edit"), asyncHandler(updateExpertReport));
+router.get("/expert-reports", requirePermission(["moderation", "experts"], "view"), asyncHandler(listReportedExperts));
+router.patch("/expert-reports/:id", requirePermission(["moderation", "experts"], "edit"), asyncHandler(updateExpertReport));
 
-router.get("/customer-reports", requirePermission("customers", "view"), asyncHandler(listReportedCustomers));
-router.patch("/customer-reports/:id", requirePermission("customers", "edit"), asyncHandler(updateCustomerReport));
+router.get("/customer-reports", requirePermission(["moderation", "customers"], "view"), asyncHandler(listReportedCustomers));
+router.patch("/customer-reports/:id", requirePermission(["moderation", "customers"], "edit"), asyncHandler(updateCustomerReport));
 
-router.get("/banners", requirePermission("experts", "view"), asyncHandler(listBanners));
-router.patch("/banners/:id/approve", requirePermission("experts", "edit"), asyncHandler(approveBanner));
-router.patch("/banners/:id/reject", requirePermission("experts", "edit"), asyncHandler(rejectBanner));
+router.get("/banners", requirePermission(["moderation", "experts"], "view"), asyncHandler(listBanners));
+router.patch("/banners/:id/approve", requirePermission(["moderation", "experts"], "edit"), asyncHandler(approveBanner));
+router.patch("/banners/:id/reject", requirePermission(["moderation", "experts"], "edit"), asyncHandler(rejectBanner));
 
 
 export default router;
