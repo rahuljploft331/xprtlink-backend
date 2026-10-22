@@ -170,13 +170,21 @@ async function checkRelationshipAccess(db, auth, asset) {
     });
     if (!messageAttachment) return false;
 
+    // Scope to the side this session is using. Matching on userId alone let a
+    // dual-role account (one user row, both profiles) read attachments from the
+    // other surface's conversations.
+    const participantWhere =
+      auth.role === "customer"
+        ? { customerId: auth.customerProfileId }
+        : auth.role === "expert"
+          ? { expertId: auth.expertProfileId }
+          : null;
+    if (!participantWhere) return false;
+
     const conversation = await db.conversation.findFirst({
       where: {
         id: messageAttachment.message.conversationId,
-        OR: [
-          { customer: { userId: auth.userId } },
-          { expert: { userId: auth.userId } },
-        ],
+        ...participantWhere,
       },
     });
     return Boolean(conversation);
@@ -192,8 +200,8 @@ async function checkRelationshipAccess(db, auth, asset) {
 
     const quote = quoteAttachment.quote;
     return (
-      quote.customerId === auth.customerProfileId ||
-      quote.expertId === auth.expertProfileId
+      (auth.role === "customer" && quote.customerId === auth.customerProfileId) ||
+      (auth.role === "expert" && quote.expertId === auth.expertProfileId)
     );
   }
 

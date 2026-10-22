@@ -197,6 +197,7 @@
   "atLeastOneSettingRequired": "At least one setting must be provided",
   "noCategoriesConfigured": "No categories configured",
   "invalidRoleFilter": "Invalid role filter",
+  "roleFilterMismatch": "You cannot view another role's list from this session",
   "invalidDate": "Invalid {label} date",
   "invalidExpertId": "Invalid expert id",
   "adminIdMustBeValidUuid": "adminId must be a valid UUID",

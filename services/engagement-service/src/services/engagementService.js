@@ -125,27 +125,36 @@ function assertExpert(auth) {
   }
 }
 
+/**
+ * Participation is judged against the side the session is actually using.
+ *
+ * Every JWT carries both profile ids (see resolveRoleContext), so comparing the
+ * ids alone let a dual-role account act on its expert-side quotes from a
+ * customer session and vice versa.
+ */
 function assertQuoteParticipant(auth, quote) {
-  const isCustomer = auth.customerProfileId === quote.customerId;
-  const isExpert = auth.expertProfileId === quote.expertId;
+  const isCustomer = auth.role === "customer" && auth.customerProfileId === quote.customerId;
+  const isExpert = auth.role === "expert" && auth.expertProfileId === quote.expertId;
   if (!isCustomer && !isExpert) throw forbidden("notAuthorizedForQuote");
 }
 
 function assertQuoteCustomer(auth, quote) {
-  if (auth.customerProfileId !== quote.customerId) {
+  if (auth.role !== "customer" || auth.customerProfileId !== quote.customerId) {
     throw forbidden("onlyRequestingCustomerCanAct");
   }
 }
 
 function assertQuoteExpert(auth, quote) {
-  if (auth.expertProfileId !== quote.expertId) {
+  if (auth.role !== "expert" || auth.expertProfileId !== quote.expertId) {
     throw forbidden("onlyAssignedExpertCanAct");
   }
 }
 
 function assertConsultationParticipant(auth, consultation) {
-  const isCustomer = auth.customerProfileId === consultation.customerId;
-  const isExpert = auth.expertProfileId === consultation.expertId;
+  const isCustomer =
+    auth.role === "customer" && auth.customerProfileId === consultation.customerId;
+  const isExpert =
+    auth.role === "expert" && auth.expertProfileId === consultation.expertId;
   if (!isCustomer && !isExpert) throw forbidden("notAuthorizedForConsultation");
 }
 
@@ -428,7 +437,17 @@ export async function updateQuote(auth, quoteId, body) {
 
 export async function listQuotes(auth, query) {
   const { page, limit, skip } = parsePagination(query);
-  const role = query.role === "expert" || query.role === "customer" ? query.role : auth.role;
+  // `role` selects which list to show — the expert app asks for its inbox
+  // explicitly — but it must agree with the session. A dual-role account (one
+  // email holding both profiles) is a SINGLE user row carrying both profile ids,
+  // so honouring a role the session is not using handed the customer app the
+  // expert's quotes.
+  const requestedRole =
+    query.role === "expert" || query.role === "customer" ? query.role : null;
+  if (requestedRole && requestedRole !== auth.role) {
+    throw forbidden("roleFilterMismatch");
+  }
+  const role = requestedRole ?? auth.role;
 
   const where = {};
   if (role === "customer") {

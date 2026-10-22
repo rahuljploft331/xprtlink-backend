@@ -777,12 +777,13 @@ export async function deleteConversation(auth, conversationId) {
     throw notFound("conversationNotFound");
   }
 
+  // Judged on the side this session is using, matching conversationWhere() used
+  // by every read path. One user row can hold both profiles, so a userId or
+  // id-only match let a customer session act on an expert-side thread.
   const isCustomer =
-    conversation.customer?.userId === auth.userId ||
-    (auth.customerProfileId && conversation.customerId === auth.customerProfileId);
+    auth.role === "customer" && conversation.customerId === auth.customerProfileId;
   const isExpert =
-    conversation.expert?.userId === auth.userId ||
-    (auth.expertProfileId && conversation.expertId === auth.expertProfileId);
+    auth.role === "expert" && conversation.expertId === auth.expertProfileId;
 
   if (!isCustomer && !isExpert) {
     throw notFound("conversationNotFound");
@@ -850,12 +851,13 @@ export async function restoreConversation(auth, conversationId) {
     throw notFound("conversationNotFound");
   }
 
+  // Judged on the side this session is using, matching conversationWhere() used
+  // by every read path. One user row can hold both profiles, so a userId or
+  // id-only match let a customer session act on an expert-side thread.
   const isCustomer =
-    conversation.customer?.userId === auth.userId ||
-    (auth.customerProfileId && conversation.customerId === auth.customerProfileId);
+    auth.role === "customer" && conversation.customerId === auth.customerProfileId;
   const isExpert =
-    conversation.expert?.userId === auth.userId ||
-    (auth.expertProfileId && conversation.expertId === auth.expertProfileId);
+    auth.role === "expert" && conversation.expertId === auth.expertProfileId;
 
   if (!isCustomer && !isExpert) {
     throw notFound("conversationNotFound");

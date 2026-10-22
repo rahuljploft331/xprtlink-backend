@@ -1805,8 +1805,13 @@ export async function getTransaction(auth, transactionId) {
   const consultation = tx.consultationCharge?.consultation;
   if (consultation) {
     // Consultation-linked transaction: check participant ownership
-    const isCustomer = consultation.customerId === auth.customerProfileId;
-    const isExpert = consultation.expertId === auth.expertProfileId;
+    // Matched against the side the session is using: every JWT carries both
+    // profile ids, so an id-only comparison let a dual-role account read the
+    // other surface's transaction.
+    const isCustomer =
+      auth.role === "customer" && consultation.customerId === auth.customerProfileId;
+    const isExpert =
+      auth.role === "expert" && consultation.expertId === auth.expertProfileId;
     if (!isCustomer && !isExpert) throw forbidden("notFound");
   } else {
     // C7: Subscription / other transaction: check ownership via metadata
@@ -1816,8 +1821,8 @@ export async function getTransaction(auth, transactionId) {
     const ownerCustomerId = meta.customerProfileId ?? null;
 
     const isOwner =
-      (auth.expertProfileId && ownerExpertId === auth.expertProfileId) ||
-      (auth.customerProfileId && ownerCustomerId === auth.customerProfileId);
+      (auth.role === "expert" && auth.expertProfileId && ownerExpertId === auth.expertProfileId) ||
+      (auth.role === "customer" && auth.customerProfileId && ownerCustomerId === auth.customerProfileId);
 
     if (!isOwner) throw forbidden("notFound");
   }
