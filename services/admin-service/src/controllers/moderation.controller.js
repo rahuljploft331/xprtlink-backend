@@ -103,6 +103,88 @@ export const updateCustomerReport = async (req, res) => {
   return ResponseFormatter.success(res, { data: report, message: getMessage("updatedSuccessfully") });
 };
 
+const bannerMetrics = (sum) => {
+  const impressions = sum?.impressions ?? 0;
+  const clicks = sum?.clicks ?? 0;
+  return { impressions, clicks, ctr: impressions ? Math.round((clicks / impressions) * 1000) / 10 : 0 };
+};
+
+const parseDay = (value, fallback) => {
+  const d = value ? new Date(`${String(value).slice(0, 10)}T00:00:00.000Z`) : fallback;
+  return Number.isNaN(d.getTime()) ? fallback : d;
+};
+
+export const getBannerAnalytics = async (req, res) => {
+  const db = getDb();
+  const today = parseDay(new Date().toISOString().slice(0, 10));
+  const to = parseDay(req.query.to, today);
+  const from = parseDay(req.query.from, new Date(to.getTime() - 29 * 86400000));
+  const dayWhere = { day: { gte: from, lte: to } };
+
+  // Same eligibility as the public banner feed, so "live" means actually being served.
+  const liveWhere = {
+    isActive: true,
+    approvalStatus: "approved",
+    expert: {
+      verificationStatus: "approved",
+      user: { status: "active" },
+      subscriptions: { some: { status: "active" } },
+    },
+  };
+
+  const [liveBanners, pendingBanners, byBanner, byDay] = await Promise.all([
+    db.expertBanner.count({ where: liveWhere }),
+    db.expertBanner.count({ where: { approvalStatus: "pending" } }),
+    db.expertBannerDailyStat.groupBy({
+      by: ["bannerId"],
+      where: dayWhere,
+      _sum: { impressions: true, clicks: true },
+    }),
+    db.expertBannerDailyStat.groupBy({
+      by: ["day"],
+      where: dayWhere,
+      _sum: { impressions: true, clicks: true },
+      orderBy: { day: "asc" },
+    }),
+  ]);
+
+  const ranked = byBanner
+    .map((r) => ({ bannerId: r.bannerId, ...bannerMetrics(r._sum) }))
+    .sort((a, b) => b.clicks - a.clicks || b.impressions - a.impressions);
+
+  const topIds = ranked.slice(0, 5).map((r) => r.bannerId);
+  const topBanners = await db.expertBanner.findMany({
+    where: { id: { in: topIds } },
+    select: {
+      id: true,
+      mediaUrl: true,
+      text: true,
+      isActive: true,
+      approvalStatus: true,
+      expert: { select: { id: true, firstName: true, lastName: true } },
+    },
+  });
+  const bannerById = new Map(topBanners.map((b) => [b.id, b]));
+
+  const impressions = ranked.reduce((n, r) => n + r.impressions, 0);
+  const clicks = ranked.reduce((n, r) => n + r.clicks, 0);
+
+  return ResponseFormatter.success(res, {
+    data: {
+      range: { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) },
+      summary: { liveBanners, pendingBanners, ...bannerMetrics({ impressions, clicks }) },
+      topPerforming: ranked
+        .slice(0, 5)
+        .filter((r) => bannerById.has(r.bannerId))
+        .map((r) => ({ ...bannerById.get(r.bannerId), impressions: r.impressions, clicks: r.clicks, ctr: r.ctr })),
+      daily: byDay.map((d) => ({
+        date: d.day.toISOString().slice(0, 10),
+        ...bannerMetrics(d._sum),
+      })),
+    },
+  });
+};
+
 export const listBanners = async (req, res) => {
   const db = getDb();
   const { status, expertProfileId, isActive } = req.query; // 'pending', 'approved', 'rejected', 'all'
@@ -147,8 +229,16 @@ export const listBanners = async (req, res) => {
     return acc;
   }, {});
 
+  const totals = await db.expertBannerDailyStat.groupBy({
+    by: ["bannerId"],
+    where: { bannerId: { in: banners.map((b) => b.id) } },
+    _sum: { impressions: true, clicks: true },
+  });
+  const totalsMap = new Map(totals.map((t) => [t.bannerId, t._sum]));
+
   const enrichedBanners = banners.map(banner => ({
     ...banner,
+    ...bannerMetrics(totalsMap.get(banner.id)),
     categoryName: banner.targetCategoryId ? categoryMap[banner.targetCategoryId] || 'Unknown Category' : 'All Categories'
   }));
 
@@ -174,7 +264,7 @@ export const approveBanner = async (req, res) => {
       ctaText: "View My Banners",
       ctaUrl: "https://xprtlink.com/expert/banners"
     }).then(html => {
-      return sendEmail({
+      return sendEmail({ category: "banner",
         to: banner.expert.user.email,
         subject: "Your Banner was Approved",
         text: "Your promotional banner has been approved and is now live.",
@@ -207,7 +297,7 @@ export const rejectBanner = async (req, res) => {
       bodyHtml: "<p>We reviewed your recent banner submission, but unfortunately it was not approved.</p><p><strong>Reason:</strong> " + reason + "</p><p>Please review our guidelines and try submitting a new banner.</p>",
       badgeText: "Requires Attention"
     }).then(html => {
-      return sendEmail({
+      return sendEmail({ category: "banner",
         to: banner.expert.user.email,
         subject: "Your Banner Needs Changes",
         text: "Your banner was rejected for the following reason: " + reason,

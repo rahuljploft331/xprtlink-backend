@@ -52,6 +52,7 @@ export const ADMIN_MODULES = [
   "admins",
   "settings",
   "support-chat",
+  "email_logs",
 ];
 
 export * from "./enums.js";

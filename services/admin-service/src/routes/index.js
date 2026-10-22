@@ -20,6 +20,7 @@ import supportTicketsRoutes from "./supportTickets.routes.js";
 import platformIssuesRoutes from "./platformIssues.routes.js";
 
 import auditLogRoutes from "./auditLog.routes.js";
+import emailLogsRoutes from "./emailLogs.routes.js";
 import notificationsRoutes from "./notifications.routes.js";
 import eventsRoutes from "./events.routes.js";
 import settingsRoutes from "./settings.routes.js";
@@ -50,6 +51,7 @@ router.use("/admins", adminsRoutes);
 router.use("/support-tickets", supportTicketsRoutes);
 router.use("/platform-issues", platformIssuesRoutes);
 router.use("/audit-log", auditLogRoutes);
+router.use("/email-logs", emailLogsRoutes);
 router.use("/notifications", notificationsRoutes);
 router.use("/events", eventsRoutes);
 router.use("/settings", settingsRoutes);

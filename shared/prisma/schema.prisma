@@ -321,17 +321,17 @@ model User {
 }
 
 model CustomerProfile {
-  id               String   @id @default(uuid()) @db.Uuid
-  userId           String   @unique @map("user_id") @db.Uuid
-  firstName        String   @map("first_name") @db.VarChar(100)
-  lastName         String   @map("last_name") @db.VarChar(100)
-  avatarMediaId    String?  @map("avatar_media_id") @db.Uuid
-  stripeCustomerId String?  @unique @map("stripe_customer_id") @db.VarChar(128)
-  passwordHash      String?  @map("password_hash") @db.VarChar(255)
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @unique @map("user_id") @db.Uuid
+  firstName         String    @map("first_name") @db.VarChar(100)
+  lastName          String    @map("last_name") @db.VarChar(100)
+  avatarMediaId     String?   @map("avatar_media_id") @db.Uuid
+  stripeCustomerId  String?   @unique @map("stripe_customer_id") @db.VarChar(128)
+  passwordHash      String?   @map("password_hash") @db.VarChar(255)
   passwordUpdatedAt DateTime? @map("password_updated_at") @db.Timestamptz(6)
-  preferences      Json     @default("{}")
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  preferences       Json      @default("{}")
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   user           User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
   avatarMedia    MediaAsset?              @relation("CustomerAvatar", fields: [avatarMediaId], references: [id], onDelete: SetNull)
@@ -342,7 +342,7 @@ model CustomerProfile {
   conversations  Conversation[]
   paymentMethods PaymentMethod[]
   expertReports  ExpertReport[]
-  reportedBy     CustomerReport[] @relation("ReportedCustomer")
+  reportedBy     CustomerReport[]         @relation("ReportedCustomer")
   reviews        Review[]
 
   @@index([avatarMediaId])
@@ -405,16 +405,16 @@ model OtpChallenge {
 }
 
 model DeviceToken {
-  id         String         @id @default(uuid()) @db.Uuid
-  userId     String         @map("user_id") @db.Uuid
+  id         String               @id @default(uuid()) @db.Uuid
+  userId     String               @map("user_id") @db.Uuid
   // The role this device was last logged in as. One physical device holds one
   // active session, so re-registering the same token after a role switch
   // updates this and pushes follow the switch.
   role       NotificationAudience @default(all)
   platform   DevicePlatform
-  token      String         @db.VarChar(512)
-  lastSeenAt DateTime       @default(now()) @map("last_seen_at") @db.Timestamptz(6)
-  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  token      String               @db.VarChar(512)
+  lastSeenAt DateTime             @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  createdAt  DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -567,13 +567,13 @@ model SupportTicket {
 }
 
 model SupportTicketAttachment {
-  id        String        @id @default(uuid()) @db.Uuid
-  ticketId  String        @map("ticket_id") @db.Uuid
-  mediaId   String        @map("media_id") @db.Uuid
-  createdAt DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  id        String   @id @default(uuid()) @db.Uuid
+  ticketId  String   @map("ticket_id") @db.Uuid
+  mediaId   String   @map("media_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  ticket    SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
-  media     MediaAsset    @relation(fields: [mediaId], references: [id], onDelete: Restrict)
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  media  MediaAsset    @relation(fields: [mediaId], references: [id], onDelete: Restrict)
 
   @@unique([ticketId, mediaId])
   @@index([mediaId])
@@ -635,7 +635,7 @@ model ExpertProfile {
   conversations    Conversation[]
   reviews          Review[]
   reports          ExpertReport[]
-  customerReports  CustomerReport[] @relation("ReportingExpert")
+  customerReports  CustomerReport[]         @relation("ReportingExpert")
   banners          ExpertBanner[]
   payouts          ExpertPayout[]
   earningsLedger   ExpertEarningsLedger[]
@@ -718,11 +718,25 @@ model ExpertBanner {
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  expert ExpertProfile @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  expert     ExpertProfile           @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  dailyStats ExpertBannerDailyStat[]
 
   @@index([expertProfileId])
   @@index([isActive])
   @@map("expert_banners")
+}
+
+model ExpertBannerDailyStat {
+  bannerId    String   @map("banner_id") @db.Uuid
+  day         DateTime @db.Date
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+
+  banner ExpertBanner @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+
+  @@id([bannerId, day])
+  @@index([day])
+  @@map("expert_banner_daily_stats")
 }
 
 // ─── Engagement (engagement-service) ─────────────────────────────────────────
@@ -850,18 +864,18 @@ model Review {
 }
 
 model ExpertReport {
-  id         String             @id @default(uuid()) @db.Uuid
-  customerId String             @map("customer_id") @db.Uuid
-  expertId   String             @map("expert_id") @db.Uuid
-  reason     String             @db.VarChar(120)
-  details    String?
-  evidence   Json               @default("[]")
-  status     ExpertReportStatus @default(open)
+  id             String             @id @default(uuid()) @db.Uuid
+  customerId     String             @map("customer_id") @db.Uuid
+  expertId       String             @map("expert_id") @db.Uuid
+  reason         String             @db.VarChar(120)
+  details        String?
+  evidence       Json               @default("[]")
+  status         ExpertReportStatus @default(open)
   /// Where the report was filed: "expert_profile" or "chat".
   source         String             @default("expert_profile") @db.VarChar(32)
   conversationId String?            @map("conversation_id") @db.Uuid
-  createdAt  DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   customer CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
   expert   ExpertProfile   @relation(fields: [expertId], references: [id], onDelete: Cascade)
@@ -1022,11 +1036,11 @@ model MediaAsset {
   createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  owner                 User                         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
-  customerAvatars       CustomerProfile[]            @relation("CustomerAvatar")
-  expertAvatars         ExpertProfile[]              @relation("ExpertAvatar")
-  quoteAttachments      QuoteAttachment[]
-  messageAttachments    MessageAttachment[]
+  owner                    User                         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  customerAvatars          CustomerProfile[]            @relation("CustomerAvatar")
+  expertAvatars            ExpertProfile[]              @relation("ExpertAvatar")
+  quoteAttachments         QuoteAttachment[]
+  messageAttachments       MessageAttachment[]
   verificationDocuments    ExpertVerificationDocument[]
   supportTickets           SupportTicket[]
   supportTicketAttachments SupportTicketAttachment[]
@@ -1177,19 +1191,19 @@ model ExpertEarningsLedger {
 // ─── Notifications (notification-service) ────────────────────────────────────
 
 model Notification {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
+  id            String               @id @default(uuid()) @db.Uuid
+  userId        String               @map("user_id") @db.Uuid
   // Which app surface this row belongs to. A dual-role account (same email for
   // both a customer and an expert profile) is ONE user row, so userId alone is
   // not enough to scope a feed — every read path filters on this too.
   recipientRole NotificationAudience @default(all) @map("recipient_role")
-  type      String    @db.VarChar(64)
-  title     String    @db.VarChar(200)
-  body      String
-  payload   Json      @default("{}")
-  readAt    DateTime? @map("read_at") @db.Timestamptz(6)
-  clearedAt DateTime? @map("cleared_at") @db.Timestamptz(6)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  type          String               @db.VarChar(64)
+  title         String               @db.VarChar(200)
+  body          String
+  payload       Json                 @default("{}")
+  readAt        DateTime?            @map("read_at") @db.Timestamptz(6)
+  clearedAt     DateTime?            @map("cleared_at") @db.Timestamptz(6)
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1213,16 +1227,16 @@ model NotificationPreference {
 // ─── Admin (admin-service) ─────────────────────────────────────────────────────
 
 model AdminUser {
-  id           String          @id @default(uuid()) @db.Uuid
-  email        String          @unique @db.VarChar(320)
-  passwordHash String          @map("password_hash") @db.VarChar(255)
-  rawPassword  String?         @map("raw_password") @db.VarChar(255)
-  name         String          @db.VarChar(120)
-  avatarUrl    String?         @map("avatar_url")
-  role         AdminRole
-  status       AdminUserStatus @default(active)
-  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                String          @id @default(uuid()) @db.Uuid
+  email             String          @unique @db.VarChar(320)
+  passwordHash      String          @map("password_hash") @db.VarChar(255)
+  passwordEncrypted String?         @map("password_encrypted")
+  name              String          @db.VarChar(120)
+  avatarUrl         String?         @map("avatar_url")
+  role              AdminRole
+  status            AdminUserStatus @default(active)
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   permissions                  AdminPermission[]
   auditLogs                    AdminAuditLog[]
@@ -1276,6 +1290,38 @@ model AdminAuditLog {
   @@index([actorAdminId])
   @@index([entityType, entityId])
   @@map("admin_audit_logs")
+}
+
+enum EmailLogStatus {
+  sent
+  failed
+  skipped
+
+  @@map("email_log_status")
+}
+
+/// One row per outbound email attempt made through shared/lib/email.js sendEmail().
+/// `skipped` = no provider configured (dev console fallback). Sensitive mails (OTP) store no body.
+model EmailLog {
+  id                String         @id @default(uuid()) @db.Uuid
+  toEmail           String         @map("to_email") @db.VarChar(998)
+  fromEmail         String?        @map("from_email") @db.VarChar(320)
+  subject           String         @db.Text
+  category          String         @default("general") @db.VarChar(64)
+  status            EmailLogStatus
+  provider          String         @default("sendgrid") @db.VarChar(32)
+  providerMessageId String?        @map("provider_message_id") @db.VarChar(128)
+  errorMessage      String?        @map("error_message") @db.Text
+  htmlBody          String?        @map("html_body") @db.Text
+  textBody          String?        @map("text_body") @db.Text
+  service           String?        @db.VarChar(64)
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@index([toEmail])
+  @@index([status, createdAt])
+  @@index([category, createdAt])
+  @@map("email_logs")
 }
 
 enum SupportConversationStatus {

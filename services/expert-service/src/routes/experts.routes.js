@@ -41,6 +41,14 @@ router.get(
   })
 );
 
+router.post(
+  "/banners/:id/click",
+  asyncHandler(async (req, res) => {
+    await bannerCtrl.recordBannerClick(req.params.id);
+    return ResponseFormatter.success(res, { message: getMessage("updatedSuccessfully") });
+  })
+);
+
 router.get(
   "/me",
   authenticate,

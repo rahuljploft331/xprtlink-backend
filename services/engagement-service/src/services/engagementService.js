@@ -370,7 +370,7 @@ export async function createQuote(auth, body) {
         ctaText: "Review Quote",
         ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com"}/quotes/${quote.id}`,
       });
-      await sendEmail({ to: quote.expert.user.email, subject: "New Quote Request", html: emailHtml }).catch(e => log.error(e));
+      await sendEmail({ category: "quote", to: quote.expert.user.email, subject: "New Quote Request", html: emailHtml }).catch(e => log.error(e));
     }
   } catch (err) {
     log.error(`[createQuote] Notification dispatch failed: ${err.message}`);
@@ -619,7 +619,7 @@ export async function submitQuotation(auth, quoteId, body) {
         ctaText: "View Quote",
         ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://app.xprtlink.com"}/quotes/${updated.id}`,
       });
-      await sendEmail({ to: updated.customer.user.email, subject: "Quote Ready", html: emailHtml }).catch(e => log.error(e));
+      await sendEmail({ category: "quote", to: updated.customer.user.email, subject: "Quote Ready", html: emailHtml }).catch(e => log.error(e));
     }
   } catch (err) {
     log.error(`[submitQuotation] Notification dispatch failed: ${err.message}`);
@@ -669,7 +669,7 @@ export async function acceptQuote(auth, quoteId) {
         ctaText: "View Quote",
         ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com"}/quotes/${updated.id}`,
       });
-      await sendEmail({ to: updated.expert.user.email, subject: "Quote Accepted", html: emailHtml }).catch(e => log.error(e));
+      await sendEmail({ category: "quote", to: updated.expert.user.email, subject: "Quote Accepted", html: emailHtml }).catch(e => log.error(e));
     }
   } catch (err) {
     log.error(`[acceptQuote] Notification dispatch failed: ${err.message}`);
@@ -721,7 +721,7 @@ export async function rejectQuote(auth, quoteId) {
           ctaText: "View Details",
           ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://app.xprtlink.com"}/quotes/${updated.id}`,
         });
-        await sendEmail({ to: updated.customer.user.email, subject: "Quote Request Rejected", html: emailHtml }).catch(e => log.error(e));
+        await sendEmail({ category: "quote", to: updated.customer.user.email, subject: "Quote Request Rejected", html: emailHtml }).catch(e => log.error(e));
       }
     } catch (err) {
       log.error(`[rejectQuote] Notification dispatch failed: ${err.message}`);
@@ -769,7 +769,7 @@ export async function rejectQuote(auth, quoteId) {
         ctaText: "View Quote",
         ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com"}/quotes/${updated.id}`,
       });
-      await sendEmail({ to: updated.expert.user.email, subject: "Quote Rejected", html: emailHtml }).catch(e => log.error(e));
+      await sendEmail({ category: "quote", to: updated.expert.user.email, subject: "Quote Rejected", html: emailHtml }).catch(e => log.error(e));
     }
   } catch (err) {
     log.error(`[rejectQuote] Notification dispatch failed: ${err.message}`);
@@ -818,7 +818,7 @@ export async function cancelQuote(auth, quoteId) {
         ctaText: "View Quote",
         ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com"}/quotes/${updated.id}`,
       });
-      await sendEmail({ to: updated.expert.user.email, subject: "Quote Cancelled", html: emailHtml }).catch(e => log.error(e));
+      await sendEmail({ category: "quote", to: updated.expert.user.email, subject: "Quote Cancelled", html: emailHtml }).catch(e => log.error(e));
     }
   } catch (err) {
     log.error(`[cancelQuote] Notification dispatch failed: ${err.message}`);
@@ -1210,7 +1210,7 @@ export async function declineConsultation(auth, consultationId) {
         ctaText: "View Consultation",
         ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://app.xprtlink.com"}/consultations/${updated.id}`,
       });
-      await sendEmail({ to: updated.customer.user.email, subject: "Consultation Declined", html: emailHtml }).catch(e => log.error(e));
+      await sendEmail({ category: "consultation", to: updated.customer.user.email, subject: "Consultation Declined", html: emailHtml }).catch(e => log.error(e));
     }
   } catch (err) {
     log.error(`[declineConsultation] Notification dispatch failed: ${err.message}`);

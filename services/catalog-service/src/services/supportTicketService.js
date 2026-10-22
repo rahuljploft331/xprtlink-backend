@@ -112,7 +112,7 @@ export async function createTicket(auth, { subject, body, category, referenceId,
       title: "New Support Request",
       bodyHtml: `<p><strong>From:</strong> ${escapeHtml(userName)} (${escapeHtml(user?.email || "No email")})<br><strong>Category:</strong> ${escapeHtml(category)}${referenceId ? `<br><strong>Reference ID:</strong> ${escapeHtml(referenceId)}` : ""}</p><p><strong>Subject:</strong> ${escapeHtml(finalSubject)}</p><p><strong>Message:</strong><br>${nl2br(body)}</p>${attachmentHtml}`,
     });
-    await sendEmail({
+    await sendEmail({ category: "support",
       to: supportEmail,
       subject: `[Support] ${finalSubject}`,
       text: textBody,

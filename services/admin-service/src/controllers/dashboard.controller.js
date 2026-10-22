@@ -143,7 +143,7 @@ export async function getStats(_req, res, next) {
     const expDelta = calculateDelta(experts30d, expertsPrev30d);
     const consDelta = calculateDelta(consultations30d, consultationsPrev30d);
     const quotesDelta = calculateDelta(quotes30d, quotesPrev30d);
-    const revDelta = calculateDelta(revenueCents, revenuePrevCents);
+    const revDelta = calculateDelta(revenueCents, revenuePrevCents, () => null);
     const subsDelta = calculateDelta(subs30d, subsPrev30d);
 
     const stats = [
@@ -428,10 +428,12 @@ function formatTicketActivity(t) {
   };
 }
 
-function calculateDelta(current, previous) {
+function calculateDelta(current, previous, noBaseline = (c) => `+${c.toLocaleString("en-US")} new in 30d`) {
   if (previous === 0) {
-    if (current === 0) return { delta: "0%", trend: "neutral" };
-    return { delta: "+100%", trend: "up" };
+    // No prior period to compare against, so no percentage: show the real
+    // 30-day figure instead (or nothing when the card headline already is it).
+    if (current === 0) return { delta: null, trend: "neutral" };
+    return { delta: noBaseline(current), trend: "up" };
   }
   const diff = current - previous;
   const pct = Math.round((diff / previous) * 100);

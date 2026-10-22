@@ -619,7 +619,7 @@ function notifyPaymentFailed(consultationId) {
         ctaText: "Update Payment Method",
         ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://app.xprtlink.com",
       });
-      await sendEmail({
+      await sendEmail({ category: "billing",
         to: consultation.customer.user.email,
         subject: "Consultation Payment Failed",
         html: emailHtml,
@@ -990,7 +990,7 @@ async function sendConsultationInvoices({
         expertName,
         customerName,
       });
-      await sendEmail({ to: recipient.email, subject, html });
+      await sendEmail({ category: "billing", to: recipient.email, subject, html });
       log.info(
         `[captureConsultation] Invoice emailed to ${recipient.audience} (${recipient.email}) for consultation ${consultation.id}`
       );
@@ -1240,7 +1240,7 @@ function alertAdmins(subject, lines) {
       title: subject,
       bodyHtml: lines.map((l) => `<p>${escapeHtml(l)}</p>`).join(""),
     });
-    await sendEmail({ to, subject, html });
+    await sendEmail({ category: "billing", to, subject, html });
   })().catch((err) => log.error(`[billing-alert] "${subject}" email failed: ${err.message}`));
 }
 
@@ -2385,7 +2385,7 @@ export async function cancelSubscription(auth) {
         ctaText: "View Subscription",
         ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com",
       });
-      await sendEmail({
+      await sendEmail({ category: "subscription",
         to: userEmail,
         subject: "Subscription Cancellation Scheduled",
         html: emailHtml,
@@ -2511,7 +2511,7 @@ export async function expireSubscriptions() {
               ctaText: "Renew Subscription",
               ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com",
             });
-            await sendEmail({
+            await sendEmail({ category: "subscription",
               to: u.email,
               subject: "Subscription Expired",
               html: emailHtml,
@@ -2821,7 +2821,7 @@ ${rows.length ? `<p style="margin-top:16px"><strong>Consultations included (${ro
     bottomNoteHtml:
       "<p>Funds usually reach your bank within a few business days, depending on your bank. You can track this payout in your Stripe payouts dashboard from the XprtLink app.</p>",
   });
-  await sendEmail({
+  await sendEmail({ category: "payout",
     to: user.email,
     subject: getMessage("payoutSentEmailSubject", { amount: usd(payout.amountCents) }),
     html,

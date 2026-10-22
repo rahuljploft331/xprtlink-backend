@@ -1556,6 +1556,110 @@
       ]
     },
     {
+      "name": "Email Logs",
+      "description": "Read-only log of every email sent through `sendEmail()` (`email_logs`). Requires `view` on the `email_logs` module — super admins and granted sub-admins.",
+      "item": [
+        {
+          "name": "List Email Logs",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/email-logs?page=1&limit=25&search=&status=&category=&dateFrom=&dateTo=&sort=&order=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "email-logs"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "25",
+                  "description": "1-100"
+                },
+                {
+                  "key": "search",
+                  "value": "",
+                  "description": "Matches recipient, subject or provider message id (case-insensitive)."
+                },
+                {
+                  "key": "status",
+                  "value": "",
+                  "description": "`sent` | `failed` | `skipped` (skipped = no provider configured, nothing delivered)."
+                },
+                {
+                  "key": "category",
+                  "value": "",
+                  "description": "e.g. otp, admin, quote, consultation, billing, subscription, payout, verification, support, banner, broadcast, expert_outreach."
+                },
+                {
+                  "key": "dateFrom",
+                  "value": "",
+                  "description": "ISO date/time lower bound (inclusive)."
+                },
+                {
+                  "key": "dateTo",
+                  "value": "",
+                  "description": "ISO date/time upper bound; a bare YYYY-MM-DD covers that whole day."
+                },
+                {
+                  "key": "sort",
+                  "value": "",
+                  "description": "createdAt | status | category | subject | to"
+                },
+                {
+                  "key": "order",
+                  "value": "",
+                  "description": "asc | desc (default desc)"
+                }
+              ]
+            },
+            "description": "Paginated email log, newest first. `data` = `{ items, page, limit, total, summary: {sent, failed, skipped}, categories: [] }`. `summary` ignores the `status` filter so the counters stay stable. List items carry no body."
+          }
+        },
+        {
+          "name": "Get Email Log",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/email-logs/:id",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "email-logs",
+                ":id"
+              ],
+              "query": []
+            },
+            "description": "Full record incl. `htmlBody`/`textBody` and `providerMessageId`. Bodies are null for sensitive mails (OTP codes, admin credentials)."
+          }
+        }
+      ]
+    },
+    {
       "name": "Global Admin Search",
       "item": [
         {

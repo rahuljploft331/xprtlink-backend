@@ -47,6 +47,8 @@ async function sendEmailOtp({ email, code, purpose }) {
     subject: `Your XprtLink ${label} code`,
     text: `Your verification code is ${code}. It expires in 10 minutes.`,
     html,
+    category: "otp",
+    sensitive: true,
   });
 }
 
