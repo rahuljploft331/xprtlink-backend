@@ -225,16 +225,15 @@ export async function register(body) {
       ? Boolean(existingActiveUserWithEmail.customerProfile)
       : Boolean(existingActiveUserWithEmail.expertProfile);
 
-    const params = roleParams(role);
     if (hasRequestedRole) {
-      throw conflict("emailAlreadyExistsForRole", "EMAIL_TAKEN", params);
+      throw conflict("emailAlreadyExists", "EMAIL_TAKEN");
     }
 
     // Proof of ownership is the phone: it must match the account's phone and have
     // been OTP-verified (checked below). The password typed here becomes the new
     // role's own password, independent of the other role's.
     if (existingActiveUserWithEmail.phone !== phone) {
-      throw conflict("emailRegisteredWithDifferentPhone", "PHONE_MISMATCH", params);
+      throw conflict("emailRegisteredWithDifferentPhone", "PHONE_MISMATCH");
     }
   } else {
     // Pre-flight availability check (fast-fails common case; real enforcement is inside the transaction)
@@ -464,18 +463,13 @@ export async function login(body) {
   if (phone) {
     // Phone auth relies on OTP; we don't verify password here
   } else {
-    const hash = roleHash(user, role);
+    // One generic failure for every cause (wrong password, other role's password,
+    // no password set) so nothing about the account leaks. A missing hash still
+    // pays for a bcrypt compare to keep timing uniform.
+    const hash = roleHash(user, role) ?? "$2b$10$abcdefghijklmnopqrstuvuXzGO7fMC7VYzWH4HmM0vXcB9tBr7bq";
     const valid = await verifyPassword(password, hash);
-    if (!valid) {
-      const params = roleParams(role);
-      // They proved they know a valid password for this email — tell them if it
-      // belongs to their other account instead of a generic failure.
-      const otherHash = role === "customer" || role === "expert" ? roleHash(user, otherRoleOf(role)) : null;
-      if (otherHash && (await verifyPassword(password, otherHash))) {
-        throw unauthorized("wrongRolePassword", "WRONG_ROLE_PASSWORD", params);
-      }
-      if (!hash) throw unauthorized("rolePasswordNotSet", "ROLE_PASSWORD_NOT_SET", params);
-      throw unauthorized("invalidRoleCredentials", "UNAUTHORIZED", params);
+    if (!valid || !roleHash(user, role)) {
+      throw unauthorized("invalidRoleCredentials", "UNAUTHORIZED", roleParams(role));
     }
   }
 
@@ -839,11 +833,8 @@ export async function forgotPassword(body) {
   // Reset is per role. If the caller names a role, that profile must exist; if
   // not (older clients), fall back to the only profile, or both when they have two.
   const role = body.role === "customer" || body.role === "expert" ? body.role : null;
-  if (user && role && !user[profileKey(role)]) {
-    throw notFound("roleSpecificResetNoProfile", "NOT_FOUND", roleParams(role));
-  }
-
-  if (!user) {
+  // A missing role looks exactly like an unknown account.
+  if (!user || (role && !user[profileKey(role)])) {
     // M7: timing mitigation
     await verifyPassword("__dummy_password_that_never_matches__", "$2b$10$abcdefghijklmnopqrstuvuXzGO7fMC7VYzWH4HmM0vXcB9tBr7bq");
     throw notFound("unregisteredUser");
