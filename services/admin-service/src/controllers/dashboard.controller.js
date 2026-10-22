@@ -431,7 +431,8 @@ function formatTicketActivity(t) {
 function calculateDelta(current, previous) {
   if (previous === 0) {
     if (current === 0) return { delta: "0%", trend: "neutral" };
-    return { delta: "+100%", trend: "up" };
+    // No prior-period baseline: a percentage is meaningless, so don't fake +100%.
+    return { delta: "New", trend: "up" };
   }
   const diff = current - previous;
   const pct = Math.round((diff / previous) * 100);
