@@ -50,6 +50,22 @@ export async function create(req, res, next) {
       include: { permissions: true },
     });
     await logAdminAction(req, "admin.create", "AdminUser", admin.id, { name, email: admin.email, role });
+
+    // Email the new subadmin their login credentials; creation must not fail if mail does.
+    try {
+      const html = await renderEmailTemplate({
+        title: "Your XprtLink admin account",
+        bodyHtml: `<p>Hi ${escapeHtml(name)},</p><p>A super admin has created an XprtLink admin account for you. Use these credentials to sign in:</p><p><strong>Email:</strong> ${escapeHtml(admin.email)}<br/><strong>Password:</strong> <span style="font-size:16px;font-weight:600;letter-spacing:1px;">${escapeHtml(password)}</span></p><p>Please change your password after signing in.</p>`,
+      });
+      await sendEmail({
+        to: admin.email,
+        subject: "Your XprtLink admin account",
+        text: `Hi ${name},\n\nA super admin has created an XprtLink admin account for you.\n\nEmail: ${admin.email}\nPassword: ${password}\n\nPlease change your password after signing in.`,
+        html,
+      });
+    } catch (mailErr) {
+      console.error("[admin.create] credentials email failed:", mailErr?.message);
+    }
     return ResponseFormatter.success(res, { data: toAdminUserDto(admin), status: 201 });
   } catch (err) { next(err); }
 }
