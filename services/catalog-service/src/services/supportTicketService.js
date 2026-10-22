@@ -22,7 +22,17 @@ export async function createTicket(auth, { subject, body, category, referenceId,
       ...(attachmentId ? [attachmentId] : []),
     ])
   ).filter(Boolean);
-  const primaryAttachmentId = allAttachmentIds[0] || null;
+
+  let validAttachmentIds = [];
+  if (allAttachmentIds.length > 0) {
+    const existingMedia = await db.mediaAsset.findMany({
+      where: { id: { in: allAttachmentIds } },
+      select: { id: true },
+    });
+    const existingSet = new Set(existingMedia.map((m) => m.id));
+    validAttachmentIds = allAttachmentIds.filter((id) => existingSet.has(id));
+  }
+  const primaryAttachmentId = validAttachmentIds[0] || null;
   
   // Get user details for the email
   const user = await db.user.findUnique({
@@ -61,7 +71,7 @@ export async function createTicket(auth, { subject, body, category, referenceId,
       attachmentId: primaryAttachmentId,
       status: "open",
       attachments: {
-        create: allAttachmentIds.map((mediaId) => ({
+        create: validAttachmentIds.map((mediaId) => ({
           mediaId,
         })),
       },
@@ -116,6 +126,6 @@ export async function createTicket(auth, { subject, body, category, referenceId,
 
   return {
     ticketId: ticket.id,
-    attachmentsCount: allAttachmentIds.length,
+    attachmentsCount: validAttachmentIds.length,
   };
 }
