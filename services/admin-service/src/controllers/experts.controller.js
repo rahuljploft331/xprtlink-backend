@@ -440,7 +440,7 @@ export async function sendEmailToExpert(req, res, next) {
       bodyHtml,
     });
 
-    await sendEmail({
+    await sendEmail({ category: "expert_outreach",
       to: expertProfile.user.email,
       subject,
       html,

@@ -70,24 +70,66 @@ export async function renderEmailTemplate({
   return html;
 }
 
+/** Persist one email attempt. Never throws — logging must not break delivery. */
+async function recordEmailLog(entry) {
+  try {
+    if (!process.env.DATABASE_URL) return;
+    const { getDb } = await import("../db/getClient.js");
+    await getDb().emailLog.create({
+      data: { ...entry, service: process.env.SERVICE_NAME || null },
+    });
+  } catch (err) {
+    log.warn(`[email] failed to write email log: ${err?.message}`);
+  }
+}
+
 /**
  * Send a transactional email via SendGrid.
  * Falls back to console logging in non-production when SENDGRID_API_KEY isn't configured.
+ * Every attempt is written to `email_logs` (admin portal → Email Logs).
+ * `category` groups mails in that view; `sensitive` skips storing the body (OTP codes etc.).
  */
-export async function sendEmail({ to, subject, text, html, replyTo }) {
+export async function sendEmail({ to, subject, text, html, replyTo, category = "general", sensitive = false }) {
   const apiKey = getSecretSync("SENDGRID_API_KEY");
   const fromEmail = getSecretSync("SENDGRID_FROM_EMAIL", "noreply@xpertlink.local");
+  const base = {
+    toEmail: Array.isArray(to) ? to.join(", ") : String(to ?? ""),
+    fromEmail,
+    subject: subject ?? "",
+    category,
+    htmlBody: sensitive ? null : html ?? null,
+    textBody: sensitive ? null : text ?? null,
+  };
 
   if (!apiKey) {
     if (isDevFallbackEnabled()) {
       log.info(`[email] to ${to}: ${subject}\n${text}`);
+      await recordEmailLog({ ...base, status: "skipped", provider: "console" });
       return;
     }
+    await recordEmailLog({ ...base, status: "failed", errorMessage: "SENDGRID_API_KEY not configured" });
     throw badRequest("emailDeliveryFailed", "EMAIL_DELIVERY_FAILED");
   }
 
   const { default: sgMail } = await import("@sendgrid/mail");
   sgMail.setApiKey(apiKey);
 
-  const msg = { to, from: fromEmail, subject, text, html }; if (replyTo) msg.replyTo = replyTo; await sgMail.send(msg);
+  const msg = { to, from: fromEmail, subject, text, html };
+  if (replyTo) msg.replyTo = replyTo;
+  try {
+    const [response] = await sgMail.send(msg);
+    await recordEmailLog({
+      ...base,
+      status: "sent",
+      providerMessageId: response?.headers?.["x-message-id"] ?? null,
+    });
+  } catch (err) {
+    const detail = err?.response?.body?.errors?.map((e) => e.message).join("; ");
+    await recordEmailLog({
+      ...base,
+      status: "failed",
+      errorMessage: String(detail || err?.message || "Unknown error").slice(0, 2000),
+    });
+    throw err;
+  }
 }

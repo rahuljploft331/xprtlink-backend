@@ -158,7 +158,7 @@ export async function reply(req, res) {
         title: "Support Ticket Update",
         bodyHtml: `<p>Hi ${escapeHtml(userName)},</p><p>Your support ticket regarding "${escapeHtml(ticket.subject || ticket.category)}" has been updated.</p><p><strong>Reply from Admin:</strong><br>${nl2br(message)}</p><p>Best regards,<br>XprtLink Support Team</p>`,
       });
-      await sendEmail({
+      await sendEmail({ category: "support",
         to: user.email,
         subject: `Re: [Support] ${ticket.subject || ticket.category}`,
         text: textBody,

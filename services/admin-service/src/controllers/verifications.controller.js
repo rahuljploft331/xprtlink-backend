@@ -156,7 +156,7 @@ export async function approve(req, res, next) {
             ctaText: "View Profile",
             ctaUrl: "https://app.xprtlink.com/expert/profile",
           });
-          await sendEmail({
+          await sendEmail({ category: "verification",
             to: expertProfile.user.email,
             subject: "Your Account has been successfully verified",
             html: emailHtml,
@@ -249,7 +249,7 @@ export async function reject(req, res, next) {
           ctaText: "Re-upload Documents",
           ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com",
         });
-        await sendEmail({
+        await sendEmail({ category: "verification",
           to: expertEmail,
           subject: getMessage("verificationRejectedEmailSubject"),
           text: `Hi ${firstName},\n\nYour XprtLink verification was not approved.\n\nReason: ${rejectionNotes}\n\nPlease re-open the app and re-upload your documents.`,

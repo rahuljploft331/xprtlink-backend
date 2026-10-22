@@ -89,7 +89,7 @@ export async function create(req, res, next) {
         title: "Your XprtLink admin account",
         bodyHtml: `<p>Hi ${escapeHtml(name)},</p><p>A super admin has created an XprtLink admin account for you. Use these credentials to sign in:</p><p><strong>Email:</strong> ${escapeHtml(admin.email)}<br/><strong>Password:</strong> <span style="font-size:16px;font-weight:600;letter-spacing:1px;">${escapeHtml(password)}</span></p><p>Please change your password after signing in.</p>`,
       });
-      await sendEmail({
+      await sendEmail({ category: "admin", sensitive: true,
         to: admin.email,
         subject: "Your XprtLink admin account",
         text: `Hi ${name},\n\nA super admin has created an XprtLink admin account for you.\n\nEmail: ${admin.email}\nPassword: ${password}\n\nPlease change your password after signing in.`,
@@ -164,7 +164,7 @@ export async function resetPassword(req, res, next) {
       bodyHtml: `<p>Hi ${escapeHtml(admin.name)},</p><p>Your XprtLink admin password was reset by a super admin. Your new temporary password is:</p><p style="font-size:18px;font-weight:600;letter-spacing:1px;">${tempPassword}</p><p>Please sign in and change it as soon as possible.</p>`,
     });
 
-    await sendEmail({
+    await sendEmail({ category: "admin", sensitive: true,
       to: admin.email,
       subject: "Your XprtLink admin password has been reset",
       text: `Hi ${admin.name},\n\nYour XprtLink admin password was reset by a super admin. Your new temporary password is:\n\n${tempPassword}\n\nPlease sign in and change it as soon as possible.`,

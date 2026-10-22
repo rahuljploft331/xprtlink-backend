@@ -166,7 +166,7 @@ export async function send(req, res) {
         });
         
         Promise.allSettled(chunkUsers.map(u => 
-          sendEmail({ to: u.email, subject: title, html: emailHtml })
+          sendEmail({ category: "broadcast", to: u.email, subject: title, html: emailHtml })
         )).catch(e => log.error(e));
       }
 

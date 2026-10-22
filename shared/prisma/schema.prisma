@@ -1278,6 +1278,38 @@ model AdminAuditLog {
   @@map("admin_audit_logs")
 }
 
+enum EmailLogStatus {
+  sent
+  failed
+  skipped
+
+  @@map("email_log_status")
+}
+
+/// One row per outbound email attempt made through shared/lib/email.js sendEmail().
+/// `skipped` = no provider configured (dev console fallback). Sensitive mails (OTP) store no body.
+model EmailLog {
+  id                String         @id @default(uuid()) @db.Uuid
+  toEmail           String         @map("to_email") @db.VarChar(998)
+  fromEmail         String?        @map("from_email") @db.VarChar(320)
+  subject           String         @db.Text
+  category          String         @default("general") @db.VarChar(64)
+  status            EmailLogStatus
+  provider          String         @default("sendgrid") @db.VarChar(32)
+  providerMessageId String?        @map("provider_message_id") @db.VarChar(128)
+  errorMessage      String?        @map("error_message") @db.Text
+  htmlBody          String?        @map("html_body") @db.Text
+  textBody          String?        @map("text_body") @db.Text
+  service           String?        @db.VarChar(64)
+  createdAt         DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([createdAt])
+  @@index([toEmail])
+  @@index([status, createdAt])
+  @@index([category, createdAt])
+  @@map("email_logs")
+}
+
 enum SupportConversationStatus {
   open
   assigned

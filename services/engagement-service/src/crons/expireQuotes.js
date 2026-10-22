@@ -58,7 +58,7 @@ export async function expireStaleQuotes() {
                 ctaText: "Open App",
                 ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://app.xprtlink.com",
               });
-              await sendEmail({ to: u.email, subject: "Quote Expired", html }).catch(e => log.error(e));
+              await sendEmail({ category: "quote", to: u.email, subject: "Quote Expired", html }).catch(e => log.error(e));
             }
           }
         });
@@ -84,7 +84,7 @@ export async function expireStaleQuotes() {
                 ctaText: "Open App",
                 ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com",
               });
-              await sendEmail({ to: u.email, subject: "Quote Expired", html }).catch(e => log.error(e));
+              await sendEmail({ category: "quote", to: u.email, subject: "Quote Expired", html }).catch(e => log.error(e));
             }
           }
         });

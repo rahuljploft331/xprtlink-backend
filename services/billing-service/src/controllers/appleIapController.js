@@ -155,7 +155,7 @@ export const verifyPurchase = async (req, res, next) => {
           ctaText: "View Subscription",
           ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com",
         });
-        await sendEmail({
+        await sendEmail({ category: "subscription",
           to: userEmail,
           subject: "Subscription Activated",
           html: emailHtml,

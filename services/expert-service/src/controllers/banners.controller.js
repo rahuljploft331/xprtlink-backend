@@ -98,7 +98,7 @@ export const createBanner = async (auth, inputData) => {
       bodyHtml: "<p>We have successfully received your new promotional banner. It is currently in a <strong>pending</strong> state while our moderation team reviews it.</p><p>We will send you another update once it has been approved or if changes are required.</p>",
       badgeText: "Under Review"
     }).then(html => {
-      sendEmail({
+      sendEmail({ category: "banner",
         to: profile.user.email,
         subject: "Your Banner is Under Review",
         text: "Your new promotional banner has been received and is currently pending review.",

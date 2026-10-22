@@ -174,7 +174,7 @@ export const approveBanner = async (req, res) => {
       ctaText: "View My Banners",
       ctaUrl: "https://xprtlink.com/expert/banners"
     }).then(html => {
-      return sendEmail({
+      return sendEmail({ category: "banner",
         to: banner.expert.user.email,
         subject: "Your Banner was Approved",
         text: "Your promotional banner has been approved and is now live.",
@@ -207,7 +207,7 @@ export const rejectBanner = async (req, res) => {
       bodyHtml: "<p>We reviewed your recent banner submission, but unfortunately it was not approved.</p><p><strong>Reason:</strong> " + reason + "</p><p>Please review our guidelines and try submitting a new banner.</p>",
       badgeText: "Requires Attention"
     }).then(html => {
-      return sendEmail({
+      return sendEmail({ category: "banner",
         to: banner.expert.user.email,
         subject: "Your Banner Needs Changes",
         text: "Your banner was rejected for the following reason: " + reason,
