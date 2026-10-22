@@ -1434,6 +1434,19 @@ async function handleChargeRefunded(stripeCharge) {
   }
 }
 
+/**
+ * Billing period of a Stripe subscription as Dates, or null when Stripe sent none.
+ * Older API versions carry it on the subscription; 2025-03-31+ moved it to the first
+ * item, and webhook payloads follow the endpoint's API version, not the SDK pin.
+ */
+function stripePeriod(sub) {
+  const item = sub?.items?.data?.[0];
+  const start = sub?.current_period_start ?? item?.current_period_start;
+  const end = sub?.current_period_end ?? item?.current_period_end;
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  return { start: new Date(start * 1000), end: new Date(end * 1000) };
+}
+
 export async function handleStripeWebhook(payload, signature) {
   const event = stripeSvc.constructWebhookEvent(payload, signature);
   const db = getDb();
@@ -1603,8 +1616,10 @@ export async function handleStripeWebhook(payload, signature) {
       // Retrieve the subscription from Stripe to get the actual period dates
       const sdk = stripeSvc._requireStripeForWebhook();
       const stripeSub = await sdk.subscriptions.retrieve(stripeSubscriptionId);
-      const periodStart = new Date(stripeSub.current_period_start * 1000);
-      const periodEnd = new Date(stripeSub.current_period_end * 1000);
+      const period = stripePeriod(stripeSub);
+      if (!period) throw new Error(`Stripe subscription ${stripeSubscriptionId} has no billing period`);
+      const periodStart = period.start;
+      const periodEnd = period.end;
 
       // A second checkout opened in another tab/URL can also complete. Cancel the
       // older Stripe subscription itself, otherwise the expert is billed for both.
@@ -1690,12 +1705,12 @@ export async function handleStripeWebhook(payload, signature) {
       if (!row) break;
 
       const newStatus = sub.status === "active" ? "active" : sub.status === "canceled" ? "canceled" : "expired";
+      const period = stripePeriod(sub);
       await db.expertSubscription.update({
         where: { id: row.id },
         data: {
           status: newStatus,
-          currentPeriodStart: new Date(sub.current_period_start * 1000),
-          currentPeriodEnd: new Date(sub.current_period_end * 1000),
+          ...(period ? { currentPeriodStart: period.start, currentPeriodEnd: period.end } : {}),
           cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
           canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
         },
@@ -3285,7 +3300,7 @@ export async function createStripeCheckoutSession(auth, { planCode, successUrl, 
   // Check for existing active subscription before any Stripe calls — prevents
   // double-billing IAP subscribers and gives a clearer error than Stripe config issues.
   const existing = await db.expertSubscription.findFirst({
-    where: { expertProfileId: auth.expertProfileId, status: "active" },
+    where: { expertProfileId: auth.expertProfileId, status: { in: ENTITLED_STATUSES } },
   });
   if (existing) throw conflict("subscriptionAlreadyActive", "SUBSCRIPTION_ALREADY_ACTIVE");
 
