@@ -535,7 +535,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "password", "forgot"]
             },
-            "description": "Start a password reset for **one role**. `role` (customer/expert) decides which account's password is reset; the other role's password is untouched. Always send `role` (older clients that omit it reset every profile on the account). If the email has no account for that role, the response is the same \"not registered\" error as an unknown email.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+            "description": "Start a password reset for **one role**. `role` (customer/expert) decides which account's password is reset; the other role's password is untouched. Always send `role` (older clients that omit it reset every profile on the account).\n\n**Enumeration-safe:** an unknown email, or an email with no account for that role, gets the identical 200 response and cooldown as a real account — no code is sent, and a code can never be redeemed for it (Reset Password answers `INVALID_OTP`, same as a wrong code).\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
           },
           "response": [
             {
@@ -557,7 +557,7 @@
                   "host": ["{{base_url}}"],
                   "path": ["api", "v1", "auth", "password", "forgot"]
                 },
-                "description": "Start a password reset for **one role**. `role` (customer/expert) decides which account's password is reset; the other role's password is untouched. Always send `role` (older clients that omit it reset every profile on the account). If the email has no account for that role, the response is the same \"not registered\" error as an unknown email.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+                "description": "Start a password reset for **one role**. `role` (customer/expert) decides which account's password is reset; the other role's password is untouched. Always send `role` (older clients that omit it reset every profile on the account).\n\n**Enumeration-safe:** an unknown email, or an email with no account for that role, gets the identical 200 response and cooldown as a real account — no code is sent, and a code can never be redeemed for it (Reset Password answers `INVALID_OTP`, same as a wrong code).\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
               },
               "status": "OK",
               "code": 200,
@@ -569,38 +569,6 @@
                 }
               ],
               "body": "{\n  \"success\": true,\n  \"message\": \"Reset code sent for your Customer account.\",\n  \"data\": {\n    \"sent\": true,\n    \"role\": \"customer\",\n    \"expiresInSeconds\": 600,\n    \"channel\": \"email\"\n  }\n}"
-            },
-            {
-              "name": "404 Not registered (unknown email, or no account for that role)",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"email\": \"{{runEmail}}\",\n  \"role\": \"customer\"\n}"
-                },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/password/forgot",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "auth", "password", "forgot"]
-                },
-                "description": "Start a password reset for **one role**. `role` (customer/expert) decides which account's password is reset; the other role's password is untouched. Always send `role` (older clients that omit it reset every profile on the account). If the email has no account for that role, the response is the same \"not registered\" error as an unknown email.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
-              },
-              "status": "Not Found",
-              "code": 404,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "body": "{\n  \"success\": false,\n  \"message\": \"The user is not registered with these details.\",\n  \"code\": \"NOT_FOUND\"\n}"
             }
           ]
         },
@@ -711,7 +679,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "auth", "login"]
             },
-            "description": "Log in and obtain access & refresh tokens.\n\nIf using `email`, `password` is required and tokens are returned instantly.\nIf using `phone`, `password` is optional. The API will generate an OTP and return `{ needsOtp: true, ... }` instead of tokens. The mobile app must then call `/auth/otp/verify` with `purpose: login`.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead).\n\n_Re-captures a fresh `accessToken` + `refreshToken` (using the password set by Reset Password) for the authenticated requests that follow._\n\nChecks the password of the requested `role` only. Every credential failure (wrong password, another role's password, no password set) returns the same generic `UNAUTHORIZED` message so nothing about the account is revealed.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+            "description": "Log in and obtain access & refresh tokens.\n\nIf using `email`, `password` is required and tokens are returned instantly.\nIf using `phone`, `password` is optional. The API will generate an OTP and return `{ needsOtp: true, ... }` instead of tokens. The mobile app must then call `/auth/otp/verify` with `purpose: login`.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead).\n\n_Re-captures a fresh `accessToken` + `refreshToken` (using the password set by Reset Password) for the authenticated requests that follow._\n\nChecks the password of the requested `role` only. Every credential failure — unknown email, an email without that role, wrong password, another role's password, no password set — returns the same generic `UNAUTHORIZED` message, so nothing about the account is revealed. Phone login answers `needsOtp` for unknown phones too; the code simply never validates.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
           },
           "response": [
             {
@@ -733,7 +701,7 @@
                   "host": ["{{base_url}}"],
                   "path": ["api", "v1", "auth", "login"]
                 },
-                "description": "Log in and obtain access & refresh tokens.\n\nIf using `email`, `password` is required and tokens are returned instantly.\nIf using `phone`, `password` is optional. The API will generate an OTP and return `{ needsOtp: true, ... }` instead of tokens. The mobile app must then call `/auth/otp/verify` with `purpose: login`.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead).\n\n_Re-captures a fresh `accessToken` + `refreshToken` (using the password set by Reset Password) for the authenticated requests that follow._\n\nChecks the password of the requested `role` only. Every credential failure (wrong password, another role's password, no password set) returns the same generic `UNAUTHORIZED` message so nothing about the account is revealed.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
+                "description": "Log in and obtain access & refresh tokens.\n\nIf using `email`, `password` is required and tokens are returned instantly.\nIf using `phone`, `password` is optional. The API will generate an OTP and return `{ needsOtp: true, ... }` instead of tokens. The mobile app must then call `/auth/otp/verify` with `purpose: login`.\n\nReturns 403 EMAIL_NOT_VERIFIED if the account is pending_verification (user should complete Step 2 instead).\n\n_Re-captures a fresh `accessToken` + `refreshToken` (using the password set by Reset Password) for the authenticated requests that follow._\n\nChecks the password of the requested `role` only. Every credential failure — unknown email, an email without that role, wrong password, another role's password, no password set — returns the same generic `UNAUTHORIZED` message, so nothing about the account is revealed. Phone login answers `needsOtp` for unknown phones too; the code simply never validates.\n\nPasswords are **per role**: a customer and an expert profile on the same email each have their own password. Messages name the role (\"Customer\"/\"Expert\")."
               },
               "status": "Unauthorized",
               "code": 401,
