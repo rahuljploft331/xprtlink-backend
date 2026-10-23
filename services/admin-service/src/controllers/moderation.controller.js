@@ -105,8 +105,10 @@ export const updateCustomerReport = async (req, res) => {
 
 const bannerMetrics = (sum) => {
   const impressions = sum?.impressions ?? 0;
-  const clicks = sum?.clicks ?? 0;
-  return { impressions, clicks, ctr: impressions ? Math.round((clicks / impressions) * 1000) / 10 : 0 };
+  // `clicks` is unique clicks (one per viewer per banner); `totalClicks` counts every tap.
+  const clicks = sum?.uniqueClicks ?? 0;
+  const totalClicks = sum?.clicks ?? 0;
+  return { impressions, clicks, totalClicks, ctr: impressions ? Math.round((clicks / impressions) * 1000) / 10 : 0 };
 };
 
 const parseDay = (value, fallback) => {
@@ -138,12 +140,12 @@ export const getBannerAnalytics = async (req, res) => {
     db.expertBannerDailyStat.groupBy({
       by: ["bannerId"],
       where: dayWhere,
-      _sum: { impressions: true, clicks: true },
+      _sum: { impressions: true, clicks: true, uniqueClicks: true },
     }),
     db.expertBannerDailyStat.groupBy({
       by: ["day"],
       where: dayWhere,
-      _sum: { impressions: true, clicks: true },
+      _sum: { impressions: true, clicks: true, uniqueClicks: true },
       orderBy: { day: "asc" },
     }),
   ]);
@@ -168,15 +170,16 @@ export const getBannerAnalytics = async (req, res) => {
 
   const impressions = ranked.reduce((n, r) => n + r.impressions, 0);
   const clicks = ranked.reduce((n, r) => n + r.clicks, 0);
+  const totalClicks = ranked.reduce((n, r) => n + r.totalClicks, 0);
 
   return ResponseFormatter.success(res, {
     data: {
       range: { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) },
-      summary: { liveBanners, pendingBanners, ...bannerMetrics({ impressions, clicks }) },
+      summary: { liveBanners, pendingBanners, ...bannerMetrics({ impressions, uniqueClicks: clicks, clicks: totalClicks }) },
       topPerforming: ranked
         .slice(0, 5)
         .filter((r) => bannerById.has(r.bannerId))
-        .map((r) => ({ ...bannerById.get(r.bannerId), impressions: r.impressions, clicks: r.clicks, ctr: r.ctr })),
+        .map((r) => ({ ...bannerById.get(r.bannerId), impressions: r.impressions, clicks: r.clicks, totalClicks: r.totalClicks, ctr: r.ctr })),
       daily: byDay.map((d) => ({
         date: d.day.toISOString().slice(0, 10),
         ...bannerMetrics(d._sum),
@@ -232,7 +235,7 @@ export const listBanners = async (req, res) => {
   const totals = await db.expertBannerDailyStat.groupBy({
     by: ["bannerId"],
     where: { bannerId: { in: banners.map((b) => b.id) } },
-    _sum: { impressions: true, clicks: true },
+    _sum: { impressions: true, clicks: true, uniqueClicks: true },
   });
   const totalsMap = new Map(totals.map((t) => [t.bannerId, t._sum]));
 
