@@ -167,7 +167,7 @@ export const handleNotification = async (req, res, next) => {
                 verificationStatus: "approved",
                 searchEligible: false,
               },
-              data: { searchEligible: true },
+              data: { searchEligible: true, availabilityStatus: "online" },
             });
             break;
           }
@@ -219,7 +219,7 @@ export const handleNotification = async (req, res, next) => {
                 verificationStatus: "approved",
                 searchEligible: false,
               },
-              data: { searchEligible: true },
+              data: { searchEligible: true, availabilityStatus: "online" },
             });
             break;
           }

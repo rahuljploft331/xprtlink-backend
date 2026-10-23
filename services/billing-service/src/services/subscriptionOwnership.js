@@ -183,7 +183,7 @@ export async function activateStoreSubscription(db, p) {
 
     await tx.expertProfile.updateMany({
       where: { id: expertProfileId, verificationStatus: "approved", searchEligible: false },
-      data: { searchEligible: true },
+      data: { searchEligible: true, availabilityStatus: "online" },
     });
 
     return Object.assign(subscription, { upgradedFrom });
