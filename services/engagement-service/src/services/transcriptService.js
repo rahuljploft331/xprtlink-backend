@@ -98,6 +98,9 @@ const pick = (obj, keys) => {
   return undefined;
 };
 
+/** ZEGO task-end notices that are not failures (see ingestAsrCallback). */
+const BENIGN_EXCEPTION_CODES = new Set(["1202"]);
+
 /** The callback `Data` schema is not fully documented, so read the likely field names. */
 export function extractAsrResult(payload) {
   let data = payload?.Data;
@@ -112,7 +115,7 @@ export function extractAsrResult(payload) {
   return {
     data,
     text: typeof text === "string" ? text.trim() : "",
-    sentenceId: pick(data, ["SentenceId", "sentenceId", "SeqId", "SequenceId", "Index"]),
+    sentenceId: pick(data, ["SentenceId", "sentenceId", "Round", "SeqId", "SequenceId", "Index"]),
     streamId: pick(data, ["StreamId", "streamId"]),
     userId: pick(data, ["UserId", "userId", "UserAccount", "user_account"]),
     language: pick(data, ["Language", "language", "Lang"]),
@@ -140,6 +143,16 @@ export async function ingestAsrCallback(payload) {
 
   if (event === "Exception") {
     const data = payload?.Data && typeof payload.Data === "object" ? payload.Data : {};
+    const code = String(pick(data, ["Code", "ErrorCode", "code"]) ?? "EXCEPTION");
+    // 1202 "RTC reach max idle time" is how ZEGO ends a task once the room goes quiet after the
+    // call — a normal end, not a failure. Never downgrade an already-failed row either.
+    if (BENIGN_EXCEPTION_CODES.has(code)) {
+      await db.consultationTranscript.updateMany({
+        where: { id: transcript.id, status: { in: ["starting", "active"] } },
+        data: { status: "stopped", stoppedAt: new Date() },
+      });
+      return "ended";
+    }
     await db.consultationTranscript.update({
       where: { id: transcript.id },
       data: {

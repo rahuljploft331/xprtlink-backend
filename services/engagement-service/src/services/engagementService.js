@@ -23,6 +23,7 @@ import {
 } from "@xprtlink/shared/mappers/consultation.mapper.js";
 import { toExpertPublicDto } from "@xprtlink/shared/mappers/expert.mapper.js";
 import { badRequest, conflict, forbidden, notFound } from "@xprtlink/shared/utils/errors.js";
+import { stopTranscript } from "./transcriptService.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 import { recalculateExpertRating } from "@xprtlink/shared/utils/rating.js";
 
@@ -1271,6 +1272,10 @@ export async function endConsultation(auth, consultationId) {
   } else {
     releaseConsultationHold(consultationId);
   }
+
+  // Stop call transcription now instead of waiting for ZEGO's idle timeout. No-op unless
+  // enabled; never throws or delays the response.
+  stopTranscript(consultationId).catch(() => {});
 
   // No "Consultation Ended" push — the Payment Successful notification that
   // follows the billing capture already tells the customer the session is done.
