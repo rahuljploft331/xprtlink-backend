@@ -265,7 +265,7 @@ export const approveBanner = async (req, res) => {
       title: "Your Promotional Banner is Live!",
       bodyHtml: "<p>Great news! Your promotional banner has been approved and is now live on the platform.</p>",
       ctaText: "View My Banners",
-      ctaUrl: "https://xprtlink.com/expert/banners"
+      ctaUrl: "https://xprtlink.com"
     }).then(html => {
       return sendEmail({ category: "banner",
         to: banner.expert.user.email,

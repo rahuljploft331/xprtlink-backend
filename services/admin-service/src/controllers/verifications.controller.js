@@ -154,7 +154,7 @@ export async function approve(req, res, next) {
             title: "Account Verified",
             bodyHtml: `<p>Congratulations${expertProfile.firstName ? ` ${expertProfile.firstName}` : ""}! Your expert profile has been approved.</p><p>You can now receive consultation requests.</p>`,
             ctaText: "View Profile",
-            ctaUrl: "https://app.xprtlink.com/expert/profile",
+            ctaUrl: "https://xprtlink.com",
           });
           await sendEmail({ category: "verification",
             to: expertProfile.user.email,
