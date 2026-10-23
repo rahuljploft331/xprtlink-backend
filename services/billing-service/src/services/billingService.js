@@ -1691,7 +1691,7 @@ export async function handleStripeWebhook(payload, signature) {
         // Flip search eligibility when verification is approved
         await tx.expertProfile.updateMany({
           where: { id: expertProfileId, verificationStatus: "approved", searchEligible: false },
-          data: { searchEligible: true },
+          data: { searchEligible: true, availabilityStatus: "online" },
         });
       });
 
@@ -1738,7 +1738,7 @@ export async function handleStripeWebhook(payload, signature) {
         // Payment recovered after a failed renewal: restore the listing the lapse removed.
         await db.expertProfile.updateMany({
           where: { id: row.expertProfileId, verificationStatus: "approved", searchEligible: false },
-          data: { searchEligible: true },
+          data: { searchEligible: true, availabilityStatus: "online" },
         });
       } else {
         const stillActive = await db.expertSubscription.findFirst({

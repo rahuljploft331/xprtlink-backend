@@ -4,6 +4,7 @@ import { notFound, badRequest } from "@xprtlink/shared/utils/errors.js";
 import { sendEmail, renderEmailTemplate, escapeHtml, nl2br } from "@xprtlink/shared/lib/email.js";
 import { generatePresignedDownloadUrl } from "@xprtlink/shared/utils/s3.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
+import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 const log = logger.child({ module: "supportTickets.controller" });
 
@@ -38,7 +39,7 @@ export async function list(req, res) {
       take,
       orderBy: { createdAt: "desc" },
       include: {
-        user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true } }, expertProfile: { select: { firstName: true, lastName: true } } } },
+        user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true, avatarMedia: { select: { storageKey: true } } } }, expertProfile: { select: { firstName: true, lastName: true, avatarMedia: { select: { storageKey: true } } } } } },
         attachment: { select: { id: true, storageKey: true, mimeType: true, sizeBytes: true } },
         attachments: {
           include: {
@@ -98,6 +99,7 @@ export async function list(req, res) {
         email: ticket.user?.email,
         firstName: profile.firstName,
         lastName: profile.lastName,
+      avatarUrl: resolveMediaUrl(profile.avatarMedia?.storageKey),
         role: role
       },
       attachments,
@@ -185,7 +187,7 @@ export async function getById(req, res) {
   const ticket = await db.supportTicket.findUnique({
     where: { id },
     include: {
-      user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true } }, expertProfile: { select: { firstName: true, lastName: true } } } },
+      user: { select: { id: true, email: true, customerProfile: { select: { firstName: true, lastName: true, avatarMedia: { select: { storageKey: true } } } }, expertProfile: { select: { firstName: true, lastName: true, avatarMedia: { select: { storageKey: true } } } } } },
       attachment: { select: { id: true, storageKey: true, mimeType: true, sizeBytes: true } },
       attachments: {
         include: {
@@ -247,6 +249,7 @@ export async function getById(req, res) {
       email: ticket.user?.email,
       firstName: profile.firstName,
       lastName: profile.lastName,
+      avatarUrl: resolveMediaUrl(profile.avatarMedia?.storageKey),
       role: role
     },
     attachments,
