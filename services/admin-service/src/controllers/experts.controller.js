@@ -32,6 +32,7 @@ export async function list(req, res, next) {
       where.OR = [
         { firstName: { contains: q, mode: "insensitive" } },
         { lastName: { contains: q, mode: "insensitive" } },
+        { user: { email: { contains: q, mode: "insensitive" } } },
       ];
     }
 
@@ -62,7 +63,7 @@ export async function list(req, res, next) {
             take: 1,
             include: { plan: { select: { name: true, code: true } } },
           },
-          user: { select: { status: true } },
+          user: { select: { status: true, email: true } },
         },
       }),
     ]);
@@ -74,6 +75,7 @@ export async function list(req, res, next) {
       avatarUrl: resolveMediaUrl(e.avatarMedia?.storageKey),
       categories: e.categories,
       verificationStatus: e.verificationStatus,
+      email: e.user?.email ?? null,
       accountStatus: e.user?.status,
       availabilityStatus: e.availabilityStatus,
       ratingAvg: e.ratingAvg,
