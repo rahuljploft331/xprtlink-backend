@@ -53,6 +53,8 @@ export const ADMIN_MODULES = [
   "settings",
   "support-chat",
   "email_logs",
+  // Call transcripts are call content: granted explicitly, never implied by "consultations".
+  "transcripts",
 ];
 
 export * from "./enums.js";

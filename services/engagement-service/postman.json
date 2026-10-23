@@ -824,6 +824,36 @@
             },
             "description": "ZegoCloud server callback endpoint. No JWT auth \u2014 verified via CallbackSecret SHA-1 signature. Events: room_create, user_login, user_logout, room_close. Returns { code: 0 } on success."
           }
+        },
+        {
+          "name": "ZEGO ASR Callback (server-to-server)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"AppId\": 283072073,\n  \"Event\": \"ASRResult\",\n  \"TaskId\": \"task-xxxx\",\n  \"RoomId\": \"room-xxxx-xxxx\",\n  \"Timestamp\": 1792650000000,\n  \"Nonce\": \"abc123\",\n  \"Signature\": \"computed-sha1-hex\",\n  \"Data\": { \"SentenceId\": \"1\", \"UserId\": \"user-uuid\", \"Text\": \"Hello\", \"IsFinal\": true }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/engagement/webhooks/zego-asr",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "engagement",
+                "webhooks",
+                "zego-asr"
+              ]
+            },
+            "description": "ZEGO Cloud Real-time ASR results. No JWT; SHA-1 signature over sorted [callbackSecret, Timestamp(ms), Nonce]. Stores transcript segments (idempotent). 401 bad signature, 5xx on DB failure so ZEGO retries. Events: ASRResult, Exception; others ignored."
+          }
         }
       ]
     }

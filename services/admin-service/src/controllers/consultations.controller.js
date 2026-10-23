@@ -3,6 +3,8 @@ import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { consultationDisplayStatus } from "@xprtlink/shared/mappers/consultation.mapper.js";
+import { logAdminAction } from "#utils/audit.js";
+import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -121,4 +123,70 @@ export async function getById(req, res, next) {
     const data = { ...c, status: consultationDisplayStatus(c) };
     return ResponseFormatter.success(res, { data });
   } catch (err) { next(err); }
+}
+
+
+/**
+ * GET /admin/consultations/:id/transcript
+ * Speech-to-text transcript of the call, for dispute/support review. Supporting evidence
+ * only. Requires the "transcripts" permission; every read is written to the audit log.
+ */
+export async function getTranscript(req, res, next) {
+  try {
+    const { id } = req.params;
+    if (!UUID_RE.test(id)) throw badRequest("invalidId");
+
+    const db = getDb();
+    const consultation = await db.consultation.findUnique({ where: { id }, select: { id: true } });
+    if (!consultation) throw notFound("consultationNotFound");
+
+    const transcript = await db.consultationTranscript.findUnique({
+      where: { consultationId: id },
+      include: {
+        segments: { orderBy: [{ zegoTimestampMs: "asc" }, { receivedAt: "asc" }] },
+      },
+    });
+
+    await logAdminAction(req, "transcript.view", "Consultation", id, {
+      segmentCount: transcript?.segments.length ?? 0,
+    });
+
+    const enabled = String(process.env.ZEGO_ASR_ENABLED ?? "").toLowerCase() === "true";
+    if (!transcript) {
+      return ResponseFormatter.success(res, {
+        message: getMessage("transcriptLoaded"),
+        data: { enabled, status: "none", segments: [] },
+      });
+    }
+
+    const segmentTime = (s) => (s.zegoTimestampMs != null ? Number(s.zegoTimestampMs) : s.receivedAt.getTime());
+    const origin = transcript.startedAt?.getTime() ?? (transcript.segments[0] ? segmentTime(transcript.segments[0]) : null);
+    const segments = transcript.segments.map((s) => {
+      const atMs = segmentTime(s);
+      return {
+        id: s.id,
+        speaker: s.speakerRole,
+        text: s.text,
+        language: s.language,
+        isFinal: s.isFinal,
+        at: new Date(atMs).toISOString(),
+        offsetSeconds: origin != null ? Math.max(0, Math.round((atMs - origin) / 1000)) : null,
+      };
+    });
+
+    return ResponseFormatter.success(res, {
+      message: getMessage("transcriptLoaded"),
+      data: {
+        enabled,
+        status: transcript.status,
+        startedAt: transcript.startedAt,
+        stoppedAt: transcript.stoppedAt,
+        errorCode: transcript.lastErrorCode,
+        errorMessage: transcript.lastErrorMessage,
+        segments,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
 }
