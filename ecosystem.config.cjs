@@ -21,6 +21,16 @@ const baseEnv = {
   CORS_ORIGIN: process.env.CORS_ORIGIN || "*",
   LOG_LEVEL: process.env.LOG_LEVEL || "info",
   NODE_OPTIONS: process.env.NODE_OPTIONS || "--dns-result-order=ipv4first",
+  // Call transcription (ZEGO Cloud ASR). This file passes env to services as an allowlist,
+  // so a key missing here never reaches the process even when it is set in .env.
+  ZEGO_ASR_ENABLED: process.env.ZEGO_ASR_ENABLED,
+  ZEGO_ASR_API_URL: process.env.ZEGO_ASR_API_URL,
+  ZEGO_ASR_VENDOR: process.env.ZEGO_ASR_VENDOR,
+  ZEGO_ASR_PARAMS: process.env.ZEGO_ASR_PARAMS,
+  ZEGO_ASR_SUBTITLE_TYPE: process.env.ZEGO_ASR_SUBTITLE_TYPE,
+  ZEGO_ASR_MAX_IDLE_SECONDS: process.env.ZEGO_ASR_MAX_IDLE_SECONDS,
+  ZEGO_ASR_HOST_TAG: process.env.ZEGO_ASR_HOST_TAG,
+  ZEGO_ASR_CALLBACK_SECRET: process.env.ZEGO_ASR_CALLBACK_SECRET,
   USER_SERVICE_URL:
     process.env.USER_SERVICE_URL || `http://localhost:${portMap["user-service"]}`,
   EXPERT_SERVICE_URL:
