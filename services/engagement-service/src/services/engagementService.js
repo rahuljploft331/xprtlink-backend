@@ -1083,15 +1083,12 @@ async function getCustomerSummary(customerId) {
         consultation: { customerId }
       }
     },
-    _sum: { amountCents: true }
+    _sum: { amountCents: true },
+    _avg: { amountCents: true }
   });
 
-  const rateAgg = await db.expertProfile.aggregate({
-    _avg: { consultationRateCents: true }
-  });
-
-  const averageConsultationFee = rateAgg._avg.consultationRateCents 
-    ? Math.round(rateAgg._avg.consultationRateCents) 
+  const averageConsultationFee = spentAgg._avg.amountCents
+    ? Math.round(spentAgg._avg.amountCents)
     : 0;
 
   return {
