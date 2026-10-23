@@ -73,6 +73,16 @@ function coerceCallbackBody(body) {
 }
 
 /**
+ * GET/HEAD /api/v1/engagement/webhooks/zego-asr
+ * Reachability probe: ZEGO checks a callback address with a plain GET when it is registered,
+ * and a 404 here looks like a dead URL. Returns nothing sensitive.
+ */
+router.all("/zego-asr", (req, res, next) => {
+  if (req.method === "GET" || req.method === "HEAD") return res.status(200).json({ code: 0 });
+  return next();
+});
+
+/**
  * POST /api/v1/engagement/webhooks/zego-asr
  *
  * ZEGO Cloud Real-time ASR results (give this URL to ZEGO support to register).
