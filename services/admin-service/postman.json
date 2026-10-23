@@ -809,6 +809,39 @@
           }
         },
         {
+          "name": "Get Consultation Transcript",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/consultations/:id/transcript",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "consultations",
+                ":id",
+                "transcript"
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "consultation-uuid-here"
+                }
+              ]
+            },
+            "description": "Speech-to-text transcript of a call (supporting evidence only). Requires the `transcripts` permission (super_admin always); every read is audit-logged. Returns { enabled, status: none|starting|active|stopped|failed, errorCode, segments[{ speaker, text, at, offsetSeconds }] }."
+          }
+        },
+        {
           "name": "List Quote Logs",
           "request": {
             "method": "GET",
