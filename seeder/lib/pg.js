@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import Stripe from "stripe";
 import { getDb, disconnectDb } from "@xprtlink/shared/db";
 import { ADMIN_MODULES } from "@xprtlink/shared/constants/index.js";
+import { encryptPassword } from "@xprtlink/shared/utils/passwordVault.js";
 
 const SALT_ROUNDS = 10;
 
@@ -237,7 +238,7 @@ export async function seedPlatformEssentials(payload) {
         role: admin.role,
         status: admin.status === "active" ? "active" : "suspended",
         passwordHash,
-        rawPassword: admin.role === "subadmin" ? admin.password : null,
+        passwordEncrypted: admin.role === "subadmin" ? encryptPassword(admin.password) : null,
       },
     });
 

@@ -14,7 +14,6 @@ export function toAdminUserDto(admin) {
     role: admin.role,
     status: admin.status,
     currentPassword: admin.role === "subadmin" ? decryptPassword(admin.passwordEncrypted) : null,
-    rawPassword: admin.role === "subadmin" ? decryptPassword(admin.passwordEncrypted) : null,
     permissionsMap: (admin.permissions ?? []).reduce((acc, p) => {
       acc[p.module] = p.level;
       return acc;

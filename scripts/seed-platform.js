@@ -23,6 +23,7 @@ import bcrypt from "bcryptjs";
 import Stripe from "stripe";
 import { getDb, disconnectDb } from "@xprtlink/shared/db/getClient.js";
 import { ADMIN_MODULES } from "@xprtlink/shared/constants/index.js";
+import { encryptPassword } from "@xprtlink/shared/utils/passwordVault.js";
 
 import { categories } from "../seeder/data/categories.js";
 import { admins } from "../seeder/data/admins.js";
@@ -224,7 +225,7 @@ async function main() {
           role: admin.role,
           status: admin.status === "active" ? "active" : "suspended",
           passwordHash,
-          rawPassword: admin.role === "subadmin" ? admin.password : null,
+          passwordEncrypted: admin.role === "subadmin" ? encryptPassword(admin.password) : null,
         },
       });
 
