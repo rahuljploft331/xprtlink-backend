@@ -801,8 +801,15 @@ export async function getDashboard(auth) {
     db.quoteRequest.count({
       where: { expertId: expert.id, status: { in: ["pending_expert_review", "submitted"] } },
     }),
+    // Dashboard "Consultations" tile = today's consultations that actually went ahead
+    // (accepted / in progress / completed). Field name stays activeConsultationCount
+    // for Flutter compatibility.
     db.consultation.count({
-      where: { expertId: expert.id, status: { in: ["requested", "ringing", "accepted", "in_progress"] } },
+      where: {
+        expertId: expert.id,
+        status: { in: ["accepted", "in_progress", "completed"] },
+        requestedAt: { gte: startOfDay },
+      },
     }),
     // clearedAt must be excluded here too — notifications are soft-deleted, and a
     // cleared item must not keep the dashboard badge lit (see notification-service).
