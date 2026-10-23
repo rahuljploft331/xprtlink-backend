@@ -1,6 +1,8 @@
 import { getDb } from "@xprtlink/shared/db";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
+import { matchesCustomer, matchesExpert } from "@xprtlink/shared/lib/zegoParticipants.js";
+import { maybeStartTranscript, stopTranscript } from "./transcriptService.js";
 const log = logger.child({ module: "zegoCallbackService" });
 
 /**
@@ -111,26 +113,10 @@ async function handleUserLogin(payload) {
     return;
   }
 
-  // Check if both the customer and the expert have joined.
-  // The Flutter app may join the Zego room using either the Account ID (user.id)
-  // or the Profile ID (customer.id / expert.id), so we accept either.
-  const normalize = (id) => (id ?? '').replace(/-/g, '');
-
-  const customerAccountId  = consultation.customer?.user?.id;   // Account/user UUID
-  const customerProfileId  = consultation.customer?.id;          // Customer-profile UUID
-  const expertAccountId    = consultation.expert?.userId;        // Account/user UUID
-  const expertProfileId    = consultation.expert?.id;            // Expert-profile UUID
-
-  const matchesCustomer = (id) =>
-    (customerAccountId && normalize(id) === normalize(customerAccountId)) ||
-    (customerProfileId && normalize(id) === normalize(customerProfileId));
-
-  const matchesExpert = (id) =>
-    (expertAccountId && normalize(id) === normalize(expertAccountId)) ||
-    (expertProfileId && normalize(id) === normalize(expertProfileId));
-
-  const hasCustomerJoined = consultation.joinedParticipantIds.some(matchesCustomer);
-  const hasExpertJoined   = consultation.joinedParticipantIds.some(matchesExpert);
+  // Both parties must have joined. The app may join with the account id or the profile id,
+  // so the shared matcher accepts either (see shared/lib/zegoParticipants.js).
+  const hasCustomerJoined = consultation.joinedParticipantIds.some((id) => matchesCustomer(consultation, id));
+  const hasExpertJoined   = consultation.joinedParticipantIds.some((id) => matchesExpert(consultation, id));
 
   if (!hasCustomerJoined || !hasExpertJoined) {
     log.info(
@@ -152,6 +138,10 @@ async function handleUserLogin(payload) {
   });
 
   log.info(`[zego-callback] Consultation ${consultation.id} → in_progress (both participants joined)`);
+
+  // Start the call transcript (no-op unless ZEGO_ASR_ENABLED). Not awaited past the row
+  // claim: the ASR vendor must never slow down or fail this webhook.
+  await maybeStartTranscript(consultation);
 }
 
 /**
@@ -287,6 +277,11 @@ async function handleRoomClose(payload) {
       log.error(`[zego-callback] Hold release call failed: ${err.message}`);
     }
   }
+
+  // Stop the call transcript. Best effort and after billing, so it can never delay a capture.
+  // (Placed on this path — not before the "already ended" guard — because the missing-participant
+  // timer simulates a room_close and the real one then returns early.)
+  stopTranscript(consultation.id).catch(() => {});
 
   // No "Consultation Ended" push here — the Payment Successful notification
   // that follows the billing capture already signals the session is complete.
