@@ -480,14 +480,18 @@ export async function listQuotes(auth, query) {
   if (query.status) {
     if (role === "customer") {
       if (query.status === "pending") {
-        where.status = { in: ["draft", "submitted", "pending_expert_review", "expert_reviewed"] };
+        where.status = { in: ["draft", "submitted", "pending_expert_review"] };
       } else if (query.status === "quoteReceived") {
-        where.status = { in: ["quoted", "accepted"] };
+        where.status = "quoted";
       } else if (query.status === "cancelled" || query.status === "canceled") {
-        where.status = { in: ["canceled", "rejected", "expired"] };
+        where.status = "canceled";
       } else {
         where.status = query.status;
       }
+    } else if (query.status === "pending_expert_review") {
+      // "Submitted" is not a stage the expert can tell apart from "Pending
+      // Review", so the one chip covers both.
+      where.status = { in: ["submitted", "pending_expert_review"] };
     } else {
       where.status = query.status;
     }
@@ -510,18 +514,22 @@ export async function listQuotes(auth, query) {
   const meta = {
     filters: role === "expert"
       ? [
-          { label: "Submitted", value: "submitted" },
           { label: "Pending Review", value: "pending_expert_review" },
           { label: "Reviewed", value: "expert_reviewed" },
           { label: "Quoted", value: "quoted" },
+          { label: "Accepted", value: "accepted" },
           { label: "Rejected", value: "rejected" },
           { label: "Canceled", value: "canceled" },
           { label: "Expired", value: "expired" },
         ]
       : [
           { label: "Pending", value: "pending" },
+          { label: "Reviewed", value: "expert_reviewed" },
           { label: "Quote Received", value: "quoteReceived" },
+          { label: "Accepted", value: "accepted" },
+          { label: "Rejected", value: "rejected" },
           { label: "Canceled", value: "cancelled" },
+          { label: "Expired", value: "expired" },
         ]
   };
 

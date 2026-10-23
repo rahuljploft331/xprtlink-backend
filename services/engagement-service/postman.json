@@ -116,7 +116,7 @@
                 {
                   "key": "status",
                   "value": "pending_expert_review",
-                  "description": "Optional status filter: submitted, pending_expert_review, expert_reviewed, quoted, accepted, rejected, canceled, expired.",
+                  "description": "Optional status filter. Expert: pending_expert_review (also matches submitted), expert_reviewed, quoted, accepted, rejected, canceled, expired. Customer: pending (draft/submitted/pending review), expert_reviewed, quoteReceived (quoted), accepted, rejected, cancelled, expired. The response meta.filters lists the chips to show, in lifecycle order.",
                   "disabled": true
                 },
                 {

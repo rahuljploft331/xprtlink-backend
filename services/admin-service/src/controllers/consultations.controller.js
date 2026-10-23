@@ -3,6 +3,7 @@ import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { consultationDisplayStatus } from "@xprtlink/shared/mappers/consultation.mapper.js";
+import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { logAdminAction } from "#utils/audit.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 
@@ -112,15 +113,20 @@ export async function getById(req, res, next) {
     const c = await db.consultation.findUnique({
       where: { id: req.params.id },
       include: {
-        customer: { include: { user: { select: { id: true, email: true, phone: true } } } },
-        expert: { include: { user: { select: { email: true } } } },
+        customer: { include: { user: { select: { id: true, email: true, phone: true } }, avatarMedia: true } },
+        expert: { include: { user: { select: { email: true } }, avatarMedia: true } },
         review: true,
         charge: { include: { transaction: true } },
       },
     });
     if (!c) return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
     // A call that never connected must not be reported as "Completed".
-    const data = { ...c, status: consultationDisplayStatus(c) };
+    const data = {
+      ...c,
+      status: consultationDisplayStatus(c),
+      customer: c.customer && { ...c.customer, avatarUrl: resolveMediaUrl(c.customer.avatarMedia?.storageKey) },
+      expert: c.expert && { ...c.expert, avatarUrl: resolveMediaUrl(c.expert.avatarMedia?.storageKey) },
+    };
     return ResponseFormatter.success(res, { data });
   } catch (err) { next(err); }
 }
