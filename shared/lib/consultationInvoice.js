@@ -45,15 +45,15 @@ function row(label, value, { bold = false, muted = false } = {}) {
   const color = muted ? "#b9cbd4" : "#f6fbff";
   return `
     <tr>
-      <td style="padding: 10px 0; font-family: 'Outfit', Arial, sans-serif; font-size: 14px; font-weight: ${weight}; color: ${color}; text-align: left;">${label}</td>
-      <td style="padding: 10px 0; font-family: 'Outfit', Arial, sans-serif; font-size: 14px; font-weight: ${weight}; color: ${color}; text-align: right; white-space: nowrap;">${value}</td>
+      <td style="padding: 12px 8px 12px 18px; font-family: 'Outfit', Arial, sans-serif; font-size: 14px; font-weight: ${weight}; color: ${color}; text-align: left;">${label}</td>
+      <td style="padding: 12px 18px 12px 8px; font-family: 'Outfit', Arial, sans-serif; font-size: 14px; font-weight: ${weight}; color: ${color}; text-align: right; white-space: nowrap;">${value}</td>
     </tr>`;
 }
 
 function divider() {
   return `
     <tr>
-      <td colspan="2" style="padding: 0;">
+      <td colspan="2" style="padding: 0 18px;">
         <div style="height: 1px; background: rgba(255,255,255,0.10); margin: 6px 0;"></div>
       </td>
     </tr>`;
@@ -76,7 +76,7 @@ function invoiceTable({ reference, dateLabel, rowsHtml }) {
           <td style="padding: 0 0 18px 0; font-family: 'Outfit', Arial, sans-serif; font-size: 14px; font-weight: 600; color: #f6fbff; text-align: right;">${escapeHtml(dateLabel)}</td>
         </tr>
       </table>
-      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse: collapse; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 4px 16px;">
+      <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-collapse: collapse; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px;">
         ${rowsHtml}
       </table>
     </div>`;
