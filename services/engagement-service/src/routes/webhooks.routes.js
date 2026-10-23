@@ -95,8 +95,21 @@ router.post(
   express.text({ type: ["text/*"], limit: "1mb" }),
   async (req, res) => {
     const payload = coerceCallbackBody(req.body);
+    const sigOk = verifyZegoAsrSignature(payload);
 
-    if (!verifyZegoAsrSignature(payload)) {
+    // Structure-only diagnostics so the real ZEGO request shape can be confirmed: field NAMES and
+    // types, never values (the Text is call content). Safe to keep; one short line per callback.
+    const data = payload?.Data && typeof payload.Data === "object" ? payload.Data : null;
+    const rawType = typeof req.body === "string" ? "string" : Array.isArray(req.body) ? "array" : typeof req.body;
+    const tsNum = Number(payload?.Timestamp);
+    log.info(
+      `[zego-asr] recv method=${req.method} contentType=${req.headers["content-type"] ?? "none"} bodyType=${rawType} ` +
+      `event=${payload?.Event ?? "none"} taskId=${payload?.TaskId ?? "none"} sigOk=${sigOk} ` +
+      `tsSkewSec=${Number.isFinite(tsNum) ? Math.round((Date.now() - (tsNum < 1e11 ? tsNum * 1000 : tsNum)) / 1000) : "n/a"} ` +
+      `keys=[${Object.keys(payload ?? {}).join(",")}] dataKeys=[${data ? Object.entries(data).map(([k, v]) => `${k}:${typeof v}`).join(",") : (payload?.Data === undefined ? "none" : typeof payload.Data)}]`
+    );
+
+    if (!sigOk) {
       log.warn("[zego-asr] Invalid signature, rejecting callback");
       return res.status(401).json({ code: 1, message: getMessage("invalidSignature") });
     }
