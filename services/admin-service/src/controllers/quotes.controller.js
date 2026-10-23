@@ -11,7 +11,7 @@ export async function list(req, res, next) {
     const status = req.query.status;
     let where = {};
     if (status) {
-      if (status === "submitted") {
+      if (status === "submitted" || status === "pending_expert_review") {
         // Submitted quotes include newly submitted and those awaiting review
         where.status = { in: ["submitted", "pending_expert_review"] };
       } else if (status === "completed") {
