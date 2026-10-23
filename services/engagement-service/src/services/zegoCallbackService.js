@@ -219,6 +219,12 @@ async function handleRoomClose(payload) {
     return;
   }
 
+  // Stop the call transcript first, whatever state the consultation is in: another path
+  // (e.g. the app ending the call) may already have completed it, and the "already ended"
+  // return below would otherwise leave the ASR task running. stopTranscript is idempotent
+  // (it claims the stop atomically) and never throws; not awaited so it can't delay billing.
+  stopTranscript(consultation.id).catch(() => {});
+
   // Only end if currently active
   if (!["requested", "ringing", "accepted", "in_progress"].includes(consultation.status)) {
     log.info(`[zego-callback] Consultation ${consultation.id} already ${consultation.status}, skipping room_close`);
@@ -277,11 +283,6 @@ async function handleRoomClose(payload) {
       log.error(`[zego-callback] Hold release call failed: ${err.message}`);
     }
   }
-
-  // Stop the call transcript. Best effort and after billing, so it can never delay a capture.
-  // (Placed on this path — not before the "already ended" guard — because the missing-participant
-  // timer simulates a room_close and the real one then returns early.)
-  stopTranscript(consultation.id).catch(() => {});
 
   // No "Consultation Ended" push here — the Payment Successful notification
   // that follows the billing capture already signals the session is complete.

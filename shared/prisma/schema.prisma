@@ -718,19 +718,34 @@ model ExpertBanner {
   createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  expert     ExpertProfile           @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
-  dailyStats ExpertBannerDailyStat[]
+  expert       ExpertProfile           @relation(fields: [expertProfileId], references: [id], onDelete: Cascade)
+  dailyStats   ExpertBannerDailyStat[]
+  clickViewers ExpertBannerClick[]
 
   @@index([expertProfileId])
   @@index([isActive])
   @@map("expert_banners")
 }
 
+/// One row per (banner, viewer) — dedupes clicks so "unique clicks" counts people, not taps.
+/// viewerKey is "u:<userId>" when signed in, otherwise "i:<sha256(ip)>".
+model ExpertBannerClick {
+  bannerId  String   @map("banner_id") @db.Uuid
+  viewerKey String   @map("viewer_key") @db.VarChar(80)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  banner ExpertBanner @relation(fields: [bannerId], references: [id], onDelete: Cascade)
+
+  @@id([bannerId, viewerKey])
+  @@map("expert_banner_clicks")
+}
+
 model ExpertBannerDailyStat {
-  bannerId    String   @map("banner_id") @db.Uuid
-  day         DateTime @db.Date
-  impressions Int      @default(0)
-  clicks      Int      @default(0)
+  bannerId     String   @map("banner_id") @db.Uuid
+  day          DateTime @db.Date
+  impressions  Int      @default(0)
+  clicks       Int      @default(0)
+  uniqueClicks Int      @default(0) @map("unique_clicks")
 
   banner ExpertBanner @relation(fields: [bannerId], references: [id], onDelete: Cascade)
 
