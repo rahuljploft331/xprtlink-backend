@@ -251,6 +251,7 @@
   "planNotAvailableOnWeb": "This plan is not available for web checkout yet. Please subscribe from the mobile app.",
   "planNotFound": "That plan could not be found.",
   "invalidWebhookSignature": "Webhook signature verification failed.",
+  "transcriptLoaded": "Transcript loaded.",
   "planCodeRequired": "Please choose a plan to continue.",
   "checkoutUrlsRequired": "Checkout return links are required.",
   "checkoutUrlNotAllowed": "The checkout return link is not allowed.",
