@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
@@ -130,29 +131,40 @@ export const deleteBanner = async (auth, bannerId) => {
   return { success: true };
 };
 
-const bumpBannerStats = (bannerIds, field) => {
+const bumpBannerStats = (bannerIds, increments) => {
   if (!bannerIds.length) return Promise.resolve();
   const db = getDb();
   const day = new Date(new Date().toISOString().slice(0, 10));
+  const bump = Object.fromEntries(Object.entries(increments).map(([k, v]) => [k, { increment: v }]));
   return Promise.all(
     bannerIds.map((bannerId) =>
       db.expertBannerDailyStat.upsert({
         where: { bannerId_day: { bannerId, day } },
-        create: { bannerId, day, [field]: 1 },
-        update: { [field]: { increment: 1 } },
+        create: { bannerId, day, ...increments },
+        update: bump,
       })
     )
-  ).catch((e) => console.error(`[BannerStats] ${field} failed:`, e));
+  ).catch((e) => console.error("[BannerStats] update failed:", e));
 };
 
-export const recordBannerClick = async (bannerId) => {
+export const bannerViewerKey = (req) =>
+  req.auth?.userId
+    ? `u:${req.auth.userId}`
+    : `i:${createHash("sha256").update(String(req.ip || "unknown")).digest("hex").slice(0, 40)}`;
+
+export const recordBannerClick = async (bannerId, viewerKey) => {
   const db = getDb();
   const banner = await db.expertBanner.findFirst({
     where: { id: bannerId, isActive: true, approvalStatus: "approved" },
     select: { id: true },
   });
   if (!banner) throw notFound("bannerNotFound");
-  await bumpBannerStats([banner.id], "clicks");
+  // A (banner, viewer) pair inserts once; repeat taps only add to the total.
+  const { count } = await db.expertBannerClick.createMany({
+    data: [{ bannerId: banner.id, viewerKey }],
+    skipDuplicates: true,
+  });
+  await bumpBannerStats([banner.id], { clicks: 1, uniqueClicks: count });
 };
 
 export const getPublicBanners = async (categoryId, query = {}) => {
@@ -209,7 +221,7 @@ export const getPublicBanners = async (categoryId, query = {}) => {
     return priceB - priceA; // Descending (highest tier first)
   });
 
-  bumpBannerStats(sortedBanners.map((b) => b.id), "impressions");
+  bumpBannerStats(sortedBanners.map((b) => b.id), { impressions: 1 });
 
   // Map to a clean public format
   return sortedBanners.map(b => ({

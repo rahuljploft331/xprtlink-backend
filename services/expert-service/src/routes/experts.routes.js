@@ -43,8 +43,9 @@ router.get(
 
 router.post(
   "/banners/:id/click",
+  optionalAuthenticate,
   asyncHandler(async (req, res) => {
-    await bannerCtrl.recordBannerClick(req.params.id);
+    await bannerCtrl.recordBannerClick(req.params.id, bannerCtrl.bannerViewerKey(req));
     return ResponseFormatter.success(res, { message: getMessage("updatedSuccessfully") });
   })
 );
