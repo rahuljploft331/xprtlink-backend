@@ -21,6 +21,13 @@ export async function list(req, res) {
   return ResponseFormatter.success(res, { message: getMessage("faqsFetched"), data: faqs });
 }
 
+export async function getById(req, res) {
+  const { id } = req.params;
+  const faq = await getDb().faq.findUnique({ where: { id } });
+  if (!faq) throw notFound("faqNotFound");
+  return ResponseFormatter.success(res, { message: getMessage("faqFetched"), data: faq });
+}
+
 export async function create(req, res) {
   const body = createSchema.parse(req.body);
   const faq = await getDb().faq.create({

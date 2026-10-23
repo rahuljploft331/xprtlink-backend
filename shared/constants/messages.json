@@ -312,6 +312,7 @@
   "expertNoEmail": "Expert has no email address associated with their account.",
   "emailSentSuccessfully": "Email sent successfully.",
   "faqsFetched": "FAQs fetched successfully",
+  "faqFetched": "FAQ details fetched successfully",
   "faqCreated": "FAQ created successfully",
   "faqUpdated": "FAQ updated successfully",
   "faqDeleted": "FAQ deleted successfully",
