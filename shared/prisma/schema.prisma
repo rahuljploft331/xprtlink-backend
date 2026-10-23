@@ -830,11 +830,12 @@ model Consultation {
   createdAt             DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  customer       CustomerProfile        @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  expert         ExpertProfile          @relation(fields: [expertId], references: [id], onDelete: Restrict)
+  customer       CustomerProfile         @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  expert         ExpertProfile           @relation(fields: [expertId], references: [id], onDelete: Restrict)
   review         Review?
   charge         ConsultationCharge?
   earningsLedger ExpertEarningsLedger[]
+  transcript     ConsultationTranscript?
 
   @@index([customerId])
   @@index([expertId])
@@ -1429,4 +1430,59 @@ model AdminBroadcast {
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("admin_broadcasts")
+}
+
+enum TranscriptStatus {
+  starting
+  active
+  stopped
+  failed
+}
+
+/// One speech-to-text session per consultation (ZEGO Cloud Real-time ASR).
+/// Call content: only admins with transcript access may read it.
+model ConsultationTranscript {
+  id               String           @id @default(uuid()) @db.Uuid
+  consultationId   String           @unique @map("consultation_id") @db.Uuid
+  /// ZEGO ASR task id; null until the start call succeeds.
+  taskId           String?          @unique @map("task_id") @db.VarChar(128)
+  status           TranscriptStatus @default(starting)
+  vendor           String?          @db.VarChar(64)
+  startedAt        DateTime?        @map("started_at") @db.Timestamptz(6)
+  stoppedAt        DateTime?        @map("stopped_at") @db.Timestamptz(6)
+  lastErrorCode    String?          @map("last_error_code") @db.VarChar(64)
+  lastErrorMessage String?          @map("last_error_message") @db.VarChar(500)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  consultation Consultation                    @relation(fields: [consultationId], references: [id], onDelete: Cascade)
+  segments     ConsultationTranscriptSegment[]
+
+  @@map("consultation_transcripts")
+}
+
+model ConsultationTranscriptSegment {
+  id              String   @id @default(uuid()) @db.Uuid
+  transcriptId    String   @map("transcript_id") @db.Uuid
+  /// Not-null with '' defaults so the unique key below dedupes (NULLs never collide in Postgres).
+  streamId        String   @default("") @map("stream_id") @db.VarChar(256)
+  sentenceId      String   @default("") @map("sentence_id") @db.VarChar(128)
+  zegoUserId      String?  @map("zego_user_id") @db.VarChar(128)
+  /// customer | expert | unknown
+  speakerRole     String   @default("unknown") @map("speaker_role") @db.VarChar(16)
+  text            String
+  language        String?  @db.VarChar(32)
+  isFinal         Boolean  @default(true) @map("is_final")
+  /// Timestamp ZEGO attached to the result (ms since epoch), when present.
+  zegoTimestampMs BigInt?  @map("zego_timestamp_ms")
+  receivedAt      DateTime @default(now()) @map("received_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  /// Original callback Data; the only copy of the raw payload (deleted with the segment).
+  raw             Json     @default("{}")
+
+  transcript ConsultationTranscript @relation(fields: [transcriptId], references: [id], onDelete: Cascade)
+
+  @@unique([transcriptId, streamId, sentenceId])
+  @@index([transcriptId, zegoTimestampMs])
+  @@map("consultation_transcript_segments")
 }
