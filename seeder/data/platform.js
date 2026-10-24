@@ -9,12 +9,6 @@ export const platformConfig = {
 
 export const cmsPages = [
   { 
-    slug: "home", 
-    title: "Homepage", 
-    status: "published",
-    bodyHtml: `<h1>Welcome to XprtLink</h1><p>The premier two-sided expert consultation marketplace.</p>`
-  },
-  { 
     slug: "privacy", 
     title: "Privacy Policy", 
     status: "published",
