@@ -125,8 +125,14 @@ export const create = async (req, res) => {
 
   let result = plan;
   if (webPriceMonthlyCents !== undefined || webTrialDays !== undefined) {
-    const out = await billingPost(`/admin/plans/${plan.id}/web-pricing`, { webPriceMonthlyCents, webTrialDays });
-    result = out?.data ?? out;
+    try {
+      const out = await billingPost(`/admin/plans/${plan.id}/web-pricing`, { webPriceMonthlyCents, webTrialDays });
+      result = out?.data ?? out;
+    } catch (err) {
+      // No half-created plan: without its Stripe Price the website could not sell it.
+      await db.subscriptionPlan.delete({ where: { id: plan.id } }).catch(() => {});
+      throw err;
+    }
   }
   await logAdminAction(req, "subscriptionPlan.create", "SubscriptionPlan", plan.id, { code: cleanCode, storeProductId: storeId, webPriceMonthlyCents, webTrialDays });
   return result;
