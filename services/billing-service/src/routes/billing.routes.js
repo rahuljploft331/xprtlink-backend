@@ -468,9 +468,7 @@ router.get(
   "/subscriptions/plans",
   requireRole("expert"),
   asyncHandler(async (req, res) => {
-    const data = await svc.listSubscriptionPlans(req.auth, {
-      channel: req.query.channel === "web" ? "web" : undefined,
-    });
+    const data = await svc.listSubscriptionPlans(req.auth);
     return ResponseFormatter.success(res, { message: getMessage("subscriptionPlans"), data });
   })
 );

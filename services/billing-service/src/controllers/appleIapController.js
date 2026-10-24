@@ -78,7 +78,7 @@ export const verifyPurchase = async (req, res, next) => {
     // 1. Resolve product ID from Apple's cryptographically verified transaction
     const targetProductCode = decoded.productId || planCode;
     let plan = await db.subscriptionPlan.findFirst({
-      where: { OR: [{ storeProductId: targetProductCode }, { code: targetProductCode }], isActive: true },
+      where: { code: targetProductCode, isActive: true },
     });
     if (!plan) throw notFound("subscriptionPlanNotFound");
 
