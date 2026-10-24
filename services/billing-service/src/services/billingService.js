@@ -1933,10 +1933,14 @@ export async function getConsultationCharge(consultationId) {
   });
 }
 
-export async function listSubscriptionPlans(auth) {
+export async function listSubscriptionPlans(auth, { channel } = {}) {
   const db = getDb();
+  // Mobile (no channel) only sees plans that exist in the app stores; the website only
+  // sees plans it can actually check out (needs a Stripe Price).
+  const channelWhere =
+    channel === "web" ? { availableOnWeb: true, stripePriceId: { not: null } } : { availableOnApp: true };
   const plans = await db.subscriptionPlan.findMany({
-    where: { isActive: true },
+    where: { isActive: true, ...channelWhere },
     orderBy: { priceMonthlyCents: "asc" },
   });
 
@@ -3358,6 +3362,7 @@ export async function createStripeCheckoutSession(auth, { planCode, successUrl, 
     where: { code: planCode, isActive: true },
   });
   if (!plan) throw notFound("planNotFound");
+  if (!plan.availableOnWeb) throw notFound("planNotFound");
   if (!plan.stripePriceId) throw badRequest("planNotAvailableOnWeb", "PLAN_NO_STRIPE_PRICE");
 
   // Resolve expert name + email for Stripe customer
