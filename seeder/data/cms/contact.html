@@ -137,17 +137,18 @@
     overflow: hidden;
     box-shadow: 0 1px 3px rgba(46,156,122,.08);
   }
-  .acc button {
+  .acc summary {
     width: 100%;
     display: flex; align-items: center; justify-content: space-between; gap: 12px;
     padding: 18px 16px;
     background: none; border: 0;
     font: inherit; font-size: 14.5px; font-weight: 500;
-    color: var(--text); text-align: left; cursor: pointer;
+    color: var(--text); text-align: left; cursor: pointer; list-style: none;
   }
+  .acc summary::-webkit-details-marker { display: none; }
   .acc svg { width: 20px; height: 20px; transition: transform .25s ease; flex-shrink: 0; }
-  .acc.open svg { transform: rotate(180deg); }
-  .acc .panel { max-height: 0; overflow: hidden; transition: max-height .3s ease; }
+  .acc[open] svg { transform: rotate(180deg); }
+  .acc .panel { overflow: hidden; }
   .acc .panel p { padding: 0 16px 18px; font-size: 13px; line-height: 1.7; color: #2b2b2b; }
 
   /* Footer links */
@@ -175,7 +176,7 @@
     .note { font-size: 15px; padding: 20px 22px; }
     .faq { padding: 0 40px; margin-top: 48px; }
     .faq h3 { font-size: 24px; }
-    .acc button { font-size: 16px; padding: 20px 22px; }
+    .acc summary { font-size: 16px; padding: 20px 22px; }
     .acc .panel p { font-size: 15px; padding: 0 22px 20px; }
     .legal { padding: 0 40px; margin-top: 38px; }
   }
@@ -203,7 +204,7 @@
     .note { font-size: 16px; }
     .faq { padding: 0 72px; margin-top: 56px; }
     .faq h3 { font-size: 26px; }
-    .acc button { font-size: 17px; }
+    .acc summary { font-size: 17px; }
     .acc .panel p { font-size: 16px; }
     .legal { padding: 0 72px; }
   }
@@ -288,34 +289,34 @@
     <section class="faq">
       <h3>Frequently asked questions</h3>
       <div class="rights">
-        <div class="acc">
-          <button type="button" aria-expanded="false">
+        <details class="acc">
+          <summary>
             How do I get my Expert profile verified?
             <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
+          </summary>
           <div class="panel"><p>Submit a valid government-issued photo ID, and secondary documentation if requested. Verification badges are granted after administrative validation.</p></div>
-        </div>
-        <div class="acc">
-          <button type="button" aria-expanded="false">
+        </details>
+        <details class="acc">
+          <summary>
             When do I receive my payouts?
             <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
+          </summary>
           <div class="panel"><p>Net earnings, after the standard 15% platform commission, are sent to your verified bank or payout account on the standard settlement schedule, once identity verification is complete.</p></div>
-        </div>
-        <div class="acc">
-          <button type="button" aria-expanded="false">
+        </details>
+        <details class="acc">
+          <summary>
             How do I report or block an abusive user?
             <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
+          </summary>
           <div class="panel"><p>Open the message menu, consultation screen, or expert profile in the app to report content or block the user with one tap. Our compliance team reviews reports within 24 hours.</p></div>
-        </div>
-        <div class="acc">
-          <button type="button" aria-expanded="false">
+        </details>
+        <details class="acc">
+          <summary>
             Can I take payments outside XprtLink?
             <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
+          </summary>
           <div class="panel"><p>No. Consultations, communications, and payments that start on XprtLink must stay on the platform. See the Expert Standards Agreement for details.</p></div>
-        </div>
+        </details>
       </div>
     </section>
 
@@ -328,23 +329,5 @@
   </div>
 </div>
 
-<script>
-  // Accordions
-  document.querySelectorAll('.acc').forEach(function (acc) {
-    var btn = acc.querySelector('button');
-    var panel = acc.querySelector('.panel');
-    btn.addEventListener('click', function () {
-      var open = acc.classList.toggle('open');
-      btn.setAttribute('aria-expanded', open);
-      panel.style.maxHeight = open ? panel.scrollHeight + 'px' : '0';
-    });
-  });
-  window.addEventListener('resize', function () {
-    document.querySelectorAll('.acc.open .panel').forEach(function (panel) {
-      panel.style.maxHeight = panel.scrollHeight + 'px';
-    });
-  });
-
-</script>
 </body>
 </html>

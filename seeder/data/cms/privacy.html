@@ -159,7 +159,7 @@
     overflow: hidden;
     box-shadow: 0 1px 3px rgba(46,156,122,.08);
   }
-  .acc button {
+  .acc summary {
     width: 100%;
     display: flex;
     align-items: center;
@@ -172,15 +172,12 @@
     font-weight: 500;
     color: var(--text);
     text-align: left;
-    cursor: pointer;
+    cursor: pointer; list-style: none;
   }
+  .acc summary::-webkit-details-marker { display: none; }
   .acc svg { width: 20px; height: 20px; transition: transform .25s ease; flex-shrink: 0; }
-  .acc.open svg { transform: rotate(180deg); }
-  .acc .panel {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height .3s ease;
-  }
+  .acc[open] svg { transform: rotate(180deg); }
+  .acc .panel { overflow: hidden; }
   .acc .panel p {
     margin: 0;
     padding: 0 16px 18px;
@@ -207,7 +204,7 @@
     section p.intro { font-size: 16px; }
     ul.points li b { font-size: 17px; }
     ul.points li span { font-size: 15px; }
-    .acc button { font-size: 16px; padding: 20px 22px; }
+    .acc summary { font-size: 16px; padding: 20px 22px; }
     .acc .panel p { font-size: 15px; padding: 0 22px 20px; }
   }
 
@@ -224,7 +221,7 @@
     section p.intro { font-size: 17px; }
     ul.points li b { font-size: 18px; }
     ul.points li span { font-size: 16px; }
-    .acc button { font-size: 17px; }
+    .acc summary { font-size: 17px; }
     .acc .panel p { font-size: 16px; }
   }
 
@@ -293,27 +290,27 @@
       <p class="intro">Depending on your location (e.g., GDPR in the EU or CCPA in California), you have specific rights regarding your personal data. At XprtLink, we extend these high-standard protections to all users globally:</p>
 
       <div class="rights">
-        <div class="acc">
-          <button type="button" aria-expanded="false">
+        <details class="acc">
+          <summary>
             Right to Access and Portability
             <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
+          </summary>
           <div class="panel"><p>You can request a copy of the personal data we hold about you, and receive it in a structured, commonly used, machine-readable format.</p></div>
-        </div>
-        <div class="acc">
-          <button type="button" aria-expanded="false">
+        </details>
+        <details class="acc">
+          <summary>
             Right to Rectification
             <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
+          </summary>
           <div class="panel"><p>You can ask us to correct inaccurate or incomplete personal data at any time, including details in your expert profile.</p></div>
-        </div>
-        <div class="acc">
-          <button type="button" aria-expanded="false">
+        </details>
+        <details class="acc">
+          <summary>
             Right to Erasure (To Be Forgotten)
             <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
+          </summary>
           <div class="panel"><p>You can request deletion of your personal data, subject to any legal obligations that require us to retain certain records.</p></div>
-        </div>
+        </details>
       </div>
     </section>
 
@@ -354,38 +351,20 @@
       </ul>
 
       <div class="rights">
-        <div class="acc">
-          <button type="button" aria-expanded="false">
+        <details class="acc">
+          <summary>
             Warranty Disclaimer &amp; Liability Limits
             <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-          </button>
+          </summary>
           <div class="panel">
             <p>XprtLink is provided on an "AS IS" and "AS AVAILABLE" basis without warranties of any kind. To the maximum extent permitted by applicable law, XprtLink shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from consultation advice, communications, or software availability.</p>
           </div>
-        </div>
+        </details>
       </div>
     </section>
 
   </div>
 </div>
 
-<script>
-  document.querySelectorAll('.acc').forEach(function (acc) {
-    var btn = acc.querySelector('button');
-    var panel = acc.querySelector('.panel');
-    btn.addEventListener('click', function () {
-      var open = acc.classList.toggle('open');
-      btn.setAttribute('aria-expanded', open);
-      panel.style.maxHeight = open ? panel.scrollHeight + 'px' : '0';
-    });
-  });
-
-  // Keep open accordions the right height when the window is resized
-  window.addEventListener('resize', function () {
-    document.querySelectorAll('.acc.open .panel').forEach(function (panel) {
-      panel.style.maxHeight = panel.scrollHeight + 'px';
-    });
-  });
-</script>
 </body>
 </html>
