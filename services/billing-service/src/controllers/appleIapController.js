@@ -152,8 +152,6 @@ export const verifyPurchase = async (req, res, next) => {
         const emailHtml = await renderEmailTemplate({
           title: "Subscription Activated",
           bodyHtml: `<p>Your ${subscription.plan.name} plan is now active via Apple.</p>`,
-          ctaText: "View Subscription",
-          ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com",
         });
         await sendEmail({ category: "subscription",
           to: userEmail,

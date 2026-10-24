@@ -368,8 +368,6 @@ export async function createQuote(auth, body) {
       const emailHtml = await renderEmailTemplate({
         title: "New Quote Request",
         bodyHtml: `<p>${customerName} sent you a new quote request: "${quote.title}"</p>`,
-        ctaText: "Review Quote",
-        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com"}/quotes/${quote.id}`,
       });
       await sendEmail({ category: "quote", to: quote.expert.user.email, subject: "New Quote Request", html: emailHtml }).catch(e => log.error(e));
     }
@@ -625,8 +623,6 @@ export async function submitQuotation(auth, quoteId, body) {
       const emailHtml = await renderEmailTemplate({
         title: "Quote Ready",
         bodyHtml: `<p>${expertName} has sent you a quote for "${updated.title}"</p>`,
-        ctaText: "View Quote",
-        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com"}/quotes/${updated.id}`,
       });
       await sendEmail({ category: "quote", to: updated.customer.user.email, subject: "Quote Ready", html: emailHtml }).catch(e => log.error(e));
     }
@@ -675,8 +671,6 @@ export async function acceptQuote(auth, quoteId) {
       const emailHtml = await renderEmailTemplate({
         title: "Quote Accepted",
         bodyHtml: `<p>${customerName} accepted your quote for "${updated.title}"</p>`,
-        ctaText: "View Quote",
-        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com"}/quotes/${updated.id}`,
       });
       await sendEmail({ category: "quote", to: updated.expert.user.email, subject: "Quote Accepted", html: emailHtml }).catch(e => log.error(e));
     }
@@ -727,8 +721,6 @@ export async function rejectQuote(auth, quoteId) {
         const emailHtml = await renderEmailTemplate({
           title: "Quote Request Rejected",
           bodyHtml: `<p>${expertName} rejected your quote request for "${updated.title}"</p>`,
-          ctaText: "View Details",
-          ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com"}/quotes/${updated.id}`,
         });
         await sendEmail({ category: "quote", to: updated.customer.user.email, subject: "Quote Request Rejected", html: emailHtml }).catch(e => log.error(e));
       }
@@ -775,8 +767,6 @@ export async function rejectQuote(auth, quoteId) {
       const emailHtml = await renderEmailTemplate({
         title: "Quote Rejected",
         bodyHtml: `<p>${customerName} rejected your quote for "${updated.title}"</p>`,
-        ctaText: "View Quote",
-        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com"}/quotes/${updated.id}`,
       });
       await sendEmail({ category: "quote", to: updated.expert.user.email, subject: "Quote Rejected", html: emailHtml }).catch(e => log.error(e));
     }
@@ -824,8 +814,6 @@ export async function cancelQuote(auth, quoteId) {
       const emailHtml = await renderEmailTemplate({
         title: "Quote Cancelled",
         bodyHtml: `<p>${customerName} cancelled their quote request: "${updated.title}"</p>`,
-        ctaText: "View Quote",
-        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com"}/quotes/${updated.id}`,
       });
       await sendEmail({ category: "quote", to: updated.expert.user.email, subject: "Quote Cancelled", html: emailHtml }).catch(e => log.error(e));
     }
@@ -1213,8 +1201,6 @@ export async function declineConsultation(auth, consultationId) {
       const emailHtml = await renderEmailTemplate({
         title: "Consultation Declined",
         bodyHtml: `<p>${expertName} is currently unavailable and declined your request.</p>`,
-        ctaText: "View Consultation",
-        ctaUrl: `${process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com"}/consultations/${updated.id}`,
       });
       await sendEmail({ category: "consultation", to: updated.customer.user.email, subject: "Consultation Declined", html: emailHtml }).catch(e => log.error(e));
     }

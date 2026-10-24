@@ -153,8 +153,6 @@ export async function approve(req, res, next) {
           const emailHtml = await renderEmailTemplate({
             title: "Account Verified",
             bodyHtml: `<p>Congratulations${expertProfile.firstName ? ` ${expertProfile.firstName}` : ""}! Your expert profile has been approved.</p><p>You can now receive consultation requests.</p>`,
-            ctaText: "View Profile",
-            ctaUrl: "https://xprtlink.com",
           });
           await sendEmail({ category: "verification",
             to: expertProfile.user.email,
@@ -246,8 +244,6 @@ export async function reject(req, res, next) {
           title: "Verification Not Approved",
           bodyHtml,
           badgeText: "Action Required",
-          ctaText: "Re-upload Documents",
-          ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com",
         });
         await sendEmail({ category: "verification",
           to: expertEmail,

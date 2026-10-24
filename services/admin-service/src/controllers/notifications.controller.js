@@ -161,8 +161,6 @@ export async function send(req, res) {
         const emailHtml = await renderEmailTemplate({
           title: title,
           bodyHtml: `<p>${body}</p>`,
-          ctaText: "Open App",
-          ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com",
         });
         
         Promise.allSettled(chunkUsers.map(u => 

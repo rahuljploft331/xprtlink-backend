@@ -55,8 +55,6 @@ export async function expireStaleQuotes() {
               const html = await renderEmailTemplate({
                 title: "Quote Expired",
                 bodyHtml: `<p>${getMessage("quoteExpiredCustomer")}</p>`,
-                ctaText: "Open App",
-                ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com",
               });
               await sendEmail({ category: "quote", to: u.email, subject: "Quote Expired", html }).catch(e => log.error(e));
             }
@@ -81,8 +79,6 @@ export async function expireStaleQuotes() {
               const html = await renderEmailTemplate({
                 title: "Quote Expired",
                 bodyHtml: `<p>${getMessage("quoteExpiredExpert")}</p>`,
-                ctaText: "Open App",
-                ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://xprtlink.com",
               });
               await sendEmail({ category: "quote", to: u.email, subject: "Quote Expired", html }).catch(e => log.error(e));
             }
