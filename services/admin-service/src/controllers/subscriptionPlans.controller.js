@@ -23,7 +23,7 @@ export const getById = async (req, res) => {
 export const update = async (req, res) => {
   const db = getDb();
   const { id } = req.params;
-  const { code, name, tagline, priceMonthlyCents, visibilityBoost, keyFeatures, isActive, isMostPopular, maxBanners, bannerUploadEnabled, bannerFrequency } = req.body;
+  const { code, name, tagline, priceMonthlyCents, visibilityBoost, keyFeatures, isActive, isMostPopular, maxBanners, bannerUploadEnabled, bannerFrequency, availableOnApp, availableOnWeb } = req.body;
 
   if (bannerFrequency !== undefined && !["monthly", "weekly"].includes(bannerFrequency)) {
     throw badRequest("validationFailed");
@@ -49,6 +49,8 @@ export const update = async (req, res) => {
       maxBanners,
       bannerUploadEnabled,
       bannerFrequency,
+      availableOnApp,
+      availableOnWeb,
     },
   });
 
