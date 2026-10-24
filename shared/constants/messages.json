@@ -346,6 +346,7 @@
   "bannerDeactivated": "Banner deactivated successfully.",
   "callStatusLoaded": "Call status loaded",
   "subscriptionPlanUpdated": "Subscription Plan updated successfully",
+  "invalidStoreProductId": "Store Product ID (code) must be 3-100 characters: lowercase letters, digits, \".\" or \"_\". Fix it before enabling the plan in the mobile app.",
   "appleSubscriptionVerified": "Apple subscription verified successfully",
   "googlePlaySubscriptionVerified": "Google Play subscription verified successfully",
   "notificationsDispatched": "Notifications dispatched",

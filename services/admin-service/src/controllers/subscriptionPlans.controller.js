@@ -3,6 +3,9 @@ import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
 import { logAdminAction } from "#utils/audit.js";
 import { assertUuid, billingPost } from "#utils/billingClient.js";
 
+// Lowercase letters, digits, "." and "_" — valid on both App Store and Play Store.
+const STORE_PRODUCT_ID_RE = /^[a-z0-9][a-z0-9._]{2,99}$/;
+
 export const list = async (req, res) => {
   const db = getDb();
   const data = await db.subscriptionPlan.findMany({
@@ -34,6 +37,14 @@ export const update = async (req, res) => {
 
   const exists = await db.subscriptionPlan.findUnique({ where: { id } });
   if (!exists) throw notFound("subscriptionPlanNotFound");
+
+  // The code doubles as the App Store / Play Store product ID, so an app-enabled plan
+  // must have one that can exist there (a bad ID makes every purchase of it fail).
+  const effectiveCode = code ?? exists.code;
+  const effectiveOnApp = availableOnApp ?? exists.availableOnApp;
+  if (effectiveOnApp && !STORE_PRODUCT_ID_RE.test(effectiveCode)) {
+    throw badRequest("invalidStoreProductId", "INVALID_STORE_PRODUCT_ID", "code");
+  }
 
   const data = await db.subscriptionPlan.update({
     where: { id },
