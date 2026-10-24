@@ -22,6 +22,7 @@ import {
   consultationHoldMinimumCents,
 } from "@xprtlink/shared/lib/consultationBilling.js";
 import { sendEmail, renderEmailTemplate, escapeHtml } from "@xprtlink/shared/lib/email.js";
+import { getSupportEmail, supportLinkHtml } from "@xprtlink/shared/lib/supportEmail.js";
 import { buildConsultationInvoiceEmail } from "@xprtlink/shared/lib/consultationInvoice.js";
 import { PAYOUT_SCHEDULE_DEFAULT_DAYS } from "@xprtlink/shared/contracts/settings.schema.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
@@ -638,9 +639,10 @@ function notifyPaymentFailed(consultationId) {
     });
 
     if (consultation.customer.user.email) {
+      const supportEmail = await getSupportEmail();
       const emailHtml = await renderEmailTemplate({
         title: "Payment Failed",
-        bodyHtml: "<p>We were unable to process your consultation payment. Please check your payment method and try again.</p>",
+        bodyHtml: `<p>We were unable to process your consultation payment. Please check your payment method and try again.</p><p>Still stuck? Contact us at ${supportLinkHtml(supportEmail)}.</p>`,
       });
       await sendEmail({ category: "billing",
         to: consultation.customer.user.email,

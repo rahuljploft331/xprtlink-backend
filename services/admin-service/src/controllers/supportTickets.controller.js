@@ -2,6 +2,7 @@ import { getDb } from "@xprtlink/shared/db/index.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { notFound, badRequest } from "@xprtlink/shared/utils/errors.js";
 import { sendEmail, renderEmailTemplate, escapeHtml, nl2br } from "@xprtlink/shared/lib/email.js";
+import { getSupportEmail, supportLinkHtml } from "@xprtlink/shared/lib/supportEmail.js";
 import { generatePresignedDownloadUrl } from "@xprtlink/shared/utils/s3.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
@@ -153,12 +154,13 @@ export async function reply(req, res) {
     const profile = user?.customerProfile || user?.expertProfile || {};
     const userName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'User';
     
-    const textBody = `Hi ${userName},\n\nYour support ticket regarding "${ticket.subject || ticket.category}" has been updated.\n\nReply from Admin:\n${message}\n\nBest regards,\nXprtLink Support Team`;
+    const supportEmail = await getSupportEmail();
+    const textBody = `Hi ${userName},\n\nYour support ticket regarding "${ticket.subject || ticket.category}" has been updated.\n\nReply from Admin:\n${message}\n\nBest regards,\nXprtLink Support Team\n${supportEmail}`;
 
     try {
       const html = await renderEmailTemplate({
         title: "Support Ticket Update",
-        bodyHtml: `<p>Hi ${escapeHtml(userName)},</p><p>Your support ticket regarding "${escapeHtml(ticket.subject || ticket.category)}" has been updated.</p><p><strong>Reply from Admin:</strong><br>${nl2br(message)}</p><p>Best regards,<br>XprtLink Support Team</p>`,
+        bodyHtml: `<p>Hi ${escapeHtml(userName)},</p><p>Your support ticket regarding "${escapeHtml(ticket.subject || ticket.category)}" has been updated.</p><p><strong>Reply from Admin:</strong><br>${nl2br(message)}</p><p>Best regards,<br>XprtLink Support Team<br>${supportLinkHtml(supportEmail)}</p>`,
       });
       await sendEmail({ category: "support",
         to: user.email,

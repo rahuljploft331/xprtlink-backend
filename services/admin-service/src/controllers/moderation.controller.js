@@ -3,6 +3,7 @@ import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { notFound, badRequest } from "@xprtlink/shared/utils/errors.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
+import { getSupportEmail, supportLinkHtml } from "@xprtlink/shared/lib/supportEmail.js";
 
 const fullName = (p) => `${p?.firstName || ""} ${p?.lastName || ""}`.trim() || "Unknown";
 
@@ -293,9 +294,10 @@ export const rejectBanner = async (req, res) => {
   if (!banner) throw notFound("bannerNotFound");
 
   if (banner.expert?.user?.email) {
+    const supportEmail = await getSupportEmail();
     renderEmailTemplate({
       title: "Banner Submission Update",
-      bodyHtml: "<p>We reviewed your recent banner submission, but unfortunately it was not approved.</p><p><strong>Reason:</strong> " + reason + "</p><p>Please review our guidelines and try submitting a new banner.</p>",
+      bodyHtml: "<p>We reviewed your recent banner submission, but unfortunately it was not approved.</p><p><strong>Reason:</strong> " + reason + "</p><p>Please review our guidelines and try submitting a new banner.</p><p>Questions? Contact us at " + supportLinkHtml(supportEmail) + ".</p>",
       badgeText: "Requires Attention"
     }).then(html => {
       return sendEmail({ category: "banner",

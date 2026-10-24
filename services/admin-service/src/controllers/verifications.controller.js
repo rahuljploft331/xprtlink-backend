@@ -7,6 +7,7 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { internalPost } from "@xprtlink/shared/lib/internalFetch.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 import { sendEmail, renderEmailTemplate, escapeHtml, nl2br } from "@xprtlink/shared/lib/email.js";
+import { getSupportEmail, supportLinkHtml } from "@xprtlink/shared/lib/supportEmail.js";
 const log = logger.child({ module: "verifications.controller" });
 
 
@@ -231,6 +232,7 @@ export async function reject(req, res, next) {
     try {
       if (expertEmail) {
         const firstName = expertProfile?.firstName ?? "Expert";
+        const supportEmail = await getSupportEmail();
         const reasonHtml = `<p style="margin:0;color:#ffe4e8">${nl2br(rejectionNotes)}</p>`;
         const bodyHtml = `
           <p style="margin:0 0 12px">Hi ${escapeHtml(firstName)},</p>
@@ -238,7 +240,7 @@ export async function reject(req, res, next) {
           <p style="margin:0 0 6px"><strong>Reason provided by the reviewer:</strong></p>
           <div style="background:#4a2230;color:#ffe4e8;border-left:4px solid #f43f5e;padding:12px 16px;border-radius:4px;margin:0 0 16px;text-align:left">${reasonHtml}</div>
           <p style="margin:0 0 12px">Please re-open the XprtLink app, upload fresh, high-quality copies of your government-issued ID, and resubmit for review. Our team will process your new submission promptly.</p>
-          <p style="margin:0">If you believe this decision was made in error, please contact our support team.</p>
+          <p style="margin:0">If you believe this decision was made in error, please contact our support team at ${supportLinkHtml(supportEmail)}.</p>
         `;
         const html = await renderEmailTemplate({
           title: "Verification Not Approved",
@@ -248,7 +250,7 @@ export async function reject(req, res, next) {
         await sendEmail({ category: "verification",
           to: expertEmail,
           subject: getMessage("verificationRejectedEmailSubject"),
-          text: `Hi ${firstName},\n\nYour XprtLink verification was not approved.\n\nReason: ${rejectionNotes}\n\nPlease re-open the app and re-upload your documents.`,
+          text: `Hi ${firstName},\n\nYour XprtLink verification was not approved.\n\nReason: ${rejectionNotes}\n\nPlease re-open the app and re-upload your documents.\n\nIf you believe this was a mistake, contact support at ${supportEmail}.`,
           html,
         });
       }
