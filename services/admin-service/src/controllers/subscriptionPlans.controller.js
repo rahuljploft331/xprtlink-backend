@@ -1,5 +1,7 @@
 import { getDb } from "@xprtlink/shared/db/index.js";
 import { badRequest, notFound } from "@xprtlink/shared/utils/errors.js";
+import { logAdminAction } from "#utils/audit.js";
+import { assertUuid, billingPost } from "#utils/billingClient.js";
 
 export const list = async (req, res) => {
   const db = getDb();
@@ -51,4 +53,14 @@ export const update = async (req, res) => {
   });
 
   return data;
+};
+
+/** Website price + free-trial days. Goes through billing-service, which owns the Stripe Price. */
+export const updateWebPricing = async (req, res) => {
+  const id = assertUuid(req.params.id);
+  const { webPriceMonthlyCents, webTrialDays } = req.body ?? {};
+  if (webPriceMonthlyCents === undefined && webTrialDays === undefined) throw badRequest("validationFailed");
+  const result = await billingPost(`/admin/plans/${id}/web-pricing`, { webPriceMonthlyCents, webTrialDays });
+  await logAdminAction(req, "subscriptionPlan.webPricing", "SubscriptionPlan", id, { webPriceMonthlyCents, webTrialDays });
+  return result?.data ?? result;
 };

@@ -1618,7 +1618,8 @@ export async function handleStripeWebhook(payload, signature) {
 
     case "checkout.session.completed": {
       const session = event.data.object;
-      if (session.mode !== "subscription" || session.payment_status !== "paid") break;
+      // A free-trial checkout completes with "no_payment_required" (nothing charged yet).
+      if (session.mode !== "subscription" || !["paid", "no_payment_required"].includes(session.payment_status)) break;
       const { expertProfileId, planId } = session.metadata ?? {};
       if (!expertProfileId || !planId) {
         log.warn(`[billing-webhook] checkout.session.completed missing metadata session=${session.id}`);
@@ -1638,6 +1639,7 @@ export async function handleStripeWebhook(payload, signature) {
       if (!period) throw new Error(`Stripe subscription ${stripeSubscriptionId} has no billing period`);
       const periodStart = period.start;
       const periodEnd = period.end;
+      const trialEndsAt = stripeSub.status === "trialing" && stripeSub.trial_end ? new Date(stripeSub.trial_end * 1000) : null;
 
       // A second checkout opened in another tab/URL can also complete. Cancel the
       // older Stripe subscription itself, otherwise the expert is billed for both.
@@ -1676,6 +1678,7 @@ export async function handleStripeWebhook(payload, signature) {
             currentPeriodEnd: periodEnd,
             cancelAtPeriodEnd: false,
             canceledAt: null,
+            trialEndsAt,
           },
           create: {
             expertProfileId,
@@ -1685,6 +1688,7 @@ export async function handleStripeWebhook(payload, signature) {
             status: "active",
             currentPeriodStart: periodStart,
             currentPeriodEnd: periodEnd,
+            trialEndsAt,
           },
         });
 
@@ -1722,7 +1726,9 @@ export async function handleStripeWebhook(payload, signature) {
       });
       if (!row) break;
 
-      const newStatus = sub.status === "active" ? "active" : sub.status === "canceled" ? "canceled" : "expired";
+      // "trialing" is a paid-up free trial: entitled exactly like active.
+      const isLive = sub.status === "active" || sub.status === "trialing";
+      const newStatus = isLive ? "active" : sub.status === "canceled" ? "canceled" : "expired";
       const period = stripePeriod(sub);
       await db.expertSubscription.update({
         where: { id: row.id },
@@ -1731,6 +1737,7 @@ export async function handleStripeWebhook(payload, signature) {
           ...(period ? { currentPeriodStart: period.start, currentPeriodEnd: period.end } : {}),
           cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
           canceledAt: sub.canceled_at ? new Date(sub.canceled_at * 1000) : null,
+          trialEndsAt: sub.status === "trialing" && sub.trial_end ? new Date(sub.trial_end * 1000) : null,
         },
       });
 
@@ -3344,7 +3351,15 @@ export async function createStripeCheckoutSession(auth, { planCode, successUrl, 
     metadata: { expertProfileId: auth.expertProfileId, userId: auth.userId },
   });
 
+  // One free trial per expert: any earlier subscription (any store, any status) uses it up.
+  const priorSub = await db.expertSubscription.findFirst({
+    where: { expertProfileId: auth.expertProfileId },
+    select: { id: true },
+  });
+  const trialDays = priorSub ? 0 : Math.max(0, plan.webTrialDays ?? 0);
+
   const session = await stripeSvc.createCheckoutSession({
+    trialDays,
     customerId: customer.id,
     priceId: plan.stripePriceId,
     // URLSearchParams percent-encodes the braces Stripe substitutes; restore them.
@@ -3358,11 +3373,45 @@ export async function createStripeCheckoutSession(auth, { planCode, successUrl, 
     },
     // Same retry returns the same open session (no double subscription); the URLs
     // are part of the key because Stripe rejects a reused key with new params.
+    // The price and trial length are keyed too: an admin price change must not collide with
+    // an earlier key that carried different params.
     idempotencyKey: `checkout_${auth.expertProfileId}_${plan.id}_${createHash("sha256")
-      .update(`${successTarget}|${cancelTarget}`).digest("hex").slice(0, 16)}`,
+      .update(`${successTarget}|${cancelTarget}|${plan.stripePriceId}|${trialDays}`).digest("hex").slice(0, 16)}`,
   });
 
   return { checkoutUrl: session.url, sessionId: session.id };
+}
+
+/**
+ * Admin: set the website price + free-trial length of a plan. Creates (or reuses) the Stripe
+ * Price first so the displayed price and the charged price can never drift apart. Existing
+ * web subscribers keep the Price they signed up on.
+ */
+export async function setPlanWebPricing(planId, { webPriceMonthlyCents, webTrialDays }) {
+  const db = getDb();
+  const plan = await db.subscriptionPlan.findUnique({ where: { id: planId } });
+  if (!plan) throw notFound("subscriptionPlanNotFound");
+
+  const data = {};
+  if (webPriceMonthlyCents !== undefined) {
+    if (!Number.isInteger(webPriceMonthlyCents) || webPriceMonthlyCents < 100 || webPriceMonthlyCents > 1000000) {
+      throw badRequest("validationFailed", "INVALID_WEB_PRICE");
+    }
+    const { productId, priceId } = await stripeSvc.ensureMonthlyPrice({
+      stripeProductId: plan.stripeProductId,
+      planCode: plan.code,
+      planName: plan.name,
+      amountCents: webPriceMonthlyCents,
+    });
+    Object.assign(data, { webPriceMonthlyCents, stripeProductId: productId, stripePriceId: priceId });
+  }
+  if (webTrialDays !== undefined) {
+    if (!Number.isInteger(webTrialDays) || webTrialDays < 0 || webTrialDays > 730) {
+      throw badRequest("validationFailed", "INVALID_TRIAL_DAYS");
+    }
+    data.webTrialDays = webTrialDays;
+  }
+  return db.subscriptionPlan.update({ where: { id: planId }, data });
 }
 
 /** The signed-in expert's payouts (money actually sent to their bank). */
