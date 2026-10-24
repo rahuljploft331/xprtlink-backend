@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
-import { list, getById, update } from "#controllers/subscriptionPlans.controller.js";
+import { list, getById, update, updateWebPricing } from "#controllers/subscriptionPlans.controller.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 
@@ -31,6 +31,15 @@ router.put(
   requirePermission("subscriptions", "edit"),
   asyncHandler(async (req, res) => {
     const data = await update(req, res);
+    return ResponseFormatter.success(res, { data, message: getMessage("subscriptionPlanUpdated") });
+  })
+);
+
+router.put(
+  "/:id/web-pricing",
+  requirePermission("subscriptions", "edit"),
+  asyncHandler(async (req, res) => {
+    const data = await updateWebPricing(req, res);
     return ResponseFormatter.success(res, { data, message: getMessage("subscriptionPlanUpdated") });
   })
 );

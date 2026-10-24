@@ -49,6 +49,9 @@ export function toSubscriptionPlanDto(plan, currency = "USD") {
     name: plan.name,
     tagline: plan.tagline ?? null,
     priceMonthly: centsToAmount(plan.priceMonthlyCents),
+    // Website (Stripe) pricing — additive; app clients keep using priceMonthly.
+    webPriceMonthly: centsToAmount(plan.webPriceMonthlyCents ?? plan.priceMonthlyCents),
+    webTrialDays: plan.webTrialDays ?? 0,
     currency,
     visibilityBoost: plan.visibilityBoost,
     isMostPopular: plan.isMostPopular ?? false,
@@ -78,6 +81,7 @@ export function toExpertSubscriptionDto(subscription, plan, currency = "USD") {
     currentPeriodEnd: toIso(subscription.currentPeriodEnd),
     gracePeriodEnd: toIso(subscription.gracePeriodEnd ?? null),
     canceledAt: toIso(subscription.canceledAt),
+    trialEndsAt: toIso(subscription.trialEndsAt ?? null),
   };
 }
 

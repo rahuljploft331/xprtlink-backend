@@ -545,6 +545,7 @@ export async function createCheckoutSession({
   cancelUrl,
   metadata = {},
   idempotencyKey,
+  trialDays = 0,
 }) {
   const sdk = requireStripe();
   const params = {
@@ -553,12 +554,47 @@ export async function createCheckoutSession({
     line_items: [{ price: priceId, quantity: 1 }],
     success_url: successUrl,
     cancel_url: cancelUrl,
-    subscription_data: { metadata },
+    subscription_data: { metadata, ...(trialDays > 0 ? { trial_period_days: trialDays } : {}) },
     metadata,
     allow_promotion_codes: true,
   };
   const opts = idempotencyKey ? { idempotencyKey } : {};
   return await sdk.checkout.sessions.create(params, opts);
+}
+
+/**
+ * Finds or creates the monthly USD Price for a plan at `amountCents`. Stripe Prices are
+ * immutable, so a price change always means a different Price object; an existing
+ * subscriber keeps the Price they signed up on.
+ */
+export async function ensureMonthlyPrice({ stripeProductId, planCode, planName, amountCents }) {
+  const sdk = requireStripe();
+  let productId = stripeProductId;
+  if (!productId) {
+    const found = await sdk.products.search({ query: `metadata['xprtlink_plan_code']:'${planCode}'` });
+    productId = found.data[0]?.id;
+  }
+  if (!productId) {
+    const product = await sdk.products.create({
+      name: `XprtLink ${planName}`,
+      metadata: { xprtlink_plan_code: planCode },
+    });
+    productId = product.id;
+  }
+  const prices = await sdk.prices.list({ product: productId, active: true, limit: 100 });
+  const match = prices.data.find(
+    (p) => p.unit_amount === amountCents && p.currency === "usd" && p.recurring?.interval === "month"
+  );
+  const price =
+    match ??
+    (await sdk.prices.create({
+      product: productId,
+      unit_amount: amountCents,
+      currency: "usd",
+      recurring: { interval: "month" },
+      metadata: { xprtlink_plan_code: planCode },
+    }));
+  return { productId, priceId: price.id };
 }
 
 /**

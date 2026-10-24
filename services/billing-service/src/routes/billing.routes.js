@@ -147,6 +147,20 @@ router.post(
 );
 
 /**
+ * POST /api/v1/billing/admin/plans/:id/web-pricing
+ * Internal-only — called by admin-service (which has no Stripe client).
+ */
+router.post(
+  "/admin/plans/:id/web-pricing",
+  internalServiceGuard,
+  stripeGuard,
+  asyncHandler(async (req, res) => {
+    const data = await svc.setPlanWebPricing(req.params.id, req.body ?? {});
+    return ResponseFormatter.success(res, { data });
+  })
+);
+
+/**
  * GET /api/v1/billing/consultations/:id/charge
  * Internal-only — called by engagement-service for charge breakdown.
  * Guarded by SERVICE_SECRET.
