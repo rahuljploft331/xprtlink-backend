@@ -526,9 +526,10 @@ model SubscriptionPlan {
   priceMonthlyCents   Int             @map("price_monthly_cents")
   /// Website (Stripe) price. Null = same as priceMonthlyCents. App-store prices are untouched.
   webPriceMonthlyCents Int?           @map("web_price_monthly_cents")
-  /// Channel visibility. Mobile clients only get availableOnApp plans (a plan with no store
+  /// Channel visibility. Mobile clients only get plans with a storeProductId (a plan with no store
   /// listing would make IAP fail); the website only gets availableOnWeb plans that have a Stripe Price.
-  availableOnApp      Boolean         @default(true) @map("available_on_app")
+  /// App Store / Play Store product ID (same ID in both). Empty = web-only plan, hidden from mobile.
+  storeProductId      String?         @unique @map("store_product_id") @db.VarChar(128)
   availableOnWeb      Boolean         @default(true) @map("available_on_web")
   /// Free-trial days granted on web checkout (0 = no trial).
   webTrialDays        Int             @default(30) @map("web_trial_days")

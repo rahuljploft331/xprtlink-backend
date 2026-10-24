@@ -55,12 +55,12 @@ export const verifyPurchase = async (req, res, next) => {
     // client's selection — otherwise a user could pay for Core and claim Elite.
     const paidBasePlanId = lineItem.offerDetails?.basePlanId?.trim().toLowerCase() || null;
     let plan = paidBasePlanId
-      ? await db.subscriptionPlan.findFirst({ where: { code: paidBasePlanId, isActive: true } })
+      ? await db.subscriptionPlan.findFirst({ where: { OR: [{ storeProductId: paidBasePlanId }, { code: paidBasePlanId }], isActive: true } })
       : null;
     if (!plan) {
       // Base plan id doesn't map to one of our plan codes: fall back to the client's code, but say so.
       log.warn({ paidBasePlanId, planCode }, "[googleIapController] Play base plan does not match a plan code — using client planCode");
-      plan = await db.subscriptionPlan.findFirst({ where: { code: planCode, isActive: true } });
+      plan = await db.subscriptionPlan.findFirst({ where: { OR: [{ storeProductId: planCode }, { code: planCode }], isActive: true } });
     } else if (planCode && planCode !== plan.code) {
       log.warn({ paidBasePlanId, planCode }, "[googleIapController] Client planCode differs from the plan Google billed — using Google's");
     }

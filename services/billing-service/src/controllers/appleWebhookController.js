@@ -115,7 +115,7 @@ export const handleNotification = async (req, res, next) => {
          */
         const planPatchFor = async (productId) => {
           if (!productId || productId === planCode) return {};
-          const next = await db.subscriptionPlan.findFirst({ where: { code: productId, isActive: true } });
+          const next = await db.subscriptionPlan.findFirst({ where: { OR: [{ storeProductId: productId }, { code: productId }], isActive: true } });
           if (!next) {
             log.warn({ productId, currentPlan: planCode }, "[appleWebhookController] Unknown productId — keeping current plan");
             return {};

@@ -1936,7 +1936,7 @@ export async function listSubscriptionPlans(auth, { channel } = {}) {
   // Mobile (no channel) only sees plans that exist in the app stores; the website only
   // sees plans it can actually check out (needs a Stripe Price).
   const channelWhere =
-    channel === "web" ? { availableOnWeb: true, stripePriceId: { not: null } } : { availableOnApp: true };
+    channel === "web" ? { availableOnWeb: true, stripePriceId: { not: null } } : { storeProductId: { not: null } };
   const plans = await db.subscriptionPlan.findMany({
     where: { isActive: true, ...channelWhere },
     orderBy: { priceMonthlyCents: "asc" },
@@ -1964,6 +1964,8 @@ export async function listSubscriptionPlans(auth, { channel } = {}) {
 
   return plans.map((plan) => {
     const dto = toSubscriptionPlanDto(plan);
+    // Mobile buys by store product ID and sends it back as planCode.
+    if (channel !== "web" && plan.storeProductId) dto.code = plan.storeProductId;
     const isCurrent = Boolean(activeSub && activeSub.planId === plan.id);
     dto.isCurrentPlan = isCurrent;
     dto.isSubscribed = isCurrent;
