@@ -83,22 +83,44 @@ export async function addPaymentMethod(auth, body) {
           select: { stripeCustomerId: true },
         });
         stripeCustomerId = refreshed.stripeCustomerId;
-        log.warn(`[billing] Concurrent Stripe customer creation race resolved — using existing ${stripeCustomerId}`);
+        if (stripeCustomerId) {
+          log.warn(`[billing] Concurrent Stripe customer creation race resolved — using existing ${stripeCustomerId}`);
+        } else {
+          // The unique constraint tripped because the email-matched Stripe customer already belongs
+          // to another profile (same email on two accounts). Give this profile its own customer.
+          try {
+            const own = await stripeSvc.createStripeCustomer({
+              email: customerProfile.user.email,
+              name: `${customerProfile.firstName} ${customerProfile.lastName}`,
+              metadata: { customerProfileId: auth.customerProfileId },
+            });
+            await db.customerProfile.update({
+              where: { id: auth.customerProfileId },
+              data: { stripeCustomerId: own.id },
+            });
+            stripeCustomerId = own.id;
+          } catch (err) {
+            throw { statusCode: 502, code: "STRIPE_CUSTOMER_CREATION_FAILED", message: err.message };
+          }
+        }
       } else {
         throw { statusCode: 502, code: "STRIPE_CUSTOMER_CREATION_FAILED", message: dbErr.message };
       }
     }
   }
 
-  // 3. Attach PaymentMethod to Stripe Customer (non-fatal in test mode)
+  // 3. Attach PaymentMethod to Stripe Customer. A card that is not on the customer can never
+  //    be charged, so a failure must not leave a saved card behind (except pm_card_* test tokens).
   try {
     await stripeSvc.attachPaymentMethod({
       stripePaymentMethodId: body.stripePaymentMethodId,
       stripeCustomerId,
     });
   } catch (attachErr) {
-    // In test mode, pm_card_* tokens may not be attachable — log and continue
-    log.warn(`[billing] Stripe attach PM failed (non-fatal): ${attachErr.message}`);
+    if (!body.stripePaymentMethodId.startsWith("pm_card_")) {
+      throw { statusCode: 502, code: "STRIPE_ATTACH_FAILED", message: attachErr.message };
+    }
+    log.warn(`[billing] Stripe attach PM failed (non-fatal, test token): ${attachErr.message}`);
   }
 
   // 4. Persist locally — upsert to avoid duplicate stripe_payment_method_id constraint errors

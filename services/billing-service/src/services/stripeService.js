@@ -30,6 +30,11 @@ export async function getOrCreateStripeCustomer({ email, name, metadata = {} }) 
   return await sdk.customers.create({ email, name, metadata });
 }
 
+/** Always creates a new Stripe Customer (no email lookup). */
+export async function createStripeCustomer({ email, name, metadata = {} }) {
+  return await requireStripe().customers.create({ email, name, metadata });
+}
+
 /**
  * Attaches a PaymentMethod to a Stripe Customer.
  */
