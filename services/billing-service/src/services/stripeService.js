@@ -21,12 +21,17 @@ function requireStripe() {
 }
 
 /**
- * Creates or retrieves a Stripe Customer object by email.
+ * Retrieves or creates a Stripe Customer for one profile. Email is not unique across profiles
+ * (one email can own a customer and an expert profile), so only a customer whose metadata
+ * carries the same `matchKey` value is reused; otherwise a new customer is created.
  */
-export async function getOrCreateStripeCustomer({ email, name, metadata = {} }) {
+export async function getOrCreateStripeCustomer({ email, name, metadata = {}, matchKey }) {
   const sdk = requireStripe();
-  const existing = await sdk.customers.list({ email, limit: 1 });
-  if (existing.data.length > 0) return existing.data[0];
+  if (matchKey && metadata[matchKey]) {
+    const existing = await sdk.customers.list({ email, limit: 100 });
+    const match = existing.data.find((c) => c.metadata?.[matchKey] === metadata[matchKey]);
+    if (match) return match;
+  }
   return await sdk.customers.create({ email, name, metadata });
 }
 
