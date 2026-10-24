@@ -60,9 +60,12 @@ export async function addPaymentMethod(auth, body) {
   if (!stripeCustomerId) {
     let newStripeCustomerId;
     try {
-      const stripeCustomer = await stripeSvc.getOrCreateStripeCustomer({
+      // The DB column is the source of truth for the profile's Stripe customer; never reuse
+      // an email-matched customer that may belong to another profile.
+      const stripeCustomer = await stripeSvc.createStripeCustomer({
         email: customerProfile.user.email,
         name: `${customerProfile.firstName} ${customerProfile.lastName}`,
+        metadata: { customerProfileId: auth.customerProfileId },
       });
       newStripeCustomerId = stripeCustomer.id;
     } catch (err) {
@@ -3371,6 +3374,7 @@ export async function createStripeCheckoutSession(auth, { planCode, successUrl, 
     email: user.email,
     name: `${expert.firstName ?? ""} ${expert.lastName ?? ""}`.trim() || undefined,
     metadata: { expertProfileId: auth.expertProfileId, userId: auth.userId },
+    matchKey: "expertProfileId",
   });
 
   // One free trial per expert: any earlier subscription (any store, any status) uses it up.
