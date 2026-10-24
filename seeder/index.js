@@ -6,6 +6,7 @@ import { seedConsultations } from "./data/consultations.js";
 import { seedQuotes } from "./data/quotes.js";
 import {
   cmsPages,
+  faqs,
   platformConfig,
   subscriptionPlans,
 } from "./data/platform.js";
@@ -24,6 +25,7 @@ export function buildSeedPayload() {
     platformConfig,
     subscriptionPlans,
     cmsPages,
+    faqs,
     categories,
     admins,
     customers,
@@ -37,6 +39,7 @@ export const SEED_COLLECTIONS = [
   "platformConfig",
   "subscriptionPlans",
   "cmsPages",
+  "faqs",
   "categories",
   "admins",
   "customers",

@@ -115,6 +115,7 @@ const TRUNCATE_ORDER = [
   "media_assets",
   "users",
   "cms_pages",
+  "faqs",
   "subscription_plans",
   "platform_settings",
   "app_config",
@@ -199,6 +200,8 @@ export async function seedPlatformEssentials(payload) {
     supportEmail: pc.supportEmail,
     foundingMemberBadgeEnabled: pc.foundingMemberBadgeEnabled,
     currency: pc.currency,
+    payoutSchedule: pc.payoutSchedule,
+    featuredExpertWeights: pc.featuredExpertWeights,
   };
   for (const [key, value] of Object.entries(settings)) {
     await db.platformSetting.create({
@@ -226,6 +229,11 @@ export async function seedPlatformEssentials(payload) {
         publishedAt: page.status === "published" ? new Date() : null,
       },
     });
+  }
+
+  // FAQs
+  for (const faq of payload.faqs ?? []) {
+    await db.faq.create({ data: { ...faq, isActive: true } });
   }
 
   // Admin users
@@ -480,6 +488,7 @@ export async function seedPostgres(payload) {
       customers: payload.customers.length,
       experts: payload.experts.length,
       cmsPages: payload.cmsPages.length,
+      faqs: (payload.faqs ?? []).length,
       subscriptionPlans: payload.subscriptionPlans.length,
       consultations: payload.consultations?.length || 0,
       quotes: payload.quotes?.length || 0,

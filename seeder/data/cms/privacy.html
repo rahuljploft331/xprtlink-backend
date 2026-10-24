@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy Policy &amp; EULA – XprtLink</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #2e9c7a;
+    --green-dark: #1f8a69;
+    --text: #0a0a0a;
+    --muted: #7b8088;
+    --body: #2b2b2b;
+    --line: #e3e6e8;
+    --mint: #eefcf8;
+    --mint-border: #cdeee4;
+    --bg: #fafafa;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #e9ecee; }
+  body {
+    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    -webkit-font-smoothing: antialiased;
+  }
+  .screen {
+    position: relative;
+    width: 100%;
+    max-width: 430px;
+    min-height: 100vh;
+    background: var(--bg);
+    overflow: hidden;
+    padding-bottom: 40px;
+  }
+  /* soft green glows */
+  .screen::before, .screen::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    filter: blur(50px);
+    z-index: 0;
+  }
+  .screen::before {
+    width: 320px; height: 220px;
+    top: -60px; left: -80px;
+    background: rgba(46,156,122,.16);
+  }
+  .screen::after {
+    width: 260px; height: 260px;
+    top: 380px; right: -140px;
+    background: rgba(46,156,122,.10);
+  }
+  .content { position: relative; z-index: 1; }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 28px 24px 0;
+  }
+  .back {
+    width: 38px; height: 38px;
+    border: 0;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    display: grid; place-items: center;
+    cursor: pointer;
+  }
+  .back svg { width: 20px; height: 20px; }
+  header h2 { font-size: 18px; font-weight: 500; }
+
+  /* Hero */
+  .hero { padding: 38px 26px 0; }
+  .eyebrow {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 1.4px;
+    color: var(--green);
+    text-transform: uppercase;
+  }
+  .hero h1 {
+    font-size: 34px;
+    font-weight: 500;
+    margin-top: 8px;
+    line-height: 1.2;
+  }
+  .hero p.lead {
+    margin-top: 10px;
+    font-size: 17px;
+    line-height: 1.55;
+    color: var(--muted);
+  }
+  .updated {
+    margin-top: 28px;
+    text-align: right;
+    padding-bottom: 22px;
+    border-bottom: 1px solid var(--line);
+  }
+  .updated span { display: block; font-size: 14px; color: #333; }
+  .updated strong {
+    display: block;
+    font-size: 21px;
+    font-weight: 600;
+    color: var(--green);
+    margin-top: 2px;
+  }
+
+  /* Sections */
+  section { padding: 0 28px; margin-top: 38px; }
+  section h3 { font-size: 21px; font-weight: 600; line-height: 1.3; }
+  section h3.accent { color: var(--green); }
+  section p {
+    margin-top: 16px;
+    font-size: 13.2px;
+    line-height: 1.75;
+    color: var(--body);
+  }
+  section p + p { margin-top: 20px; }
+  section p.intro { font-size: 14.5px; line-height: 1.65; }
+
+  ul.points { list-style: none; margin-top: 18px; }
+  ul.points li { margin-bottom: 14px; padding-left: 22px; position: relative; }
+  ul.points li::before {
+    content: "";
+    position: absolute;
+    left: 6px; top: 9px;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--green);
+  }
+  ul.points li b {
+    display: block;
+    font-weight: 500;
+    font-size: 15px;
+    color: var(--green);
+  }
+  ul.points li span {
+    display: block;
+    margin-top: 2px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--body);
+  }
+
+  /* Accordion */
+  .rights { margin-top: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .acc {
+    background: var(--mint);
+    border: 1px solid var(--mint-border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(46,156,122,.08);
+  }
+  .acc button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 16px;
+    background: none;
+    border: 0;
+    font: inherit;
+    font-size: 14.5px;
+    font-weight: 500;
+    color: var(--text);
+    text-align: left;
+    cursor: pointer;
+  }
+  .acc svg { width: 20px; height: 20px; transition: transform .25s ease; flex-shrink: 0; }
+  .acc.open svg { transform: rotate(180deg); }
+  .acc .panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .3s ease;
+  }
+  .acc .panel p {
+    margin: 0;
+    padding: 0 16px 18px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--body);
+  }
+
+  /* ---------- Responsive: Tablet ---------- */
+  @media (min-width: 768px) {
+    .screen { max-width: 720px; padding-bottom: 56px; }
+    .screen::before { width: 520px; height: 340px; top: -100px; left: -130px; }
+    header { padding: 36px 40px 0; }
+    header h2 { font-size: 20px; }
+    .hero { padding: 48px 40px 0; }
+    .eyebrow { font-size: 12.5px; }
+    .hero h1 { font-size: 42px; }
+    .hero p.lead { font-size: 19px; }
+    .updated { margin-top: 34px; padding-bottom: 26px; }
+    .updated strong { font-size: 23px; }
+    section { padding: 0 40px; margin-top: 48px; }
+    section h3 { font-size: 24px; }
+    section p { font-size: 15px; }
+    section p.intro { font-size: 16px; }
+    ul.points li b { font-size: 17px; }
+    ul.points li span { font-size: 15px; }
+    .acc button { font-size: 16px; padding: 20px 22px; }
+    .acc .panel p { font-size: 15px; padding: 0 22px 20px; }
+  }
+
+  /* ---------- Responsive: Desktop ---------- */
+  @media (min-width: 1100px) {
+    .screen { max-width: 1200px; }
+    header { padding: 40px 72px 0; }
+    .hero { padding: 56px 72px 0; }
+    .hero h1 { font-size: 48px; }
+    .hero p.lead { font-size: 20px; max-width: 900px; }
+    section { padding: 0 72px; margin-top: 56px; }
+    section h3 { font-size: 26px; }
+    section p { font-size: 16px; }
+    section p.intro { font-size: 17px; }
+    ul.points li b { font-size: 18px; }
+    ul.points li span { font-size: 16px; }
+    .acc button { font-size: 17px; }
+    .acc .panel p { font-size: 16px; }
+  }
+
+  /* ---------- Responsive: Large screens ---------- */
+  @media (min-width: 1400px) {
+    .screen { max-width: 1360px; }
+    header { padding: 44px 96px 0; }
+    .hero { padding: 60px 96px 0; }
+    section { padding: 0 96px; }
+  }
+
+  /* ---------- Print / Save as PDF ---------- */
+  @media print {
+    html, body { background: #fff; }
+    .screen { max-width: 100%; overflow: visible; }
+    .screen::before, .screen::after { display: none; }
+    .back { display: none; }
+    .acc svg { display: none; }
+    .acc .panel { max-height: none !important; }
+    section, .acc { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="content">
+    <div class="hero">
+      <div class="eyebrow">Legal Document</div>
+      <h1>Privacy Policy &amp; EULA</h1>
+      <p class="lead">At XprtLink, your privacy and trust are our foundation. We provide complete transparency into how we collect, protect, and manage your data, along with our End User License terms.</p>
+      <div class="updated">
+        <span>Last updated</span>
+        <strong>October 24, 2026</strong>
+      </div>
+    </div>
+
+    <section>
+      <h3>1. Introduction</h3>
+      <p>Welcome to XprtLink. This Privacy Policy and End User License Agreement describes how XprtLink ("we", "us", or "our") collects, uses, and shares your personal information when you visit our platform or use our expert-linking services. By using our services, you consent to the practices described in this policy.</p>
+      <p>We operate on the principle of Efficient Expertise. This means we only collect the minimum amount of data necessary to provide a high-resolution professional experience, ensuring both consultants and clients can operate with total trust.</p>
+    </section>
+
+    <section>
+      <h3>2. Data Collection</h3>
+      <p>To facilitate expert connections, we collect information that you provide directly to us:</p>
+      <ul class="points">
+        <li><b>Identity Data</b><span>Full name, professional title, and biographical information provided in expert profiles.</span></li>
+        <li><b>Contact Data</b><span>Email addresses, phone numbers, and professional social media handles.</span></li>
+        <li><b>Transactional Data</b><span>Details about bookings, payments, and professional services rendered through our calendar system.</span></li>
+      </ul>
+    </section>
+
+    <section>
+      <h3>3. How We Use Your Data</h3>
+      <p>XprtLink uses the collected data for various professional purposes aimed at enhancing service delivery:</p>
+      <ul class="points">
+        <li><b>Service Facilitation</b><span>Matching expert consultants with high-intent clients based on domain expertise and availability.</span></li>
+        <li><b>Platform Integrity</b><span>Verifying credentials and maintaining a high-resolution marketplace of competent professionals.</span></li>
+        <li><b>Payment Processing</b><span>Ensuring secure and timely settlement of consulting fees through our encrypted payment gateways.</span></li>
+        <li><b>Technical Optimization</b><span>Analyzing usage patterns to improve the UI/UX and algorithmic accuracy of our search engine.</span></li>
+      </ul>
+    </section>
+
+    <section>
+      <h3 class="accent">4. Your Rights</h3>
+      <p class="intro">Depending on your location (e.g., GDPR in the EU or CCPA in California), you have specific rights regarding your personal data. At XprtLink, we extend these high-standard protections to all users globally:</p>
+
+      <div class="rights">
+        <div class="acc">
+          <button type="button" aria-expanded="false">
+            Right to Access and Portability
+            <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="panel"><p>You can request a copy of the personal data we hold about you, and receive it in a structured, commonly used, machine-readable format.</p></div>
+        </div>
+        <div class="acc">
+          <button type="button" aria-expanded="false">
+            Right to Rectification
+            <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="panel"><p>You can ask us to correct inaccurate or incomplete personal data at any time, including details in your expert profile.</p></div>
+        </div>
+        <div class="acc">
+          <button type="button" aria-expanded="false">
+            Right to Erasure (To Be Forgotten)
+            <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="panel"><p>You can request deletion of your personal data, subject to any legal obligations that require us to retain certain records.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. End User License Agreement (EULA) -->
+    <section>
+      <h3 class="accent">5. End User License Agreement (EULA)</h3>
+      <p>By downloading, installing, or using the XprtLink mobile applications or accessing our web platform, you agree to be bound by the terms of this End User License Agreement ("EULA"). This agreement constitutes a legally binding contract between you and XprtLink.</p>
+
+      <ul class="points">
+        <li>
+          <b>Scope of License</b>
+          <span>XprtLink grants you a revocable, non-exclusive, non-transferable, limited license to download, install, and use our mobile and web applications solely for accessing verified expert consultation marketplace services in compliance with this agreement.</span>
+        </li>
+        <li>
+          <b>User-Generated Content &amp; Zero Tolerance Policy</b>
+          <span>In accordance with mobile platform standards (including Apple App Store Guideline 1.2), XprtLink enforces a strict zero-tolerance policy regarding objectionable, abusive, harassing, sexually explicit, defamatory, hateful, or illegal content. Users must not transmit offensive material in chat, quote requests, profile bios, or live consultations.</span>
+        </li>
+        <li>
+          <b>Content Moderation &amp; 24-Hour Enforcement</b>
+          <span>Any user can report offensive content or abusive participants directly in-app through message menus, consultation screens, and expert profiles. Our dedicated compliance team reviews all flagged content within 24 hours. Content found in violation is immediately removed, and the offending user's account is subject to immediate suspension or permanent ban.</span>
+        </li>
+        <li>
+          <b>User Blocking Protection</b>
+          <span>Clients and experts have access to immediate, one-tap blocking features. Blocking an abusive individual immediately prevents all future messaging, session bookings, and direct communication across the platform.</span>
+        </li>
+        <li>
+          <b>App Store &amp; Third-Party Beneficiaries</b>
+          <span>You acknowledge and agree that this EULA is concluded between you and XprtLink only, and not with Apple Inc. or Google LLC. Apple and Google bear no responsibility for the software, its content, maintenance, or customer support. Upon your acceptance of this agreement, Apple and Apple's subsidiaries are third-party beneficiaries with the right to enforce this EULA against you.</span>
+        </li>
+        <li>
+          <b>In-App Purchases &amp; Subscriptions</b>
+          <span>Expert subscription tiers (Core, Professional, Elite) and consultation credits purchased via Apple In-App Purchase or Google Play Billing are subject to the billing terms and conditions of the respective platform store. Subscriptions auto-renew unless canceled prior to the billing cycle end date.</span>
+        </li>
+        <li>
+          <b>License Termination</b>
+          <span>This license is effective until terminated by either party. Your rights under this license terminate immediately without notice if you fail to comply with any provision. Upon termination, you must cease all use of the platform and delete the application.</span>
+        </li>
+      </ul>
+
+      <div class="rights">
+        <div class="acc">
+          <button type="button" aria-expanded="false">
+            Warranty Disclaimer &amp; Liability Limits
+            <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="panel">
+            <p>XprtLink is provided on an "AS IS" and "AS AVAILABLE" basis without warranties of any kind. To the maximum extent permitted by applicable law, XprtLink shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from consultation advice, communications, or software availability.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+  document.querySelectorAll('.acc').forEach(function (acc) {
+    var btn = acc.querySelector('button');
+    var panel = acc.querySelector('.panel');
+    btn.addEventListener('click', function () {
+      var open = acc.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open);
+      panel.style.maxHeight = open ? panel.scrollHeight + 'px' : '0';
+    });
+  });
+
+  // Keep open accordions the right height when the window is resized
+  window.addEventListener('resize', function () {
+    document.querySelectorAll('.acc.open .panel').forEach(function (panel) {
+      panel.style.maxHeight = panel.scrollHeight + 'px';
+    });
+  });
+</script>
+</body>
+</html>

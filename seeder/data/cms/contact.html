@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contact Us – XprtLink</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --green: #2e8f72;
+    --green-btn: #3a9a7c;
+    --green-dark: #2e8f72;
+    --text: #0a0a0a;
+    --muted: #7b8088;
+    --body: #6b6f76;
+    --line: #dfe3e5;
+    --mint: #eafaf5;
+    --mint-border: #cdeee4;
+    --bg: #fafafa;
+    --error: #d64545;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { background: #e9ecee; }
+  body {
+    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+    color: var(--text);
+    display: flex;
+    justify-content: center;
+    -webkit-font-smoothing: antialiased;
+  }
+  .screen {
+    position: relative;
+    width: 100%;
+    max-width: 430px;
+    min-height: 100vh;
+    background: var(--bg);
+    overflow: hidden;
+    padding-bottom: 40px;
+  }
+  .screen::before, .screen::after {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    filter: blur(55px);
+    z-index: 0;
+  }
+  .screen::before {
+    width: 340px; height: 240px;
+    top: -70px; left: -90px;
+    background: rgba(46,156,122,.16);
+  }
+  .screen::after {
+    width: 260px; height: 260px;
+    top: 620px; right: -140px;
+    background: rgba(46,156,122,.10);
+  }
+  .content { position: relative; z-index: 1; }
+
+  /* Header */
+  header { display: flex; align-items: center; gap: 16px; padding: 28px 24px 0; }
+  .back {
+    width: 38px; height: 38px;
+    border: 0; border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgba(0,0,0,.08);
+    display: grid; place-items: center;
+    cursor: pointer;
+  }
+  .back svg { width: 20px; height: 20px; }
+  header h2 { font-size: 18px; font-weight: 500; }
+
+  /* Hero */
+  .hero { padding: 38px 24px 0; }
+  .eyebrow {
+    font-size: 11.5px; font-weight: 600; letter-spacing: 1.4px;
+    color: var(--green); text-transform: uppercase;
+  }
+  .hero h1 { font-size: 32px; font-weight: 500; margin-top: 8px; line-height: 1.2; }
+  .hero p.lead { margin-top: 10px; font-size: 15px; line-height: 1.6; color: var(--muted); }
+
+  /* Layout */
+  .layout { padding: 0 24px; margin-top: 30px; display: flex; flex-direction: column; gap: 16px; }
+  .info { display: flex; flex-direction: column; gap: 16px; }
+
+  /* Cards */
+  .card {
+    background: rgba(255,255,255,.85);
+    border: 1px solid #eceff0;
+    border-radius: 20px;
+    padding: 22px 18px;
+    box-shadow: 0 1px 6px rgba(0,0,0,.03);
+  }
+  .card h3 { font-size: 19px; font-weight: 600; line-height: 1.4; }
+  .card > p { margin-top: 8px; font-size: 13.8px; line-height: 1.7; color: var(--body); }
+
+  .methods { margin-top: 20px; display: flex; flex-direction: column; gap: 22px; }
+  .method { display: flex; gap: 14px; align-items: flex-start; }
+  .icon {
+    width: 44px; height: 44px; flex-shrink: 0;
+    border-radius: 14px;
+    background: var(--mint);
+    border: 1px solid var(--mint-border);
+    display: grid; place-items: center;
+  }
+  .icon svg { width: 22px; height: 22px; }
+  .method h4 { font-size: 16px; font-weight: 600; line-height: 1.35; }
+  .method p { margin-top: 4px; font-size: 13.5px; line-height: 1.65; color: var(--body); }
+  .method a {
+    display: inline-block; margin-top: 8px;
+    font-size: 14px; font-weight: 500;
+    color: var(--green); text-decoration: none;
+    word-break: break-all;
+  }
+  .method a:hover { text-decoration: underline; }
+
+  .note {
+    background: var(--mint);
+    border-radius: 14px;
+    padding: 16px 14px;
+    font-style: italic;
+    font-size: 14px;
+    line-height: 1.65;
+    color: #2b2b2b;
+  }
+
+  /* FAQ accordion */
+  .faq { padding: 0 24px; margin-top: 34px; }
+  .faq h3 { font-size: 21px; font-weight: 600; line-height: 1.3; }
+  .rights { margin-top: 18px; display: flex; flex-direction: column; gap: 14px; }
+  .acc {
+    background: var(--mint);
+    border: 1px solid var(--mint-border);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(46,156,122,.08);
+  }
+  .acc button {
+    width: 100%;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 18px 16px;
+    background: none; border: 0;
+    font: inherit; font-size: 14.5px; font-weight: 500;
+    color: var(--text); text-align: left; cursor: pointer;
+  }
+  .acc svg { width: 20px; height: 20px; transition: transform .25s ease; flex-shrink: 0; }
+  .acc.open svg { transform: rotate(180deg); }
+  .acc .panel { max-height: 0; overflow: hidden; transition: max-height .3s ease; }
+  .acc .panel p { padding: 0 16px 18px; font-size: 13px; line-height: 1.7; color: #2b2b2b; }
+
+  /* Footer links */
+  .legal { padding: 0 24px; margin-top: 30px; display: flex; flex-wrap: wrap; gap: 10px 22px; justify-content: center; }
+  .legal a { font-size: 13px; color: var(--green); text-decoration: none; }
+  .legal a:hover { text-decoration: underline; }
+
+  /* ---------- Responsive: Tablet ---------- */
+  @media (min-width: 768px) {
+    .screen { max-width: 720px; padding-bottom: 56px; }
+    .screen::before { width: 520px; height: 340px; top: -100px; left: -130px; }
+    header { padding: 36px 40px 0; }
+    header h2 { font-size: 20px; }
+    .hero { padding: 48px 40px 0; }
+    .eyebrow { font-size: 12.5px; }
+    .hero h1 { font-size: 40px; }
+    .hero p.lead { font-size: 17px; }
+    .layout { padding: 0 40px; margin-top: 38px; gap: 20px; }
+    .info { gap: 20px; }
+    .card { padding: 30px 32px; border-radius: 24px; }
+    .card h3 { font-size: 22px; }
+    .card > p { font-size: 15px; }
+    .method h4 { font-size: 17px; }
+    .method p { font-size: 14.5px; }
+    .note { font-size: 15px; padding: 20px 22px; }
+    .faq { padding: 0 40px; margin-top: 48px; }
+    .faq h3 { font-size: 24px; }
+    .acc button { font-size: 16px; padding: 20px 22px; }
+    .acc .panel p { font-size: 15px; padding: 0 22px 20px; }
+    .legal { padding: 0 40px; margin-top: 38px; }
+  }
+
+  /* ---------- Responsive: Desktop (two columns) ---------- */
+  @media (min-width: 1100px) {
+    .screen { max-width: 1200px; }
+    header { padding: 40px 72px 0; }
+    .hero { padding: 56px 72px 0; }
+    .hero h1 { font-size: 48px; }
+    .hero p.lead { font-size: 18px; max-width: 760px; }
+    .layout {
+      padding: 0 72px;
+      margin-top: 44px;
+      flex-direction: row;
+      align-items: flex-start;
+      gap: 28px;
+    }
+    .info { flex: 1 1 0; }
+    .card { padding: 36px 40px; }
+    .methods { display: grid; grid-template-columns: repeat(3, 1fr); gap: 36px; margin-top: 28px; }
+    .card h3 { font-size: 24px; }
+    .card > p { font-size: 16px; }
+    .method p { font-size: 15px; }
+    .note { font-size: 16px; }
+    .faq { padding: 0 72px; margin-top: 56px; }
+    .faq h3 { font-size: 26px; }
+    .acc button { font-size: 17px; }
+    .acc .panel p { font-size: 16px; }
+    .legal { padding: 0 72px; }
+  }
+
+  /* ---------- Responsive: Large screens ---------- */
+  @media (min-width: 1400px) {
+    .screen { max-width: 1360px; }
+    header { padding: 44px 96px 0; }
+    .hero { padding: 60px 96px 0; }
+    .layout { padding: 0 96px; }
+    .faq { padding: 0 96px; }
+    .legal { padding: 0 96px; }
+  }
+
+  /* ---------- Print ---------- */
+  @media print {
+    html, body { background: #fff; }
+    .screen { max-width: 100%; overflow: visible; }
+    .screen::before, .screen::after { display: none; }
+    .back { display: none; }
+    .acc svg { display: none; }
+    .acc .panel { max-height: none !important; }
+    .card, .acc { break-inside: avoid; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="content">
+    <div class="hero">
+      <div class="eyebrow">Get in touch</div>
+      <h1>How can we help?</h1>
+      <p class="lead">Questions about onboarding, verification, payouts, or a consultation? Our operations and expert success teams are here to help you get the most out of XprtLink.</p>
+    </div>
+
+    <div class="layout">
+
+      <!-- Left: ways to reach us -->
+      <div class="info">
+        <article class="card">
+          <h3>Reach us directly</h3>
+
+          <div class="methods">
+          <div class="method">
+            <div class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#2e8f72" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+            </div>
+            <div>
+              <h4>Expert Support</h4>
+              <p>Onboarding, identity verification, payouts, and consultation best practices.</p>
+              <a href="mailto:support@xpertlink.com">support@xpertlink.com</a>
+            </div>
+          </div>
+
+          <div class="method">
+            <div class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#2e8f72" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6l8-3z"/><path d="M9 12l2 2 4-4"/></svg>
+            </div>
+            <div>
+              <h4>Report a concern</h4>
+              <p>Use the in-app report option on messages, consultation screens, and expert profiles. Flagged content is reviewed within 24 hours.</p>
+            </div>
+          </div>
+
+          <div class="method">
+            <div class="icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="#2e8f72" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7M12 17h.01"/></svg>
+            </div>
+            <div>
+              <h4>Browse the FAQ</h4>
+              <p>Quick answers to the most common questions are just below.</p>
+            </div>
+          </div>
+          </div>
+        </article>
+
+        <div class="note">"Every message is read by a real person on our team. Write to us and we'll point you in the right direction."</div>
+      </div>
+
+    </div>
+
+    <section class="faq">
+      <h3>Frequently asked questions</h3>
+      <div class="rights">
+        <div class="acc">
+          <button type="button" aria-expanded="false">
+            How do I get my Expert profile verified?
+            <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="panel"><p>Submit a valid government-issued photo ID, and secondary documentation if requested. Verification badges are granted after administrative validation.</p></div>
+        </div>
+        <div class="acc">
+          <button type="button" aria-expanded="false">
+            When do I receive my payouts?
+            <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="panel"><p>Net earnings, after the standard 15% platform commission, are sent to your verified bank or payout account on the standard settlement schedule, once identity verification is complete.</p></div>
+        </div>
+        <div class="acc">
+          <button type="button" aria-expanded="false">
+            How do I report or block an abusive user?
+            <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="panel"><p>Open the message menu, consultation screen, or expert profile in the app to report content or block the user with one tap. Our compliance team reviews reports within 24 hours.</p></div>
+        </div>
+        <div class="acc">
+          <button type="button" aria-expanded="false">
+            Can I take payments outside XprtLink?
+            <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+          </button>
+          <div class="panel"><p>No. Consultations, communications, and payments that start on XprtLink must stay on the platform. See the Expert Standards Agreement for details.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <nav class="legal" aria-label="Legal links">
+      <a href="terms-of-service.html">Terms of Service</a>
+      <a href="privacy-policy-eula.html">Privacy Policy &amp; EULA</a>
+      <a href="expert-standards.html">Expert Standards</a>
+    </nav>
+
+  </div>
+</div>
+
+<script>
+  // Accordions
+  document.querySelectorAll('.acc').forEach(function (acc) {
+    var btn = acc.querySelector('button');
+    var panel = acc.querySelector('.panel');
+    btn.addEventListener('click', function () {
+      var open = acc.classList.toggle('open');
+      btn.setAttribute('aria-expanded', open);
+      panel.style.maxHeight = open ? panel.scrollHeight + 'px' : '0';
+    });
+  });
+  window.addEventListener('resize', function () {
+    document.querySelectorAll('.acc.open .panel').forEach(function (panel) {
+      panel.style.maxHeight = panel.scrollHeight + 'px';
+    });
+  });
+
+</script>
+</body>
+</html>

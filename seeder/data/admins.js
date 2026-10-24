@@ -46,7 +46,8 @@ export const admins = [
     name: "Ops Admin",
     role: "super_admin",
     status: "active",
-    password: "Admin@123",
+    // Demo default is local-only; set SEED_SUPER_ADMIN_PASSWORD when seeding prod.
+    password: process.env.SEED_SUPER_ADMIN_PASSWORD || "Admin@123",
     permissions: null,
   },
   {

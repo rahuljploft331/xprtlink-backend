@@ -29,6 +29,7 @@ import { categories } from "../seeder/data/categories.js";
 import { admins } from "../seeder/data/admins.js";
 import {
   cmsPages,
+  faqs,
   platformConfig,
   subscriptionPlans,
 } from "../seeder/data/platform.js";
@@ -166,12 +167,16 @@ async function main() {
     supportEmail: platformConfig.supportEmail,
     foundingMemberBadgeEnabled: platformConfig.foundingMemberBadgeEnabled,
     currency: platformConfig.currency,
+    payoutSchedule: platformConfig.payoutSchedule,
+    featuredExpertWeights: platformConfig.featuredExpertWeights,
   };
+  // `value` is a Json column — store native types (admin settings controller does the same).
+  // Existing rows are left alone so re-running never clobbers admin-portal edits.
   for (const [key, value] of Object.entries(settings)) {
     await db.platformSetting.upsert({
       where: { key },
-      create: { key, value: String(value) },
-      update: { value: String(value) },
+      create: { key, value },
+      update: {},
     });
   }
   console.log(`  ✓ ${Object.keys(settings).length} platform settings upserted`);
@@ -200,7 +205,7 @@ async function main() {
       create: {
         slug: page.slug,
         title: page.title,
-        bodyHtml: `<p>${page.title} content placeholder.</p>`,
+        bodyHtml: page.bodyHtml,
         status: page.status === "published" ? "published" : "draft",
         publishedAt: page.status === "published" ? new Date() : null,
       },
@@ -210,7 +215,17 @@ async function main() {
       },
     });
   }
-  console.log(`  ✓ ${cmsPages.length} CMS pages upserted`);
+  console.log(`  ✓ ${cmsPages.length} CMS pages upserted (existing bodies left untouched)`);
+
+  // ── FAQs ─────────────────────────────────────────────────────────────────────
+  console.log("[seed:platform] Upserting FAQs...");
+  for (const faq of faqs) {
+    const existing = await db.faq.findFirst({ where: { question: faq.question, type: faq.type } });
+    if (!existing) {
+      await db.faq.create({ data: { ...faq, isActive: true } });
+    }
+  }
+  console.log(`  ✓ ${faqs.length} FAQs ensured`);
 
   // ── Admin users ──────────────────────────────────────────────────────────────
   console.log("[seed:platform] Upserting admin users...");
