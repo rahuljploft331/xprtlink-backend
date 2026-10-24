@@ -52,7 +52,7 @@ beforeEach(() => {
     update: vi.fn(async ({ data }) => Object.assign(row, data)),
   };
   db.subscriptionPlan = {
-    findFirst: vi.fn(async ({ where }) => PLANS.find((p) => p.code === where.code) ?? null),
+    findFirst: vi.fn(async ({ where }) => PLANS.find((p) => p.code === (where.code ?? where.OR?.find((c) => c.code)?.code)) ?? null),
   };
   db.expertProfile = { update: vi.fn(), updateMany: vi.fn() };
   decoded.transaction = { originalTransactionId: TX, productId: "elite", expiresDate: Date.now() + 30 * DAY };
