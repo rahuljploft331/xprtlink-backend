@@ -741,6 +741,83 @@
           }
         }
       ]
+    },
+    {
+      "name": "Places (Service Areas search)",
+      "item": [
+        {
+          "id": "57225879-66666666-0000-4000-8000-000000000001",
+          "name": "Autocomplete places",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/places/autocomplete?q=Jploft&sessionToken={{placesSession}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "places",
+                "autocomplete"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "Jploft"
+                },
+                {
+                  "key": "sessionToken",
+                  "value": "{{placesSession}}"
+                }
+              ]
+            },
+            "description": "Expert only. Up to 5 suggestions [{placeId,name}] for a free-text query (3-200 chars): cities, regions and businesses. Proxies Google Places (New) with the server-side key GOOGLE_MAPS_API_KEY; 40 requests/min per expert (429 PLACES_RATE_LIMIT_EXCEEDED). 503 PLACES_NOT_CONFIGURED when the server has no key; 502 PLACES_UPSTREAM_ERROR when Google fails. sessionToken (8-64 chars [A-Za-z0-9-]) groups a search + pick for Google billing."
+          }
+        },
+        {
+          "id": "57225879-66666666-0000-4000-8000-000000000002",
+          "name": "Place details (coordinates)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/places/details?placeId=ChIJO_IQUEG1bTkRJ0DdVVvSYWU&sessionToken={{placesSession}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "places",
+                "details"
+              ],
+              "query": [
+                {
+                  "key": "placeId",
+                  "value": "ChIJO_IQUEG1bTkRJ0DdVVvSYWU"
+                },
+                {
+                  "key": "sessionToken",
+                  "value": "{{placesSession}}"
+                }
+              ]
+            },
+            "description": "Expert only. {lat,lng} of a place picked from autocomplete. 30 requests/min per expert."
+          }
+        }
+      ]
     }
   ]
 }

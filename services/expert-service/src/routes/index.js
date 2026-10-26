@@ -1,6 +1,7 @@
 import { Router } from "express";
 import expertsRoutes from "./experts.routes.js";
 import searchRoutes from "./search.routes.js";
+import placesRoutes from "./places.routes.js";
 
 const router = Router();
 
@@ -18,4 +19,5 @@ router.param("id", (req, _res, next, value) => {
 
 router.use("/v1/experts", expertsRoutes);
 router.use("/v1/search", searchRoutes);
+router.use("/v1/places", placesRoutes);
 export default router;

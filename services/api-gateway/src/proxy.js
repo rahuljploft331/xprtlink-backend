@@ -67,6 +67,7 @@ export function createGatewayProxies() {
     { path: "/api/v1/customers", target: serviceUrls.user },
     { path: "/api/v1/experts", target: serviceUrls.expert },
     { path: "/api/v1/search", target: serviceUrls.expert },
+    { path: "/api/v1/places", target: serviceUrls.expert },
     { path: "/api/v1/catalog", target: serviceUrls.catalog },
     { path: "/api/v1/engagement", target: serviceUrls.engagement },
     { path: "/api/v1/billing", target: serviceUrls.billing },
