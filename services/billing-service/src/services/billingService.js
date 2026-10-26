@@ -1373,7 +1373,7 @@ async function handleDisputeClosed(dispute) {
   alertAdmins(getMessage(lost ? "disputeLostAlertSubject" : "disputeWonAlertSubject"), [
     `The card dispute ${dispute.id} on consultation ${ctx.consultationId} closed as "${dispute.status}".`,
     lost
-      ? `The platform keeps the loss of ${usd(dispute.amount)}; the expert's unpaid earning for this call was cancelled.`
+      ? `The platform keeps the loss of ${usd(dispute.amount)}; the expert's unpaid earning for this call was canceled.`
       : "The funds were returned and the expert's earning is released for the next payout.",
   ]);
 }
@@ -2412,20 +2412,20 @@ export async function cancelSubscription(auth) {
       userIds: [auth.userId],
       type: "subscription_cancelled",
       audience: "expert",
-      title: "Subscription Cancellation Scheduled",
-      body: `Your ${updated.plan.name} subscription will be cancelled on ${periodEnd}. You retain access until then.`,
+      title: "Subscription Cancelation Scheduled",
+      body: `Your ${updated.plan.name} subscription will be canceled on ${periodEnd}. You retain access until then.`,
       data: { subscriptionId: updated.id, planId: updated.planId },
     });
 
     const userEmail = (await getDb().user.findUnique({ where: { id: auth.userId }, select: { email: true } }))?.email;
     if (userEmail) {
       const emailHtml = await renderEmailTemplate({
-        title: "Subscription Cancellation Scheduled",
-        bodyHtml: `<p>Your ${updated.plan.name} subscription will be cancelled on ${periodEnd}. You retain access until then.</p>`,
+        title: "Subscription Cancelation Scheduled",
+        bodyHtml: `<p>Your ${updated.plan.name} subscription will be canceled on ${periodEnd}. You retain access until then.</p>`,
       });
       await sendEmail({ category: "subscription",
         to: userEmail,
-        subject: "Subscription Cancellation Scheduled",
+        subject: "Subscription Cancelation Scheduled",
         html: emailHtml,
       });
     }

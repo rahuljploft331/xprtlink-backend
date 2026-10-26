@@ -248,7 +248,7 @@ export async function notifyAutoRenewDisabled(sub, userId) {
       userIds: [userId],
       type: "subscription_cancelled",
       audience: "expert",
-      title: "Subscription Cancellation Confirmed",
+      title: "Subscription Cancelation Confirmed",
       body: `Auto-renewal is off. You keep access until ${when}.`,
       data: { subscriptionId: sub.id, planId: sub.planId, event: "subscription_status_changed" },
     });

@@ -805,17 +805,17 @@ export async function cancelQuote(auth, quoteId) {
       userIds: [updated.expert.user.id],
       type: "quote_cancelled",
       audience: "expert",
-      title: "Quote Request Cancelled",
-      body: `${customerName} cancelled their quote request: "${updated.title}"`,
+      title: "Quote Request Canceled",
+      body: `${customerName} canceled their quote request: "${updated.title}"`,
       data: { quoteId: updated.id, referenceNumber: updated.referenceNumber },
     });
 
     if (updated.expert?.user?.email) {
       const emailHtml = await renderEmailTemplate({
-        title: "Quote Cancelled",
-        bodyHtml: `<p>${customerName} cancelled their quote request: "${updated.title}"</p>`,
+        title: "Quote Canceled",
+        bodyHtml: `<p>${customerName} canceled their quote request: "${updated.title}"</p>`,
       });
-      await sendEmail({ category: "quote", to: updated.expert.user.email, subject: "Quote Cancelled", html: emailHtml }).catch(e => log.error(e));
+      await sendEmail({ category: "quote", to: updated.expert.user.email, subject: "Quote Canceled", html: emailHtml }).catch(e => log.error(e));
     }
   } catch (err) {
     log.error(`[cancelQuote] Notification dispatch failed: ${err.message}`);
