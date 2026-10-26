@@ -513,6 +513,14 @@ model AppConfig {
   minAppVersion      String   @map("min_app_version") @db.VarChar(32)
   forceUpdate        Boolean  @default(false) @map("force_update")
   maintenanceMessage String?  @map("maintenance_message")
+  /// Per-platform release gates. min = blocking (force update), latest = soft prompt.
+  /// Null = no gate for that platform. Legacy minAppVersion/forceUpdate stay for old clients.
+  iosMinVersion      String?  @map("ios_min_version") @db.VarChar(32)
+  iosLatestVersion   String?  @map("ios_latest_version") @db.VarChar(32)
+  iosStoreUrl        String?  @map("ios_store_url")
+  androidMinVersion  String?  @map("android_min_version") @db.VarChar(32)
+  androidLatestVersion String? @map("android_latest_version") @db.VarChar(32)
+  androidStoreUrl    String?  @map("android_store_url")
   updatedAt          DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("app_config")

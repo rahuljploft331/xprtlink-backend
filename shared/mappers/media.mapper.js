@@ -26,6 +26,16 @@ export function toAppConfigDto(config, platformSettings = {}) {
     forceUpdate: config?.forceUpdate ?? false,
     maintenanceMode: platformSettings.maintenanceMode ?? false,
     maintenanceMessage: config?.maintenanceMessage ?? null,
+    ios: toPlatformGate(config, "ios"),
+    android: toPlatformGate(config, "android"),
+  };
+}
+
+function toPlatformGate(config, prefix) {
+  return {
+    minVersion: config?.[`${prefix}MinVersion`] ?? null,
+    latestVersion: config?.[`${prefix}LatestVersion`] ?? null,
+    storeUrl: config?.[`${prefix}StoreUrl`] ?? null,
   };
 }
 

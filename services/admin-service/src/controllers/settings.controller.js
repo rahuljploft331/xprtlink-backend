@@ -1,5 +1,6 @@
 import { getDb } from "@xprtlink/shared/db/getClient.js";
-import { platformSettings } from "@xprtlink/shared/db/repositories/catalog/index.js";
+import { platformSettings, appConfig } from "@xprtlink/shared/db/repositories/catalog/index.js";
+import { toAppConfigDto } from "@xprtlink/shared/mappers/media.mapper.js";
 import { adminUsers } from "@xprtlink/shared/db/repositories/admin/index.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { hashPassword, verifyPassword } from "@xprtlink/shared/auth/password.js";
@@ -9,7 +10,9 @@ import { badRequest, unauthorized } from "@xprtlink/shared/utils/errors.js";
 import {
   PLATFORM_SETTING_DEFAULTS,
   updatePlatformSettingsSchema,
+  updateAppControlSchema,
   changeOwnPasswordSchema,
+  compareVersions,
 } from "@xprtlink/shared/contracts/settings.schema.js";
 import { logAdminAction } from "#utils/audit.js";
 
@@ -117,6 +120,97 @@ export async function updateSettings(req, res, next) {
     return ResponseFormatter.success(res, {
       message: getMessage("platformSettingsUpdated"),
       data,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** Admin view of the app-control payload: same shape the mobile app reads. */
+async function readAppControl() {
+  const [config, row] = await Promise.all([
+    appConfig().findFirst({ orderBy: { updatedAt: "desc" } }),
+    platformSettings().findUnique({ where: { key: "maintenanceMode" } }),
+  ]);
+  const dto = toAppConfigDto(config, { maintenanceMode: normalize("maintenanceMode", row?.value) });
+  return {
+    maintenanceMode: dto.maintenanceMode,
+    maintenanceMessage: dto.maintenanceMessage,
+    ios: dto.ios,
+    android: dto.android,
+  };
+}
+
+/** GET /api/v1/admin/settings/app-config */
+export async function getAppControl(req, res, next) {
+  try {
+    return ResponseFormatter.success(res, {
+      message: getMessage("appControlLoaded"),
+      data: await readAppControl(),
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * PATCH /api/v1/admin/settings/app-config
+ * Partial update across two stores: `maintenanceMode` is a PlatformSetting row
+ * (engagement-service gates bookings on it); message + version gates are columns
+ * on the single AppConfig row, which is updated in place (created on first save).
+ */
+export async function updateAppControl(req, res, next) {
+  try {
+    const parsed = updateAppControlSchema.parse(req.body);
+    const { maintenanceMode, maintenanceMessage, ios, android } = parsed;
+
+    const data = {};
+    if (maintenanceMessage !== undefined) data.maintenanceMessage = maintenanceMessage;
+    for (const [prefix, gate] of [["ios", ios], ["android", android]]) {
+      if (!gate) continue;
+      if (gate.minVersion !== undefined) data[`${prefix}MinVersion`] = gate.minVersion;
+      if (gate.latestVersion !== undefined) data[`${prefix}LatestVersion`] = gate.latestVersion;
+      if (gate.storeUrl !== undefined) data[`${prefix}StoreUrl`] = gate.storeUrl;
+    }
+
+    if (maintenanceMode === undefined && Object.keys(data).length === 0) {
+      throw badRequest("atLeastOneSettingRequired", "VALIDATION_ERROR");
+    }
+
+    // A partial PATCH can pass the per-platform check while contradicting the
+    // stored half (e.g. raising min above the saved latest) — re-check the merged result.
+    const existing = await appConfig().findFirst({ orderBy: { updatedAt: "desc" } });
+    for (const [prefix, label] of [["ios", "iOS"], ["android", "Android"]]) {
+      const min = data[`${prefix}MinVersion`] !== undefined ? data[`${prefix}MinVersion`] : existing?.[`${prefix}MinVersion`];
+      const latest = data[`${prefix}LatestVersion`] !== undefined ? data[`${prefix}LatestVersion`] : existing?.[`${prefix}LatestVersion`];
+      if (min && latest && compareVersions(min, latest) > 0) {
+        throw badRequest("appVersionMinAboveLatest", "VALIDATION_ERROR", `${prefix}MinVersion`, { platform: label });
+      }
+    }
+
+    const db = getDb();
+    await db.$transaction(async (tx) => {
+      if (Object.keys(data).length > 0) {
+        if (existing) {
+          await tx.appConfig.update({ where: { id: existing.id }, data });
+        } else {
+          await tx.appConfig.create({ data: { minAppVersion: "1.0.0", ...data } });
+        }
+      }
+      if (maintenanceMode !== undefined) {
+        await tx.platformSetting.upsert({
+          where: { key: "maintenanceMode" },
+          create: { key: "maintenanceMode", value: maintenanceMode },
+          update: { value: maintenanceMode },
+        });
+      }
+    });
+
+    await logAdminAction(req, "settings.app_control_update", "AppConfig", existing?.id ?? null, parsed);
+
+    return ResponseFormatter.success(res, {
+      message: getMessage("appControlUpdated"),
+      data: await readAppControl(),
     });
   } catch (err) {
     next(err);

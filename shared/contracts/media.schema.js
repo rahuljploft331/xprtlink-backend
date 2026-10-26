@@ -37,6 +37,8 @@ export const appConfigDtoSchema = z.object({
   forceUpdate: z.boolean(),
   maintenanceMode: z.boolean(),
   maintenanceMessage: z.string().nullable(),
+  ios: z.object({ minVersion: z.string().nullable(), latestVersion: z.string().nullable(), storeUrl: z.string().nullable() }),
+  android: z.object({ minVersion: z.string().nullable(), latestVersion: z.string().nullable(), storeUrl: z.string().nullable() }),
 });
 
 export const categoryDtoSchema = z.object({
