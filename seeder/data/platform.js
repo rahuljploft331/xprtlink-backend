@@ -11,6 +11,10 @@ export const platformConfig = {
   // Keys below mirror PLATFORM_SETTING_DEFAULTS in shared/contracts/settings.schema.js
   payoutSchedule: 7,
   featuredExpertWeights: { tierWeight: 100, ratingWeight: 10 },
+  // Store listings for the update prompts. Versions are left null (no gate).
+  // TODO: replace the iOS id with the real App Store id once the app is listed.
+  iosStoreUrl: "https://apps.apple.com/app/id1234567890",
+  androidStoreUrl: "https://play.google.com/store/apps/details?id=com.app.xprtlink",
 };
 
 /**

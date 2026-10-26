@@ -190,6 +190,8 @@ async function main() {
         minAppVersion: "1.0.0",
         forceUpdate: false,
         maintenanceMessage: platformConfig.maintenanceMode ? "Platform under maintenance." : null,
+        iosStoreUrl: platformConfig.iosStoreUrl,
+        androidStoreUrl: platformConfig.androidStoreUrl,
       },
     });
     console.log("  ✓ app config created");

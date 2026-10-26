@@ -215,6 +215,8 @@ export async function seedPlatformEssentials(payload) {
       minAppVersion: "1.0.0",
       forceUpdate: false,
       maintenanceMessage: pc.maintenanceMode ? "Platform under maintenance." : null,
+      iosStoreUrl: pc.iosStoreUrl,
+      androidStoreUrl: pc.androidStoreUrl,
     },
   });
 
