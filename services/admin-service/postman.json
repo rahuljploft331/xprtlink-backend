@@ -2177,6 +2177,66 @@
             },
             "description": "The logged-in admin changing their OWN password. Distinct from `PUT /admin/admins/:id/reset-password`, which is a super admin resetting somebody else's account.\n\n**Auth**: `requireAdmin` only — no module permission, because it can only ever touch the caller's own row.\n\n- `currentPassword` is verified with the same bcrypt helper the admin login uses; a mismatch returns **401** `Current password is incorrect`.\n- `newPassword` must be at least 8 characters, otherwise **400**.\n- The audit entry `settings.password_change` records the actor's email only — never password values — and no response ever contains a password hash.\n- Existing sessions are left intact; the new password applies to the next login.\n\n**Response**\n```json\n{\n  \"success\": true,\n  \"message\": \"Password changed\",\n  \"data\": null\n}\n```"
           }
+        },
+        {
+          "name": "Get App Control",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/settings/app-config",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "settings",
+                "app-config"
+              ]
+            },
+            "description": "Maintenance mode + message and the per-platform (ios / android) `minVersion` (blocking), `latestVersion` (soft prompt) and `storeUrl`. Null = no gate.\n\n**Auth**: `requireAdmin` + `requirePermission(\"settings\", \"view\")`.\n\nThe same gates are served publicly (merged with the legacy `minAppVersion` / `forceUpdate` keys) by `GET /api/v1/catalog/app-config`."
+          }
+        },
+        {
+          "name": "Update App Control",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/settings/app-config",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "settings",
+                "app-config"
+              ]
+            },
+            "description": "Partial update; at least one key required. Empty string clears a version/URL/message.\n\n**Auth**: `requireAdmin` + `requirePermission(\"settings\", \"edit\")`.\n\n| Field | Rule |\n| --- | --- |\n| `maintenanceMode` | boolean (PlatformSetting; also pauses new bookings) |\n| `maintenanceMessage` | string ≤ 500 |\n| `ios` / `android` `.minVersion` / `.latestVersion` | `x.y.z` |\n| `ios` / `android` `.storeUrl` | valid URL |\n\n`minVersion` may not exceed `latestVersion` (checked against the stored value too → 400 `VALIDATION_ERROR`). Audit entry: `settings.app_control_update`.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"maintenanceMode\": false,\n  \"maintenanceMessage\": \"We'll be back shortly.\",\n  \"ios\": {\n    \"minVersion\": \"1.2.0\",\n    \"latestVersion\": \"1.3.0\",\n    \"storeUrl\": \"https://apps.apple.com/app/id000000000\"\n  },\n  \"android\": {\n    \"minVersion\": \"1.2.0\",\n    \"latestVersion\": \"1.3.0\",\n    \"storeUrl\": \"https://play.google.com/store/apps/details?id=com.xprtlink\"\n  }\n}"
+            }
+          }
         }
       ]
     }
