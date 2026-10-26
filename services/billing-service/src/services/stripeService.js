@@ -179,6 +179,24 @@ export async function setStripeCancelAtPeriodEnd(stripeSubscriptionId) {
 }
 
 /**
+ * Creates a Stripe Customer Portal session for the customer that owns a subscription, so the
+ * expert can cancel, update their card, see invoices (and, if enabled in the Stripe Dashboard,
+ * switch plan) on a Stripe-hosted page. `configurationId` is optional (defaults to the
+ * Dashboard's default portal configuration).
+ */
+export async function createBillingPortalSession({ stripeSubscriptionId, returnUrl, configurationId }) {
+  const sdk = requireStripe();
+  const sub = await sdk.subscriptions.retrieve(stripeSubscriptionId);
+  const customer = typeof sub.customer === "string" ? sub.customer : sub.customer?.id;
+  if (!customer) throw new Error("Stripe subscription has no customer");
+  return await sdk.billingPortal.sessions.create({
+    customer,
+    return_url: returnUrl,
+    ...(configurationId ? { configuration: configurationId } : {}),
+  });
+}
+
+/**
  * Cancels an uncaptured PaymentIntent, releasing the authorization hold on the
  * customer's card. Safe to call repeatedly: a PI that is already canceled (or was
  * captured) is returned as-is instead of throwing.

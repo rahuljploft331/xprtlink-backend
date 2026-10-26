@@ -686,6 +686,46 @@
             },
             "description": "Provider-based cancellation, decided by the ORIGINAL purchase store (never the caller's device).\n\n- Apple / Google Play: does NOT cancel or modify the record. Returns `subscriptionManagementUrl`, `manualCancelRequired: true`, `cancellationConfirmed: false`. The flag flips (`autoRenewEnabled: false`, `cancelAtPeriodEnd: true`) only after a verified App Store Server Notification / Play RTDN or store status check; access continues until `currentPeriodEnd`.\n- Stripe: cancels at period end via Stripe; returns `cancellationConfirmed: true`, `manualCancelRequired: false`, `subscriptionManagementUrl: null`.\n\nIdempotent. Returns 404 if no active subscription exists."
           }
+        },
+        {
+          "id": "57225879-55555555-0000-4000-8000-0000000000f1",
+          "name": "Stripe Customer Portal Session (web subscribers)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"returnUrl\": \"https://xprtlink.com/expert-signup.html\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/billing/subscriptions/portal-session",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "billing",
+                "subscriptions",
+                "portal-session"
+              ]
+            },
+            "description": "Returns { portalUrl }: a Stripe-hosted Customer Portal page where a web (Stripe) subscriber can cancel, update their card, see invoices and (if enabled in the Stripe Dashboard) switch plan. 404 when the expert has no Stripe subscription (Apple/Google subscribers manage theirs in the store). returnUrl must be on an allowed origin (same allowlist as checkout-session). Optional env STRIPE_PORTAL_CONFIGURATION_ID selects a non-default portal configuration."
+          }
         }
       ]
     },

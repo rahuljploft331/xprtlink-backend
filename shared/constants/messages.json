@@ -256,6 +256,8 @@
   "checkoutUrlsRequired": "Checkout return links are required.",
   "checkoutUrlNotAllowed": "The checkout return link is not allowed.",
   "checkoutSessionCreated": "Checkout session created",
+  "portalSessionCreated": "Billing portal session created",
+  "noStripeSubscriptionToManage": "There is no website (Stripe) subscription to manage. Manage App Store or Google Play subscriptions in the store.",
   "invalidStore": "Unsupported store. Use \"google\" or \"apple\".",
   "storeVerificationFailed": "We could not verify your store purchase right now. Please try again in a moment.",
   "subscriptionExpired": "The subscription has expired and cannot be restored or activated.",

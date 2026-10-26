@@ -1755,9 +1755,17 @@ export async function handleStripeWebhook(payload, signature) {
       const isLive = sub.status === "active" || sub.status === "trialing";
       const newStatus = isLive ? "active" : sub.status === "canceled" ? "canceled" : "expired";
       const period = stripePeriod(sub);
+      // A plan switch made in the Stripe Customer Portal arrives as a new Price on the subscription:
+      // follow it. Unknown prices (e.g. an older Price an admin has since replaced) change nothing.
+      const stripePriceId = sub.items?.data?.[0]?.price?.id;
+      const switchedPlan = stripePriceId
+        ? await db.subscriptionPlan.findFirst({ where: { stripePriceId } })
+        : null;
+      const newPlanId = switchedPlan && switchedPlan.id !== row.planId ? switchedPlan.id : null;
       await db.expertSubscription.update({
         where: { id: row.id },
         data: {
+          ...(newPlanId ? { planId: newPlanId } : {}),
           status: newStatus,
           ...(period ? { currentPeriodStart: period.start, currentPeriodEnd: period.end } : {}),
           cancelAtPeriodEnd: sub.cancel_at_period_end ?? false,
@@ -1784,7 +1792,7 @@ export async function handleStripeWebhook(payload, signature) {
           });
         }
       }
-      log.info(`[billing-webhook] customer.subscription.updated sub=${stripeSubscriptionId} status=${newStatus}`);
+      log.info(`[billing-webhook] customer.subscription.updated sub=${stripeSubscriptionId} status=${newStatus}${newPlanId ? ` plan→${switchedPlan.code}` : ""}`);
       break;
     }
 
@@ -3402,6 +3410,28 @@ export async function createStripeCheckoutSession(auth, { planCode, successUrl, 
   });
 
   return { checkoutUrl: session.url, sessionId: session.id };
+}
+
+/**
+ * Opens the Stripe-hosted Customer Portal for the expert's website (Stripe) subscription.
+ * Store-managed (Apple / Google) subscriptions are not manageable here — the app/store owns those.
+ * The return link must be on our own origins, same allowlist as checkout.
+ */
+export async function createStripePortalSession(auth, { returnUrl }) {
+  const returnTarget = parseCheckoutReturnUrl(returnUrl);
+  const db = getDb();
+  const subscription = await db.expertSubscription.findFirst({
+    where: { expertProfileId: auth.expertProfileId, store: "stripe", status: { in: ENTITLED_STATUSES } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!subscription?.externalSubscriptionId) throw notFound("noStripeSubscriptionToManage");
+
+  const session = await stripeSvc.createBillingPortalSession({
+    stripeSubscriptionId: subscription.externalSubscriptionId,
+    returnUrl: returnTarget.toString(),
+    configurationId: process.env.STRIPE_PORTAL_CONFIGURATION_ID || undefined,
+  });
+  return { portalUrl: session.url };
 }
 
 /**

@@ -490,6 +490,20 @@ router.post(
   })
 );
 
+// Stripe-hosted Customer Portal for web subscribers: cancel, card, invoices (and plan switch if enabled in
+// the Stripe Dashboard). The returnUrl must be on our own origins (same allowlist as checkout).
+router.post(
+  "/subscriptions/portal-session",
+  stripeGuard,
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const { returnUrl } = req.body;
+    if (!returnUrl) throw badRequest("checkoutUrlsRequired", "MISSING_URLS");
+    const data = await svc.createStripePortalSession(req.auth, { returnUrl });
+    return ResponseFormatter.success(res, { message: getMessage("portalSessionCreated"), data });
+  })
+);
+
 // Legacy generic subscribe route. DISABLED as an activation path — it used to mint
 // a subscription from an unvalidated receipt (revenue bypass). Real activations must
 // go through the store verification endpoints below. `subscribe()` hard-rejects.
