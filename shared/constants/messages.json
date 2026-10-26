@@ -257,6 +257,8 @@
   "checkoutUrlNotAllowed": "The checkout return link is not allowed.",
   "checkoutSessionCreated": "Checkout session created",
   "portalSessionCreated": "Billing portal session created",
+  "subscriptionManagedOnWeb": "Your subscription is managed on the XprtLink website. Plan changes, billing and cancellation are done there.",
+  "subscriptionManagedOnWebTitle": "Managed on the Website",
   "noStripeSubscriptionToManage": "There is no website (Stripe) subscription to manage. Manage App Store or Google Play subscriptions in the store.",
   "invalidStore": "Unsupported store. Use \"google\" or \"apple\".",
   "storeVerificationFailed": "We could not verify your store purchase right now. Please try again in a moment.",

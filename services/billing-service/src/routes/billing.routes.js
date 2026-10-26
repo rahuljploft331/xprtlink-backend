@@ -605,14 +605,16 @@ router.post(
 router.post(
   "/subscriptions/restore",
   requireRole("expert"),
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req, res, next) => {
     const { store } = req.body;
     if (!store) throw badRequest("missingTransactionId"); // reuse key — store is required
+    // `next` must be forwarded: the controllers report errors through it, and without it every error here
+    // (e.g. 409 SUBSCRIPTION_MANAGED_ON_WEB) surfaced as a 500 "next is not a function".
     if (store === "apple") {
-      return appleIapController.verifyPurchase(req, res);
+      return appleIapController.verifyPurchase(req, res, next);
     }
     if (store === "google") {
-      return googleIapController.verifyPurchase(req, res);
+      return googleIapController.verifyPurchase(req, res, next);
     }
     // Stripe: no receipt — just return current active sub from DB
     const data = await svc.restoreStripeSubscription(req.auth);

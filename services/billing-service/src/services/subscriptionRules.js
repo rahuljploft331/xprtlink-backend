@@ -21,6 +21,8 @@ export const PLAN_CHANGE = Object.freeze({
 export const SUBSCRIPTION_ERROR = Object.freeze({
   DOWNGRADE_BLOCKED: "SUBSCRIPTION_DOWNGRADE_BLOCKED",
   ALREADY_ACTIVE: "SUBSCRIPTION_ALREADY_ACTIVE",
+  // The account has a live website (Stripe) subscription: it is changed/cancelled on the website, never by an in-app purchase.
+  MANAGED_ON_WEB: "SUBSCRIPTION_MANAGED_ON_WEB",
   // Kept as-is: already emitted by the verify endpoints before this change.
   ALREADY_LINKED: "SUBSCRIPTION_ALREADY_LINKED",
   STORE_VERIFICATION_FAILED: "STORE_VERIFICATION_FAILED",

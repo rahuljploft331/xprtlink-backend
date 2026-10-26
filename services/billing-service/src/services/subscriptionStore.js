@@ -39,7 +39,11 @@ function envUrl(name) {
  * Store-hosted page where the user must cancel auto-renewal. Null for stripe.
  * Overridable via SUBSCRIPTION_CANCEL_URL_IOS / SUBSCRIPTION_CANCEL_URL_ANDROID.
  */
+const WEB_MANAGE_URL = "https://xprtlink.com/expert-signup.html?mode=login";
+
 export function getManagementUrl(store) {
+  // Website (Stripe) subscribers manage everything on the website; their login lands on the Manage subscription card.
+  if (store === "stripe") return envUrl("SUBSCRIPTION_MANAGE_URL_WEB") ?? WEB_MANAGE_URL;
   if (store === "apple") return envUrl("SUBSCRIPTION_CANCEL_URL_IOS") ?? APPLE_MANAGE_URL;
   if (store === "google") {
     const override = envUrl("SUBSCRIPTION_CANCEL_URL_ANDROID");

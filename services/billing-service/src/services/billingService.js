@@ -29,7 +29,7 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { fetchAppleState, fetchGoogleState, getManagementUrl, isStoreManaged, reconcileSubscription } from "./subscriptionStore.js";
 import { ENTITLED_STATUSES, PLAN_CHANGE, SUBSCRIPTION_ERROR, comparePlans, evaluatePlanChange, hasActiveEntitlement } from "./subscriptionRules.js";
 import { logSubscriptionEvent } from "./subscriptionLog.js";
-import { findForeignOwner, ownedByAnotherAccountError, ownerHasLiveEntitlement, transferAllowed } from "./subscriptionOwnership.js";
+import { findForeignOwner, managedOnWebError, ownedByAnotherAccountError, ownerHasLiveEntitlement, transferAllowed } from "./subscriptionOwnership.js";
 import { customerDisplayName, toIso } from "@xprtlink/shared/mappers/common.js";
 import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
 
@@ -1986,6 +1986,16 @@ export async function listSubscriptionPlans(auth) {
     dto.purchaseEligible = !hasActiveEntitlement || anyPlanPurchasable;
     dto.activeSubscriptionStore = activeStore;   // null when no active subscription
     dto.activePlanId = activePlanId;             // null when no active subscription
+    // Website (Stripe) subscribers: the app must show no purchase / upgrade / restore, only "manage on the website".
+    const managedOnWeb = activeStore === "stripe";
+    dto.managedOnWeb = managedOnWeb;
+    dto.restoreEligible = !managedOnWeb;
+    dto.managementUrl = managedOnWeb ? getManagementUrl("stripe") : null;
+    if (managedOnWeb) {
+      dto.planChangeAction = isCurrent ? "current" : "manage_on_web";
+      dto.planPurchaseEligible = false;
+      dto.purchaseEligible = false;
+    }
     return dto;
   });
 }
@@ -2082,6 +2092,12 @@ export async function checkPurchaseEligibility(auth, input = {}) {
     cancelAtPeriodEnd: activeSub.cancelAtPeriodEnd,
     managementUrl: getManagementUrl(activeSub.store),
   };
+
+  // Website (Stripe) subscribers change plan / cancel on the website: no in-app purchase, upgrade or restore.
+  if (activeSub.store === "stripe") {
+    const err = managedOnWebError();
+    return { eligible: false, code: err.code, reason: err.code, message: err.message, managedOnWeb: true, ...err.details, activeSubscription };
+  }
 
   // Legacy callers (no planCode): any live subscription still blocks, as before.
   if (!planCode) {

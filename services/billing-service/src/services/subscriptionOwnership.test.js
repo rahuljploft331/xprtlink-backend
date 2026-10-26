@@ -12,7 +12,7 @@ vi.mock("./subscriptionStore.js", async (orig) => ({
   reconcileSubscription: async (_d, sub) => sub,
 }));
 
-const { activateStoreSubscription } = await import("./subscriptionOwnership.js");
+const { activateStoreSubscription, assertNotManagedOnWeb } = await import("./subscriptionOwnership.js");
 const { checkPurchaseEligibility } = await import("./billingService.js");
 
 const PLANS = {
@@ -105,6 +105,54 @@ describe("activateStoreSubscription — plan hierarchy", () => {
   it("a Google replacement chain (linked token) is not judged as a second subscription", async () => {
     reload([row({ id: "old", plan: "professional", expertProfileId: "A", externalSubscriptionId: "t1" })]);
     await expect(claim("A", "core", "t2", { linkedExternalId: "t1" })).resolves.toMatchObject({ plan: { code: "core" } });
+  });
+});
+
+describe("website (Stripe) subscribers are managed on the website", () => {
+  const stripeRow = (plan = "core") => row({ id: "web1", plan, store: "stripe", expertProfileId: "A", externalSubscriptionId: "sub_web" });
+
+  it.each(["professional", "elite", "core"])("an in-app purchase of %s is refused and the Stripe row is left untouched", async (to) => {
+    reload([stripeRow("core")]);
+    await expect(claim("A", to, "tok-iap")).rejects.toMatchObject({
+      statusCode: 409,
+      code: "SUBSCRIPTION_MANAGED_ON_WEB",
+      details: { store: "stripe", managementUrl: expect.stringContaining("xprtlink.com") },
+    });
+    expect(db.expertSubscription.rows).toHaveLength(1);
+    expect(db.expertSubscription.rows[0]).toMatchObject({ store: "stripe", status: "active" });
+  });
+
+  it("a restore of a store purchase (same call as a purchase) is refused the same way", async () => {
+    reload([stripeRow("professional")]);
+    await expect(claim("A", "professional", "tok-restore")).rejects.toMatchObject({ code: "SUBSCRIPTION_MANAGED_ON_WEB" });
+  });
+
+  it("an expired Stripe subscription no longer blocks an in-app purchase", async () => {
+    reload([{ ...stripeRow("core"), currentPeriodEnd: past }]);
+    await expect(claim("A", "professional", "tok-iap")).resolves.toMatchObject({ plan: { code: "professional" } });
+  });
+
+  it("an in-app subscriber is unaffected (upgrade still works, downgrade still blocked)", async () => {
+    reload([row({ id: "g1", plan: "core", expertProfileId: "A", externalSubscriptionId: "t1" })]);
+    await expect(claim("A", "elite", "t2")).resolves.toMatchObject({ upgradedFrom: "core" });
+  });
+
+  it("assertNotManagedOnWeb refuses before any store call, only for a live Stripe subscription", async () => {
+    reload([stripeRow("core")]);
+    await expect(assertNotManagedOnWeb(db, "A")).rejects.toMatchObject({ statusCode: 409, code: "SUBSCRIPTION_MANAGED_ON_WEB" });
+    await expect(assertNotManagedOnWeb(db, "B")).resolves.toBeUndefined(); // another expert
+    reload([{ ...stripeRow("core"), currentPeriodEnd: past }]);
+    await expect(assertNotManagedOnWeb(db, "A")).resolves.toBeUndefined(); // expired
+    reload([row({ id: "g1", plan: "core", expertProfileId: "A", externalSubscriptionId: "t1" })]);
+    await expect(assertNotManagedOnWeb(db, "A")).resolves.toBeUndefined(); // in-app subscriber
+  });
+
+  it("the eligibility pre-check says so up front, with the website link", async () => {
+    reload([stripeRow("core")]);
+    const r = await checkPurchaseEligibility({ userId: "u", expertProfileId: "A" }, { planCode: "elite" });
+    expect(r).toMatchObject({ eligible: false, code: "SUBSCRIPTION_MANAGED_ON_WEB", managedOnWeb: true, store: "stripe" });
+    expect(r.managementUrl).toContain("xprtlink.com");
+    expect(r.activeSubscription).toMatchObject({ store: "stripe", planCode: "core" });
   });
 });
 

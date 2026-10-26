@@ -41,6 +41,31 @@ export function ownedByAnotherAccountError(store) {
   });
 }
 
+/** The account has a live website (Stripe) subscription, so in-app purchases/upgrades/restores are refused. */
+export function managedOnWebError() {
+  return new AppError(getMessage("subscriptionManagedOnWeb"), {
+    statusCode: 409,
+    code: SUBSCRIPTION_ERROR.MANAGED_ON_WEB,
+    details: {
+      title: getMessage("subscriptionManagedOnWebTitle"),
+      alertMessage: getMessage("subscriptionManagedOnWeb"),
+      store: "stripe",
+      managementUrl: getManagementUrl("stripe"),
+    },
+  });
+}
+
+/**
+ * Early refusal for in-app purchase / restore calls: a live website (Stripe) subscription is managed on the
+ * website, so the store is not even contacted. (activateStoreSubscription enforces the same rule atomically.)
+ */
+export async function assertNotManagedOnWeb(db, expertProfileId, now = new Date()) {
+  const live = await db.expertSubscription.findFirst({
+    where: { expertProfileId, store: "stripe", status: { in: ENTITLED_STATUSES }, currentPeriodEnd: { gt: now } },
+  });
+  if (live) throw managedOnWebError();
+}
+
 /** Another account's row for this store purchase, or null. */
 export function findForeignOwner(db, { store, externalSubscriptionId, expertProfileId }) {
   return db.expertSubscription.findFirst({
@@ -143,6 +168,12 @@ export async function activateStoreSubscription(db, p) {
 
     let upgradedFrom = null;
     for (const cur of others) {
+      // A live Stripe subscription is never replaced by an in-app purchase: step 3 below would mark it cancelled
+      // here while Stripe kept billing. Plan changes for web subscribers happen in the Stripe portal.
+      if (cur.store === "stripe") {
+        logSubscriptionEvent("BLOCKED", { store, plan: plan.code, expertProfileId, note: "In-app purchase refused: the account has a live website (Stripe) subscription" });
+        throw managedOnWebError();
+      }
       const verdict = evaluatePlanChange(cur.plan?.code, plan.code);
       if (!verdict.allowed) {
         log.warn({ expertProfileId, from: cur.plan?.code, to: plan.code, relation: verdict.relation }, "[activate] plan change blocked");
