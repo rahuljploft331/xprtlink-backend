@@ -27,6 +27,7 @@ import { mkdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import pino from "pino";
+import { redactUrl } from "./redactUrl.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -112,7 +113,7 @@ const baseLogger = pino(
         return {
           id: req.id,
           method: req.method,
-          url: req.url,
+          url: redactUrl(req.url), // never log ?token= / other secrets in query strings
         };
       },
       res(res) {

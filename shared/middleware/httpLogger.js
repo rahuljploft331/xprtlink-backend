@@ -8,6 +8,7 @@
  */
 import pinoHttp from "pino-http";
 import { logger } from "../lib/logger.js";
+import { redactUrl } from "../lib/redactUrl.js";
 
 /** Paths that should not generate a log line on every hit (health probes). */
 const QUIET_PATHS = new Set(["/health", "/favicon.ico"]);
@@ -36,9 +37,9 @@ export const httpLogger = pinoHttp({
   },
 
   customSuccessMessage: (req, res) =>
-    `${req.method} ${req.url} ${res.statusCode}`,
+    `${req.method} ${redactUrl(req.url)} ${res.statusCode}`,
   customErrorMessage: (req, res, err) =>
-    `${req.method} ${req.url} ${res.statusCode} - ${err?.message ?? "error"}`,
+    `${req.method} ${redactUrl(req.url)} ${res.statusCode} - ${err?.message ?? "error"}`,
 
   // req/res/err serializers are defined on the base logger (shared/lib/logger.js)
   // so they apply consistently across every child logger pino-http creates.
