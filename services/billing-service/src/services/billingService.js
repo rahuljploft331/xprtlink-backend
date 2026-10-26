@@ -29,6 +29,7 @@ import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { fetchAppleState, fetchGoogleState, getManagementUrl, getWebManagementUrl, isStoreManaged, reconcileSubscription } from "./subscriptionStore.js";
 import { ENTITLED_STATUSES, PLAN_CHANGE, SUBSCRIPTION_ERROR, comparePlans, evaluatePlanChange, hasActiveEntitlement } from "./subscriptionRules.js";
 import { logSubscriptionEvent } from "./subscriptionLog.js";
+import { buildPortalProducts } from "./portalProducts.js";
 import { findForeignOwner, managedOnWebError, ownedByAnotherAccountError, ownerHasLiveEntitlement, transferAllowed } from "./subscriptionOwnership.js";
 import { customerDisplayName, toIso } from "@xprtlink/shared/mappers/common.js";
 import { expertDisplayName } from "@xprtlink/shared/mappers/expert.mapper.js";
@@ -3460,6 +3461,25 @@ export async function createStripeCheckoutSession(auth, { planCode, successUrl, 
 }
 
 /**
+ * The portal configuration for this subscriber: plan switching offers each plan's latest Price (plus the
+ * subscriber's own current Price for their own plan), built by ensurePortalConfiguration from the Dashboard's
+ * settings. Never blocks the portal: on any failure it falls back to the configured/default portal.
+ */
+async function portalConfigurationFor(db, subscription) {
+  const fallback = process.env.STRIPE_PORTAL_CONFIGURATION_ID || undefined;
+  try {
+    const plans = await db.subscriptionPlan.findMany({ where: { isActive: true, stripePriceId: { not: null } } });
+    const current = await stripeSvc.getSubscriptionPrice(subscription.externalSubscriptionId);
+    const products = await buildPortalProducts({ plans, current, productOfPrice: stripeProductOfPrice });
+    if (products.length === 0) return fallback;
+    return await stripeSvc.ensurePortalConfiguration({ products, baseConfigurationId: fallback });
+  } catch (err) {
+    log.warn({ err: err.message }, "[portal] could not build a per-subscriber portal configuration; using the default portal");
+    return fallback;
+  }
+}
+
+/**
  * Opens the Stripe-hosted Customer Portal for the expert's website (Stripe) subscription.
  * Store-managed (Apple / Google) subscriptions are not manageable here — the app/store owns those.
  * The return link must be on our own origins, same allowlist as checkout.
@@ -3476,7 +3496,7 @@ export async function createStripePortalSession(auth, { returnUrl }) {
   const session = await stripeSvc.createBillingPortalSession({
     stripeSubscriptionId: subscription.externalSubscriptionId,
     returnUrl: returnTarget.toString(),
-    configurationId: process.env.STRIPE_PORTAL_CONFIGURATION_ID || undefined,
+    configurationId: await portalConfigurationFor(db, subscription),
   });
   return { portalUrl: session.url };
 }

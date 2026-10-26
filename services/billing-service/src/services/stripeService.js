@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import Stripe from "stripe";
 import { getSecretSync } from "@xprtlink/shared/config/secrets.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
@@ -200,6 +201,80 @@ export async function createBillingPortalSession({ stripeSubscriptionId, returnU
     return_url: returnUrl,
     ...(configurationId ? { configuration: configurationId } : {}),
   });
+}
+
+/** The Price (and its Product) a Stripe subscription is currently on. */
+export async function getSubscriptionPrice(stripeSubscriptionId) {
+  const sub = await requireStripe().subscriptions.retrieve(stripeSubscriptionId);
+  const price = sub.items?.data?.[0]?.price;
+  return {
+    priceId: price?.id ?? null,
+    productId: typeof price?.product === "string" ? price.product : price?.product?.id ?? null,
+  };
+}
+
+/**
+ * A Customer Portal configuration that offers exactly `products` for plan switching and is otherwise a copy of the
+ * base configuration (the Dashboard's default unless `baseConfigurationId` is given), so everything an admin sets in
+ * the Stripe Dashboard (cancellation, proration, downgrade timing, ...) still applies. Configurations are reused:
+ * the key covers the base settings and the product list, so a Dashboard change or a price change makes a new one.
+ * If the base has plan switching switched off, the base itself is returned (the Dashboard stays the master switch).
+ */
+export async function ensurePortalConfiguration({ products, baseConfigurationId }) {
+  const sdk = requireStripe();
+  const base = baseConfigurationId
+    ? await sdk.billingPortal.configurations.retrieve(baseConfigurationId)
+    : (await sdk.billingPortal.configurations.list({ is_default: true, limit: 1 })).data[0];
+  if (!base) throw new Error("No base Customer Portal configuration (create one in the Stripe Dashboard)");
+
+  const f = base.features ?? {};
+  if (f.subscription_update?.enabled === false) return base.id;
+
+  const sha = (v) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
+  const key = sha({ base: base.id, bp: base.business_profile, features: f, products }).slice(0, 32);
+
+  const existing = (await sdk.billingPortal.configurations.list({ limit: 100 }).autoPagingToArray({ limit: 500 }))
+    .find((c) => c.active && c.metadata?.xprt_portal_key === key);
+  if (existing) return existing.id;
+
+  const bp = base.business_profile ?? {};
+  const cancel = f.subscription_cancel ?? {};
+  const update = f.subscription_update ?? {};
+  const customerUpdate = f.customer_update ?? {};
+  const created = await sdk.billingPortal.configurations.create({
+    business_profile: {
+      ...(bp.headline ? { headline: bp.headline } : {}),
+      ...(bp.privacy_policy_url ? { privacy_policy_url: bp.privacy_policy_url } : {}),
+      ...(bp.terms_of_service_url ? { terms_of_service_url: bp.terms_of_service_url } : {}),
+    },
+    features: {
+      customer_update: customerUpdate.enabled && customerUpdate.allowed_updates?.length
+        ? { enabled: true, allowed_updates: customerUpdate.allowed_updates }
+        : { enabled: false },
+      invoice_history: { enabled: f.invoice_history?.enabled !== false },
+      payment_method_update: { enabled: f.payment_method_update?.enabled !== false },
+      subscription_cancel: cancel.enabled === false
+        ? { enabled: false }
+        : {
+            enabled: true,
+            mode: cancel.mode ?? "at_period_end",
+            ...(cancel.proration_behavior ? { proration_behavior: cancel.proration_behavior } : {}),
+            ...(cancel.cancellation_reason?.enabled && cancel.cancellation_reason.options?.length
+              ? { cancellation_reason: { enabled: true, options: cancel.cancellation_reason.options } }
+              : {}),
+          },
+      subscription_update: {
+        enabled: true,
+        default_allowed_updates: update.default_allowed_updates?.length ? update.default_allowed_updates : ["price"],
+        proration_behavior: update.proration_behavior ?? "create_prorations",
+        products,
+        ...(update.schedule_at_period_end?.conditions?.length ? { schedule_at_period_end: { conditions: update.schedule_at_period_end.conditions } } : {}),
+        ...(update.trial_update_behavior ? { trial_update_behavior: update.trial_update_behavior } : {}),
+      },
+    },
+    metadata: { xprt_portal_key: key, xprt_portal_base: base.id },
+  });
+  return created.id;
 }
 
 /**
