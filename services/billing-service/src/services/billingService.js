@@ -1482,6 +1482,39 @@ async function handleChargeRefunded(stripeCharge) {
  * Older API versions carry it on the subscription; 2025-03-31+ moved it to the first
  * item, and webhook payloads follow the endpoint's API version, not the SDK pin.
  */
+// Price -> Product lookups are stable, so remember them for the life of the process.
+const priceProductCache = new Map();
+async function stripeProductOfPrice(priceId) {
+  if (!priceId) return null;
+  if (priceProductCache.has(priceId)) return priceProductCache.get(priceId);
+  try {
+    const productId = await stripeSvc.getPriceProductId(priceId);
+    if (productId) priceProductCache.set(priceId, productId);
+    return productId ?? null;
+  } catch (err) {
+    log.warn({ priceId, err: err.message }, "[billing-webhook] could not resolve the Stripe product of a price");
+    return null;
+  }
+}
+
+/**
+ * The plan a Stripe Price belongs to. First by the plan's current Price; failing that by Stripe Product, so an
+ * older Price of the same product (e.g. before an admin changed the website price, which subscribers keep) still
+ * maps to the right plan when the expert switches plans in the Customer Portal.
+ */
+async function planForStripePrice(db, priceId) {
+  if (!priceId) return null;
+  const exact = await db.subscriptionPlan.findFirst({ where: { stripePriceId: priceId } });
+  if (exact) return exact;
+  const productId = await stripeProductOfPrice(priceId);
+  if (!productId) return null;
+  const plans = (await db.subscriptionPlan.findMany?.({ where: { stripePriceId: { not: null } } })) ?? [];
+  for (const plan of plans) {
+    if ((await stripeProductOfPrice(plan.stripePriceId)) === productId) return plan;
+  }
+  return null;
+}
+
 function stripePeriod(sub) {
   const item = sub?.items?.data?.[0];
   const start = sub?.current_period_start ?? item?.current_period_start;
@@ -1758,9 +1791,7 @@ export async function handleStripeWebhook(payload, signature) {
       // A plan switch made in the Stripe Customer Portal arrives as a new Price on the subscription:
       // follow it. Unknown prices (e.g. an older Price an admin has since replaced) change nothing.
       const stripePriceId = sub.items?.data?.[0]?.price?.id;
-      const switchedPlan = stripePriceId
-        ? await db.subscriptionPlan.findFirst({ where: { stripePriceId } })
-        : null;
+      const switchedPlan = await planForStripePrice(db, stripePriceId);
       const newPlanId = switchedPlan && switchedPlan.id !== row.planId ? switchedPlan.id : null;
       await db.expertSubscription.update({
         where: { id: row.id },

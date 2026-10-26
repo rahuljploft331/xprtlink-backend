@@ -178,6 +178,12 @@ export async function setStripeCancelAtPeriodEnd(stripeSubscriptionId) {
   return sdk.subscriptions.update(stripeSubscriptionId, { cancel_at_period_end: true });
 }
 
+/** The Stripe Product id a Price belongs to (used to recognise plans across old and new Prices). */
+export async function getPriceProductId(priceId) {
+  const price = await requireStripe().prices.retrieve(priceId);
+  return typeof price.product === "string" ? price.product : price.product?.id ?? null;
+}
+
 /**
  * Creates a Stripe Customer Portal session for the customer that owns a subscription, so the
  * expert can cancel, update their card, see invoices (and, if enabled in the Stripe Dashboard,
