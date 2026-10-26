@@ -5,7 +5,7 @@ export const sessionRoleSchema = z.enum(["customer", "expert"]);
 /** E.164 phone format (e.g. +14155552671) */
 export const e164PhoneSchema = z
   .string()
-  .regex(/^\+[1-9]\d{7,14}$/, "Phone must be in E.164 format (e.g. +14155552671)");
+  .regex(/^\+[1-9]\d{7,14}$/, "Please enter a valid mobile number with country code, e.g. +919876543210");
 
 /** MFS password policy: min 8, upper, lower, digit, special */
 export const passwordSchema = z

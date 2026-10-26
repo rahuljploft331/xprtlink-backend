@@ -98,7 +98,7 @@ export const customConnectKycRequestSchema = z.object({
   // US account can receive transfers; optional so older app builds still work.
   idNumber: z.string().regex(/^\d{9}$/, "idNumber must be 9 digits").optional(),
   // E.164, e.g. +14155550123. Falls back to the phone on the user account.
-  phone: z.string().regex(/^\+[1-9]\d{6,14}$/, "phone must be in E.164 format").optional(),
+  phone: z.string().regex(/^\+[1-9]\d{6,14}$/, "Please enter a valid mobile number with country code, e.g. +919876543210").optional(),
   frontDocumentFileId: z.string().min(1).optional(),
   backDocumentFileId: z.string().min(1).optional(),
   userIpAddress: z.string().optional(),
