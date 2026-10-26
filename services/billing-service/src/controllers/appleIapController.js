@@ -6,7 +6,7 @@ import { logSubscriptionEvent } from "../services/subscriptionLog.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 import { cancelSupersededSubscriptions } from "../services/billingService.js";
-import { activateStoreSubscription, assertNotManagedOnWeb } from "../services/subscriptionOwnership.js";
+import { activateStoreSubscription } from "../services/subscriptionOwnership.js";
 const log = logger.child({ module: "appleIapController" });
 // N5 fix: decodeSignedTransaction does NOT exist on @apple/app-store-server-library.
 // Only import the symbols that the library actually exports.
@@ -62,7 +62,6 @@ export const verifyPurchase = async (req, res, next) => {
     if (!transactionId) throw badRequest("missingTransactionId");
 
     const db = getDb();
-    await assertNotManagedOnWeb(db, req.auth.expertProfileId);
 
     const client = getAppleClient();
     const transactionInfo = await client.getTransactionInfo(transactionId);

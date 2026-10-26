@@ -26,7 +26,7 @@ import { getSupportEmail, supportLinkHtml } from "@xprtlink/shared/lib/supportEm
 import { buildConsultationInvoiceEmail } from "@xprtlink/shared/lib/consultationInvoice.js";
 import { PAYOUT_SCHEDULE_DEFAULT_DAYS } from "@xprtlink/shared/contracts/settings.schema.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
-import { fetchAppleState, fetchGoogleState, getManagementUrl, isStoreManaged, reconcileSubscription } from "./subscriptionStore.js";
+import { fetchAppleState, fetchGoogleState, getManagementUrl, getWebManagementUrl, isStoreManaged, reconcileSubscription } from "./subscriptionStore.js";
 import { ENTITLED_STATUSES, PLAN_CHANGE, SUBSCRIPTION_ERROR, comparePlans, evaluatePlanChange, hasActiveEntitlement } from "./subscriptionRules.js";
 import { logSubscriptionEvent } from "./subscriptionLog.js";
 import { findForeignOwner, managedOnWebError, ownedByAnotherAccountError, ownerHasLiveEntitlement, transferAllowed } from "./subscriptionOwnership.js";
@@ -1990,7 +1990,7 @@ export async function listSubscriptionPlans(auth) {
     const managedOnWeb = activeStore === "stripe";
     dto.managedOnWeb = managedOnWeb;
     dto.restoreEligible = !managedOnWeb;
-    dto.managementUrl = managedOnWeb ? getManagementUrl("stripe") : null;
+    dto.managementUrl = managedOnWeb ? getWebManagementUrl() : null;
     if (managedOnWeb) {
       dto.planChangeAction = isCurrent ? "current" : "manage_on_web";
       dto.planPurchaseEligible = false;

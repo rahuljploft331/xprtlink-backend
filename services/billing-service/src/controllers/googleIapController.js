@@ -7,7 +7,7 @@ import { logSubscriptionEvent } from "../services/subscriptionLog.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 import { cancelSupersededSubscriptions } from "../services/billingService.js";
-import { activateStoreSubscription, assertNotManagedOnWeb } from "../services/subscriptionOwnership.js";
+import { activateStoreSubscription } from "../services/subscriptionOwnership.js";
 const log = logger.child({ module: "googleIapController" });
 
 function getGoogleClient() {
@@ -31,7 +31,6 @@ export const verifyPurchase = async (req, res, next) => {
     if (!purchaseToken || !subscriptionId) throw badRequest("missingPurchaseTokenOrSubscriptionId");
 
     const db = getDb();
-    await assertNotManagedOnWeb(db, req.auth.expertProfileId);
     
     // Verify the subscription with Google
     const androidPublisher = getGoogleClient();

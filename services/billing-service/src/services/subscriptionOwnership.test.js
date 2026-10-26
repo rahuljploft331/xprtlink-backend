@@ -12,7 +12,7 @@ vi.mock("./subscriptionStore.js", async (orig) => ({
   reconcileSubscription: async (_d, sub) => sub,
 }));
 
-const { activateStoreSubscription, assertNotManagedOnWeb } = await import("./subscriptionOwnership.js");
+const { activateStoreSubscription } = await import("./subscriptionOwnership.js");
 const { checkPurchaseEligibility } = await import("./billingService.js");
 
 const PLANS = {
@@ -108,46 +108,29 @@ describe("activateStoreSubscription — plan hierarchy", () => {
   });
 });
 
-describe("website (Stripe) subscribers are managed on the website", () => {
+describe("website (Stripe) subscribers — existing in-app behaviour is unchanged", () => {
   const stripeRow = (plan = "core") => row({ id: "web1", plan, store: "stripe", expertProfileId: "A", externalSubscriptionId: "sub_web" });
 
-  it.each(["professional", "elite", "core"])("an in-app purchase of %s is refused and the Stripe row is left untouched", async (to) => {
+  it("an in-app upgrade over a live Stripe subscription still activates and retires the Stripe row (as before; the Stripe cancel is done by cancelSupersededSubscriptions)", async () => {
     reload([stripeRow("core")]);
-    await expect(claim("A", to, "tok-iap")).rejects.toMatchObject({
-      statusCode: 409,
-      code: "SUBSCRIPTION_MANAGED_ON_WEB",
-      details: { store: "stripe", managementUrl: expect.stringContaining("xprtlink.com") },
-    });
-    expect(db.expertSubscription.rows).toHaveLength(1);
-    expect(db.expertSubscription.rows[0]).toMatchObject({ store: "stripe", status: "active" });
+    const s = await claim("A", "professional", "tok-iap");
+    expect(s).toMatchObject({ plan: { code: "professional" }, upgradedFrom: "core" });
+    expect(db.expertSubscription.rows.find((r) => r.id === "web1").status).toBe("canceled");
   });
 
-  it("a restore of a store purchase (same call as a purchase) is refused the same way", async () => {
+  it("the plan-hierarchy rules apply to a Stripe row exactly as to an in-app row (downgrade / same plan still blocked)", async () => {
     reload([stripeRow("professional")]);
-    await expect(claim("A", "professional", "tok-restore")).rejects.toMatchObject({ code: "SUBSCRIPTION_MANAGED_ON_WEB" });
+    await expect(claim("A", "core", "tok-iap")).rejects.toMatchObject({ code: "SUBSCRIPTION_DOWNGRADE_BLOCKED" });
+    await expect(claim("A", "professional", "tok-iap2")).rejects.toMatchObject({ code: "SUBSCRIPTION_ALREADY_ACTIVE" });
+    expect(db.expertSubscription.rows.find((r) => r.id === "web1").status).toBe("active");
   });
 
-  it("an expired Stripe subscription no longer blocks an in-app purchase", async () => {
-    reload([{ ...stripeRow("core"), currentPeriodEnd: past }]);
-    await expect(claim("A", "professional", "tok-iap")).resolves.toMatchObject({ plan: { code: "professional" } });
-  });
-
-  it("an in-app subscriber is unaffected (upgrade still works, downgrade still blocked)", async () => {
+  it("an in-app subscriber is unaffected (upgrade works)", async () => {
     reload([row({ id: "g1", plan: "core", expertProfileId: "A", externalSubscriptionId: "t1" })]);
     await expect(claim("A", "elite", "t2")).resolves.toMatchObject({ upgradedFrom: "core" });
   });
 
-  it("assertNotManagedOnWeb refuses before any store call, only for a live Stripe subscription", async () => {
-    reload([stripeRow("core")]);
-    await expect(assertNotManagedOnWeb(db, "A")).rejects.toMatchObject({ statusCode: 409, code: "SUBSCRIPTION_MANAGED_ON_WEB" });
-    await expect(assertNotManagedOnWeb(db, "B")).resolves.toBeUndefined(); // another expert
-    reload([{ ...stripeRow("core"), currentPeriodEnd: past }]);
-    await expect(assertNotManagedOnWeb(db, "A")).resolves.toBeUndefined(); // expired
-    reload([row({ id: "g1", plan: "core", expertProfileId: "A", externalSubscriptionId: "t1" })]);
-    await expect(assertNotManagedOnWeb(db, "A")).resolves.toBeUndefined(); // in-app subscriber
-  });
-
-  it("the eligibility pre-check says so up front, with the website link", async () => {
+  it("only the eligibility PRE-CHECK tells the app to hide purchase/upgrade/restore for a Stripe subscriber", async () => {
     reload([stripeRow("core")]);
     const r = await checkPurchaseEligibility({ userId: "u", expertProfileId: "A" }, { planCode: "elite" });
     expect(r).toMatchObject({ eligible: false, code: "SUBSCRIPTION_MANAGED_ON_WEB", managedOnWeb: true, store: "stripe" });

@@ -2,7 +2,7 @@ import { AppError } from "@xprtlink/shared/utils/errors.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { logger } from "@xprtlink/shared/lib/logger.js";
 import { logSubscriptionEvent } from "./subscriptionLog.js";
-import { fetchAppleState, fetchGoogleState, getManagementUrl } from "./subscriptionStore.js";
+import { fetchAppleState, fetchGoogleState, getManagementUrl, getWebManagementUrl } from "./subscriptionStore.js";
 import {
   ENTITLED_STATUSES,
   PLAN_CHANGE,
@@ -41,7 +41,11 @@ export function ownedByAnotherAccountError(store) {
   });
 }
 
-/** The account has a live website (Stripe) subscription, so in-app purchases/upgrades/restores are refused. */
+/**
+ * Payload shape for "this account's subscription is managed on the website". Used by the eligibility pre-check so the
+ * app hides purchase/upgrade/restore. It is NOT thrown by activation: an in-app purchase still supersedes a Stripe
+ * subscription (and cancelSupersededSubscriptions cancels it on Stripe) exactly as before.
+ */
 export function managedOnWebError() {
   return new AppError(getMessage("subscriptionManagedOnWeb"), {
     statusCode: 409,
@@ -50,20 +54,9 @@ export function managedOnWebError() {
       title: getMessage("subscriptionManagedOnWebTitle"),
       alertMessage: getMessage("subscriptionManagedOnWeb"),
       store: "stripe",
-      managementUrl: getManagementUrl("stripe"),
+      managementUrl: getWebManagementUrl(),
     },
   });
-}
-
-/**
- * Early refusal for in-app purchase / restore calls: a live website (Stripe) subscription is managed on the
- * website, so the store is not even contacted. (activateStoreSubscription enforces the same rule atomically.)
- */
-export async function assertNotManagedOnWeb(db, expertProfileId, now = new Date()) {
-  const live = await db.expertSubscription.findFirst({
-    where: { expertProfileId, store: "stripe", status: { in: ENTITLED_STATUSES }, currentPeriodEnd: { gt: now } },
-  });
-  if (live) throw managedOnWebError();
 }
 
 /** Another account's row for this store purchase, or null. */
@@ -168,12 +161,6 @@ export async function activateStoreSubscription(db, p) {
 
     let upgradedFrom = null;
     for (const cur of others) {
-      // A live Stripe subscription is never replaced by an in-app purchase: step 3 below would mark it cancelled
-      // here while Stripe kept billing. Plan changes for web subscribers happen in the Stripe portal.
-      if (cur.store === "stripe") {
-        logSubscriptionEvent("BLOCKED", { store, plan: plan.code, expertProfileId, note: "In-app purchase refused: the account has a live website (Stripe) subscription" });
-        throw managedOnWebError();
-      }
       const verdict = evaluatePlanChange(cur.plan?.code, plan.code);
       if (!verdict.allowed) {
         log.warn({ expertProfileId, from: cur.plan?.code, to: plan.code, relation: verdict.relation }, "[activate] plan change blocked");

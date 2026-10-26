@@ -557,7 +557,7 @@
                 "plans"
               ]
             },
-            "description": "List subscription plans available for experts. Response includes id, code, name, tagline, priceMonthly, currency, visibilityBoost, isMostPopular, and keyFeatures array. Per plan also: planChangeAction (current|upgrade|downgrade_blocked|purchase|manage_on_web), planPurchaseEligible, purchaseEligible, activeSubscriptionStore, and (new) managedOnWeb / restoreEligible / managementUrl. When the expert has a live website (Stripe) subscription: managedOnWeb=true, restoreEligible=false, purchaseEligible=false, planChangeAction=manage_on_web on every non-current plan, and managementUrl points at the website — the app must hide purchase/upgrade/restore. Store verify/restore for such an expert returns 409 SUBSCRIPTION_MANAGED_ON_WEB."
+            "description": "List subscription plans available for experts. Response includes id, code, name, tagline, priceMonthly, currency, visibilityBoost, isMostPopular, and keyFeatures array. Per plan also: planChangeAction (current|upgrade|downgrade_blocked|purchase|manage_on_web), planPurchaseEligible, purchaseEligible, activeSubscriptionStore, and (new) managedOnWeb / restoreEligible / managementUrl. When the expert has a live website (Stripe) subscription: managedOnWeb=true, restoreEligible=false, purchaseEligible=false, planChangeAction=manage_on_web on every non-current plan, and managementUrl points at the website — the app must hide purchase/upgrade/restore. This is informational for the app UI only; server-side purchase handling is unchanged (an in-app purchase still supersedes a Stripe subscription and cancels it on Stripe)."
           }
         },
         {
