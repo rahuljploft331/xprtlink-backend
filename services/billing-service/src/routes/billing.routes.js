@@ -534,7 +534,7 @@ router.get(
   "/subscriptions/me",
   requireRole("expert"),
   asyncHandler(async (req, res) => {
-    const data = await svc.getMySubscription(req.auth);
+    const data = await svc.getMySubscription(req.auth, { includePending: req.query.pending === "1" });
     return ResponseFormatter.success(res, { message: getMessage("currentSubscription"), data });
   })
 );

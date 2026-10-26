@@ -2208,7 +2208,7 @@ export async function subscribe() {
   throw badRequest("subscriptionRequiresStoreReceipt", "STORE_RECEIPT_REQUIRED");
 }
 
-export async function getMySubscription(auth) {
+export async function getMySubscription(auth, { includePending = false } = {}) {
   // Includes active, grace_period, and on_hold subscriptions (all represent
   // active entitlements where access should still be granted).
   const db = getDb();
@@ -2232,9 +2232,24 @@ export async function getMySubscription(auth) {
   }
 
   const current = await reconcileSubscription(db, subscription);
+
+  // A downgrade made in the Stripe portal waits for the end of the paid period; show it as pending so the expert can
+  // see it was scheduled. Opt-in (?pending=1): it costs a Stripe call, and only the website needs it.
+  let pendingPlanChange = null;
+  if (includePending && current.store === "stripe" && current.externalSubscriptionId) {
+    try {
+      const change = await stripeSvc.getScheduledPriceChange(current.externalSubscriptionId);
+      const plan = change ? await planForStripePrice(db, change.priceId) : null;
+      if (plan) pendingPlanChange = { planCode: plan.code, planName: plan.name, effectiveAt: toIso(change.startsAt) };
+    } catch (err) {
+      log.warn({ err: err.message }, "[subscription] could not read the scheduled plan change");
+    }
+  }
+
   return {
     ...toExpertSubscriptionDto(current, current.plan),
     subscriptionManagementUrl: getManagementUrl(current.store),
+    ...(includePending ? { pendingPlanChange } : {}),
   };
 }
 

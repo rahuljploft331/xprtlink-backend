@@ -214,9 +214,39 @@ export async function getSubscriptionPrice(stripeSubscriptionId) {
 }
 
 /**
+ * A plan change already scheduled for the end of the current period (a downgrade made in the Customer Portal), or null.
+ * Stripe holds it as a subscription schedule whose next phase carries the new Price.
+ */
+export async function getScheduledPriceChange(stripeSubscriptionId) {
+  const sub = await requireStripe().subscriptions.retrieve(stripeSubscriptionId, { expand: ["schedule"] });
+  const schedule = sub.schedule && typeof sub.schedule === "object" ? sub.schedule : null;
+  if (!schedule || schedule.status !== "active") return null;
+  const now = Math.floor(Date.now() / 1000);
+  const next = (schedule.phases ?? []).find((p) => p.start_date > now);
+  const price = next?.items?.[0]?.price;
+  const priceId = typeof price === "string" ? price : price?.id;
+  return priceId ? { priceId, startsAt: new Date(next.start_date * 1000) } : null;
+}
+
+/**
+ * How a plan change made in the Stripe Customer Portal is billed (business rules, decided 2026-10-26):
+ *  - UPGRADE: takes effect immediately, the billing cycle restarts now and the full new plan price is charged at once
+ *    (no credit for unused time on the old plan). Upgrading during a free trial ends the trial and charges now.
+ *  - DOWNGRADE: waits until the current paid period ends (the expert keeps the plan they paid for); nothing is charged
+ *    or changed until then.
+ * Enforced here, not left to Dashboard clicks, so every generated portal configuration behaves the same.
+ */
+export const PLAN_CHANGE_RULES = Object.freeze({
+  proration_behavior: "none",
+  billing_cycle_anchor: "now",
+  trial_update_behavior: "end_trial",
+  schedule_at_period_end: { conditions: [{ type: "decreasing_item_amount" }] },
+});
+
+/**
  * A Customer Portal configuration that offers exactly `products` for plan switching and is otherwise a copy of the
  * base configuration (the Dashboard's default unless `baseConfigurationId` is given), so everything an admin sets in
- * the Stripe Dashboard (cancellation, proration, downgrade timing, ...) still applies. Configurations are reused:
+ * the Stripe Dashboard (cancellation, payment methods, invoices, ...) still applies; plan-change billing is fixed by PLAN_CHANGE_RULES. Configurations are reused:
  * the key covers the base settings and the product list, so a Dashboard change or a price change makes a new one.
  * If the base has plan switching switched off, the base itself is returned (the Dashboard stays the master switch).
  */
@@ -231,7 +261,7 @@ export async function ensurePortalConfiguration({ products, baseConfigurationId 
   if (f.subscription_update?.enabled === false) return base.id;
 
   const sha = (v) => createHash("sha256").update(JSON.stringify(v)).digest("hex");
-  const key = sha({ base: base.id, bp: base.business_profile, features: f, products }).slice(0, 32);
+  const key = sha({ base: base.id, bp: base.business_profile, features: f, products, rules: PLAN_CHANGE_RULES }).slice(0, 32);
 
   const existing = (await sdk.billingPortal.configurations.list({ limit: 100 }).autoPagingToArray({ limit: 500 }))
     .find((c) => c.active && c.metadata?.xprt_portal_key === key);
@@ -266,10 +296,8 @@ export async function ensurePortalConfiguration({ products, baseConfigurationId 
       subscription_update: {
         enabled: true,
         default_allowed_updates: update.default_allowed_updates?.length ? update.default_allowed_updates : ["price"],
-        proration_behavior: update.proration_behavior ?? "create_prorations",
         products,
-        ...(update.schedule_at_period_end?.conditions?.length ? { schedule_at_period_end: { conditions: update.schedule_at_period_end.conditions } } : {}),
-        ...(update.trial_update_behavior ? { trial_update_behavior: update.trial_update_behavior } : {}),
+        ...PLAN_CHANGE_RULES,
       },
     },
     metadata: { xprt_portal_key: key, xprt_portal_base: base.id },
