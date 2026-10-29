@@ -344,6 +344,7 @@ model CustomerProfile {
   expertReports  ExpertReport[]
   reportedBy     CustomerReport[]         @relation("ReportedCustomer")
   reviews        Review[]
+  reviewReports  ReviewReport[]           @relation("ReviewReportCustomer")
 
   @@index([avatarMediaId])
   @@map("customer_profiles")
@@ -648,6 +649,7 @@ model ExpertProfile {
   reviews          Review[]
   reports          ExpertReport[]
   customerReports  CustomerReport[]         @relation("ReportingExpert")
+  reviewReports    ReviewReport[]           @relation("ReviewReportExpert")
   banners          ExpertBanner[]
   payouts          ExpertPayout[]
   earningsLedger   ExpertEarningsLedger[]
@@ -884,11 +886,34 @@ model Review {
   consultation Consultation    @relation(fields: [consultationId], references: [id], onDelete: Cascade)
   customer     CustomerProfile @relation(fields: [customerId], references: [id], onDelete: Cascade)
   expert       ExpertProfile   @relation(fields: [expertId], references: [id], onDelete: Cascade)
+  reports      ReviewReport[]
 
   @@index([customerId])
   @@index([expertId])
   @@index([rating])
   @@map("reviews")
+}
+
+model ReviewReport {
+  id                  String             @id @default(uuid()) @db.Uuid
+  reviewId            String             @map("review_id") @db.Uuid
+  reporterRole        String             @map("reporter_role") @db.VarChar(16)
+  reporterCustomerId  String?            @map("reporter_customer_id") @db.Uuid
+  reporterExpertId    String?            @map("reporter_expert_id") @db.Uuid
+  reason              String             @db.VarChar(120)
+  details             String?
+  status              ExpertReportStatus @default(open)
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  review           Review           @relation(fields: [reviewId], references: [id], onDelete: Cascade)
+  reporterCustomer CustomerProfile? @relation("ReviewReportCustomer", fields: [reporterCustomerId], references: [id], onDelete: SetNull)
+  reporterExpert   ExpertProfile?   @relation("ReviewReportExpert", fields: [reporterExpertId], references: [id], onDelete: SetNull)
+
+  @@unique([reviewId, reporterCustomerId])
+  @@unique([reviewId, reporterExpertId])
+  @@index([status])
+  @@map("review_reports")
 }
 
 model ExpertReport {
