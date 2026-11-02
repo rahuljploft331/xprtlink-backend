@@ -35,7 +35,8 @@ export const cmsPages = [
 export const faqs = [
   { question: "How do I set my availability?", answer: "Go to your Profile tab and edit your Schedule to open time slots.", type: "expert", sortOrder: 10 },
   { question: "When do I get paid?", answer: "Payouts are processed weekly directly to your linked bank account via Stripe.", type: "expert", sortOrder: 11 },
-  { question: "Can I cancel a consultation?", answer: "Yes, but frequent cancellations may lower your expert rating.", type: "both", sortOrder: 12 },
+  { question: "Can I cancel a consultation?", answer: "Yes, but frequent cancellations may lower your expert rating.", type: "expert", sortOrder: 12 },
+  { question: "Can I cancel a consultation?", answer: "Yes, you can cancel a scheduled consultation. Please check our cancellation policy for any applicable fees or restrictions.", type: "customer", sortOrder: 12 },
 ];
 
 export const subscriptionPlans = [
