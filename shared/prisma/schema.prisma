@@ -631,6 +631,7 @@ model ExpertProfile {
   stripeStatusCheckedAt DateTime?          @map("stripe_status_checked_at") @db.Timestamptz(6)
   poorReviewsAlert      Boolean            @default(false) @map("poor_reviews_alert")
   pricingUpdatedAt      DateTime?          @map("pricing_updated_at") @db.Timestamptz(6)
+  otherCategory         String?            @map("other_category") @db.VarChar(200)
   createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
