@@ -16,6 +16,7 @@ import reviewsRoutes from "./reviews.routes.js";
 import cmsRoutes from "./cms.routes.js";
 import faqsRoutes from "./faqs.routes.js";
 import adminsRoutes from "./admins.routes.js";
+import invitesRoutes from "./invites.routes.js";
 import supportTicketsRoutes from "./supportTickets.routes.js";
 import platformIssuesRoutes from "./platformIssues.routes.js";
 
@@ -30,6 +31,7 @@ const router = Router();
 
 /* ── Public ─────────────────────────────────────────── */
 router.use("/auth", authRoutes);
+router.use("/invites", invitesRoutes);
 
 /* ── Protected domain routes ────────────────────────── */
 router.use("/search", searchRoutes);

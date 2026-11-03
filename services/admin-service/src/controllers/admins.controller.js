@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { z } from "zod";
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { hashPassword } from "@xprtlink/shared/auth/password.js";
@@ -175,6 +176,135 @@ export async function resetPassword(req, res, next) {
     return ResponseFormatter.success(res, {
       data: { tempPassword },
       message: getMessage("adminPasswordResetEmailed", { email: admin.email }),
+    });
+  } catch (err) { next(err); }
+}
+
+const INVITE_TTL_HOURS = 72;
+const INVITE_PASSWORD_RE = /^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+[\]{};':"\\|,.<>/?]).{8,}$/;
+
+const sendInviteSchema = z.object({
+  name: z.string().min(3).max(120),
+  email: z.string().email().max(320).transform((v) => v.toLowerCase()),
+  permissions: z.record(z.string(), z.enum(["view", "edit", "none"])).optional(),
+});
+
+export async function sendInvite(req, res, next) {
+  try {
+    const { name, email, permissions } = sendInviteSchema.parse(req.body);
+    const db = getDb();
+
+    // Block if email is already an active admin
+    const existing = await db.adminUser.findFirst({ where: { email } });
+    if (existing) throw badRequest("emailAlreadyAdminUser", "EMAIL_IN_USE");
+
+    // Mark any previous unused invites for this email as expired
+    await db.adminInvite.updateMany({
+      where: { email, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { expiresAt: new Date() },
+    });
+
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + INVITE_TTL_HOURS * 60 * 60 * 1000);
+
+    await db.adminInvite.create({
+      data: {
+        token,
+        email,
+        name,
+        permissions: permissions ?? {},
+        expiresAt,
+        invitedById: req.adminUser.id,
+      },
+    });
+
+    const acceptUrl = `${process.env.ADMIN_PORTAL_URL ?? "https://devadmin.xprtlink.com"}/invite/${token}`;
+    const html = await renderEmailTemplate({
+      title: "You've been invited to XprtLink Admin",
+      bodyHtml: `<p>Hi ${escapeHtml(name)},</p><p>You've been invited to join the XprtLink admin portal. Click the button below to set your password and activate your account.</p><p style="color:#6b7280;font-size:12px;">This invitation link expires in ${INVITE_TTL_HOURS} hours.</p>`,
+      ctaText: "Accept Invitation",
+      ctaUrl: acceptUrl,
+    });
+    await sendEmail({
+      category: "admin",
+      sensitive: false,
+      to: email,
+      subject: "You're invited to XprtLink Admin",
+      text: `Hi ${name},\n\nYou've been invited to join the XprtLink admin portal. Accept your invitation here:\n\n${acceptUrl}\n\nThis link expires in ${INVITE_TTL_HOURS} hours.`,
+      html,
+    });
+
+    await logAdminAction(req, "admin.invite", "AdminInvite", null, { name, email });
+    return ResponseFormatter.success(res, {
+      message: `Invitation sent to ${email}. Link expires in ${INVITE_TTL_HOURS} hours.`,
+    });
+  } catch (err) { next(err); }
+}
+
+export async function checkInvite(req, res, next) {
+  try {
+    const db = getDb();
+    const invite = await db.adminInvite.findUnique({ where: { token: req.params.token } });
+    if (!invite || invite.usedAt || invite.expiresAt < new Date()) {
+      return res.status(404).json({ success: false, message: "This invitation link is invalid or has expired." });
+    }
+    return ResponseFormatter.success(res, { data: { name: invite.name, email: invite.email } });
+  } catch (err) { next(err); }
+}
+
+const acceptInviteSchema = z.object({
+  password: z.string().min(8).max(128),
+});
+
+export async function acceptInvite(req, res, next) {
+  try {
+    const { password } = acceptInviteSchema.parse(req.body);
+    if (!INVITE_PASSWORD_RE.test(password)) {
+      return res.status(422).json({ success: false, field: "password", message: "Password must be at least 8 characters and include an uppercase letter, a number, and a special character." });
+    }
+
+    const db = getDb();
+    const invite = await db.adminInvite.findUnique({ where: { token: req.params.token } });
+    if (!invite || invite.usedAt || invite.expiresAt < new Date()) {
+      return res.status(404).json({ success: false, message: "This invitation link is invalid or has expired." });
+    }
+
+    const existing = await db.adminUser.findFirst({ where: { email: invite.email } });
+    if (existing) {
+      await db.adminInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } });
+      return res.status(409).json({ success: false, message: "An account with this email already exists. Please sign in." });
+    }
+
+    const passwordHash = await hashPassword(password);
+    const admin = await db.$transaction(async (tx) => {
+      const created = await tx.adminUser.create({
+        data: {
+          name: invite.name,
+          email: invite.email,
+          passwordHash,
+          passwordEncrypted: encryptPassword(password),
+          role: "subadmin",
+          status: "active",
+        },
+      });
+
+      const permissions = invite.permissions ?? {};
+      if (Object.keys(permissions).length > 0) {
+        await Promise.all(
+          Object.entries(permissions).map(([module, level]) =>
+            tx.adminPermission.create({ data: { adminUserId: created.id, module, level } })
+          )
+        );
+      }
+
+      await tx.adminInvite.update({ where: { id: invite.id }, data: { usedAt: new Date() } });
+      return tx.adminUser.findUnique({ where: { id: created.id }, include: { permissions: true } });
+    });
+
+    return ResponseFormatter.success(res, {
+      data: toAdminUserDto(admin),
+      message: "Account created successfully. You can now sign in.",
+      status: 201,
     });
   } catch (err) { next(err); }
 }

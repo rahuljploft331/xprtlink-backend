@@ -34,12 +34,13 @@ export async function globalSearch(req, res, next) {
       quotes,
       admins,
     ] = await Promise.all([
-      // Customers — match name or email
+      // Customers — match name, email, or phone
       db.user.findMany({
         where: {
           customerProfile: { isNot: null },
           OR: [
             { email: { contains: q, ...ci } },
+            { phone: { contains: q, ...ci } },
             { customerProfile: { firstName: { contains: q, ...ci } } },
             { customerProfile: { lastName: { contains: q, ...ci } } },
           ],
@@ -48,12 +49,14 @@ export async function globalSearch(req, res, next) {
         include: { customerProfile: { select: { firstName: true, lastName: true } } },
       }),
 
-      // Experts — match name
+      // Experts — match name, phone, or email
       db.expertProfile.findMany({
         where: {
           OR: [
             { firstName: { contains: q, ...ci } },
             { lastName: { contains: q, ...ci } },
+            { phone: { contains: q, ...ci } },
+            { user: { email: { contains: q, ...ci } } },
           ],
         },
         take: MAX_PER_GROUP,
