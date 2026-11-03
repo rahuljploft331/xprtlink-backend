@@ -218,7 +218,7 @@ export async function sendInvite(req, res, next) {
       },
     });
 
-    const acceptUrl = `${process.env.ADMIN_PORTAL_URL ?? "https://admin.xpertlink.com"}/invite/${token}`;
+    const acceptUrl = `${process.env.ADMIN_PORTAL_URL ?? "https://devadmin.xprtlink.com"}/invite/${token}`;
     const html = await renderEmailTemplate({
       title: "You've been invited to XprtLink Admin",
       bodyHtml: `<p>Hi ${escapeHtml(name)},</p><p>You've been invited to join the XprtLink admin portal. Click the button below to set your password and activate your account.</p><p style="color:#6b7280;font-size:12px;">This invitation link expires in ${INVITE_TTL_HOURS} hours.</p>`,
