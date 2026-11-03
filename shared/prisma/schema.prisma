@@ -1300,6 +1300,7 @@ model AdminUser {
   supportConversationsAssigned SupportConversation[]
   supportMessagesSent          SupportMessage[]
   sessions                     AdminSession[]
+  invitesSent                  AdminInvite[]
 
   @@map("admin_users")
 }
@@ -1346,6 +1347,23 @@ model AdminAuditLog {
   @@index([actorAdminId])
   @@index([entityType, entityId])
   @@map("admin_audit_logs")
+}
+
+model AdminInvite {
+  id          String    @id @default(uuid()) @db.Uuid
+  token       String    @unique @db.VarChar(64)
+  email       String    @db.VarChar(320)
+  name        String    @db.VarChar(120)
+  permissions Json?
+  expiresAt   DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt      DateTime? @map("used_at") @db.Timestamptz(6)
+  invitedById String?   @map("invited_by_id") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  invitedBy AdminUser? @relation(fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@map("admin_invites")
 }
 
 enum EmailLogStatus {
