@@ -152,6 +152,7 @@ export async function getById(req, res, next) {
                 status: true,
                 billingStatus: true,
                 durationSeconds: true,
+                ratePerMinuteCents: true,
                 customer: {
                   select: {
                     ...PARTY_SELECT,
