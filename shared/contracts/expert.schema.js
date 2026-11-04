@@ -2,6 +2,13 @@ import { z } from "zod";
 
 // ─── Shared sub-schemas ───────────────────────────────────────────────────────
 
+/** Free-text "my category isn't listed" suggestion. Empty string clears it. */
+export const otherCategorySchema = z
+  .string()
+  .trim()
+  .max(100)
+  .refine((v) => v === "" || v.length >= 2, "Category must be at least 2 characters");
+
 export const serviceAreaLocationSchema = z.object({
   name: z.string().min(1).max(200),
   lat: z.number().min(-90).max(90),
@@ -75,6 +82,7 @@ export const expertMeUpdateRequestSchema = z.object({
   experienceYears: z.number().int().nonnegative().max(99).optional(),
   availabilityStatus: z.enum(["online", "offline", "busy"]).optional(),
   categoryIds: z.array(z.string().uuid()).min(1).max(20).optional(),
+  otherCategory: otherCategorySchema.optional(),
   avatarMediaId: z.string().uuid().optional(),
 });
 
@@ -189,6 +197,7 @@ export const expertOnboardingRequestSchema = z.object({
   consultationRate: z.number().min(15, "Consultation rate must be at least $15.00").max(1000000).optional(),
   experienceYears: z.number().int().nonnegative().max(99).optional(),
   categoryIds: z.array(z.string().uuid()).min(1).max(20).optional(),
+  otherCategory: otherCategorySchema.optional(),
   avatarMediaId: z.string().uuid().nullable().optional(),
 });
 

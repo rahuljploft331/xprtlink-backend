@@ -74,6 +74,7 @@ export async function list(req, res, next) {
       lastName: e.lastName,
       avatarUrl: resolveMediaUrl(e.avatarMedia?.storageKey),
       categories: e.categories,
+      otherCategory: e.otherCategory,
       verificationStatus: e.verificationStatus,
       email: e.user?.email ?? null,
       accountStatus: e.user?.status,
