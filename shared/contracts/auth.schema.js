@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { otherCategorySchema } from "./expert.schema.js";
 
 export const sessionRoleSchema = z.enum(["customer", "expert"]);
 
@@ -58,6 +59,7 @@ export const registerRequestSchema = z
     otpChannel: z.enum(["email", "phone"]).optional(),
     /** Category selections for expert registration (Figma sign-up screen). Optional for customers; experts require at least one. */
     categoryIds: z.array(z.string().uuid()).min(1).max(20).optional(),
+    otherCategory: otherCategorySchema.optional(),
     /**
      * Optional profile photo chosen during sign-up. Must be a media asset the
      * registering user already uploaded (purpose "avatar", status "ready").

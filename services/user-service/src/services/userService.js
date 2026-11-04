@@ -118,7 +118,7 @@ async function createProfileForRole(
   role,
   firstName,
   lastName,
-  { categoryIds, avatarMediaId, withPassword = false, passwordHash } = {}
+  { categoryIds, otherCategory, avatarMediaId, withPassword = false, passwordHash } = {}
 ) {
   const pw = passwordHash
     ? { passwordHash, passwordUpdatedAt: new Date() }
@@ -167,6 +167,7 @@ async function createProfileForRole(
           lastName,
           ...pw,
           categories: { connect: resolvedCategoryIds.map((id) => ({ id })) },
+          ...(otherCategory ? { otherCategory } : {}),
           consultationRateCents: 0,
           ...(avatarMediaId ? { avatarMediaId } : {}),
           settings: { create: { preferences: {} } },
@@ -207,6 +208,7 @@ export async function register(body) {
     lastName,
     otpChannel = "phone",
     categoryIds,
+    otherCategory,
     avatarMediaId,
   } = body;
 
@@ -424,6 +426,7 @@ export async function register(body) {
       lastName,
       otpChannel,
       categoryIds,
+      otherCategory,
       avatarMediaId,
       ...(existingActiveUserWithEmail ? { passwordHash } : {}),
     },
@@ -679,7 +682,7 @@ export async function verifyOtp(body) {
       );
     }
 
-    const { role, firstName, lastName, otpChannel, categoryIds, avatarMediaId, passwordHash: roleOwnHash } =
+    const { role, firstName, lastName, otpChannel, categoryIds, otherCategory, avatarMediaId, passwordHash: roleOwnHash } =
       challenge.registrationData;
 
     // Validate the optional sign-up avatar: it must be a "ready" avatar asset
@@ -743,6 +746,7 @@ export async function verifyOtp(body) {
 
       return createProfileForRole(tx, challenge.userId, role, firstName, lastName, {
         categoryIds,
+        otherCategory,
         avatarMediaId: resolvedAvatarMediaId,
         withPassword: true,
         passwordHash: roleOwnHash,
