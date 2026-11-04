@@ -138,11 +138,13 @@ const slugify = (s) =>
   s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
 
 const matching = (text) => ({ otherCategory: { equals: text, mode: "insensitive" } });
+// Only experts whose documents were approved are surfaced/attached; pending ones appear once verified.
+const verifiedMatching = (text) => ({ ...matching(text), verificationStatus: "approved" });
 
 export async function listSuggestions(_req, res, next) {
   try {
     const experts = await getDb().expertProfile.findMany({
-      where: { otherCategory: { not: null } },
+      where: { otherCategory: { not: null }, verificationStatus: "approved" },
       select: { id: true, firstName: true, lastName: true, otherCategory: true, updatedAt: true },
       orderBy: { updatedAt: "desc" },
     });
@@ -165,7 +167,7 @@ export async function approveSuggestion(req, res, next) {
     const { suggestion, name = suggestion } = approveSuggestionSchema.parse(req.body);
     const db = getDb();
     const result = await db.$transaction(async (tx) => {
-      const experts = await tx.expertProfile.findMany({ where: matching(suggestion), select: { id: true } });
+      const experts = await tx.expertProfile.findMany({ where: verifiedMatching(suggestion), select: { id: true } });
       if (experts.length === 0) return null;
 
       let category = await tx.category.findFirst({ where: { name: { equals: name, mode: "insensitive" } } });
