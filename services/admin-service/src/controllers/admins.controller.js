@@ -88,12 +88,12 @@ export async function create(req, res, next) {
     try {
       const html = await renderEmailTemplate({
         title: "Your XprtLink admin account",
-        bodyHtml: `<p>Hi ${escapeHtml(name)},</p><p>A super admin has created an XprtLink admin account for you. Use these credentials to sign in:</p><p><strong>Email:</strong> ${escapeHtml(admin.email)}<br/><strong>Password:</strong> <span style="font-size:16px;font-weight:600;letter-spacing:1px;">${escapeHtml(password)}</span></p><p>Please change your password after signing in.</p>`,
+        bodyHtml: `<p>Hi ${escapeHtml(name)},</p><p>A super admin has created an XprtLink admin account for you. Use these credentials to sign in:</p><p><strong>Email:</strong> ${escapeHtml(admin.email)}<br/><strong>Password:</strong> <span style="font-size:16px;font-weight:600;letter-spacing:1px;">${escapeHtml(password)}</span></p><p><a href="${process.env.ADMIN_PORTAL_URL || "https://devadmin.xprtlink.com"}" style="display:inline-block;padding:10px 24px;background:#1e3a5f;color:#fff;text-decoration:none;border-radius:6px;font-weight:600;">Open Admin Portal</a></p><p>Please change your password after signing in.</p>`,
       });
       await sendEmail({ category: "admin", sensitive: true,
         to: admin.email,
         subject: "Your XprtLink admin account",
-        text: `Hi ${name},\n\nA super admin has created an XprtLink admin account for you.\n\nEmail: ${admin.email}\nPassword: ${password}\n\nPlease change your password after signing in.`,
+        text: `Hi ${name},\n\nA super admin has created an XprtLink admin account for you.\n\nEmail: ${admin.email}\nPassword: ${password}\n\nSign in here: ${process.env.ADMIN_PORTAL_URL || "https://devadmin.xprtlink.com"}\n\nPlease change your password after signing in.`,
         html,
       });
     } catch (mailErr) {
