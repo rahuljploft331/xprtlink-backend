@@ -149,7 +149,8 @@ async function createProfileForRole(
     });
     resolvedCategoryIds = active.map((c) => c.id);
   }
-  if (resolvedCategoryIds.length === 0) {
+  // A custom-only expert stays uncategorised until an admin approves their suggested category.
+  if (resolvedCategoryIds.length === 0 && !otherCategory) {
     const category = await tx.category.findFirst({
       where: { isActive: true },
       orderBy: { sortOrder: "asc" },
@@ -166,7 +167,7 @@ async function createProfileForRole(
           firstName,
           lastName,
           ...pw,
-          categories: { connect: resolvedCategoryIds.map((id) => ({ id })) },
+          ...(resolvedCategoryIds.length ? { categories: { connect: resolvedCategoryIds.map((id) => ({ id })) } } : {}),
           ...(otherCategory ? { otherCategory } : {}),
           consultationRateCents: 0,
           ...(avatarMediaId ? { avatarMediaId } : {}),
