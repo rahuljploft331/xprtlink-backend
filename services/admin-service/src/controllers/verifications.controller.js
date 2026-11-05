@@ -32,7 +32,7 @@ export async function list(req, res, next) {
         take: limit,
         orderBy: { submittedAt: "desc" },
         include: {
-          expert: { select: { id: true, firstName: true, lastName: true } },
+          expert: { select: { id: true, firstName: true, lastName: true, otherCategory: true } },
           _count: { select: { documents: true } },
         },
       }),
@@ -41,6 +41,7 @@ export async function list(req, res, next) {
     const items = verifications.map((v) => ({
       id: v.id,
       expert: v.expert,
+      newCategory: v.expert?.otherCategory ?? null,
       status: v.status,
       submittedAt: v.submittedAt,
       reviewedAt: v.reviewedAt,
