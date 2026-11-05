@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { list, getById, setFeatured, update, setStatus, getTransactions, getSupportChats, sendEmailToExpert, remove } from "#controllers/experts.controller.js";
+import { list, getById, setFeatured, update, setStatus, getTransactions, getSupportChats, sendEmailToExpert, remove, approveCategorySuggestion, rejectCategorySuggestion } from "#controllers/experts.controller.js";
 import { requireAdmin, requirePermission } from "#middlewares/adminAuth.js";
 import { asyncHandler } from "@xprtlink/shared/middleware/asyncHandler.js";
 
@@ -15,4 +15,6 @@ router.delete("/:id", requirePermission("experts", "edit"), asyncHandler(remove)
 router.get("/:id/transactions", requirePermission("experts", "view"), asyncHandler(getTransactions));
 router.get("/:id/support-chats", requirePermission("experts", "view"), asyncHandler(getSupportChats));
 router.post("/:id/email", requirePermission("experts", "edit"), asyncHandler(sendEmailToExpert));
+router.post("/:id/category-suggestion/approve", requirePermission("experts", "edit"), asyncHandler(approveCategorySuggestion));
+router.post("/:id/category-suggestion/reject", requirePermission("experts", "edit"), asyncHandler(rejectCategorySuggestion));
 export default router;

@@ -573,3 +573,75 @@ export async function remove(req, res, next) {
     next(err);
   }
 }
+
+// ─── Expert-suggested category ("My category isn't listed") ──────────────────
+// Decided per expert from the verification page: approve creates/reuses the category and attaches the
+// expert; reject clears the text and, if the expert has no category, files them under "Others".
+
+const slugify = (v) =>
+  v.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
+
+async function findOrCreateCategory(tx, name) {
+  const existing = await tx.category.findFirst({ where: { name: { equals: name, mode: "insensitive" } } });
+  if (existing) return { category: existing, created: false };
+  const base = slugify(name) || "category";
+  let slug = base;
+  for (let i = 2; await tx.category.findUnique({ where: { slug } }); i += 1) slug = `${base}-${i}`;
+  const { _max } = await tx.category.aggregate({ _max: { sortOrder: true } });
+  const category = await tx.category.create({ data: { name, slug, sortOrder: (_max.sortOrder ?? 0) + 1, isActive: true } });
+  return { category, created: true };
+}
+
+async function decideSuggestion(req, res, next, decide) {
+  try {
+    if (!uuidRegex.test(req.params.id)) {
+      return res.status(404).json({ success: false, message: getMessage("expertNotFound"), code: "NOT_FOUND" });
+    }
+    const result = await getDb().$transaction(async (tx) => {
+      const expert = await tx.expertProfile.findUnique({
+        where: { id: req.params.id },
+        select: { id: true, otherCategory: true, _count: { select: { categories: true } } },
+      });
+      if (!expert?.otherCategory) return null;
+      return { suggestion: expert.otherCategory, ...(await decide(tx, expert)) };
+    });
+    if (!result) {
+      return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
+    }
+    await logAdminAction(req, result.action, "ExpertProfile", req.params.id, {
+      suggestion: result.suggestion, category: result.category.name,
+    });
+    return ResponseFormatter.success(res, { data: { category: result.category, created: result.created } });
+  } catch (err) { next(err); }
+}
+
+/** POST /api/v1/admin/experts/:id/category-suggestion/approve  { name? } */
+export function approveCategorySuggestion(req, res, next) {
+  const name = (typeof req.body?.name === "string" ? req.body.name.trim() : "");
+  if (name && (name.length < 3 || name.length > 120)) {
+    return res.status(400).json({ success: false, message: "Category name must be 3 to 120 characters", code: "VALIDATION_ERROR", field: "name" });
+  }
+  return decideSuggestion(req, res, next, async (tx, expert) => {
+    const { category, created } = await findOrCreateCategory(tx, name || expert.otherCategory);
+    await tx.expertProfile.update({
+      where: { id: expert.id },
+      data: { categories: { connect: { id: category.id } }, otherCategory: null },
+    });
+    return { category, created, action: "expert.category_suggestion.approve" };
+  });
+}
+
+/** POST /api/v1/admin/experts/:id/category-suggestion/reject */
+export function rejectCategorySuggestion(req, res, next) {
+  return decideSuggestion(req, res, next, async (tx, expert) => {
+    const { category, created } = await findOrCreateCategory(tx, "Others");
+    await tx.expertProfile.update({
+      where: { id: expert.id },
+      data: {
+        otherCategory: null,
+        ...(expert._count.categories === 0 ? { categories: { connect: { id: category.id } } } : {}),
+      },
+    });
+    return { category, created, action: "expert.category_suggestion.reject" };
+  });
+}
