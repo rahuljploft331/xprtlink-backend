@@ -61,7 +61,7 @@ export async function getById(req, res, next) {
     const v = await db.expertVerification.findUnique({
       where: { id: req.params.id },
       include: {
-        expert: { include: { user: { select: { email: true } } } },
+        expert: { include: { user: { select: { email: true } }, categories: { select: { id: true, name: true } } } },
         documents: { include: { media: true } },
       },
     });

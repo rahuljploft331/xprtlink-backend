@@ -1,4 +1,3 @@
-import { z } from "zod";
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
@@ -122,86 +121,5 @@ export async function reorder(req, res, next) {
     );
     await logAdminAction(req, "category.reorder", "Category", "batch", { count: items.length });
     return ResponseFormatter.success(res, { message: getMessage("categoryOrderSaved") });
-  } catch (err) { next(err); }
-}
-
-// ─── Expert "my category isn't listed" suggestions ───────────────────────────
-// Suggestions are free text on expert_profiles.other_category. Approving one creates (or reuses) a
-// Category and attaches every expert who typed it; dismissing just clears the text (abuse/typos).
-
-const suggestionActionSchema = z.object({ suggestion: z.string().trim().min(1).max(200) });
-const approveSuggestionSchema = suggestionActionSchema.extend({
-  name: z.string().trim().min(3).max(120).optional(), // final category name; defaults to the suggestion
-});
-
-const slugify = (s) =>
-  s.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 60);
-
-const matching = (text) => ({ otherCategory: { equals: text, mode: "insensitive" } });
-// Only experts whose documents were approved are surfaced/attached; pending ones appear once verified.
-const verifiedMatching = (text) => ({ ...matching(text), verificationStatus: "approved" });
-
-export async function listSuggestions(_req, res, next) {
-  try {
-    const experts = await getDb().expertProfile.findMany({
-      where: { otherCategory: { not: null }, verificationStatus: "approved" },
-      select: { id: true, firstName: true, lastName: true, otherCategory: true, updatedAt: true },
-      orderBy: { updatedAt: "desc" },
-    });
-    const groups = new Map();
-    for (const e of experts) {
-      const key = e.otherCategory.trim().toLowerCase();
-      if (!key) continue;
-      const g = groups.get(key) ?? { suggestion: e.otherCategory.trim(), count: 0, experts: [], lastSuggestedAt: e.updatedAt };
-      g.count += 1;
-      if (g.experts.length < 5) g.experts.push({ id: e.id, name: `${e.firstName} ${e.lastName}` });
-      groups.set(key, g);
-    }
-    const items = [...groups.values()].sort((a, b) => b.count - a.count);
-    return ResponseFormatter.success(res, { data: { items } });
-  } catch (err) { next(err); }
-}
-
-export async function approveSuggestion(req, res, next) {
-  try {
-    const { suggestion, name = suggestion } = approveSuggestionSchema.parse(req.body);
-    const db = getDb();
-    const result = await db.$transaction(async (tx) => {
-      const experts = await tx.expertProfile.findMany({ where: verifiedMatching(suggestion), select: { id: true } });
-      if (experts.length === 0) return null;
-
-      let category = await tx.category.findFirst({ where: { name: { equals: name, mode: "insensitive" } } });
-      const created = !category;
-      if (!category) {
-        const base = slugify(name) || "category";
-        let slug = base;
-        for (let i = 2; await tx.category.findUnique({ where: { slug } }); i += 1) slug = `${base}-${i}`;
-        const { _max } = await tx.category.aggregate({ _max: { sortOrder: true } });
-        category = await tx.category.create({ data: { name, slug, sortOrder: (_max.sortOrder ?? 0) + 1, isActive: true } });
-      }
-      for (const { id } of experts) {
-        await tx.expertProfile.update({
-          where: { id },
-          data: { categories: { connect: { id: category.id } }, otherCategory: null },
-        });
-      }
-      return { category, created, expertCount: experts.length };
-    });
-    if (!result) {
-      return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
-    }
-    await logAdminAction(req, "category.suggestion.approve", "Category", result.category.id, {
-      suggestion, name, created: result.created, expertCount: result.expertCount,
-    });
-    return ResponseFormatter.success(res, { data: result });
-  } catch (err) { next(err); }
-}
-
-export async function dismissSuggestion(req, res, next) {
-  try {
-    const { suggestion } = suggestionActionSchema.parse(req.body);
-    const { count } = await getDb().expertProfile.updateMany({ where: matching(suggestion), data: { otherCategory: null } });
-    await logAdminAction(req, "category.suggestion.dismiss", "Category", "suggestion", { suggestion, expertCount: count });
-    return ResponseFormatter.success(res, { data: { expertCount: count } });
   } catch (err) { next(err); }
 }
