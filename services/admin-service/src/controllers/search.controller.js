@@ -55,7 +55,7 @@ export async function globalSearch(req, res, next) {
           OR: [
             { firstName: { contains: q, ...ci } },
             { lastName: { contains: q, ...ci } },
-            { phone: { contains: q, ...ci } },
+            { user: { phone: { contains: q, ...ci } } },
             { user: { email: { contains: q, ...ci } } },
           ],
         },
