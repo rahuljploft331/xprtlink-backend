@@ -29,11 +29,9 @@ export async function getCmsPage(slug) {
   if (!page) throw notFound("pageNotFound");
   return toCmsPageDto(page);
 }
+// No type defaults to customer so older clients never see expert-only answers.
 export async function getFaqs({ type } = {}) {
-  const where = { isActive: true };
-  if (type) {
-    where.type = { in: [type, "both"] };
-  }
+  const where = { isActive: true, type: { in: [type || "customer", "both"] } };
 
   const rows = await getDb().faq.findMany({
     where,
