@@ -609,7 +609,7 @@ async function decideSuggestion(req, res, next, decide) {
       return res.status(404).json({ success: false, message: getMessage("notFound"), code: "NOT_FOUND" });
     }
     await logAdminAction(req, result.action, "ExpertProfile", req.params.id, {
-      suggestion: result.suggestion, category: result.category.name,
+      suggestion: result.suggestion, category: result.category?.name ?? null,
     });
     return ResponseFormatter.success(res, { data: { category: result.category, created: result.created } });
   } catch (err) { next(err); }
@@ -634,13 +634,11 @@ export function approveCategorySuggestion(req, res, next) {
 /** POST /api/v1/admin/experts/:id/category-suggestion/reject */
 export function rejectCategorySuggestion(req, res, next) {
   return decideSuggestion(req, res, next, async (tx, expert) => {
-    const { category, created } = await findOrCreateCategory(tx, "Others");
+    const needsFallback = expert._count.categories === 0; // only then does "Others" get created/attached
+    const { category = null, created = false } = needsFallback ? await findOrCreateCategory(tx, "Others") : {};
     await tx.expertProfile.update({
       where: { id: expert.id },
-      data: {
-        otherCategory: null,
-        ...(expert._count.categories === 0 ? { categories: { connect: { id: category.id } } } : {}),
-      },
+      data: { otherCategory: null, ...(category ? { categories: { connect: { id: category.id } } } : {}) },
     });
     return { category, created, action: "expert.category_suggestion.reject" };
   });
