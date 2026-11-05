@@ -97,6 +97,19 @@ export async function approve(req, res, next) {
   try {
     const db = getDb();
 
+    // A typed-in category must be approved/rejected first (Verification page), or the expert goes live with none.
+    const pending = await db.expertVerification.findUnique({
+      where: { id: req.params.id },
+      select: { expert: { select: { otherCategory: true } } },
+    });
+    if (pending?.expert?.otherCategory) {
+      return res.status(400).json({
+        success: false,
+        message: getMessage("verificationCategoryPending"),
+        code: "CATEGORY_SUGGESTION_PENDING",
+      });
+    }
+
     const result = await db.$transaction(async (tx) => {
       // 1. Update verification record
       const v = await tx.expertVerification.update({

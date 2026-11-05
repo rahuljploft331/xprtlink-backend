@@ -24,6 +24,7 @@
   "payoutMarkedAsPaid": "Payout marked as paid",
   "verificationNotFound": "Verification not found",
   "verificationApproved": "Verification approved",
+  "verificationCategoryPending": "Approve or reject the expert's custom category before approving verification",
   "verificationRejected": "Verification rejected",
   "verificationRejectedEmailSubject": "Your XprtLink Verification Was Not Approved",
   "verificationRejectedEmailDefaultReason": "Your documents did not meet our verification requirements. Please re-upload clear, valid government-issued ID documents.",
