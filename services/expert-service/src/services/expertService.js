@@ -35,6 +35,15 @@ function activeBoostRank(expert) {
   return VISIBILITY_BOOST_RANK[boost] ?? 0;
 }
 
+// Trims common suffixes so "plumbing" also finds "plumber" (substring match on the stem).
+// shortcut: crude English suffix strip, swap for pg_trgm similarity if misses persist.
+const STEM_SUFFIXES = ["ists", "ist", "ers", "er", "ing", "ions", "ion", "ed", "es", "s"];
+export function stemSearchTerm(term) {
+  const t = term.toLowerCase();
+  const suffix = STEM_SUFFIXES.find((x) => t.endsWith(x) && t.length - x.length >= 4);
+  return suffix ? t.slice(0, -suffix.length) : term;
+}
+
 /**
  * Featured experts (MFS §9.7.3, CUS-HOME-003).
  *
@@ -157,14 +166,14 @@ export async function searchExperts(query, auth) {
     const words = searchTerm.split(/\s+/).filter(Boolean);
     if (words.length <= 1) {
       where.OR = [
-        { firstName: { contains: searchTerm, mode: "insensitive" } },
-        { lastName: { contains: searchTerm, mode: "insensitive" } },
-        { businessName: { contains: searchTerm, mode: "insensitive" } },
-        { headline: { contains: searchTerm, mode: "insensitive" } },
-        { bio: { contains: searchTerm, mode: "insensitive" } },
-        { title: { contains: searchTerm, mode: "insensitive" } },
+        { firstName: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } },
+        { lastName: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } },
+        { businessName: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } },
+        { headline: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } },
+        { bio: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } },
+        { title: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } },
         // Match experts by their linked category/organisation name (e.g. "Legal").
-        { categories: { some: { name: { contains: searchTerm, mode: "insensitive" } } } },
+        { categories: { some: { name: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } } } },
       ];
     } else {
       // Multi-word search (e.g. "Vishal Kumar"): each word must match at least one field
@@ -172,13 +181,13 @@ export async function searchExperts(query, auth) {
         ...(where.AND || []),
         ...words.map((word) => ({
           OR: [
-            { firstName: { contains: word, mode: "insensitive" } },
-            { lastName: { contains: word, mode: "insensitive" } },
-            { businessName: { contains: word, mode: "insensitive" } },
-            { headline: { contains: word, mode: "insensitive" } },
-            { bio: { contains: word, mode: "insensitive" } },
-            { title: { contains: word, mode: "insensitive" } },
-            { categories: { some: { name: { contains: word, mode: "insensitive" } } } },
+            { firstName: { contains: stemSearchTerm(word), mode: "insensitive" } },
+            { lastName: { contains: stemSearchTerm(word), mode: "insensitive" } },
+            { businessName: { contains: stemSearchTerm(word), mode: "insensitive" } },
+            { headline: { contains: stemSearchTerm(word), mode: "insensitive" } },
+            { bio: { contains: stemSearchTerm(word), mode: "insensitive" } },
+            { title: { contains: stemSearchTerm(word), mode: "insensitive" } },
+            { categories: { some: { name: { contains: stemSearchTerm(word), mode: "insensitive" } } } },
           ],
         })),
       ];

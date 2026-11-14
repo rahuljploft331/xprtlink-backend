@@ -2591,7 +2591,7 @@ export async function expireSubscriptions() {
           type: "subscription_expired",
           audience: "expert",
           title: "Subscription Expired",
-          body: "Your expert subscription has expired. Renew now to stay discoverable on XpertLink.",
+          body: "Your expert subscription has expired. Renew now to stay discoverable on XprtLink.",
           data: {},
         });
 
@@ -2608,7 +2608,7 @@ export async function expireSubscriptions() {
           if (u.email) {
             const emailHtml = await renderEmailTemplate({
               title: "Subscription Expired",
-              bodyHtml: "<p>Your expert subscription has expired. Renew now to stay discoverable on XpertLink.</p>",
+              bodyHtml: "<p>Your expert subscription has expired. Renew now to stay discoverable on XprtLink.</p>",
             });
             await sendEmail({ category: "subscription",
               to: u.email,
