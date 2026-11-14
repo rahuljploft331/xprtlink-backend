@@ -130,7 +130,10 @@ export async function getStats(_req, res, next) {
       where: { OR: [{ disputeStatus: "open" }, { needsReview: true }] },
     });
 
+    const pendingBanners = await db.expertBanner.count({ where: { approvalStatus: "pending" } });
+
     const pendingAdminActions =
+      pendingBanners +
       pendingVerifications +
       pendingReviews +
       pendingPaymentsInvestigating +
@@ -220,6 +223,7 @@ export async function getStats(_req, res, next) {
     const pendingActions = [
       { id: "t", label: "Review open support tickets", module: "Support Tickets", count: pendingSupportTickets, href: "/support-tickets?status=open" },
       { id: "pi", label: "Resolve reported platform issues", module: "Platform Issues", count: pendingPlatformIssues, href: "/platform-issues?status=open" },
+      { id: "b", label: "Approve pending expert banners", module: "Banners", count: pendingBanners, href: "/moderation/banners" },
       { id: "v", label: "Review expert ID documents", module: "Verifications", count: pendingVerifications, href: "/verifications?status=pending" },
       { id: "d", label: "Resolve card disputes & payment reviews", module: "Payments", count: paymentsNeedingAttention, href: "/payments" },
       { id: "r", label: "Moderate flagged reviews", module: "Reviews", count: pendingReviews, href: "/reviews?status=flagged" },

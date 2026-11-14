@@ -93,6 +93,27 @@ export async function getById(req, res, next) {
   }
 }
 
+/** DELETE /api/v1/admin/verifications/:id/documents/:docId — remove one bad upload */
+export async function removeDocument(req, res, next) {
+  try {
+    const db = getDb();
+    const doc = await db.expertVerificationDocument.findFirst({
+      where: { id: req.params.docId, verificationId: req.params.id },
+    });
+    if (!doc) {
+      return res.status(404).json({ success: false, message: getMessage("verificationNotFound"), code: "NOT_FOUND" });
+    }
+    await db.$transaction([
+      db.expertVerificationDocument.delete({ where: { id: doc.id } }),
+      db.mediaAsset.update({ where: { id: doc.mediaId }, data: { status: "deleted" } }),
+    ]);
+    await logAdminAction(req, "verification.removeDocument", "ExpertVerification", req.params.id, { docId: doc.id, docType: doc.docType });
+    return ResponseFormatter.success(res, { message: "Document removed", data: { id: doc.id } });
+  } catch (err) {
+    next(err);
+  }
+}
+
 /** PATCH /api/v1/admin/verifications/:id/approve */
 export async function approve(req, res, next) {
   try {

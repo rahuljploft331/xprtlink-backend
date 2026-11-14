@@ -279,6 +279,7 @@
   "transactionProductMismatch": "Transaction product ID does not match the requested plan",
   "planDoesNotSupportBanners": "Your current subscription plan does not support banners.",
   "bannerLimitReached": "You have reached the limit of {maxBanners} banners per month for your plan.",
+  "bannerImageInvalid": "Banner must be an image under 5 MB.",
   "bannerWeeklyLimitReached": "Your plan allows one banner per week. Please try again later.",
   "missingOrInvalidAuthToken": "Missing or invalid authorization token",
   "invalidOrExpiredToken": "Invalid or expired token",

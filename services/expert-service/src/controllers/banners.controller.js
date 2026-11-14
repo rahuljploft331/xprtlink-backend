@@ -6,6 +6,9 @@ import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 import { createBannerSchema } from "@xprtlink/shared/contracts/index.js";
 
+// shortcut: size/type only, no pixel-dimension check (needs an image lib), add when banner dimensions are fixed
+const MAX_BANNER_BYTES = 5 * 1024 * 1024;
+
 export const getMyBanners = async (auth) => {
   const db = getDb();
   const profile = await db.expertProfile.findUnique({
@@ -35,6 +38,9 @@ export const createBanner = async (auth, inputData) => {
     const asset = await db.mediaAsset.findUnique({ where: { id: mediaUrl } });
     if (!asset || asset.ownerUserId !== auth.userId) {
       throw badRequest("mediaNotFound", "BAD_REQUEST", null, { mediaUrl });
+    }
+    if (!asset.mimeType?.startsWith("image/") || asset.sizeBytes > MAX_BANNER_BYTES) {
+      throw badRequest("bannerImageInvalid", "BAD_REQUEST", null, { maxBytes: MAX_BANNER_BYTES });
     }
     mediaUrl = resolveMediaUrl(asset.storageKey);
   }

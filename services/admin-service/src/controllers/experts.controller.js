@@ -155,6 +155,30 @@ export async function getById(req, res, next) {
   }
 }
 
+/** DELETE /api/v1/admin/experts/:id/avatar — remove an inappropriate profile photo */
+export async function removeAvatar(req, res, next) {
+  try {
+    if (!uuidRegex.test(req.params.id)) {
+      return res.status(404).json({ success: false, message: getMessage("expertNotFound"), code: "NOT_FOUND" });
+    }
+    const db = getDb();
+    const expert = await db.expertProfile.findUnique({ where: { id: req.params.id } });
+    if (!expert) {
+      return res.status(404).json({ success: false, message: getMessage("expertNotFound"), code: "NOT_FOUND" });
+    }
+    if (expert.avatarMediaId) {
+      await db.$transaction([
+        db.expertProfile.update({ where: { id: expert.id }, data: { avatarMediaId: null } }),
+        db.mediaAsset.update({ where: { id: expert.avatarMediaId }, data: { status: "deleted" } }),
+      ]);
+    }
+    await logAdminAction(req, "expert.removeAvatar", "ExpertProfile", expert.id, { mediaId: expert.avatarMediaId });
+    return ResponseFormatter.success(res, { message: "Profile photo removed", data: { id: expert.id } });
+  } catch (err) {
+    next(err);
+  }
+}
+
 /** PATCH /api/v1/admin/experts/:id/featured */
 export async function setFeatured(req, res, next) {
   try {
@@ -205,7 +229,7 @@ export async function update(req, res, next) {
     const { 
       email, phone, status, 
       firstName, lastName, headline, bio, title, businessName, 
-      consultationRateCents, currency, experienceYears, searchEligible, serviceAreas
+      consultationRateCents, currency, experienceYears, searchEligible, serviceAreas, foundingMember
     } = req.body;
     
     const userData = {};
@@ -243,6 +267,7 @@ export async function update(req, res, next) {
     }
     if (searchEligible !== undefined) profileData.searchEligible = searchEligible;
     if (serviceAreas !== undefined) profileData.serviceAreas = serviceAreas;
+    if (typeof foundingMember === "boolean") profileData.foundingMember = foundingMember;
 
     const expertProfile = await db.expertProfile.findUnique({ where: { id: req.params.id } });
     if (!expertProfile) {
