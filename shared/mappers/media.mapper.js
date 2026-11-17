@@ -1,3 +1,4 @@
+import { parseWebsitePlansEnabled } from "../lib/websitePlans.js";
 import { generatePresignedDownloadUrl } from "../utils/s3.js";
 import { resolveMediaUrl, toIso } from "./common.js";
 
@@ -25,6 +26,7 @@ export function toAppConfigDto(config, platformSettings = {}) {
     minAppVersion: config?.minAppVersion ?? "1.0.0",
     forceUpdate: config?.forceUpdate ?? false,
     maintenanceMode: platformSettings.maintenanceMode ?? false,
+    websitePlansEnabled: parseWebsitePlansEnabled(platformSettings.websitePlansEnabled),
     maintenanceMessage: config?.maintenanceMessage ?? null,
     ios: toPlatformGate(config, "ios"),
     android: toPlatformGate(config, "android"),

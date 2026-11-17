@@ -22,6 +22,7 @@ import {
   consultationHoldMinimumCents,
 } from "@xprtlink/shared/lib/consultationBilling.js";
 import { sendEmail, renderEmailTemplate, escapeHtml } from "@xprtlink/shared/lib/email.js";
+import { isWebsitePlansEnabled } from "@xprtlink/shared/lib/websitePlans.js";
 import { getSupportEmail, supportLinkHtml } from "@xprtlink/shared/lib/supportEmail.js";
 import { buildConsultationInvoiceEmail } from "@xprtlink/shared/lib/consultationInvoice.js";
 import { PAYOUT_SCHEDULE_DEFAULT_DAYS } from "@xprtlink/shared/contracts/settings.schema.js";
@@ -3405,6 +3406,45 @@ function parseCheckoutReturnUrl(raw) {
  * The session URL is returned to the client for redirect.  Subscription
  * activation happens in handleStripeWebhook on checkout.session.completed.
  */
+const WEBSITE_INTEREST_CATEGORY = "website_plans_interest";
+
+/**
+ * Plans hidden on the website: tell the expert we'll be in touch. Sent at most
+ * once per address — a sent/dev-skipped log row counts, a failed one is retried.
+ * The recipient always comes from the account, never the request.
+ */
+export async function sendWebsitePlansInterestEmail(auth) {
+  if (await isWebsitePlansEnabled()) return { sent: false, reason: "plans_enabled" };
+  const db = getDb();
+  const user = await db.user.findUnique({
+    where: { id: auth.userId },
+    select: { email: true, expertProfile: { select: { firstName: true } } },
+  });
+  if (!user?.email) return { sent: false, reason: "no_email" };
+  const already = await db.emailLog.count({
+    where: { toEmail: user.email, category: WEBSITE_INTEREST_CATEGORY, status: { in: ["sent", "skipped"] } },
+  });
+  if (already > 0) return { sent: false, reason: "already_sent" };
+
+  const firstName = user.expertProfile?.firstName || "there";
+  const supportEmail = await getSupportEmail();
+  const html = await renderEmailTemplate({
+    title: "Thanks for your interest in XprtLink",
+    bodyHtml: `<p>Hi ${escapeHtml(firstName)},</p>`
+      + "<p>Thank you for your interest in joining XprtLink as an expert. Your profile is approved, and our team will get back to you shortly with the next steps for activating your membership.</p>"
+      + `<p>Questions in the meantime? Reach us at <a href="mailto:${escapeHtml(supportEmail)}">${escapeHtml(supportEmail)}</a>.</p>`,
+    badgeText: "We'll be in touch",
+  });
+  await sendEmail({
+    category: WEBSITE_INTEREST_CATEGORY,
+    to: user.email,
+    subject: "Thanks for your interest in XprtLink",
+    text: `Hi ${firstName},\n\nThank you for your interest in joining XprtLink as an expert. Your profile is approved, and our team will get back to you shortly with the next steps for activating your membership.\n\nQuestions? ${supportEmail}`,
+    html,
+  });
+  return { sent: true };
+}
+
 export async function createStripeCheckoutSession(auth, { planCode, successUrl, cancelUrl }) {
   const db = getDb();
 

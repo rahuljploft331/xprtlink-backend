@@ -18,7 +18,8 @@ import * as googleIapController from "../controllers/googleIapController.js";
 import * as appleWebhookController from "../controllers/appleWebhookController.js";
 import * as googlePlayWebhookController from "../controllers/googlePlayWebhookController.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
-import { badRequest } from "@xprtlink/shared/utils/errors.js";
+import { badRequest, forbidden } from "@xprtlink/shared/utils/errors.js";
+import { isWebsitePlansEnabled } from "@xprtlink/shared/lib/websitePlans.js";
 
 const router = Router();
 
@@ -473,6 +474,17 @@ router.get(
   })
 );
 
+// Website plan step while plans are hidden (Settings): emails the signed-in
+// expert once that the team will contact them. No-op when plans are visible.
+router.post(
+  "/subscriptions/website-interest",
+  requireRole("expert"),
+  asyncHandler(async (req, res) => {
+    const data = await svc.sendWebsitePlansInterestEmail(req.auth);
+    return ResponseFormatter.success(res, { message: getMessage("websitePlansInterestRecorded"), data });
+  })
+);
+
 // Web checkout: creates a Stripe Checkout Session and returns the redirect URL.
 // The subscription is activated by the checkout.session.completed webhook, never
 // by the success_url return. successUrl / cancelUrl come from the request body
@@ -485,6 +497,8 @@ router.post(
     const { planCode, successUrl, cancelUrl } = req.body;
     if (!planCode) throw badRequest("planCodeRequired", "MISSING_PLAN_CODE");
     if (!successUrl || !cancelUrl) throw badRequest("checkoutUrlsRequired", "MISSING_URLS");
+    // Admin can hide website plans; a stale/restored tab must not still reach Stripe.
+    if (!(await isWebsitePlansEnabled())) throw forbidden("websitePlansDisabled", "WEBSITE_PLANS_DISABLED");
     const data = await svc.createStripeCheckoutSession(req.auth, { planCode, successUrl, cancelUrl });
     return ResponseFormatter.success(res, { message: getMessage("checkoutSessionCreated"), data });
   })

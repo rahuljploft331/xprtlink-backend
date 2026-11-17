@@ -28,6 +28,8 @@ export const PLATFORM_SETTING_DEFAULTS = {
     tierWeight: 100,
     ratingWeight: 10,
   },
+  // Off = the website hides plan selection and shows a "we'll be in touch" screen.
+  websitePlansEnabled: true,
 };
 
 /**
@@ -62,6 +64,7 @@ export const updatePlatformSettingsSchema = z.object({
     tierWeight: z.number().min(0),
     ratingWeight: z.number().min(0),
   }).optional(),
+  websitePlansEnabled: z.boolean().optional(),
 });
 
 /**

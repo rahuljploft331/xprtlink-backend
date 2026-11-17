@@ -1,3 +1,4 @@
+import { parseWebsitePlansEnabled } from "@xprtlink/shared/lib/websitePlans.js";
 import { getDb } from "@xprtlink/shared/db/getClient.js";
 import { platformSettings, appConfig } from "@xprtlink/shared/db/repositories/catalog/index.js";
 import { toAppConfigDto } from "@xprtlink/shared/mappers/media.mapper.js";
@@ -49,6 +50,7 @@ function normalize(key, value) {
     if (typeof value === "boolean") return value;
     return value === "true" || value === 1;
   }
+  if (key === "websitePlansEnabled") return parseWebsitePlansEnabled(value);
   if (key === "featuredExpertWeights") {
     return typeof value === "object" ? value : PLATFORM_SETTING_DEFAULTS[key];
   }
