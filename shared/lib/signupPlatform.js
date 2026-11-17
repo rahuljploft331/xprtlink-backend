@@ -11,6 +11,16 @@ export function platformFromUserAgent(userAgent) {
   return /Mozilla\//.test(ua) && !/Dart\//.test(ua) ? "web" : null;
 }
 
+/**
+ * The app may send `X-Client-Platform: ios|android`; only those two are trusted
+ * from the header (web is always detected from the browser user agent).
+ */
+export function platformFromRequest(headers = {}) {
+  const declared = String(headers["x-client-platform"] || "").trim().toLowerCase();
+  if (declared === "ios" || declared === "android") return declared;
+  return platformFromUserAgent(headers["user-agent"]);
+}
+
 /** First write wins: never overwrites a known platform. Best-effort, never throws. */
 export async function tagExpertSignupPlatform(userId, platform, now = new Date()) {
   if (!userId || !["ios", "android", "web"].includes(platform)) return;

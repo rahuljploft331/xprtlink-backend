@@ -17,12 +17,11 @@ import {
   forgotPasswordRequestSchema,
 } from "@xprtlink/shared/contracts";
 import * as svc from "../services/userService.js";
-import { platformFromUserAgent, tagExpertSignupPlatform } from "@xprtlink/shared/lib/signupPlatform.js";
+import { platformFromRequest, tagExpertSignupPlatform } from "@xprtlink/shared/lib/signupPlatform.js";
 
-// Website signups create the expert profile on these routes; the app is tagged later from its push token.
-const tagWebSignup = (req, data) => {
-  if (platformFromUserAgent(req.get("user-agent")) === "web") return tagExpertSignupPlatform(data?.session?.userId, "web");
-};
+// Signups create the expert profile on these routes: website from the browser user agent,
+// app from its X-Client-Platform header (older app builds are tagged later from their push token).
+const tagSignupPlatform = (req, data) => tagExpertSignupPlatform(data?.session?.userId, platformFromRequest(req.headers));
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 // Rate limiting is handled by api-gateway. Service-level limiters were creating a global bucket.
 
@@ -115,7 +114,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = otpVerifyRequestSchema.parse(req.body);
     const data = await svc.verifyOtp(body);
-    await tagWebSignup(req, data);
+    await tagSignupPlatform(req, data);
     return ResponseFormatter.success(res, { message: getMessage("otpVerified"), data });
   })
 );
@@ -180,7 +179,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = socialLoginRequestSchema.parse(req.body);
     const data = await svc.socialLogin(body);
-    await tagWebSignup(req, data);
+    await tagSignupPlatform(req, data);
     const message = data.needsProfileCompletion
       ? "Profile completion required"
       : "Social login successful";
@@ -193,7 +192,7 @@ router.post(
   asyncHandler(async (req, res) => {
     const body = socialCompleteRequestSchema.parse(req.body);
     const data = await svc.socialComplete(body);
-    await tagWebSignup(req, data);
+    await tagSignupPlatform(req, data);
     return ResponseFormatter.success(res, { message: getMessage("verificationCodeSent"), data });
   })
 );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { platformFromUserAgent } from "./signupPlatform.js";
+import { platformFromRequest, platformFromUserAgent } from "./signupPlatform.js";
 
 describe("platformFromUserAgent", () => {
   it("tags browsers as web", () => {
@@ -11,5 +11,18 @@ describe("platformFromUserAgent", () => {
     expect(platformFromUserAgent("")).toBe(null);
     expect(platformFromUserAgent(undefined)).toBe(null);
     expect(platformFromUserAgent("PostmanRuntime/7.39")).toBe(null);
+  });
+});
+
+describe("platformFromRequest", () => {
+  it("trusts the app header for ios/android only", () => {
+    expect(platformFromRequest({ "x-client-platform": "iOS", "user-agent": "Dart/3.5 (dart:io)" })).toBe("ios");
+    expect(platformFromRequest({ "x-client-platform": "android" })).toBe("android");
+    expect(platformFromRequest({ "x-client-platform": "web", "user-agent": "Dart/3.5 (dart:io)" })).toBe(null);
+    expect(platformFromRequest({ "x-client-platform": "hacker" })).toBe(null);
+  });
+  it("falls back to the browser user agent", () => {
+    expect(platformFromRequest({ "user-agent": "Mozilla/5.0 Chrome/130" })).toBe("web");
+    expect(platformFromRequest({})).toBe(null);
   });
 });
