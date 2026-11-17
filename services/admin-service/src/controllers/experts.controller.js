@@ -150,9 +150,6 @@ export async function getById(req, res, next) {
         }));
       }
     }
-    if (typeof foundingMember === "boolean" && foundingMember !== expertProfile.foundingMember) {
-      await logAdminAction(req, "expert.setFoundingMember", "ExpertProfile", expertProfile.id, { foundingMember });
-    }
 
     return ResponseFormatter.success(res, { data: expert });
   } catch (err) {
@@ -293,6 +290,10 @@ export async function update(req, res, next) {
         expertProfile: true
       }
     });
+
+    if (typeof foundingMember === "boolean" && foundingMember !== expertProfile.foundingMember) {
+      await logAdminAction(req, "expert.setFoundingMember", "ExpertProfile", expertProfile.id, { foundingMember });
+    }
 
     return ResponseFormatter.success(res, { data: expert });
   } catch (err) {
