@@ -85,6 +85,7 @@ export async function list(req, res, next) {
       activeSubscription: e.subscriptions[0] ?? null,
       isFeatured: e.isFeatured,
       foundingMember: e.foundingMember,
+      signupPlatform: e.signupPlatform,
       featuredRank: e.featuredRank,
       featuredUntil: e.featuredUntil,
       createdAt: e.createdAt,

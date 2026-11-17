@@ -230,6 +230,15 @@ enum NotificationAudience {
   @@map("notification_audience")
 }
 
+/// Where an expert signed up (admin Experts list). Null = not known (pre-tracking or no signal).
+enum SignupPlatform {
+  ios
+  android
+  web
+
+  @@map("signup_platform")
+}
+
 enum DevicePlatform {
   ios
   android
@@ -617,6 +626,7 @@ model ExpertProfile {
   onboardingStep        Int                @default(0) @map("onboarding_step")
   onboardingCompletedAt DateTime?          @map("onboarding_completed_at") @db.Timestamptz(6)
   foundingMember        Boolean            @default(false) @map("founding_member")
+  signupPlatform        SignupPlatform?    @map("signup_platform")
   ratingAvg             Decimal            @default(0) @map("rating_avg") @db.Decimal(3, 2)
   ratingCount           Int                @default(0) @map("rating_count")
   searchEligible        Boolean            @default(false) @map("search_eligible")

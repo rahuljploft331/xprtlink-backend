@@ -15,6 +15,7 @@ import {
   audienceFilterForRole,
   isAudience,
 } from "@xprtlink/shared/utils/notificationAudience.js";
+import { tagExpertSignupPlatform } from "@xprtlink/shared/lib/signupPlatform.js";
 import { sendPushToUsers, resetBadgeForUser, syncBadgeForUser } from "./fcmSender.js";
 
 export async function registerDeviceToken(auth, body) {
@@ -55,6 +56,8 @@ export async function registerDeviceToken(auth, body) {
       lastSeenAt: new Date(),
     },
   });
+  // An expert's first app push token right after signup tells us iOS vs Android.
+  if (auth.role === "expert") await tagExpertSignupPlatform(auth.userId, body.platform);
   return { registered: true };
 }
 
