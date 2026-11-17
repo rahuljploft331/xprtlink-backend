@@ -1,3 +1,4 @@
+import { liveBannerWhere } from "@xprtlink/shared/lib/bannerVisibility.js";
 import { getDb } from "@xprtlink/shared/db";
 import { ResponseFormatter } from "@xprtlink/shared/utils/responseFormatter.js";
 import { notFound, badRequest } from "@xprtlink/shared/utils/errors.js";
@@ -125,15 +126,7 @@ export const getBannerAnalytics = async (req, res) => {
   const dayWhere = { day: { gte: from, lte: to } };
 
   // Same eligibility as the public banner feed, so "live" means actually being served.
-  const liveWhere = {
-    isActive: true,
-    approvalStatus: "approved",
-    expert: {
-      verificationStatus: "approved",
-      user: { status: "active" },
-      subscriptions: { some: { status: "active" } },
-    },
-  };
+  const liveWhere = liveBannerWhere();
 
   const [liveBanners, pendingBanners, byBanner, byDay] = await Promise.all([
     db.expertBanner.count({ where: liveWhere }),

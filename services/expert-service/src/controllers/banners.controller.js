@@ -5,6 +5,7 @@ import { resolveMediaUrl } from "@xprtlink/shared/mappers/common.js";
 import { parsePagination } from "@xprtlink/shared/utils/pagination.js";
 import { sendEmail, renderEmailTemplate } from "@xprtlink/shared/lib/email.js";
 import { createBannerSchema } from "@xprtlink/shared/contracts/index.js";
+import { liveBannerWhere } from "@xprtlink/shared/lib/bannerVisibility.js";
 
 // shortcut: size/type only, no pixel-dimension check (needs an image lib), add when banner dimensions are fixed
 const MAX_BANNER_BYTES = 5 * 1024 * 1024;
@@ -182,16 +183,8 @@ export const getPublicBanners = async (categoryId, query = {}) => {
   
   const banners = await db.expertBanner.findMany({
     where: {
-      isActive: true,
-      approvalStatus: "approved",
+      ...liveBannerWhere(),
       ...(categoryId ? { targetCategoryId: categoryId } : {}),
-      expert: {
-        verificationStatus: "approved",
-        user: { status: "active" },
-        subscriptions: {
-          some: { status: "active" }
-        }
-      }
     },
     include: {
       expert: {

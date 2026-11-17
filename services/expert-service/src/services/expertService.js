@@ -12,6 +12,7 @@ import {
 import { amountToCents } from "@xprtlink/shared/mappers/common.js";
 import { badRequest, notFound, unauthorized } from "@xprtlink/shared/utils/errors.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
+import { liveBannerWhere } from "@xprtlink/shared/lib/bannerVisibility.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 
 const PUBLIC_WHERE = { searchEligible: true, verificationStatus: "approved", user: { status: "active" } };
@@ -326,7 +327,13 @@ export async function getExpertById(id, auth) {
       log.error({ err: err.message }, `[getExpertById] Failed to record recently viewed for expert ${id}:`);
     });
   }
-  return toExpertPublicDto(expert, { categories: expert.categories, isSaved });
+  // Only banners a customer may see anywhere (approved, on, entitled + unexpired plan).
+  const banners = await getDb().expertBanner.findMany({
+    where: { ...liveBannerWhere(), expertProfileId: id },
+    select: { id: true, mediaUrl: true, linkUrl: true, text: true },
+    orderBy: { createdAt: "desc" },
+  });
+  return { ...toExpertPublicDto(expert, { categories: expert.categories, isSaved }), banners };
 }
 
 export async function getExpertReviews(id, query) {
