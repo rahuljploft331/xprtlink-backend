@@ -84,6 +84,7 @@ export async function list(req, res, next) {
       poorReviewsAlert: e.poorReviewsAlert,
       activeSubscription: e.subscriptions[0] ?? null,
       isFeatured: e.isFeatured,
+      foundingMember: e.foundingMember,
       featuredRank: e.featuredRank,
       featuredUntil: e.featuredUntil,
       createdAt: e.createdAt,
