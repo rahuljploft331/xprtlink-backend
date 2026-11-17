@@ -51,6 +51,11 @@ function cleanSession(sessionToken) {
   return sessionToken;
 }
 
+// U.S.-first product: rank U.S. places first (bias, not a restriction — other countries still match).
+const US_PREFERENCE = {
+  locationBias: { rectangle: { low: { latitude: 24.4, longitude: -125.0 }, high: { latitude: 49.5, longitude: -66.9 } } },
+};
+
 /** Up to 5 suggestions for a free-text query (cities, regions and businesses). */
 export async function autocompletePlaces({ q, sessionToken } = {}) {
   const input = typeof q === "string" ? q.trim() : "";
@@ -61,7 +66,7 @@ export async function autocompletePlaces({ q, sessionToken } = {}) {
   const json = await googleFetch(AUTOCOMPLETE_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json", "X-Goog-Api-Key": key },
-    body: JSON.stringify({ input, ...(session ? { sessionToken: session } : {}) }),
+    body: JSON.stringify({ input, ...US_PREFERENCE, ...(session ? { sessionToken: session } : {}) }),
   });
 
   const seen = new Set();

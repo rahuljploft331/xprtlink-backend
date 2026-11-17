@@ -27,7 +27,11 @@ describe("autocompletePlaces", () => {
     expect(url).toBe("https://places.googleapis.com/v1/places:autocomplete");
     expect(url).not.toContain("test-key");
     expect(init.headers["X-Goog-Api-Key"]).toBe("test-key");
-    expect(JSON.parse(init.body)).toEqual({ input: "Pune", sessionToken: "abcd1234-ef" });
+    expect(JSON.parse(init.body)).toEqual({
+      input: "Pune",
+      sessionToken: "abcd1234-ef",
+      locationBias: { rectangle: { low: { latitude: 24.4, longitude: -125.0 }, high: { latitude: 49.5, longitude: -66.9 } } },
+    });
   });
 
   it.each([undefined, "", "ab", "x".repeat(201)])("rejects a bad query (%j) without calling Google", async (q) => {
