@@ -198,7 +198,6 @@ export async function seedPlatformEssentials(payload) {
     commissionPercent: pc.commissionPercent,
     maintenanceMode: pc.maintenanceMode,
     supportEmail: pc.supportEmail,
-    foundingMemberBadgeEnabled: pc.foundingMemberBadgeEnabled,
     currency: pc.currency,
     payoutSchedule: pc.payoutSchedule,
     featuredExpertWeights: pc.featuredExpertWeights,

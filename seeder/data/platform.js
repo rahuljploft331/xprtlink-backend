@@ -6,7 +6,6 @@ export const platformConfig = {
   commissionPercent: 15,
   maintenanceMode: false,
   supportEmail: "support@xpertlink.com",
-  foundingMemberBadgeEnabled: true,
   currency: "USD",
   // Keys below mirror PLATFORM_SETTING_DEFAULTS in shared/contracts/settings.schema.js
   payoutSchedule: 7,

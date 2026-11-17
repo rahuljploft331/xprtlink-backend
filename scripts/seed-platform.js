@@ -165,7 +165,6 @@ async function main() {
     commissionPercent: platformConfig.commissionPercent,
     maintenanceMode: platformConfig.maintenanceMode,
     supportEmail: platformConfig.supportEmail,
-    foundingMemberBadgeEnabled: platformConfig.foundingMemberBadgeEnabled,
     currency: platformConfig.currency,
     payoutSchedule: platformConfig.payoutSchedule,
     featuredExpertWeights: platformConfig.featuredExpertWeights,
