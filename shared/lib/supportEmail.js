@@ -1,6 +1,6 @@
 import { getDb } from "../db/getClient.js";
 
-export const DEFAULT_SUPPORT_EMAIL = "support@xpertlink.com";
+export const DEFAULT_SUPPORT_EMAIL = "support@xprtlink.com";
 
 /** Support address from Settings → Support email; falls back to the default. Never throws. */
 export async function getSupportEmail() {

@@ -38,7 +38,7 @@ pnpm init:flows --flow F    # Consultation Lifecycle (12 steps)
 
 ## Running in Postman
 
-These flow collections also exist in the **Xpertlink Team Workspace** on Postman cloud:
+These flow collections also exist in the **XprtLink Team Workspace** on Postman cloud:
 - Flow B: Expert Onboarding (Email OTP)
 - Flow C: Customer Onboarding & Quote
 - Flow D: Expert Subscription Lifecycle

@@ -1,5 +1,5 @@
 #!/bin/bash
-# XpertLink Expert Subscription Flow - End-to-End Test Script
+# XprtLink Expert Subscription Flow - End-to-End Test Script
 # Run: bash test-subscription-flow.sh
 
 BASE_URL="http://localhost:4000"
@@ -7,7 +7,7 @@ PASS=true
 
 echo ""
 echo "========================================"
-echo " XpertLink Expert Subscription Flow Test"
+echo " XprtLink Expert Subscription Flow Test"
 echo "========================================"
 
 # ── STEP 1: Login ────────────────────────────────────────────────

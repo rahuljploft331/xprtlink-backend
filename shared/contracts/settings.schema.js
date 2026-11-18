@@ -22,7 +22,7 @@ export const PAYOUT_SCHEDULE_DEFAULT_DAYS = 7;
 export const PLATFORM_SETTING_DEFAULTS = {
   commissionPercent: 15,
   maintenanceMode: false,
-  supportEmail: "support@xpertlink.com",
+  supportEmail: "support@xprtlink.com",
   payoutSchedule: PAYOUT_SCHEDULE_DEFAULT_DAYS,
   featuredExpertWeights: {
     tierWeight: 100,

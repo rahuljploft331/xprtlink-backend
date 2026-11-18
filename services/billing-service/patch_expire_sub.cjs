@@ -7,14 +7,14 @@ content = content.replace(
           userIds,
           type: "subscription_expired",
           title: "Subscription Expired",
-          body: "Your expert subscription has expired. Renew now to stay discoverable on XpertLink.",
+          body: "Your expert subscription has expired. Renew now to stay discoverable on XprtLink.",
           data: {},
         });`,
   `        await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
           userIds,
           type: "subscription_expired",
           title: "Subscription Expired",
-          body: "Your expert subscription has expired. Renew now to stay discoverable on XpertLink.",
+          body: "Your expert subscription has expired. Renew now to stay discoverable on XprtLink.",
           data: {},
         });
 
@@ -23,7 +23,7 @@ content = content.replace(
           if (u.email) {
             const emailHtml = await renderEmailTemplate({
               title: "Subscription Expired",
-              bodyHtml: "<p>Your expert subscription has expired. Renew now to stay discoverable on XpertLink.</p>",
+              bodyHtml: "<p>Your expert subscription has expired. Renew now to stay discoverable on XprtLink.</p>",
               ctaText: "Renew Subscription",
               ctaUrl: process.env.APP_DEEP_LINK_URL ?? "https://expert.xprtlink.com",
             });

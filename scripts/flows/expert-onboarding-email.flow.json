@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "6108bb81-6edc-4081-bac3-4a775bb0b110",
-    "name": "XpertLink Automated Email Expert Onboarding Flow  (Verified)",
-    "description": "Official Automated User & Expert Email Onboarding Chained Flow Collection for XpertLink. Automatically generates fresh unique emails and uses OTP channel 'email'.",
+    "name": "XprtLink Automated Email Expert Onboarding Flow  (Verified)",
+    "description": "Official Automated User & Expert Email Onboarding Chained Flow Collection for XprtLink. Automatically generates fresh unique emails and uses OTP channel 'email'.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -413,7 +413,7 @@
               "  pm.test('bio persisted', function () { pm.expect(me.bio).to.eql('Seasoned professional with extensive industry experience. Email-onboarded init flow account.'); });",
               "  pm.test('headline persisted', function () { pm.expect(me.headline).to.eql('Industry Expert'); });",
               "  pm.test('title persisted', function () { pm.expect(me.title).to.eql('Senior Consultant'); });",
-              "  pm.test('businessName persisted', function () { pm.expect(me.businessName).to.eql('XpertLink Consulting LLC'); });",
+              "  pm.test('businessName persisted', function () { pm.expect(me.businessName).to.eql('XprtLink Consulting LLC'); });",
               "  pm.test('consultationRate persisted', function () { pm.expect(me.consultationRate).to.eql(150); });",
               "  pm.test('experienceYears persisted', function () { pm.expect(me.experienceYears).to.eql(10); });",
               "  pm.test('languages persisted', function () { pm.expect(me.languages).to.include('English'); });",
@@ -439,7 +439,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\"categoryIds\":[\"{{category_id}}\"],\"bio\":\"Seasoned professional with extensive industry experience. Email-onboarded init flow account.\",\"headline\":\"Industry Expert\",\"title\":\"Senior Consultant\",\"businessName\":\"XpertLink Consulting LLC\",\"consultationRate\":150,\"experienceYears\":10,\"languages\":[\"English\",\"Spanish\"],\"serviceAreas\":[{\"name\":\"San Francisco, CA\",\"lat\":37.7749,\"lng\":-122.4194}],\"avatarMediaId\":\"{{avatar_media_id}}\"}"
+          "raw": "{\"categoryIds\":[\"{{category_id}}\"],\"bio\":\"Seasoned professional with extensive industry experience. Email-onboarded init flow account.\",\"headline\":\"Industry Expert\",\"title\":\"Senior Consultant\",\"businessName\":\"XprtLink Consulting LLC\",\"consultationRate\":150,\"experienceYears\":10,\"languages\":[\"English\",\"Spanish\"],\"serviceAreas\":[{\"name\":\"San Francisco, CA\",\"lat\":37.7749,\"lng\":-122.4194}],\"avatarMediaId\":\"{{avatar_media_id}}\"}"
         },
         "url": {
           "raw": "{{base_url}}/api/v1/experts/me/onboarding/submit",

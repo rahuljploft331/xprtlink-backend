@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "f4a2c8d1-9e3b-4a7f-b612-expert-verify-e",
-    "name": "XpertLink Expert Verification Approval Flow (Verified)",
+    "name": "XprtLink Expert Verification Approval Flow (Verified)",
     "description": "Flow E: Authenticates as admin, lists all pending expert verifications, approves each, and verifies resulting expert profile state (verificationStatus + searchEligible).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },

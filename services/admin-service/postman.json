@@ -2108,7 +2108,7 @@
                 "settings"
               ]
             },
-            "description": "Current platform settings as a flat object.\n\n**Auth**: `requireAdmin` + `requirePermission(\"settings\", \"view\")` — an admin without at least `view` on the `settings` module gets 403.\n\nA key that has never been written falls back to its default (15 / false / support@xpertlink.com / weekly), so a freshly migrated database still returns all four.\n\n**Response**\n```json\n{\n  \"success\": true,\n  \"message\": \"Platform settings loaded\",\n  \"data\": {\n    \"commissionPercent\": 15,\n    \"maintenanceMode\": false,\n    \"supportEmail\": \"support@xpertlink.com\",\n    \"payoutSchedule\": \"weekly\"\n  }\n}\n```"
+            "description": "Current platform settings as a flat object.\n\n**Auth**: `requireAdmin` + `requirePermission(\"settings\", \"view\")` — an admin without at least `view` on the `settings` module gets 403.\n\nA key that has never been written falls back to its default (15 / false / support@xprtlink.com / weekly), so a freshly migrated database still returns all four.\n\n**Response**\n```json\n{\n  \"success\": true,\n  \"message\": \"Platform settings loaded\",\n  \"data\": {\n    \"commissionPercent\": 15,\n    \"maintenanceMode\": false,\n    \"supportEmail\": \"support@xprtlink.com\",\n    \"payoutSchedule\": \"weekly\"\n  }\n}\n```"
           }
         },
         {
@@ -2127,7 +2127,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"commissionPercent\": 15,\n  \"maintenanceMode\": false,\n  \"supportEmail\": \"support@xpertlink.com\",\n  \"payoutSchedule\": \"weekly\"\n}"
+              "raw": "{\n  \"commissionPercent\": 15,\n  \"maintenanceMode\": false,\n  \"supportEmail\": \"support@xprtlink.com\",\n  \"payoutSchedule\": \"weekly\"\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/admin/settings",
@@ -2141,7 +2141,7 @@
                 "settings"
               ]
             },
-            "description": "Partial update — every field is optional and only the keys present in the body are written, so untouched settings keep their existing rows. At least one key is required (an empty body returns 400).\n\n**Auth**: `requireAdmin` + `requirePermission(\"settings\", \"edit\")` — a sub-admin with only `view` gets 403.\n\n**Validation** (`shared/contracts/settings.schema.js`, all failures are 400 `VALIDATION_ERROR`)\n| Field | Rule |\n| --- | --- |\n| `commissionPercent` | number, 0–100 |\n| `maintenanceMode` | boolean |\n| `supportEmail` | valid email |\n| `payoutSchedule` | `daily` \\| `weekly` \\| `monthly` |\n\nWrites an audit entry `settings.update` on `PlatformSetting` carrying only the changed keys.\n\n**Response** — the full settings object after the write:\n```json\n{\n  \"success\": true,\n  \"message\": \"Platform settings updated\",\n  \"data\": {\n    \"commissionPercent\": 15,\n    \"maintenanceMode\": false,\n    \"supportEmail\": \"support@xpertlink.com\",\n    \"payoutSchedule\": \"weekly\"\n  }\n}\n```"
+            "description": "Partial update — every field is optional and only the keys present in the body are written, so untouched settings keep their existing rows. At least one key is required (an empty body returns 400).\n\n**Auth**: `requireAdmin` + `requirePermission(\"settings\", \"edit\")` — a sub-admin with only `view` gets 403.\n\n**Validation** (`shared/contracts/settings.schema.js`, all failures are 400 `VALIDATION_ERROR`)\n| Field | Rule |\n| --- | --- |\n| `commissionPercent` | number, 0–100 |\n| `maintenanceMode` | boolean |\n| `supportEmail` | valid email |\n| `payoutSchedule` | `daily` \\| `weekly` \\| `monthly` |\n\nWrites an audit entry `settings.update` on `PlatformSetting` carrying only the changed keys.\n\n**Response** — the full settings object after the write:\n```json\n{\n  \"success\": true,\n  \"message\": \"Platform settings updated\",\n  \"data\": {\n    \"commissionPercent\": 15,\n    \"maintenanceMode\": false,\n    \"supportEmail\": \"support@xprtlink.com\",\n    \"payoutSchedule\": \"weekly\"\n  }\n}\n```"
           }
         },
         {

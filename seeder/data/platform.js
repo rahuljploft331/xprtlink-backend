@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 export const platformConfig = {
   commissionPercent: 15,
   maintenanceMode: false,
-  supportEmail: "support@xpertlink.com",
+  supportEmail: "support@xprtlink.com",
   currency: "USD",
   // Keys below mirror PLATFORM_SETTING_DEFAULTS in shared/contracts/settings.schema.js
   payoutSchedule: 7,

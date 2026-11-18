@@ -23,7 +23,7 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 async function runAllFlows() {
   const db = getDb();
   console.log("=================================================================");
-  console.log("      XPERTLINK END-TO-END DOMAIN LIFECYCLE FLOW TESTING         ");
+  console.log("      XPRTLINK END-TO-END DOMAIN LIFECYCLE FLOW TESTING         ");
   console.log("=================================================================\n");
 
   // 0. Ensure Prerequisites (Categories & Subscription Plans)

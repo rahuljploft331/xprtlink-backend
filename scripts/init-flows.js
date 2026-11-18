@@ -49,31 +49,31 @@ const FLOWS = [
     id: "B",
     label: "Email Expert Onboarding",
     file: path.join(FLOWS_DIR, "expert-onboarding-email.flow.json"),
-    collection: "XpertLink Automated Email Expert Onboarding Flow (Verified)",
+    collection: "XprtLink Automated Email Expert Onboarding Flow (Verified)",
   },
   {
     id: "D",
     label: "Expert Subscription Lifecycle (13 steps)",
     file: path.join(FLOWS_DIR, "expert-subscription-lifecycle.flow.json"),
-    collection: "XpertLink Expert Subscription Flow (Verified)",
+    collection: "XprtLink Expert Subscription Flow (Verified)",
   },
   {
     id: "E",
     label: "Expert Verification Approval",
     file: path.join(FLOWS_DIR, "expert-verification-approval.flow.json"),
-    collection: "XpertLink Expert Verification Approval Flow (Verified)",
+    collection: "XprtLink Expert Verification Approval Flow (Verified)",
   },
   {
     id: "C",
     label: "Customer Onboarding & Quote Flow",
     file: path.join(FLOWS_DIR, "customer-onboarding.flow.json"),
-    collection: "XpertLink Automated Customer Onboarding & Flow (Verified)",
+    collection: "XprtLink Automated Customer Onboarding & Flow (Verified)",
   },
   {
     id: "F",
     label: "Consultation Lifecycle (12 steps)",
     file: path.join(FLOWS_DIR, "consultation-lifecycle.flow.json"),
-    collection: "XpertLink Consultation Lifecycle Flow (Verified)",
+    collection: "XprtLink Consultation Lifecycle Flow (Verified)",
   },
   // Flow G (Messaging Chat) is intentionally excluded:
   // All chat is handled over WebSocket (Socket.IO). REST endpoints for
@@ -231,7 +231,7 @@ function runNewman(flow) {
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
-  logSection("XpertLink API-Driven Init Script  (pnpm init:flows)");
+  logSection("XprtLink API-Driven Init Script  (pnpm init:flows)");
 
   log(`  Mode  : ${isFresh ? "FRESH (wipe + seed + flows)" : "INCREMENTAL (seed prereqs + flows)"}`);
   log(`  Flows : ${selectedFlows.map((f) => `${f.id}. ${f.label}`).join(", ")}`);

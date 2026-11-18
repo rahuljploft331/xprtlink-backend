@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "4b7415df-350a-4e25-a59a-c6ff9db01772",
-    "name": "XpertLink Expert Subscription Flow (Verified)",
+    "name": "XprtLink Expert Subscription Flow (Verified)",
     "description": "Real-world expert subscription lifecycle flow: registers a fresh expert, verifies OTP, completes onboarding, subscribes for the first time, tests re-subscribe guard (409), upgrades plan, cancels subscription (cancel-at-period-end), and verifies access is preserved until period end.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },

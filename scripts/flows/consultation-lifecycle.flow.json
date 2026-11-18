@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "a1c9e7f2-5d4b-4e8a-9f61-consultation-lc-f",
-    "name": "XpertLink Consultation Lifecycle Flow (Verified)",
+    "name": "XprtLink Consultation Lifecycle Flow (Verified)",
     "description": "Flow F: Full consultation lifecycle \u2014 registers fresh customer & expert, onboards expert with profile+subscription, creates consultation, expert accepts, ends call, customer pays and submits review, verifies final state.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },

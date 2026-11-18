@@ -1,7 +1,7 @@
 {
   "info": {
     "_postman_id": "4b7415df-350a-4e25-a59a-c6ff9db01772",
-    "name": "XpertLink Expert Subscription Flow (Final Verified)",
+    "name": "XprtLink Expert Subscription Flow (Final Verified)",
     "description": "Complete automated Postman flow for an expert subscribing to a subscription plan (login -> list plans -> subscribe -> verify active subscription state).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },

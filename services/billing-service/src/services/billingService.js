@@ -1262,7 +1262,7 @@ const usd = (cents) => `$${((cents ?? 0) / 100).toFixed(2)}`;
 function alertAdmins(subject, lines) {
   (async () => {
     const row = await getDb().platformSetting.findUnique({ where: { key: "supportEmail" } });
-    const to = typeof row?.value === "string" && row.value.includes("@") ? row.value : "support@xpertlink.com";
+    const to = typeof row?.value === "string" && row.value.includes("@") ? row.value : "support@xprtlink.com";
     const html = await renderEmailTemplate({
       title: subject,
       bodyHtml: lines.map((l) => `<p>${escapeHtml(l)}</p>`).join(""),

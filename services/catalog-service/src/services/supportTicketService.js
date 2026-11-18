@@ -44,7 +44,7 @@ export async function createTicket(auth, { subject, body, category, referenceId,
   const lastName = profile.lastName || '';
 
   // Get the support email from platform settings
-  let supportEmail = "support@xpertlink.com";
+  let supportEmail = "support@xprtlink.com";
   const setting = await db.platformSetting.findUnique({
     where: { key: "supportEmail" }
   });

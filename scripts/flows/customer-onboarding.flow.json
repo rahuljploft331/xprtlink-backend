@@ -1,8 +1,8 @@
 {
   "info": {
     "_postman_id": "88b2b6e3-7688-41e6-b73e-383aa911443c",
-    "name": "XpertLink Automated Customer Onboarding & Flow  (Verified)",
-    "description": "Official Automated Customer Onboarding, Profile Setup, Payment Method & Quote Request Chained Flow Collection for XpertLink.",
+    "name": "XprtLink Automated Customer Onboarding & Flow  (Verified)",
+    "description": "Official Automated Customer Onboarding, Profile Setup, Payment Method & Quote Request Chained Flow Collection for XprtLink.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
