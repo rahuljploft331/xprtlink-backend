@@ -37,6 +37,18 @@ async function platformRevenueCents(db, createdAt) {
   return (commission._sum.commissionCents || 0) + (subscriptions._sum.amountCents || 0);
 }
 
+/** Admin pending-action queues: model, filter, and the timestamp that marks when an item arrived. */
+const PENDING_QUEUES = {
+  t: { model: "supportTicket", where: { status: { in: ["open", "in_progress"] } } },
+  pi: { model: "platformIssue", where: { status: { in: ["open", "in_progress"] } } },
+  b: { model: "expertBanner", where: { approvalStatus: "pending" } },
+  v: { model: "expertVerification", where: { status: { in: ["pending", "in_progress"] } }, at: "submittedAt" },
+  d: { model: "consultationCharge", where: { OR: [{ disputeStatus: "open" }, { needsReview: true }] } },
+  r: { model: "review", where: { status: "flagged" }, at: "updatedAt" },
+  p: { model: "transaction", where: { status: "pending" } },
+  po: { model: "expertPayout", where: { status: "pending" } },
+};
+
 /** 30 UTC calendar day window: today UTC + past 29 days (30 days total). */
 function getThirtyDayRange(now = new Date()) {
   const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -78,7 +90,7 @@ export async function getStats(_req, res, next) {
       db.expertProfile.count(),
       db.consultation.count(),
       db.quoteRequest.count(),
-      db.expertVerification.count({ where: { status: { in: ["pending", "in_progress"] } } }),
+      db.expertVerification.count({ where: PENDING_QUEUES.v.where }),
       db.expertSubscription.count({ where: { status: "active" } }),
       db.consultation.count({
         where: { createdAt: { gte: thirtyDaysAgo } },
@@ -104,13 +116,13 @@ export async function getStats(_req, res, next) {
       db.expertProfile.count({
         where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } },
       }),
-      db.expertPayout.count({ where: { status: "pending" } }),
-      db.review.count({ where: { status: "flagged" } }),
-      db.transaction.count({ where: { status: "pending" } }),
+      db.expertPayout.count({ where: PENDING_QUEUES.po.where }),
+      db.review.count({ where: PENDING_QUEUES.r.where }),
+      db.transaction.count({ where: PENDING_QUEUES.p.where }),
       db.expertSubscription.count({ where: { createdAt: { gte: thirtyDaysAgo } } }),
       db.expertSubscription.count({ where: { createdAt: { gte: sixtyDaysAgo, lt: thirtyDaysAgo } } }),
-      db.supportTicket.count({ where: { status: { in: ["open", "in_progress"] } } }),
-      db.platformIssue.count({ where: { status: { in: ["open", "in_progress"] } } }),
+      db.supportTicket.count({ where: PENDING_QUEUES.t.where }),
+      db.platformIssue.count({ where: PENDING_QUEUES.pi.where }),
     ]);
 
     // Platform Revenue = what the platform keeps: consultation commission (on
@@ -126,11 +138,9 @@ export async function getStats(_req, res, next) {
     })}`;
 
     // Card disputes to answer + money events flagged by billing webhooks.
-    const paymentsNeedingAttention = await db.consultationCharge.count({
-      where: { OR: [{ disputeStatus: "open" }, { needsReview: true }] },
-    });
+    const paymentsNeedingAttention = await db.consultationCharge.count({ where: PENDING_QUEUES.d.where });
 
-    const pendingBanners = await db.expertBanner.count({ where: { approvalStatus: "pending" } });
+    const pendingBanners = await db.expertBanner.count({ where: PENDING_QUEUES.b.where });
 
     const pendingAdminActions =
       pendingBanners +
@@ -230,6 +240,16 @@ export async function getStats(_req, res, next) {
       { id: "p", label: "Investigate refund requests", module: "Payments", count: pendingPaymentsInvestigating, href: "/payments?status=pending" },
       { id: "po", label: "Process pending payouts", module: "Payouts", count: pendingPayouts, href: "/payouts?status=pending" },
     ].filter((a) => a.count > 0);
+
+    // Newest pending item first, so a long-open queue doesn't stay pinned on top.
+    const latest = await Promise.all(
+      pendingActions.map(({ id }) => {
+        const { model, where, at = "createdAt" } = PENDING_QUEUES[id];
+        return db[model].aggregate({ where, _max: { [at]: true } }).then((r) => r._max[at]);
+      }),
+    );
+    pendingActions.forEach((a, i) => { a.latestAt = latest[i]; });
+    pendingActions.sort((a, b) => (b.latestAt ?? 0) - (a.latestAt ?? 0));
 
     return ResponseFormatter.success(res, {
       data: { stats, recentActivity, pendingActions },
