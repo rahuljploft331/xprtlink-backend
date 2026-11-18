@@ -121,6 +121,27 @@ export async function getById(req, res, next) {
   }
 }
 
+/** DELETE /api/v1/admin/customers/:id/avatar — remove an inappropriate profile photo */
+export async function removeAvatar(req, res, next) {
+  try {
+    const db = getDb();
+    const profile = await db.customerProfile.findUnique({ where: { userId: req.params.id } });
+    if (!profile) {
+      return res.status(404).json({ success: false, message: getMessage("customerNotFound"), code: "NOT_FOUND" });
+    }
+    if (profile.avatarMediaId) {
+      await db.$transaction([
+        db.customerProfile.update({ where: { id: profile.id }, data: { avatarMediaId: null } }),
+        db.mediaAsset.update({ where: { id: profile.avatarMediaId }, data: { status: "deleted" } }),
+      ]);
+    }
+    await logAdminAction(req, "customer.removeAvatar", "CustomerProfile", profile.id, { mediaId: profile.avatarMediaId });
+    return ResponseFormatter.success(res, { message: "Profile photo removed", data: { id: req.params.id } });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function update(req, res, next) {
   try {
     const db = getDb();
