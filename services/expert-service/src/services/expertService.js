@@ -13,7 +13,7 @@ import { amountToCents } from "@xprtlink/shared/mappers/common.js";
 import { badRequest, notFound, unauthorized } from "@xprtlink/shared/utils/errors.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { liveBannerWhere } from "@xprtlink/shared/lib/bannerVisibility.js";
-import { anyWordWhere, buildVocabulary, closestWord, expandWord, matchedWordCount, tokenize } from "./searchText.js";
+import { anyWordWhere, buildVocabulary, closestWord, expandWord, matchScore, tokenize } from "./searchText.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 
 const PUBLIC_WHERE = { searchEligible: true, verificationStatus: "approved", user: { status: "active" } };
@@ -237,10 +237,10 @@ async function searchExpertsOnce(query, auth) {
   let experts;
   let total;
   if (wordTerms.length > 1) {
-    // Multi-word text: experts matching more of the words come first (stable over the normal sort).
+    // Multi-word text: direct word matches beat synonym-only matches (stable over the normal sort).
     // shortcut: ranks in memory over all matches; fine for hundreds of experts, use DB full-text search beyond that.
     const all = await db.expertProfile.findMany({ where, orderBy, include: { categories: true, avatarMedia: true } });
-    all.sort((x, y) => matchedWordCount(y, wordTerms) - matchedWordCount(x, wordTerms));
+    all.sort((x, y) => matchScore(y, wordTerms) - matchScore(x, wordTerms));
     total = all.length;
     experts = all.slice(skip, skip + limit);
   } else {

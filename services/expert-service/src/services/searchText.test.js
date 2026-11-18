@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { anyWordWhere, buildVocabulary, closestWord, editDistance, expandWord, matchedWordCount, stemSearchTerm, tokenize } from "./searchText.js";
+import { anyWordWhere, buildVocabulary, closestWord, editDistance, expandWord, matchScore, stemSearchTerm, tokenize } from "./searchText.js";
 
 describe("stemSearchTerm", () => {
   it("maps word forms to one stem", () => {
@@ -27,12 +27,14 @@ describe("tokenize / expandWord", () => {
   });
 });
 
-describe("matchedWordCount", () => {
-  const kim = { firstName: "Kim", lastName: "John", title: "Plumber", categories: [{ name: "Home Services" }] };
-  it("counts how many typed words an expert matches", () => {
-    expect(matchedWordCount(kim, [expandWord("plumbing"), expandWord("repair")])).toBe(2);
-    expect(matchedWordCount(kim, [expandWord("plumbing"), expandWord("tax")])).toBe(1);
-    expect(matchedWordCount(kim, [expandWord("lawyer")])).toBe(0);
+describe("matchScore", () => {
+  const plumber = { firstName: "Kim", lastName: "John", categories: [{ name: "Needs as plumber" }] };
+  const handyman = { firstName: "Robert", lastName: "Sam", categories: [{ name: "Home Services" }] };
+  it("ranks a direct word match above a synonym-only match", () => {
+    const q = [expandWord("plumbing"), expandWord("repair")];
+    expect(matchScore(plumber, q)).toBe(2);
+    expect(matchScore(handyman, q)).toBe(1);
+    expect(matchScore(plumber, [expandWord("lawyer")])).toBe(0);
   });
 });
 

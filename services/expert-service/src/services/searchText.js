@@ -58,10 +58,16 @@ function expertText(e) {
     .toLowerCase();
 }
 
-/** How many of the typed words this expert matches — used to rank "plumbing repair" style searches. */
-export function matchedWordCount(expert, wordTerms) {
+/**
+ * Rank score for "plumbing repair" style searches: per typed word, 2 if the word itself
+ * (its stem, the first term) matches, 1 if only a synonym does.
+ */
+export function matchScore(expert, wordTerms) {
   const text = expertText(expert);
-  return wordTerms.filter((terms) => terms.some((t) => text.includes(t))).length;
+  return wordTerms.reduce((score, [stem, ...synonyms]) => {
+    if (text.includes(stem)) return score + 2;
+    return synonyms.some((t) => text.includes(t)) ? score + 1 : score;
+  }, 0);
 }
 
 /** Words a typo can be corrected to: names/titles/categories of listed experts plus known search words. */
