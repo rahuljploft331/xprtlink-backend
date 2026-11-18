@@ -74,6 +74,7 @@ export async function list(req, res, next) {
       lastName: u.customerProfile?.lastName ?? "",
       avatarUrl: resolveMediaUrl(u.customerProfile?.avatarMedia?.storageKey),
       consultationCount: countMap[u.customerProfile?.id] ?? 0,
+      signupPlatform: u.customerProfile?.signupPlatform ?? null,
       createdAt: u.createdAt,
       lastActiveAt: u.customerProfile?.updatedAt ?? u.createdAt,
     }));

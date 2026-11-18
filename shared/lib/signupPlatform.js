@@ -21,14 +21,19 @@ export function platformFromRequest(headers = {}) {
   return platformFromUserAgent(headers["user-agent"]);
 }
 
-/** First write wins: never overwrites a known platform. Best-effort, never throws. */
-export async function tagExpertSignupPlatform(userId, platform, now = new Date()) {
+/**
+ * First write wins: never overwrites a known platform. Tags the just-created expert and/or
+ * customer profile of this user (`roles` limits which). Best-effort, never throws.
+ */
+export async function tagSignupPlatform(userId, platform, { roles = ["expert", "customer"], now = new Date() } = {}) {
   if (!userId || !["ios", "android", "web"].includes(platform)) return;
+  const where = { userId, signupPlatform: null, createdAt: { gte: new Date(now.getTime() - JUST_CREATED_MS) } };
+  const db = getDb();
   try {
-    await getDb().expertProfile.updateMany({
-      where: { userId, signupPlatform: null, createdAt: { gte: new Date(now.getTime() - JUST_CREATED_MS) } },
-      data: { signupPlatform: platform },
-    });
+    await Promise.all([
+      roles.includes("expert") && db.expertProfile.updateMany({ where, data: { signupPlatform: platform } }),
+      roles.includes("customer") && db.customerProfile.updateMany({ where, data: { signupPlatform: platform } }),
+    ]);
   } catch {
     // Tagging must never break login/signup or device registration.
   }
