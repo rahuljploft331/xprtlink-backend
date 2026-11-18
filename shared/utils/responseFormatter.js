@@ -18,6 +18,7 @@ export const ResponseFormatter = {
       stats,
       code,
       meta,
+      didYouMean,
       status = 200,
     } = {}
   ) {
@@ -27,6 +28,7 @@ export const ResponseFormatter = {
 
     const data = { items, page: pPage, limit: pLimit, total: pTotal };
     if (stats !== undefined) data.stats = stats;
+    if (didYouMean) data.didYouMean = didYouMean;
     const body = {
       success: true,
       message,

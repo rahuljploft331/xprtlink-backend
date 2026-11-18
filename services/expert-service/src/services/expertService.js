@@ -13,6 +13,7 @@ import { amountToCents } from "@xprtlink/shared/mappers/common.js";
 import { badRequest, notFound, unauthorized } from "@xprtlink/shared/utils/errors.js";
 import { getMessage } from "@xprtlink/shared/utils/messages.js";
 import { liveBannerWhere } from "@xprtlink/shared/lib/bannerVisibility.js";
+import { anyWordWhere, buildVocabulary, closestWord, expandWord, matchedWordCount, tokenize } from "./searchText.js";
 import { parsePagination, paginatedResult } from "@xprtlink/shared/utils/pagination.js";
 
 const PUBLIC_WHERE = { searchEligible: true, verificationStatus: "approved", user: { status: "active" } };
@@ -34,15 +35,6 @@ const VISIBILITY_BOOST_RANK = { top_5: 3, top_25: 2, listing: 1 };
 function activeBoostRank(expert) {
   const boost = expert.subscriptions?.[0]?.plan?.visibilityBoost;
   return VISIBILITY_BOOST_RANK[boost] ?? 0;
-}
-
-// Trims common suffixes so "plumbing" also finds "plumber" (substring match on the stem).
-// shortcut: crude English suffix strip, swap for pg_trgm similarity if misses persist.
-const STEM_SUFFIXES = ["ists", "ist", "ers", "er", "ing", "ions", "ion", "ed", "es", "s"];
-export function stemSearchTerm(term) {
-  const t = term.toLowerCase();
-  const suffix = STEM_SUFFIXES.find((x) => t.endsWith(x) && t.length - x.length >= 4);
-  return suffix ? t.slice(0, -suffix.length) : term;
 }
 
 /**
@@ -135,7 +127,31 @@ export async function getTrending(limit = 10, categoryId = null) {
 }
 
 
+/**
+ * Expert search. If the text finds nothing, retry once with typos corrected against
+ * words our experts actually use and return that as `didYouMean`.
+ */
 export async function searchExperts(query, auth) {
+  const result = await searchExpertsOnce(query, auth);
+  const words = tokenize(query.q);
+  if (result.pagination.total > 0 || words.length === 0) return result;
+
+  // shortcut: vocabulary built from all listed experts per miss; fine at hundreds of experts,
+  // move to a cached word list or pg_trgm once the marketplace is large.
+  const db = getDb();
+  const [experts, categories] = await Promise.all([
+    db.expertProfile.findMany({ where: PUBLIC_WHERE, select: { firstName: true, lastName: true, businessName: true, headline: true, title: true } }),
+    db.category.findMany({ where: { isActive: true }, select: { name: true } }),
+  ]);
+  const vocab = buildVocabulary(experts, categories.map((c) => c.name));
+  const corrected = words.map((w) => closestWord(w, vocab) || w);
+  if (corrected.join(" ") === words.join(" ")) return result;
+
+  const retry = await searchExpertsOnce({ ...query, q: corrected.join(" ") }, auth);
+  return retry.pagination.total > 0 ? { ...retry, didYouMean: corrected.join(" ") } : result;
+}
+
+async function searchExpertsOnce(query, auth) {
   const { page, limit, skip } = parsePagination(query);
   const where = { ...PUBLIC_WHERE };
 
@@ -162,38 +178,9 @@ export async function searchExperts(query, auth) {
   }
   if (query.verified === "true") where.verificationStatus = "approved";
 
-  const searchTerm = (query.q || "").trim();
-  if (searchTerm) {
-    const words = searchTerm.split(/\s+/).filter(Boolean);
-    if (words.length <= 1) {
-      where.OR = [
-        { firstName: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } },
-        { lastName: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } },
-        { businessName: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } },
-        { headline: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } },
-        { bio: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } },
-        { title: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } },
-        // Match experts by their linked category/organisation name (e.g. "Legal").
-        { categories: { some: { name: { contains: stemSearchTerm(searchTerm), mode: "insensitive" } } } },
-      ];
-    } else {
-      // Multi-word search (e.g. "Vishal Kumar"): each word must match at least one field
-      where.AND = [
-        ...(where.AND || []),
-        ...words.map((word) => ({
-          OR: [
-            { firstName: { contains: stemSearchTerm(word), mode: "insensitive" } },
-            { lastName: { contains: stemSearchTerm(word), mode: "insensitive" } },
-            { businessName: { contains: stemSearchTerm(word), mode: "insensitive" } },
-            { headline: { contains: stemSearchTerm(word), mode: "insensitive" } },
-            { bio: { contains: stemSearchTerm(word), mode: "insensitive" } },
-            { title: { contains: stemSearchTerm(word), mode: "insensitive" } },
-            { categories: { some: { name: { contains: stemSearchTerm(word), mode: "insensitive" } } } },
-          ],
-        })),
-      ];
-    }
-  }
+  // Any typed word may match (ranked by how many match below); each word also matches its stem and synonyms.
+  const wordTerms = tokenize(query.q).map(expandWord);
+  if (wordTerms.length > 0) where.OR = anyWordWhere(wordTerms);
 
   // Location filter: lat, lng, radius (km) — uses Haversine post-filter on serviceAreas Json
   const hasLocationFilter = query.lat && query.lng;
@@ -247,11 +234,22 @@ export async function searchExperts(query, auth) {
     return paginatedResult(items, { page, limit, total });
   }
 
-  // Standard non-geo search with DB-level pagination
-  const [experts, total] = await Promise.all([
-    db.expertProfile.findMany({ where, skip, take: limit, orderBy, include: { categories: true, avatarMedia: true } }),
-    db.expertProfile.count({ where }),
-  ]);
+  let experts;
+  let total;
+  if (wordTerms.length > 1) {
+    // Multi-word text: experts matching more of the words come first (stable over the normal sort).
+    // shortcut: ranks in memory over all matches; fine for hundreds of experts, use DB full-text search beyond that.
+    const all = await db.expertProfile.findMany({ where, orderBy, include: { categories: true, avatarMedia: true } });
+    all.sort((x, y) => matchedWordCount(y, wordTerms) - matchedWordCount(x, wordTerms));
+    total = all.length;
+    experts = all.slice(skip, skip + limit);
+  } else {
+    // Standard non-geo search with DB-level pagination
+    [experts, total] = await Promise.all([
+      db.expertProfile.findMany({ where, skip, take: limit, orderBy, include: { categories: true, avatarMedia: true } }),
+      db.expertProfile.count({ where }),
+    ]);
+  }
 
   let savedIds = new Set();
   if (auth?.customerProfileId) {
