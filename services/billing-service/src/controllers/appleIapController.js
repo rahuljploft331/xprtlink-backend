@@ -135,8 +135,8 @@ export const verifyPurchase = async (req, res, next) => {
 
     logSubscriptionEvent("SUBSCRIBED", { store: "apple", plan: subscription.plan?.code, expertProfileId: req.auth.expertProfileId, note: "Purchase verified and activated" });
 
-    // Notify expert
-    try {
+    // Notify expert — only on a real activation, not a re-verify of an already-live purchase.
+    if (subscription.newlyActivated) try {
       const notifUrl = process.env.NOTIFICATION_SERVICE_URL ?? "http://localhost:4007";
       await internalPost(notifUrl, "/api/v1/notifications/dispatch", {
         userIds: [req.auth.userId],

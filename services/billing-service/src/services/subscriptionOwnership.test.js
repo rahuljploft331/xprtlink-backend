@@ -175,6 +175,19 @@ describe("activateStoreSubscription — ownership", () => {
     expect(db.expertSubscription.rows[0].status).toBe("active");
   });
 
+  it("only the first of many concurrent verifies of one new purchase is newly activated", async () => {
+    const results = await Promise.all(Array.from({ length: 5 }, () => claim("A", "elite", "tok-burst")));
+    expect(results.filter((s) => s.newlyActivated)).toHaveLength(1);
+    expect(db.expertSubscription.rows).toHaveLength(1);
+  });
+
+  it("re-verifying an already-active purchase is not newly activated; a lapsed one is", async () => {
+    reload(ownedByA());
+    expect((await claim("A", "professional", "tok")).newlyActivated).toBe(false);
+    reload([row({ plan: "professional", expertProfileId: "A", externalSubscriptionId: "tok", currentPeriodEnd: past })]);
+    expect((await claim("A", "professional", "tok")).newlyActivated).toBe(true);
+  });
+
   it("once the previous owner's subscription has expired, another account may claim it", async () => {
     reload([row({ id: "a1", plan: "professional", expertProfileId: "A", externalSubscriptionId: "tok", currentPeriodEnd: past })]);
     const s = await claim("B", "professional", "tok");

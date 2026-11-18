@@ -175,7 +175,17 @@ export async function activateStoreSubscription(db, p) {
       data: { status: "canceled", canceledAt: now, cancelAtPeriodEnd: false },
     });
 
-    // 4. Idempotent on (store, externalSubscriptionId): restore/renewal never duplicates
+    // 4. Idempotent on (store, externalSubscriptionId): restore/renewal never duplicates.
+    // The app can re-verify the same purchase many times at once (StoreKit replays), so only
+    // a purchase that wasn't already live on this plan for this account counts as newly activated.
+    const prior = await tx.expertSubscription.findFirst({ where: { store, externalSubscriptionId } });
+    const newlyActivated = !(
+      prior &&
+      prior.status === "active" &&
+      prior.expertProfileId === expertProfileId &&
+      prior.planId === plan.id &&
+      new Date(prior.currentPeriodEnd) > now
+    );
     const subscription = await tx.expertSubscription.upsert({
       where: { store_externalSubscriptionId: { store, externalSubscriptionId } },
       update: {
@@ -204,6 +214,6 @@ export async function activateStoreSubscription(db, p) {
       data: { searchEligible: true, availabilityStatus: "online" },
     });
 
-    return Object.assign(subscription, { upgradedFrom });
+    return Object.assign(subscription, { upgradedFrom, newlyActivated });
   }, { timeout: 30_000, maxWait: 10_000 });
 }
